@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "react-jsx",
+    "incremental": true,
+    "paths": {
+      "@latch/contracts": ["packages/contracts/src/index.ts"],
+      "@latch/policy": ["packages/policy/src/index.ts"],
+      "@latch/dal": ["packages/dal/src/index.ts"],
+      "@latch/audit": ["packages/audit/src/index.ts"],
+      "@latch/approval": ["packages/approval/src/index.ts"],
+      "@latch/react": ["packages/react/src/index.ts"],
+      "@latch/codegen": ["packages/codegen/src/index.ts"]
+    }
+  }
+}

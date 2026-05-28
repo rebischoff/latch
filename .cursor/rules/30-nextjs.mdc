@@ -1,0 +1,31 @@
+---
+description: Next.js 16 conventions and traps
+globs: apps/web/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# Next.js usage
+
+## This is NOT the Next.js you know
+
+This project uses **Next.js 16 + React 19** (App Router). APIs, conventions, and file structure may differ from your training data. **Read `node_modules/next/dist/docs/`** for the relevant guide before writing or refactoring routing/server-action/RSC code. Heed deprecation notices.
+
+## API surface choice
+
+This project uses a deliberate **hybrid**:
+
+- **Route handlers** (`route.ts`) for anything that may ever be called externally (lists, detail reads, exports, bulk ops). Built via `createSurfaceRouteHandlers(surfaceDef)` from `@latch/dal`.
+- **Server Actions** for internal RSC form mutations. Built via `createSurfaceActions(surfaceDef)`. **Do not** use Server Actions for endpoints that need to be openable to non-React clients.
+
+See [`docs/planning/architecture/api-style.md`](../../docs/planning/architecture/api-style.md).
+
+## Manifest delivery
+
+- Resolve the manifest in a Server Component (layout/page) and pass it via props to a `CapabilitiesProvider`. Avoid client-side `fetch` for the manifest unless RSC is impractical.
+- Never trust a manifest received from the client on a write — re-resolve server-side.
+
+## Don't
+
+- Don't import `db` or anything from `@latch/dal` into a Client Component (`"use client"`).
+- Don't put business logic in route handlers — they are thin shells around DAL calls.
+- Don't add libraries (tRPC, GraphQL, React Query) without a docs update — they are explicitly out of v1 scope.

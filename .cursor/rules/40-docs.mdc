@@ -1,0 +1,39 @@
+---
+description: Documentation style for docs/
+globs: docs/**/*.md,STATUS.md,README.md
+alwaysApply: false
+---
+
+# Doc style
+
+## When updating a planning doc
+
+- Prefer **updating existing docs** over creating new ones. The index in [`docs/README.md`](../../docs/README.md) is curated.
+- When locking a choice, add a dated **Decision** block at the top of the affected section:
+
+  ```markdown
+  ### Decision: <topic> (YYYY-MM-DD)
+
+  **Choice:** <one line>
+
+  **Rationale:** <one paragraph>
+  ```
+
+- Mark tentative ideas with **TBD** or **Proposal** in headings.
+- When a question is resolved, move it from [`open-questions.md`](../../docs/planning/open-questions.md) ? architecture doc, and add the row to the "Resolved" table in `open-questions.md`.
+
+## STATUS.md
+
+- Keep it **short** (under ~150 lines).
+- "Right now — do this next" should always have exactly one immediate step, with a clear deliverable.
+- When that step completes, update the file immediately (same PR/commit).
+
+## Linking
+
+- Use relative links between docs (`./foo.md`, `../bar.md`).
+- Cross-reference rather than duplicate. Each fact should have one canonical location.
+
+## Tables vs prose
+
+- Use tables when comparing options or listing fields/columns/options.
+- Use prose for rationale and trade-off discussion.

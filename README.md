@@ -1,36 +1,82 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Latch
 
-## Getting Started
+> 👉 **Start here:** [`STATUS.md`](./STATUS.md) — current focus, next step, blockers.
 
-First, run the development server:
+A library set for building **business data apps** on **Next.js + PostgreSQL** with **field-level access control** and **frontend/backend permission sync**. The platform packages are vertical-agnostic; the first pilot is a small **service-trades CRM** sample app.
+
+## What it offers
+
+| Concern | What the platform does |
+|---|---|
+| **Authorization** | Server-resolved manifest of Surface + Field permissions per principal |
+| **Data access** | A DAL kernel that narrows queries/writes to the manifest — no raw DB from handlers |
+| **Frontend sync** | UI gates and Field controls render from the same manifest the server enforces |
+| **Validation** | Generated Zod schemas, narrowed per user, strict on writes |
+| **Audit** | Append-only log per mutation, with retention defaults |
+| **Approval** | Pending-change workflow with audit linkage (all-or-nothing in v1) |
+| **Bulk ops** | Per-row permission evaluation, partial-success reporting |
+
+## Status
+
+**Phase 0 — Scaffold & planning.** Architecture is largely decided; code is a Next.js scaffold + planning docs. See [`STATUS.md`](./STATUS.md) for the immediate next step.
+
+## Stack (current scaffold)
+
+| Layer | Choice |
+|---|---|
+| App / API | Next.js 16 (App Router), TypeScript |
+| Hosting | Vercel (preview / prod) |
+| Database | PostgreSQL 16 — Neon (preview/prod) · Docker Compose (local) |
+| ORM | Drizzle (planned) |
+| Styling | Tailwind CSS |
+| Layout | **Monorepo** — `apps/web` + `packages/*` |
+
+## Quick start
 
 ```bash
+npm install
+docker compose up -d
+cp .env.example .env.local
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3001](http://localhost:3001). Health: `/api/health`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+> Latch uses port **3001** by default so it can run alongside other local Next.js apps on 3000.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Repository layout
 
-## Learn More
+```
+./
+├── STATUS.md             # ← read first
+├── docs/                 # Planning, glossary, discovery, roadmap
+├── .cursor/rules/        # AI agent guidance
+├── apps/
+│   └── web/              # Next.js + sample app (trades-CRM)
+├── packages/
+│   ├── contracts/        # Manifest schema, Field IDs, base Zod
+│   ├── policy/           # PolicyService (server)
+│   ├── dal/              # DAL kernel (server)
+│   ├── audit/            # Audit + retention (server)
+│   ├── approval/         # Pending changes (server)
+│   ├── react/            # CapabilitiesProvider, <Can>, <FieldControl>
+│   └── codegen/          # YAML → TS CLI
+├── docker-compose.yml    # Local Postgres
+└── .env.example
+```
 
-To learn more about Next.js, take a look at the following resources:
+See [`docs/planning/architecture/packages.md`](./docs/planning/architecture/packages.md).
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Documentation index
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+The full index lives in [`docs/README.md`](./docs/README.md). High-traffic entries:
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- [`STATUS.md`](./STATUS.md) — what's next
+- [`docs/planning/scope.md`](./docs/planning/scope.md) — v1 in / out
+- [`docs/planning/vision.md`](./docs/planning/vision.md) — why this exists
+- [`docs/planning/use-cases.md`](./docs/planning/use-cases.md) — pilot scenarios
+- [`docs/planning/architecture/overview.md`](./docs/planning/architecture/overview.md)
+- [`docs/planning/architecture/packages.md`](./docs/planning/architecture/packages.md)
+- [`docs/planning/architecture/api-style.md`](./docs/planning/architecture/api-style.md)
+- [`docs/planning/threat-model.md`](./docs/planning/threat-model.md)
+- [`docs/roadmap.md`](./docs/roadmap.md)

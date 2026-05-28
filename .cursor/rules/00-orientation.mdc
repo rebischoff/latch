@@ -1,0 +1,24 @@
+---
+description: How to orient yourself in this repo (read this first)
+alwaysApply: true
+---
+
+# Orientation
+
+This repo is a **data-governance platform** for Next.js + Postgres business apps. It is in **Phase 0** — planning + scaffold. Most artifacts are docs, not code.
+
+## Always read first
+
+1. [`STATUS.md`](../../STATUS.md) — the "quarterback" file. Current focus, immediate next step, blockers. **Update it when steps complete.**
+2. [`docs/planning/scope.md`](../../docs/planning/scope.md) — what is in v1 and what is explicitly out. Refuse work that's out of scope unless the user explicitly overrides.
+3. [`docs/planning/architecture/packages.md`](../../docs/planning/architecture/packages.md) — monorepo layout and import boundaries.
+
+## Working principles
+
+- **Docs-first.** Update the relevant doc *before* writing code that contradicts it. Add a dated **Decision** block (e.g. `### Decision: <topic> (YYYY-MM-DD)`) when locking a choice.
+- **Don't ship features that aren't in v1 scope.** Suggest, don't build. If the user asks for something out of scope, confirm before proceeding.
+- **Product name is Latch** (`@latch/*`, `latch_*` schema prefix) — see [`docs/planning/naming.md`](../../docs/planning/naming.md).
+
+## When the user asks "what's next?"
+
+Read `STATUS.md` and answer from its "Right now — do this next" section. Do not improvise.

@@ -1,0 +1,39 @@
+---
+description: Naming conventions and project identifiers
+alwaysApply: true
+---
+
+# Naming
+
+## Project name
+
+- **Product name:** **Latch**
+- **Package scope:** `@latch/*` (e.g. `@latch/dal`, `@latch/react`)
+- **DB schema / table prefix:** `latch_*` (e.g. `latch_audit`)
+- **Env prefix:** `LATCH_*` when needed
+
+See [`docs/planning/naming.md`](../../docs/planning/naming.md). Former codename **Modula** is retired.
+
+## Domain terms (locked)
+
+| Term | Use | Don't say |
+|---|---|---|
+| **Surface** | A screen-shaped policy boundary (form/list) that spans tables | "Module" (deprecated) |
+| **Field** | Logical permission unit, maps to 1+ columns | "Column" (raw DB term) |
+| **Company** | Organizational customer with its own DB | "Tenant" (we don't do shared-schema) |
+| **Manifest** | Server-resolved permission map for a scope | "Permissions object" (vague) |
+| **PermissionContext** | Request-scoped: principal + manifest + active Surface | "Auth context" |
+| **DAL** | Sole application path to business data | "Repository" / "ORM layer" |
+
+## Code identifiers
+
+| Kind | Convention | Example |
+|---|---|---|
+| Surface id | `snake_case` | `job_detail`, `customer_list` |
+| Field id | `snake_case` | `financial_terms`, `salary_band` |
+| Action | lowercase verb | `read`, `write`, `approve`, `delete`, `restore`, `hard_delete` |
+| Role id | `snake_case` | `platform_admin`, `field_tech` |
+| Generated file | `*.generated.ts` under `generated/` | `job.schema.generated.ts` |
+| Metadata file | `<surface>.surface.yaml`, `<surface>.policies.yaml` | `job.surface.yaml` |
+
+> Old metadata files may still say `*.module.yaml` until the metadata renaming pass completes.

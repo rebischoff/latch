@@ -1,0 +1,65 @@
+---
+description: Architectural invariants that must never be violated
+alwaysApply: true
+---
+
+# Invariants
+
+These are load-bearing. Code that breaks them is a bug, regardless of how convenient it looks.
+
+## 1. Manifest is the only source of truth for permissions
+
+`PolicyService.resolve(principal, scope) ? manifest` runs on the **server only**.
+
+- The DAL **must** receive a `PermissionContext` (principal + manifest + active Surface). No DAL method runs without one.
+- Zod schemas used for parsing **must** be narrowed from the same manifest (`readableSchema` / `writableSchema`).
+- The UI **must** render from the manifest. The UI is never a security boundary.
+
+## 2. No raw DB access from route handlers / server actions / components
+
+All business reads and writes go through the **DAL**. Route handlers and Server Actions orchestrate; they do not query.
+
+```ts
+// ? BAD
+const rows = await db.select().from(jobs).where(eq(jobs.id, id));
+
+// ? GOOD
+const rows = await dal.jobs.get(ctx, id);
+```
+
+## 3. Strict writes — reject unknown keys
+
+Writable Zod schemas are `.strict()`. PATCH/POST bodies with unknown or non-writable keys are **rejected** (not stripped). Mass assignment is a tested threat (see [`threat-model.md`](../../docs/planning/threat-model.md) T1).
+
+## 4. Forbidden fields are omitted server-side
+
+If the manifest does not grant `read` on a Field, the DAL **must not** include those columns in the response DTO. Hiding in the UI is not security.
+
+Explicit client requests for forbidden Fields ? **403** (default) or **404** (sensitive Fields, per global option).
+
+## 5. Re-authorize every mutation
+
+`POST`/`PATCH`/`DELETE` (including bulk) re-resolve the manifest. The UI manifest is a rendering cache, never an auth token.
+
+## 6. Audit is append-only
+
+The `latch_audit` table (codename) is INSERT-only at the database role level. App code cannot `UPDATE` or `DELETE` audit rows. Mutations on registered tables produce audit rows via triggers or DAL middleware.
+
+## 7. Surface ? table
+
+A **Surface** is one form/list screen and spans one or more tables/views. A table may appear in many Surfaces with different Field sets. Permissions and manifests are scoped to the **Surface**, not the table.
+
+## 8. Generated files are not hand-edited
+
+Files under any `generated/` folder are produced by `npm run codegen` from `*.module.yaml`. CI fails on drift (`codegen --check`).
+
+## Common mistake checklist
+
+Before completing a change, verify:
+
+- [ ] No DAL method is called without `PermissionContext`
+- [ ] No write schema is missing `.strict()`
+- [ ] No new column is read without a Field mapping
+- [ ] No `db.*` import outside `packages/dal/`
+- [ ] Audit is produced for any new mutation path
+- [ ] Bulk operations re-evaluate permissions per row (see [`bulk-operations.md`](../../docs/planning/architecture/bulk-operations.md))
