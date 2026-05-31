@@ -26,7 +26,7 @@ A library set for building **business data apps** on **Next.js + PostgreSQL** wi
 |---|---|
 | App / API | Next.js 16 (App Router), TypeScript |
 | Hosting | Vercel (preview / prod) |
-| Database | PostgreSQL 16 — Neon (preview/prod) · Docker Compose (local) |
+| Database | PostgreSQL — **Neon** (local dev, preview, prod) |
 | ORM | Drizzle (planned) |
 | Styling | Tailwind CSS |
 | Layout | **Monorepo** — `apps/web` + `packages/*` |
@@ -35,14 +35,17 @@ A library set for building **business data apps** on **Next.js + PostgreSQL** wi
 
 ```bash
 npm install
-docker compose up -d
-cp .env.example .env.local
+cp apps/web/.env.example apps/web/.env.local
+# Edit apps/web/.env.local — set DATABASE_URL to your Neon direct connection string
+npm run db:migrate   # optional: needs psql; skip if you only use the in-memory pilot store
 npm run dev
 ```
 
-Open [http://localhost:3001](http://localhost:3001). Health: `/api/health`.
+Open [http://localhost:3001](http://localhost:3001). Health: `/api/health`. CRM harness: `npm run dev:crm` → [http://localhost:3002](http://localhost:3002).
 
 > Latch uses port **3001** by default so it can run alongside other local Next.js apps on 3000.
+
+Database setup (Neon, migrations, audit): [`docs/foundations/development.md`](./docs/foundations/development.md).
 
 ## Repository layout
 
@@ -52,7 +55,8 @@ Open [http://localhost:3001](http://localhost:3001). Health: `/api/health`.
 ├── docs/                 # Planning, glossary, discovery, roadmap
 ├── .cursor/rules/        # AI agent guidance
 ├── apps/
-│   └── web/              # Next.js + sample app (trades-CRM)
+│   ├── web/              # Next.js + sample app (trades-CRM)
+│   └── crm/              # Latch proof harness (Ant Design)
 ├── packages/
 │   ├── contracts/        # Manifest schema, Field IDs, base Zod
 │   ├── policy/           # PolicyService (server)
@@ -61,22 +65,22 @@ Open [http://localhost:3001](http://localhost:3001). Health: `/api/health`.
 │   ├── approval/         # Pending changes (server)
 │   ├── react/            # CapabilitiesProvider, <Can>, <FieldControl>
 │   └── codegen/          # YAML → TS CLI
-├── docker-compose.yml    # Local Postgres
+├── docker-compose.yml    # Optional local Postgres (not required)
 └── .env.example
 ```
 
-See [`docs/planning/architecture/packages.md`](./docs/planning/architecture/packages.md).
+See [`docs/reference/packages.md`](./docs/reference/packages.md).
 
 ## Documentation index
 
 The full index lives in [`docs/README.md`](./docs/README.md). High-traffic entries:
 
 - [`STATUS.md`](./STATUS.md) — what's next
-- [`docs/planning/scope.md`](./docs/planning/scope.md) — v1 in / out
-- [`docs/planning/vision.md`](./docs/planning/vision.md) — why this exists
-- [`docs/planning/use-cases.md`](./docs/planning/use-cases.md) — pilot scenarios
-- [`docs/planning/architecture/overview.md`](./docs/planning/architecture/overview.md)
-- [`docs/planning/architecture/packages.md`](./docs/planning/architecture/packages.md)
-- [`docs/planning/architecture/api-style.md`](./docs/planning/architecture/api-style.md)
-- [`docs/planning/threat-model.md`](./docs/planning/threat-model.md)
+- [`docs/foundations/scope.md`](./docs/foundations/scope.md) — v1 in / out
+- [`docs/foundations/vision.md`](./docs/foundations/vision.md) — why this exists
+- [`docs/foundations/use-cases.md`](./docs/foundations/use-cases.md) — pilot scenarios
+- [`docs/foundations/architecture-overview.md`](./docs/foundations/architecture-overview.md)
+- [`docs/reference/packages.md`](./docs/reference/packages.md)
+- [`docs/reference/api-style.md`](./docs/reference/api-style.md)
+- [`docs/foundations/threat-model.md`](./docs/foundations/threat-model.md)
 - [`docs/roadmap.md`](./docs/roadmap.md)

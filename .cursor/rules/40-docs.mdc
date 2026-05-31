@@ -20,7 +20,7 @@ alwaysApply: false
   ```
 
 - Mark tentative ideas with **TBD** or **Proposal** in headings.
-- When a question is resolved, move it from [`open-questions.md`](../../docs/planning/open-questions.md) ? architecture doc, and add the row to the "Resolved" table in `open-questions.md`.
+- When a question is resolved, move it from [`open-questions.md`](../../docs/foundations/open-questions.md) ? architecture doc, and add the row to the "Resolved" table in `open-questions.md`.
 
 ## STATUS.md
 

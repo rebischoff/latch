@@ -54,7 +54,7 @@ Mechanical sweep applied across the repo:
 
 **Not renamed:** local clone directory (`Sites/modula`) — rename on disk if desired.
 
-**Local dev:** If you have an existing `.env.local` or Docker volume from the old defaults, recreate or update credentials (`postgresql://latch:latch@localhost:5432/latch`) and consider `docker compose down -v` to reset the volume name.
+**Local dev:** Use a Neon connection string in `apps/web/.env.local` (see [`development.md`](./development.md)). If you still use optional Docker Postgres, credentials default to `postgresql://latch:latch@localhost:5432/latch`.
 
 ## Related
 

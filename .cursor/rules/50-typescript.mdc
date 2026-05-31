@@ -1,0 +1,30 @@
+---
+description: TypeScript style — prefer arrow functions
+globs: "**/*.{ts,tsx}"
+alwaysApply: false
+---
+
+# TypeScript style
+
+## Arrow functions
+
+Prefer **arrow functions** (`const fn = () => {}`) for declarations, exports, and helpers.
+
+**Exceptions** (use `function` when required):
+
+- **Overload signatures** — TypeScript needs `function` declarations for overload sets
+- **Class constructors** and `abstract` classes
+- **Generators** (`function*`)
+
+```typescript
+// ✅ GOOD
+export const unionGrants = (
+  grants: FieldPolicyGrant[],
+  options: MergeOptions,
+): Record<FieldId, FieldAction[]> => { ... };
+
+// ❌ BAD
+export function unionGrants(grants: FieldPolicyGrant[], options: MergeOptions) { ... }
+```
+
+Class instance methods may use arrow property syntax (`resolve = (...) => {}`) when appropriate; module-level logic should stay in arrow helpers.

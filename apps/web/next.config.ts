@@ -10,6 +10,12 @@ const nextConfig: NextConfig = {
     "@latch/audit",
     "@latch/approval",
   ],
+  // Packages use Node16-style `.js` specifiers on `.ts` sources (see tsconfig `moduleResolution`).
+  experimental: {
+    extensionAlias: {
+      ".js": [".ts", ".tsx", ".js"],
+    },
+  },
 };
 
 export default nextConfig;

@@ -4,7 +4,7 @@ Terms used across docs and (eventually) code. Project: **Latch** ([`naming.md`](
 
 ## Company (deployment)
 
-A **company** is an organizational customer or unit that gets its **own PostgreSQL database**, created from a shared **schema template**. Data is isolated at the database boundary  not by `tenant_id` in a shared database.
+A **company** is an organizational customer or unit that gets its **own PostgreSQL database**, created from a shared **schema template**. Data is isolated at the database boundary ï¿½ not by `tenant_id` in a shared database.
 
 > **v1 simplification:** Only one company per deployment. The abstraction for company ? `DATABASE_URL` routing exists, but is hard-coded to a single URL. Multi-company routing is deferred ([`scope.md`](./scope.md)).
 
@@ -24,7 +24,7 @@ A **Surface** is the unit that matches **one user-facing screen or flow**: a **f
 
 | Aspect | Definition |
 |---|---|
-| **UX scope** | One page or form (and its list, if any)  what the user sees and edits |
+| **UX scope** | One page or form (and its list, if any) ï¿½ what the user sees and edits |
 | **Data scope** | **Spans** one or more **tables and/or views** joined for that screen |
 | **Tables** | A physical table may appear in **multiple** Surfaces (e.g. `customers` on `customer_detail` and `job_detail`) |
 | **Identity** | Stable `id` in repo YAML (e.g. `job_detail`, `job_list`) |
@@ -54,7 +54,7 @@ Surface `job_list`:
 
 One Surface can declare **modes** (list / detail / create) or split into two ids. Convention TBD in metadata schema. **Invariant:** permissions and manifests are scoped to the Surface (and mode) the user opened.
 
-See [`architecture/metadata-and-codegen.md`](./architecture/metadata-and-codegen.md).
+See [`architecture/metadata-and-codegen.md`](../reference/metadata-and-codegen.md).
 
 ## Field
 
@@ -73,15 +73,17 @@ Policies grant `read` / `write` / `approve` on Fields within a Surface. Storage 
 
 ## Policy
 
-A rule that allows or denies an **action** on a **resource** (Surface, Field, row) for a **principal** (user, role). Policies live in repo YAML and bind to **roles**. Effective access merges roles per global `multiRoleCombine` (only `union_grants` in v1); explicit deny overrides when `denyWins` is true. See [`architecture/access-control.md`](./architecture/access-control.md).
+A rule that allows or denies an **action** on a **resource** (Surface, Field, row) for a **principal** (user, role). Policies live in repo YAML and bind to **roles**. Effective access merges roles per global `multiRoleCombine` (only `union_grants` in v1); explicit deny overrides when `denyWins` is true. See [`architecture/access-control.md`](../reference/access-control.md).
 
 ## Audit event
 
 An append-only log entry for a data change: actor, timestamp, resource, operation, and before/after or patch. Distinct from **approval trail** events (decisions).
 
-## Soft delete
+## Delete (hard delete)
 
-Record marked deleted (`deleted_at`, `deleted_by`) but retained in storage. Default queries exclude it. (Restore action and hard delete are deferred  [`scope.md`](./scope.md).)
+Removes the row from live tables. The DAL writes an audit entry with `action = delete` and a `before` snapshot. **No** `deleted_at` tombstone columns in v1. **Recovery** is restore-from-audit (privileged replay), not undelete â€” see [`scope.md`](./scope.md) and [`../reference/audit-and-lifecycle.md`](../reference/audit-and-lifecycle.md).
+
+> **Deprecated term:** "soft delete" â€” do not use in new docs or code.
 
 ## Approval trail (accept / reject)
 
@@ -113,7 +115,7 @@ Request-scoped object carrying `{ principal, manifest, surface }`. Required by e
 
 ## Bulk operation
 
-A DAL method that processes many ids in one request with per-row permission evaluation and partial-success reporting. See [`architecture/bulk-operations.md`](./architecture/bulk-operations.md).
+A DAL method that processes many ids in one request with per-row permission evaluation and partial-success reporting. See [`architecture/bulk-operations.md`](../reference/bulk-operations.md).
 
 ## Discovery
 

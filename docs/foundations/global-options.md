@@ -2,7 +2,7 @@
 
 Platform-wide configuration defaults. Exact storage (env, `<project>_config` table, or config file) is TBD; values below are **decided defaults** unless noted.
 
-> **v1 vs deferred:** Rows marked **(v1)** ship in v1. Rows marked **(deferred)** are designed-for but not implemented in v1 — the engine has the seam, the option is not honored yet. See [`../scope.md`](../scope.md).
+> **v1 vs deferred:** Rows marked **(v1)** ship in v1. Rows marked **(deferred)** are designed-for but not implemented in v1 ï¿½ the engine has the seam, the option is not honored yet. See [`../scope.md`](./scope.md).
 
 ## Identity & deployment
 
@@ -10,14 +10,14 @@ Platform-wide configuration defaults. Exact storage (env, `<project>_config` tab
 |---|---|---|---|
 | `deploymentModel` | `database_per_company` | (v1, single co) | One DB per company. **v1: single company.** Multi-company routing deferred. |
 | `appHosting` | `vercel` | (v1) | Next.js on Vercel. |
-| `localDatabase` | `docker_compose` | (v1) | Local dev only. Preview/prod use Neon. See [`../development.md`](../development.md). |
+| `localDatabase` | `neon` | (v1) | Hosted Postgres (Neon) for local dev, preview, and prod. Optional `docker-compose.yml` for offline use. See [`development.md`](./development.md). |
 
 ## Authorization
 
 | Option | Default | v1? | Notes |
 |---|---|---|---|
 | `authzModel` | `rbac` | (v1) | Role-based. |
-| `multiRoleCombine` | `union_grants` | (v1, single mode) | **v1 implements `union_grants` only.** Other modes designed but deferred. See [`access-control.md`](./access-control.md). |
+| `multiRoleCombine` | `union_grants` | (v1, single mode) | **v1 implements `union_grants` only.** Other modes designed but deferred. See [`access-control.md`](../reference/access-control.md). |
 | `denyWins` | `true` | (v1) | Explicit `deny` overrides any allow. |
 | `forbiddenFieldResponse` | `403` | (v1) | Optional `404` for sensitive Fields (existence hiding). |
 | `auditDeniedAccess` | `false` | (v1) | When `true`, denied reads/writes log to audit. Recommended `true` for sensitive Surfaces. |
@@ -56,6 +56,13 @@ Platform-wide configuration defaults. Exact storage (env, `<project>_config` tab
 | `auditPartitionBy` | `month` | (v1) | Partition audit table by `occurred_at` month. |
 | `gdprErasureMode` | `off` | Deferred | `pseudonymize` optional later; legal hold overrides. |
 
+## List operations
+
+| Option | Default | v1? | Notes |
+|---|---|---|---|
+| `listDefaultPageSize` | `50` | (v1) | Default `limit` when omitted on collection reads. |
+| `listMaxPageSize` | `200` | (v1) | Hard cap on `limit` per list request. Cursor pagination deferred. |
+
 ## Bulk operations
 
 | Option | Default | v1? | Notes |
@@ -81,10 +88,10 @@ Platform-wide configuration defaults. Exact storage (env, `<project>_config` tab
 
 ## Related docs
 
-- [`access-control.md`](./access-control.md)
-- [`audit-and-lifecycle.md`](./audit-and-lifecycle.md)
-- [`permissions-and-ui-sync.md`](./permissions-and-ui-sync.md)
-- [`bulk-operations.md`](./bulk-operations.md)
-- [`../development.md`](../development.md)
-- [`../scope.md`](../scope.md)
-- [`../open-questions.md`](../open-questions.md)
+- [`access-control.md`](../reference/access-control.md)
+- [`audit-and-lifecycle.md`](../reference/audit-and-lifecycle.md)
+- [`permissions-and-ui-sync.md`](../reference/permissions-and-ui-sync.md)
+- [`bulk-operations.md`](../reference/bulk-operations.md)
+- [`../development.md`](./development.md)
+- [`../scope.md`](./scope.md)
+- [`../open-questions.md`](./open-questions.md)

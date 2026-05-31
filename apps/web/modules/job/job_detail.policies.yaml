@@ -1,0 +1,43 @@
+# job_detail — role → Field grants (Step 3 pilot)
+# @see docs/archive/tasks/job_detail/07-policies-yaml.md
+# @see docs/foundations/use-cases.md — S1 (field tech), S3 (PM approval / office_admin financial)
+#
+# Runtime truth: packages/policy/src/surfaces/job-detail.ts (hand-synced until codegen loads policies).
+
+surface: job_detail
+
+roles:
+  field_tech:
+    rowScope: own
+    surfaceActions:
+      - read
+    fields:
+      - field: summary
+        actions: [read, write]
+      - field: scope
+        actions: [read, write]
+      - field: assignments
+        actions: [read]
+      # Propose financial changes (S3); explicit deny blocks read/write/approve on live data.
+      - field: financial_terms
+        actions: [submit]
+      - field: financial_terms
+        actions: [read, write, approve]
+        effect: deny
+
+  office_admin:
+    rowScope: all
+    surfaceActions:
+      - read
+      - write
+      - delete
+      - restore
+    fields:
+      - field: summary
+        actions: [read, write]
+      - field: scope
+        actions: [read, write]
+      - field: assignments
+        actions: [read, write]
+      - field: financial_terms
+        actions: [read, write, approve]

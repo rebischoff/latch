@@ -36,11 +36,11 @@ stateDiagram-v2
 
 ## Storage options
 
-### A — Shadow columns / JSONB on entity
+### A ï¿½ Shadow columns / JSONB on entity
 
 `pending_patch JSONB` on main row. Simple; messy for multi-table Modules.
 
-### B — `latch_pending_changes` table (preferred sketch)
+### B ï¿½ `latch_pending_changes` table (preferred sketch)
 
 | Column | Purpose |
 |--------|---------|
@@ -55,7 +55,7 @@ stateDiagram-v2
 
 On **accept**: apply `patch` in transaction, write audit, mark pending row accepted.
 
-### C — Duplicate “staging” tables
+### C ï¿½ Duplicate ï¿½stagingï¿½ tables
 
 Full copy of Module tables for pending version. Heavy but clear for complex graphs.
 
@@ -65,12 +65,12 @@ Full copy of Module tables for pending version. Heavy but clear for complex grap
 
 ### Decision: all-or-nothing for v1 (2026-05-27)
 
-**Choice:** **Option 1** — one pending record per submission; accept or reject applies to the **entire** proposed bundle. After reject, submitter may **resubmit** as a **new** pending record (trail links versions).
+**Choice:** **Option 1** ï¿½ one pending record per submission; accept or reject applies to the **entire** proposed bundle. After reject, submitter may **resubmit** as a **new** pending record (trail links versions).
 
 **Deferred:** Per-Field accept/reject (Option 2) and richer workflow (parallel approvers, SLAs) may become a separate package later.
 
-- **Option 1**: All-or-nothing per pending record — **v1**
-- **Option 2**: Split pending per Field group — later
+- **Option 1**: All-or-nothing per pending record ï¿½ **v1**
+- **Option 2**: Split pending per Field group ï¿½ later
 
 ## Reviewer scope
 
@@ -90,7 +90,7 @@ Out of scope for Phase 0; trail is queryable via API/admin UI later.
 
 ## API sketch (future)
 
-- `POST /api/modules/:module/entities/:id/pending` — propose change
+- `POST /api/modules/:module/entities/:id/pending` ï¿½ propose change
 - `POST /api/pending/:id/accept`
 - `POST /api/pending/:id/reject`
 - `GET /api/pending?module=&status=submitted`

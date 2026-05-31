@@ -2,26 +2,31 @@ import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
 
-const webFiles = ["apps/web/**/*.{js,jsx,ts,tsx,mjs,cjs}"];
+const nextAppScopes = [
+  { files: ["apps/web/**/*.{js,jsx,ts,tsx,mjs,cjs}"], rootDir: "apps/web/" },
+  { files: ["apps/crm/**/*.{js,jsx,ts,tsx,mjs,cjs}"], rootDir: "apps/crm/" },
+];
 
-function scopeToWeb(configs) {
-  return configs.map((config) => {
-    if (config.ignores) {
-      return config;
-    }
+function scopeToNextApps(configs) {
+  return nextAppScopes.flatMap(({ files, rootDir }) =>
+    configs.map((config) => {
+      if (config.ignores) {
+        return null;
+      }
 
-    return {
-      ...config,
-      files: config.files ?? webFiles,
-      settings: {
-        ...config.settings,
-        next: {
-          ...config.settings?.next,
-          rootDir: "apps/web/",
+      return {
+        ...config,
+        files: config.files ?? files,
+        settings: {
+          ...config.settings,
+          next: {
+            ...config.settings?.next,
+            rootDir,
+          },
         },
-      },
-    };
-  });
+      };
+    }),
+  ).filter(Boolean);
 }
 
 const eslintConfig = defineConfig([
@@ -33,8 +38,8 @@ const eslintConfig = defineConfig([
     "**/dist/**",
     "**/next-env.d.ts",
   ]),
-  ...scopeToWeb(nextVitals),
-  ...scopeToWeb(nextTs),
+  ...scopeToNextApps(nextVitals),
+  ...scopeToNextApps(nextTs),
   {
     files: ["packages/contracts/**/*.{ts,tsx}"],
     rules: {

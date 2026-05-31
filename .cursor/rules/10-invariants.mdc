@@ -27,9 +27,9 @@ const rows = await db.select().from(jobs).where(eq(jobs.id, id));
 const rows = await dal.jobs.get(ctx, id);
 ```
 
-## 3. Strict writes ó reject unknown keys
+## 3. Strict writes ù reject unknown keys
 
-Writable Zod schemas are `.strict()`. PATCH/POST bodies with unknown or non-writable keys are **rejected** (not stripped). Mass assignment is a tested threat (see [`threat-model.md`](../../docs/planning/threat-model.md) T1).
+Writable Zod schemas are `.strict()`. PATCH/POST bodies with unknown or non-writable keys are **rejected** (not stripped). Mass assignment is a tested threat (see [`threat-model.md`](../../docs/foundations/threat-model.md) T1).
 
 ## 4. Forbidden fields are omitted server-side
 
@@ -62,4 +62,4 @@ Before completing a change, verify:
 - [ ] No new column is read without a Field mapping
 - [ ] No `db.*` import outside `packages/dal/`
 - [ ] Audit is produced for any new mutation path
-- [ ] Bulk operations re-evaluate permissions per row (see [`bulk-operations.md`](../../docs/planning/architecture/bulk-operations.md))
+- [ ] Bulk operations re-evaluate permissions per row (see [`bulk-operations.md`](../../docs/reference/bulk-operations.md))

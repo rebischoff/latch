@@ -7,5 +7,16 @@
   "exports": {
     ".": "./src/index.ts"
   },
-  "types": "./src/index.ts"
+  "types": "./src/index.ts",
+  "scripts": {
+    "generate": "tsx src/cli.ts",
+    "check": "tsx src/cli.ts --check"
+  },
+  "dependencies": {
+    "yaml": "^2.7.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.3",
+    "typescript": "^5"
+  }
 }

@@ -4,16 +4,23 @@
   "workspaces": ["apps/*", "packages/*"],
   "scripts": {
     "dev": "npm -w @latch/web run dev",
+    "dev:crm": "npm -w @latch/crm run dev",
     "build": "npm -w @latch/web run build",
     "start": "npm -w @latch/web run start",
     "lint": "eslint .",
-    "db:up": "docker compose up -d",
-    "db:down": "docker compose down",
-    "db:logs": "docker compose logs -f postgres"
+    "db:docker:up": "docker compose up -d",
+    "db:docker:down": "docker compose down",
+    "db:docker:logs": "docker compose logs -f postgres",
+    "db:migrate": "node scripts/db-migrate.mjs",
+    "db:check": "node scripts/db-migrate.mjs --check",
+    "test": "vitest run",
+    "codegen": "npm -w @latch/codegen run generate",
+    "codegen:check": "npm -w @latch/codegen run check"
   },
   "devDependencies": {
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^3.0.5"
   }
 }

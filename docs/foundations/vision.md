@@ -25,7 +25,7 @@ Three things, in order of importance:
 2. **A permission-sync layer** so the same manifest the DAL enforces is what the UI renders from. No "show-hide CSS" pretending to be security; no unauthorized data on the wire.
 3. **Conventions and codegen** so a new Surface is YAML + a small amount of business logic, not a hand-wired stack of three places to update.
 
-Built-in behaviors (audit, soft delete, approval) are bundled because they're the same shape in every business app and are constantly rebuilt.
+Built-in behaviors (audit, hard delete, approval) are bundled because they're the same shape in every business app and are constantly rebuilt.
 
 ## What we're not building (v1)
 
@@ -51,7 +51,7 @@ Why this vertical: it naturally exercises every concept (Field-level perms for f
 3. **One manifest shape** drives DAL, Zod, and UI rendering; tested for drift.
 4. **A new Surface** can be added by writing YAML + business logic only — no boilerplate per Field.
 5. **Threat model tests** (T1, T2, T3, T5, T6, T11, T13, T15) pass in CI.
-6. **Local dev:** `npm install && docker compose up && npm run dev` works in under a minute on a clean clone.
+6. **Local dev:** `npm install`, Neon `DATABASE_URL` in `.env.local`, and `npm run dev` work on a clean clone (Postgres optional for in-memory pilot).
 
 ## Audience
 
@@ -63,5 +63,5 @@ Why this vertical: it naturally exercises every concept (Field-level perms for f
 
 - [`scope.md`](./scope.md)
 - [`use-cases.md`](./use-cases.md)
-- [`architecture/overview.md`](./architecture/overview.md)
+- [`architecture/overview.md`](./architecture-overview.md)
 - [`naming.md`](./naming.md)

@@ -9,5 +9,10 @@
     "emitDeclarationOnly": true,
     "outDir": "dist"
   },
-  "include": ["src"]
+  "include": ["src"],
+  "references": [
+    { "path": "../audit" },
+    { "path": "../contracts" },
+    { "path": "../policy" }
+  ]
 }

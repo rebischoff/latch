@@ -1,6 +1,6 @@
 # Architecture overview
 
-High-level shape for Latch. **Proposal** for Postgres RLS details ù see discovery doc. **Decided** for DAL, manifest, and UI sync ù see [permissions-and-ui-sync.md](./permissions-and-ui-sync.md).
+High-level shape for Latch. **Proposal** for Postgres RLS details ? see discovery doc. **Decided** for DAL, manifest, and UI sync ? see [permissions-and-ui-sync.md](../reference/permissions-and-ui-sync.md).
 
 ## Layered model
 
@@ -50,8 +50,8 @@ flowchart TB
 
 | Layer | Owns |
 |-------|------|
-| **Identity (authn)** | Who is the user (JWT, session, SSO) ù likely external or thin wrapper |
-| **Authorization (authz)** | What they can do on Modules/Fields/rows ù `PolicyService` + manifest |
+| **Identity (authn)** | Who is the user (JWT, session, SSO) ? likely external or thin wrapper |
+| **Authorization (authz)** | What they can do on Modules/Fields/rows ? `PolicyService` + manifest |
 | **Manifest** | Server-computed permissions for page + nav; UI render hints (read-only vs hidden) |
 | **DAL** | All business reads/writes; narrows SQL/DTO from manifest; no raw DB from handlers |
 | **Zod** | Validates only allowed shape; writable schemas **reject** extra keys |
@@ -66,7 +66,7 @@ flowchart TB
 1. Authenticate ? `principal_id`, roles, tenant (if multi-tenant).
 2. `PolicyService.resolve(scope)` ? **manifest** for page (and separately for nav if needed).
 3. Gate: Module/Field `read` for requested resources; **403** if client asks for forbidden Fields.
-4. **DAL** query with `PermissionContext` ù SELECT only columns for allowed Fields.
+4. **DAL** query with `PermissionContext` ? SELECT only columns for allowed Fields.
 5. Parse response with **readable** Zod schema (manifest-narrowed).
 6. Return DTO + manifest subset to UI; UI does not render controls for Fields without `read`.
 
@@ -74,10 +74,10 @@ flowchart TB
 
 1. Authenticate ? **re-resolve** permissions (do not trust UI manifest alone).
 2. Gate `write` on target Fields; **403** if forbidden.
-3. Parse body with **writable** Zod schema ù **reject unknown keys**.
+3. Parse body with **writable** Zod schema ? **reject unknown keys**.
 4. If Module requires approval for those Fields ? **pending** store, not live columns.
 5. Else **DAL** apply; **audit** (trigger and/or app).
-6. Soft delete sets `deleted_at`; hard delete runs controlled delete + audit snapshot.
+6. **Delete** removes the live row; audit records `before` snapshot (`action = delete`). Recovery = restore-from-audit (Phase 04 tool).
 
 ## Metadata vs business data
 
@@ -89,9 +89,9 @@ We expect `latch_*` (name TBD) tables for:
 - `policies` or role?Field bindings
 - `approval_config`
 
-Module **structure** is also declared in repo (YAML/JSON) and drives **codegen** ù see [metadata-and-codegen.md](./metadata-and-codegen.md).
+Module **structure** is also declared in repo (YAML/JSON) and drives **codegen** ? see [metadata-and-codegen.md](../reference/metadata-and-codegen.md).
 
-Business tables remain normal Postgres tables, possibly with standard columns (`created_at`, `updated_at`, `deleted_at`).
+Business tables remain normal Postgres tables with standard columns (`created_at`, `updated_at`) ‚Äî **no** `deleted_at` in v1.
 
 ## Global options (platform config)
 
@@ -112,13 +112,13 @@ Additional knobs (exact schema TBD):
 | `@latch/dal` | DB access, migrations, RLS templates |
 | `apps/web` | Next.js app (current repo root may split later) |
 
-Phase 0ù2 may use `src/modules/*/generated/` instead of packages.
+Phase 0?2 may use `src/modules/*/generated/` instead of packages.
 
 ## Related docs
 
 - [global-options.md](./global-options.md)
-- [permissions-and-ui-sync.md](./permissions-and-ui-sync.md)
-- [metadata-and-codegen.md](./metadata-and-codegen.md)
-- [access-control.md](./access-control.md)
-- [audit-and-lifecycle.md](./audit-and-lifecycle.md)
-- [approval-trails.md](./approval-trails.md)
+- [permissions-and-ui-sync.md](../reference/permissions-and-ui-sync.md)
+- [metadata-and-codegen.md](../reference/metadata-and-codegen.md)
+- [access-control.md](../reference/access-control.md)
+- [audit-and-lifecycle.md](../reference/audit-and-lifecycle.md)
+- [approval-trails.md](../reference/approval-trails.md)

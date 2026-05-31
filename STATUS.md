@@ -1,62 +1,51 @@
-# STATUS ù what's next
+# STATUS ‚Äî what's next
 
 > **The "quarterback" file.** When in doubt, start here. Always read this first.
-> Updated: 2026-05-28.
-
-This file is the single source of truth for **current focus, immediate next step, and active blockers**. It is short on purpose. Detail lives in [`docs/`](./docs/README.md).
+> This is the **global pointer**: it names the **active phase**. Detailed, per-phase status lives in each phase's own `STATUS.md`.
+> Updated: 2026-05-29.
 
 ---
 
 ## Project at a glance
 
-- **Name:** **Latch** ù see [naming](./docs/planning/naming.md).
-- **Phase:** 0 ù Scaffold & planning.
-- **Goal of v1:** A reusable library set for **field-level data access-control** on **Postgres** with **frontend/backend permission sync**, proven by a small **trades-CRM sample app**.
+- **Name:** **Latch** ‚Äî see [naming](./docs/foundations/naming.md).
+- **Phase model:** delivery is sliced into self-contained phases under [`docs/phases/`](./docs/phases/README.md). Phases are **sequenced but re-orderable** (change-order tolerant).
+- **Goal of v1:** Field-level access-control on Postgres with UI/backend sync, proven by a trades-CRM sample app.
 - **Solo dev. Single company. Internal use first.**
 
 ---
 
-## Right now ù do this next
+## Active phase
 
-### Step 3 ù Build the first Surface end-to-end
+### ‚Üí Phase 01 ‚Äî Data access (`@latch/dal`)
 
-- Pilot Surface: **`job_detail`** (a work order screen). See [`docs/planning/use-cases.md`](./docs/planning/use-cases.md).
-- Goal: walk every concept through a single screen ù YAML ? codegen ? manifest ? DAL narrow ? Zod strict ? UI gate ? audit. Skip anything not needed for this Surface.
-- Definition of done in [`docs/planning/scope.md`](./docs/planning/scope.md).
+| | |
+|---|---|
+| **Plan** | [`docs/phases/01-data-access/README.md`](./docs/phases/01-data-access/README.md) |
+| **Phase STATUS** | [`docs/phases/01-data-access/STATUS.md`](./docs/phases/01-data-access/STATUS.md) |
+| **Focus** | List Surface, column manifest, bulk update/delete (`job_list`) ‚Äî reuses the foundation stack |
+| **Do next** | Execute [`docs/phases/01-data-access/tasks/06-surface-yaml.md`](./docs/phases/01-data-access/tasks/06-surface-yaml.md) (task chain documented; 00‚Äì01 done) |
 
----
+To switch focus (a "change order"), re-point this section at another phase folder ‚Äî no other file needs rewriting. See [how phases work](./docs/phases/README.md).
 
-## Recently completed
-
-### Step 2 ù Monorepo layout (2026-05-28)
-
-- `apps/web/` ù Next.js app (`@latch/web`)
-- `packages/{contracts,policy,dal,audit,approval,react,codegen}/` ù stub `@latch/*` packages
-- npm workspaces, TS project refs, ESLint import boundaries
-- Plan: [`docs/planning/architecture/packages.md`](./docs/planning/architecture/packages.md)
+> **CRM harness trails the active phase** ‚Äî it has no separate active item. Slice checklist: [`apps/crm/docs/TASKS.md`](./apps/crm/docs/TASKS.md); timing: [`docs/reference/crm-and-phases.md`](./docs/reference/crm-and-phases.md).
+>
+> **Planning gate:** when any implementation task hits an unplanned fork, stop and plan before coding ‚Äî see [`docs/phases/README.md`](./docs/phases/README.md#planning-gate-stop-and-plan-rule).
 
 ---
 
-## Active decisions needed (small)
+## Phase board
 
-These block forward progress but are small enough to resolve in one sitting:
-
-| # | Decision | Where it goes |
-|---|---|---|
-| D2 | Auth provider for v1 (Clerk / NextAuth / custom) | [`open-questions.md`](./docs/planning/open-questions.md) |
-| D3 | Confirm pilot Surface = `job_detail` (or alternate) | [`use-cases.md`](./docs/planning/use-cases.md) |
-| D4 | Single role-merge mode for v1: `union_grants` only | [`access-control.md`](./docs/planning/architecture/access-control.md) ù proposed |
-| D5 | Defer RLS to post-v1 | [`postgres-rls-and-security.md`](./docs/planning/discovery/postgres-rls-and-security.md) ù proposed |
-
----
-
-## v1 scope (in / out at a glance)
-
-**In:** single company, three Surfaces (`job_detail`, `job_list`, `customer_detail`), Field-level perms, `union_grants` + `denyWins`, REST handler factory + Server Action helper, audit triggers, soft delete, all-or-nothing approval (internal reviewers), bulk update/delete with manifest gating, codegen CLI with drift check.
-
-**Out (deferred):** multi-company DB routing, RLS, hard delete, partial approvals, external reviewers, the other three role-merge modes, admin UI as a product, GraphQL, tRPC.
-
-Full list: [`scope.md`](./docs/planning/scope.md).
+| Phase | Capability | State |
+|-------|-----------|-------|
+| [00 Foundation](./docs/phases/00-foundation/STATUS.md) | contracts, policy, codegen, single-record DAL | mostly done |
+| **[01 Data access](./docs/phases/01-data-access/STATUS.md)** | list, projection, bulk (`job_list`) | **active** |
+| [02 UI sync](./docs/phases/02-ui-sync/STATUS.md) | `<Can>`/`<FieldControl>`, `customer_detail` | partial |
+| [03 Identity & IAM](./docs/phases/03-identity-iam/STATUS.md) | users/roles in DB, IAM + Data master, auth | not started |
+| [04 Audit & lifecycle](./docs/phases/04-audit-lifecycle/STATUS.md) | full audit, hard delete + recovery | partial |
+| [05 Verification](./docs/phases/05-verification/STATUS.md) | accept/reject, verification gates | partial |
+| [06 Performance & safety](./docs/phases/06-performance-safety/STATUS.md) | manifest cache, RLS surface-gate | not started |
+| [07 Scale-out](./docs/phases/07-scale-out/STATUS.md) | multi-company, publish packages | deferred |
 
 ---
 
@@ -64,27 +53,17 @@ Full list: [`scope.md`](./docs/planning/scope.md).
 
 | Area | State |
 |---|---|
-| Docs | Architecture-complete for v1; some open questions remain (see above) |
-| Code | Monorepo scaffold ó `apps/web` + stub `@latch/*` packages, health route |
-| Tests | None yet |
-| CI | None yet |
-| Threat model | Drafted ([`threat-model.md`](./docs/planning/threat-model.md)); tests not implemented |
-
----
-
-## How to use this file
-
-1. Anytime you (or an AI agent) start a session: **read this file first.**
-2. When a step completes, **edit the "Right now" section** to point at the next step.
-3. Keep this file short. If a section grows, move detail into `docs/` and link.
-4. Decisions go in the relevant architecture doc with a dated **Decision** block; this file only summarizes.
+| Docs | Reorganized into `foundations` / `reference` / `phases` / `discovery` / `archive` (2026-05-29) |
+| Code | `job_detail` stack proven end-to-end (archived pilot) |
+| Tests | `npm run test` ‚Äî contracts, policy, dal, audit, e2e, threat |
+| CI | GitHub Actions on `main` PRs |
 
 ---
 
 ## Pointers
 
-- Roadmap (phased): [`docs/roadmap.md`](./docs/roadmap.md)
-- Architecture index: [`docs/README.md`](./docs/README.md)
-- Open questions: [`docs/planning/open-questions.md`](./docs/planning/open-questions.md)
-- Scope (in / out): [`docs/planning/scope.md`](./docs/planning/scope.md)
-- Monorepo plan: [`docs/planning/architecture/packages.md`](./docs/planning/architecture/packages.md)
+- Phases (the roadmap): [`docs/phases/README.md`](./docs/phases/README.md)
+- Docs map: [`docs/README.md`](./docs/README.md)
+- Scope: [`docs/foundations/scope.md`](./docs/foundations/scope.md)
+- Invariants: [`.cursor/rules/10-invariants.mdc`](./.cursor/rules/10-invariants.mdc)
+- Pilot archive: [`docs/archive/`](./docs/archive/)

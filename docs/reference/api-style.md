@@ -48,7 +48,7 @@ export function createSurfaceRouteHandlers<S extends SurfaceDef>(surface: S) {
     },
     DELETE: async (req: Request, { params }) => {
       const ctx = await resolvePermissionContext(req, surface);
-      await dal[surface.id].softDelete(ctx, params.id);
+      await dal[surface.id].delete(ctx, params.id);
       return new Response(null, { status: 204 });
     },
   };
@@ -80,7 +80,7 @@ export function createSurfaceActions<S extends SurfaceDef>(surface: S) {
 
 ## Why both styles share one DAL
 
-Single enforcement path = single threat-model surface (see [`../threat-model.md`](../threat-model.md) T2, T3, T10, T15). If you have to defend two enforcement layers, one drifts. Always.
+Single enforcement path = single threat-model surface (see [`../threat-model.md`](../foundations/threat-model.md) T2, T3, T10, T15). If you have to defend two enforcement layers, one drifts. Always.
 
 ## Pros / cons (recorded for posterity)
 
@@ -101,7 +101,7 @@ We'd revisit:
 
 ## Related
 
-- [`../scope.md`](../scope.md)
+- [`../scope.md`](../foundations/scope.md)
 - [`packages.md`](./packages.md)
 - [`permissions-and-ui-sync.md`](./permissions-and-ui-sync.md)
 - [`bulk-operations.md`](./bulk-operations.md)

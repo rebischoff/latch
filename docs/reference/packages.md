@@ -9,7 +9,7 @@ How the codebase is partitioned. The repo is a **monorepo from day one** so pack
 **Rationale:**
 
 - Import boundaries between layers (`react` ? `dal`, `dal` ? UI) are the easiest things to violate and the hardest to refactor later.
-- Future publishing of `@<project>/*` packages is a goal — start with the right shape.
+- Future publishing of `@<project>/*` packages is a goal ? start with the right shape.
 - Solo dev: a monorepo costs almost nothing if we use simple workspaces (no Nx/Turbo required initially).
 
 ## Tooling
@@ -33,12 +33,13 @@ How the codebase is partitioned. The repo is a **monorepo from day one** so pack
 ??? .cursor/
 ?   ??? rules/*.mdc
 ??? docs/                          # Planning, architecture, discovery
-??? docker-compose.yml             # Local Postgres
+??? docker-compose.yml             # Optional local Postgres (Neon is default)
 ??? package.json                   # Root: workspaces + dev scripts
 ??? tsconfig.base.json
 ??? apps/
-?   ??? web/                       # Next.js app (today's src/ moves here)
-?       ??? app/                   # App Router
+?   ??? web/                       # Thin pilot (job_detail)
+?   ??? crm/                       # Latch proof harness (docs only; Ant Design, no Tailwind)
+?       ??? app/                   # App Router (future)
 ?       ??? lib/
 ?       ??? modules/               # Surface YAML + generated/ per Surface
 ?       ??? package.json
@@ -64,7 +65,7 @@ How the codebase is partitioned. The repo is a **monorepo from day one** so pack
 | `@<project>/approval` | server | `contracts`, `audit` | `react`, `dal` |
 | `@<project>/react` | client | `contracts` | `policy`, `dal`, `audit`, `approval` |
 | `@<project>/codegen` | dev CLI | `contracts` | `react`, `dal` |
-| `apps/web` | both | all packages, role-appropriate | — |
+| `apps/web` | both | all packages, role-appropriate | ? |
 
 **Enforcement:**
 
@@ -85,7 +86,7 @@ How the codebase is partitioned. The repo is a **monorepo from day one** so pack
 
 ### Decision: Step 2 complete (2026-05-28)
 
-**Choice:** Monorepo layout is live — `apps/web` (`@latch/web`) + seven stub `@latch/*` packages under `packages/`, npm workspaces, TS project references, ESLint `no-restricted-imports` boundaries.
+**Choice:** Monorepo layout is live ? `apps/web` (`@latch/web`) + seven stub `@latch/*` packages under `packages/`, npm workspaces, TS project references, ESLint `no-restricted-imports` boundaries.
 
 **Rationale:** Package boundaries are enforceable from day one; Step 3 can add real code to the right packages without another structural migration.
 
@@ -104,8 +105,8 @@ Current state: monorepo scaffold. Migration steps below are historical reference
      "scripts": {
        "dev": "npm -w apps/web run dev",
        "build": "npm -w apps/web run build",
-       "db:up": "docker compose up -d",
-       "db:down": "docker compose down"
+       "db:migrate": "node scripts/db-migrate.mjs",
+       "db:docker:up": "docker compose up -d"
      }
    }
    ```
@@ -122,6 +123,6 @@ Current state: monorepo scaffold. Migration steps below are historical reference
 
 ## Related
 
-- [`STATUS.md`](../../../STATUS.md) — Step 2
-- [`scope.md`](../scope.md)
-- [`overview.md`](./overview.md)
+- [`STATUS.md`](../../STATUS.md) ? Step 2
+- [`scope.md`](../foundations/scope.md)
+- [`overview.md`](../foundations/architecture-overview.md)

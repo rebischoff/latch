@@ -29,7 +29,7 @@ The UI receives a **copy of permissions** (manifest or safe subset). It does **n
 
 **Rationale:** Fewer round-trips, manifest aligned with route scope, fits Next.js App Router. Invariant unchanged: permissions resolved before render and before DAL.
 
-See [global-options.md](./global-options.md).
+See [global-options.md](../foundations/global-options.md).
 
 ## Decision: manifest scope — page + nav (2026-05)
 
@@ -195,7 +195,7 @@ The same DAL underlies both **REST route handlers** (public/contract surface) an
 
 ## Bulk operations
 
-Bulk update / soft-delete is part of v1 and obeys the same manifest model — per-row permission evaluation; no shortcut to set-based writes that bypass authorization. See [`bulk-operations.md`](./bulk-operations.md).
+Bulk update / hard-delete is part of v1 and obeys the same manifest model — per-row permission evaluation; no shortcut to set-based writes that bypass authorization. See [`bulk-operations.md`](./bulk-operations.md).
 
 ## Related docs
 
@@ -203,6 +203,6 @@ Bulk update / soft-delete is part of v1 and obeys the same manifest model — pe
 - [`metadata-and-codegen.md`](./metadata-and-codegen.md) — Surface YAML → Zod
 - [`api-style.md`](./api-style.md) — REST + Server Actions
 - [`bulk-operations.md`](./bulk-operations.md)
-- [`overview.md`](./overview.md) — system diagram
-- [`../threat-model.md`](../threat-model.md) — controls mapped to threats
-- [`../open-questions.md`](../open-questions.md) — remaining TBDs
+- [`overview.md`](../foundations/architecture-overview.md) — system diagram
+- [`../threat-model.md`](../foundations/threat-model.md) — controls mapped to threats
+- [`../open-questions.md`](../foundations/open-questions.md) — remaining TBDs

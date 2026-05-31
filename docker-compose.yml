@@ -1,3 +1,11 @@
+# Optional — not required for Latch development.
+# Default workflow uses Neon; see docs/foundations/development.md
+#
+# Usage:
+#   npm run db:docker:up
+#   DATABASE_URL=postgresql://latch:latch@localhost:5432/latch  # in apps/web/.env.local
+#   npm run db:migrate
+
 services:
   postgres:
     image: postgres:16-alpine

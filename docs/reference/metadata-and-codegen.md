@@ -2,7 +2,7 @@
 
 How **Surface** definitions (legacy file names may still say `*.module.yaml` until the naming pass) and **Field** definitions drive generated types, Zod schemas, and DAL mappings.
 
-A Surface is one form and/or list page, may join many tables/views, and a table may appear in multiple Surfaces. See [`glossary.md`](../glossary.md).
+A Surface is one form and/or list page, may join many tables/views, and a table may appear in multiple Surfaces. See [`glossary.md`](../foundations/glossary.md).
 
 > **Paths reflect the monorepo target** ([`packages.md`](./packages.md)). Source YAML lives in `apps/web/modules/<surface>/`; the codegen CLI lives in `packages/codegen`; generated TS is committed to `apps/web/modules/<surface>/generated/`.
 
@@ -110,4 +110,4 @@ CI runs `codegen --check`; drift between YAML and committed generated files fail
 - [`packages.md`](./packages.md)
 - [`permissions-and-ui-sync.md`](./permissions-and-ui-sync.md)
 - [`access-control.md`](./access-control.md)
-- [`../threat-model.md`](../threat-model.md) (T11, T13)
+- [`../threat-model.md`](../foundations/threat-model.md) (T11, T13)

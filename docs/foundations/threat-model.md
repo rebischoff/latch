@@ -38,7 +38,7 @@ Lightweight STRIDE-style enumeration. Each row:
 | **T13** | Field reference forgery | UI / API caller sends `field_id` that doesn't exist on the Surface | Manifest enumerates all known Field IDs; unknown IDs in request rejected | Test sending unknown `field_id` ? 400 |
 | **T14** | Over-broad manifest exfiltration | Server returns full app manifest including Surfaces user shouldn't know exist | `navManifestScope: minimal` default; response shape snapshot-tested | Snapshot manifest per role; assert no leakage of unauthorized Surface IDs |
 | **T15** | Bulk operation partial-corruption | One mid-batch row fails after others applied with no rollback / no report | Bulk DAL evaluates permission per row up front; applies in transaction; returns per-row result | Bulk test with mixed permitted/forbidden rows ? all-or-none or partial-success per spec |
-| **T16** | Audit gap on soft delete / restore | Soft-delete trigger fires but doesn't write audit | Trigger writes audit row in same transaction as `deleted_at` update | Delete then query audit ? row present |
+| **T16** | Audit gap on delete / restore | Delete path skips `writeAudit` | DAL `delete` always writes audit `before` snapshot in same flow | Delete then query audit — row present |
 | **T17** | Denied requests not logged | Authorization failure leaves no trace; brute-force attempts invisible | Optional `auditDeniedAccess` global option; recommended `true` for sensitive Surfaces | Trigger 5 denied reads ? 5 audit deny rows |
 
 ## Priority for v1
@@ -55,7 +55,7 @@ The rest should be implemented (the control), even if the test is deferred.
 
 ## Related
 
-- [`architecture/access-control.md`](./architecture/access-control.md)
-- [`architecture/permissions-and-ui-sync.md`](./architecture/permissions-and-ui-sync.md)
-- [`architecture/audit-and-lifecycle.md`](./architecture/audit-and-lifecycle.md)
-- [`architecture/bulk-operations.md`](./architecture/bulk-operations.md)
+- [`architecture/access-control.md`](../reference/access-control.md)
+- [`architecture/permissions-and-ui-sync.md`](../reference/permissions-and-ui-sync.md)
+- [`architecture/audit-and-lifecycle.md`](../reference/audit-and-lifecycle.md)
+- [`architecture/bulk-operations.md`](../reference/bulk-operations.md)

@@ -1,0 +1,41 @@
+# Phase 02 — UI sync (`@latch/react`, `apps/web`)
+
+> **Home packages:** `@latch/react`, `apps/web` (pilot), `apps/crm` (proof harness, planned) · **Status:** partial · **Phase STATUS:** [`STATUS.md`](./STATUS.md)
+
+## Goal
+
+Make the UI render **entirely from the manifest** — hidden / read-only / editable per Field, nav showing only permitted routes — and prove it on a second Surface (`customer_detail`) with a cross-Surface link from jobs. The UI is never a security boundary; the server omits forbidden data before it reaches the client.
+
+## Depends on
+
+- **Phase 00** — manifest + `@latch/contracts`.
+- **Phase 01** — list/detail DAL for the Surfaces being rendered.
+
+## In / out of scope
+
+| In scope | Out of scope (this phase) |
+|----------|---------------------------|
+| `CapabilitiesProvider` from RSC-provided manifest | Identity / login UI (Phase 03) |
+| `<Can>` for conditional sections | Verification reviewer UX (Phase 05) |
+| `<FieldControl>`: hidden / read-only / editable from manifest | Restore-from-audit UI (Phase 04) |
+| Nav manifest with `minimal` scope | Polished theming beyond consistent Tailwind |
+| `customer_detail` Surface (detail, cross-Surface link) | — |
+
+## Sub-goals — what this phase proves
+
+1. No Field value without `read` reaches the client (T2/T14 at the UI layer).
+2. `read` but no `write` → control renders **read-only** (your client read-only requirement).
+3. Nav lists only routes the user may open (no leakage of Surface IDs).
+4. A second Surface reuses the same components with no bespoke permission code.
+
+## Definition of done
+
+- [ ] `CapabilitiesProvider` + `<Can>` + `<FieldControl>` consumed by `apps/web` or `apps/crm`
+- [ ] `customer_detail` Surface YAML + policies + page
+- [ ] Cross-Surface link job → customer respects manifest
+- [ ] Snapshot tests: nav + DTO per role (no unauthorized Surface IDs / Fields)
+
+## References
+
+- [`../../reference/permissions-and-ui-sync.md`](../../reference/permissions-and-ui-sync.md) · [`../../foundations/use-cases.md`](../../foundations/use-cases.md)
+- [`../../reference/access-control.md`](../../reference/access-control.md) (omit vs read-only vs deny)

@@ -1,12 +1,12 @@
 # Access control
 
-How Latch thinks about **granular** data access. Combines **Surface** (working name: Module), **Field**, mandatory **DAL**, optional Postgres RLS, and **UI-aligned manifests**. See [permissions-and-ui-sync.md](./permissions-and-ui-sync.md) and [glossary.md](../glossary.md).
+How Latch thinks about **granular** data access. Combines **Surface** (working name: Module), **Field**, mandatory **DAL**, optional Postgres RLS, and **UI-aligned manifests**. See [permissions-and-ui-sync.md](./permissions-and-ui-sync.md) and [glossary.md](../foundations/glossary.md).
 
 ## Resource hierarchy
 
 ```
-Company (deployment ù own Postgres database)
- ??? Surface (one form / list screen ù spans tables & views)
+Company (deployment ? own Postgres database)
+ ??? Surface (one form / list screen ? spans tables & views)
       ??? Table / view (physical; may appear in many Surfaces)
       ??? Row (entity instance)
       ??? Field (logical, on that Surface)
@@ -23,9 +23,9 @@ We **do not** use shared-schema multi-tenancy. Each company has its own database
 **Implications:**
 
 - Company ? `DATABASE_URL` routing (TBD)
-- User/role tables inside each company DB (or control plane ù TBD)
+- User/role tables inside each company DB (or control plane ? TBD)
 - RLS for row/owner rules **within** a company DB
-- Hosted Postgres on Vercel (e.g. Neon) ù see [development.md](../development.md)
+- Hosted Postgres on Vercel (e.g. Neon) ? see [development.md](../foundations/development.md)
 
 Actions (draft): `read`, `write`, `delete`, `restore`, `approve`, `hard_delete`.
 
@@ -37,28 +37,39 @@ Actions (draft): `read`, `write`, `delete`, `restore`, `approve`, `hard_delete`.
 - **Users are assigned to one or more roles** (Latch tables; IdP sync later).
 - Surface/Field policies per role in **repo YAML/JSON**.
 
-### Decision: multiple roles ù `multiRoleCombine` (2026-05-27, revised)
+### Decision: multiple roles ? `multiRoleCombine` (2026-05-27, revised)
 
-**Choice (v1):** When a user has multiple roles, effective permissions are merged using global option **`multiRoleCombine`**. **v1 implements `union_grants` only.** The other three modes are designed as pluggable strategies but not built or tested in v1 ([`scope.md`](../scope.md)).
+**Choice (v1):** When a user has multiple roles, effective permissions are merged using global option **`multiRoleCombine`**. **v1 implements `union_grants` only.** The other three modes are designed as pluggable strategies but not built or tested in v1 ([`scope.md`](../foundations/scope.md)).
 
 | Mode | Status | Semantics |
 |---|---|---|
-| `union_grants` | **v1 default and only mode** | Union of allows ù if **any** role grants an action on a Field/Surface, user has it. |
+| `union_grants` | **v1 default and only mode** | Union of allows ? if **any** role grants an action on a Field/Surface, user has it. |
 | `intersection_grants` | Deferred | User has an action only if **every** assigned role grants it. |
 | `most_restrictive` | Deferred | Per Field/action, take **least privilege** across roles. |
 | `priority` | Deferred | Each role has `priority`; for conflicts, highest-priority role wins. |
 
 **`denyWins` (global, default `true`):** Explicit `deny` in policy overrides allows from any role.
 
-**v1 deliverable:** `PolicyService` unit tests for `union_grants` ù `denyWins` matrix. Engine ships with a `RoleMergeStrategy` seam so other modes can be added without refactor.
+**v1 deliverable:** `PolicyService` unit tests for `union_grants` ? `denyWins` matrix. Engine ships with a `RoleMergeStrategy` seam so other modes can be added without refactor.
 
-See [global-options.md](./global-options.md).
+See [global-options.md](../foundations/global-options.md).
+
+### Decision: Step 3 pilot Surface (2026-05-28)
+
+**Choice:** The v1 pilot Surface id is **`job_detail`**. It covers use cases **S1**, **S3**, and **S4** in [`use-cases.md`](../foundations/use-cases.md) (field tech read, PM approval, cross-tech denial).
+
+**Rationale:** One multi-table Surface exercises Field-level permissions (financials hidden from field tech), row-level rules (own jobs), approval (change orders), audit, and hard delete without building the full trades-CRM surface set.
+
+**Locked with this decision (task 00):**
+
+- **D4:** v1 implements **`union_grants` only** with global **`denyWins: true`** (see **Decision: multiple roles ? `multiRoleCombine`** above).
+- **D5:** **RLS deferred**; v1 enforcement is DAL-only ([`scope.md`](../foundations/scope.md)).
 
 ## Surface as policy boundary
 
 Most UI and API entry points are **Surface-scoped** (one form or list page):
 
-- Open `contract_detail` ? manifest + DAL for that Surfaceùs tables, views, and Fields
+- Open `contract_detail` ? manifest + DAL for that Surface?s tables, views, and Fields
 - Same table `contracts` may appear in `contract_list` with a different Field set and policies
 - Cross-Surface access is explicit (e.g. link to `party_detail` by id)
 
@@ -67,7 +78,7 @@ Most UI and API entry points are **Surface-scoped** (one form or list page):
 Policies attach to **Field IDs** on a Surface, not raw column names:
 
 ```yaml
-# Illustrative ù see metadata-and-codegen.md
+# Illustrative ? see metadata-and-codegen.md
 surface: contract_detail
 fields:
   - id: financial_terms
@@ -113,8 +124,8 @@ See [postgres-rls-and-security.md](../discovery/postgres-rls-and-security.md).
 
 ## Bulk operations
 
-Bulk update/delete is part of v1. The per-row evaluation model is documented in [`bulk-operations.md`](./bulk-operations.md). Key invariant: bulk paths use the same `PolicyService` + `PermissionContext` as single-record paths ó *no parallel enforcement*.
+Bulk update/delete is part of v1. The per-row evaluation model is documented in [`bulk-operations.md`](./bulk-operations.md). Key invariant: bulk paths use the same `PolicyService` + `PermissionContext` as single-record paths ? *no parallel enforcement*.
 
 ## Open points
 
-Deny policy YAML syntax, built-in role catalog, break-glass audit, per-Surface override of `multiRoleCombine`. Multi-company DB routing is deferred ([`../scope.md`](../scope.md)).
+Deny policy YAML syntax, built-in role catalog, break-glass audit, per-Surface override of `multiRoleCombine`. Multi-company DB routing is deferred ([`../scope.md`](../foundations/scope.md)).

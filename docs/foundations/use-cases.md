@@ -1,4 +1,4 @@
-# Use cases ó service-trades vertical
+# Use cases ù service-trades vertical
 
 The platform itself is generic. The **pilot** is a service-trades business app suite (construction, electrical, HVAC, plumbing). This doc grounds the abstractions in concrete scenarios so design choices have something to push against.
 
@@ -9,7 +9,7 @@ The platform itself is generic. The **pilot** is a service-trades business app s
 - Naturally exercises **Surfaces that span many tables** (a Job ? customer + site + scope + line items + assignments + attachments).
 - Naturally exercises **approval** (change orders, refunds, schedule changes above a threshold).
 - Naturally exercises **audit** (insurance / regulatory disputes).
-- Naturally exercises **bulk operations** (re-assign 20 jobs to a different tech, soft-delete cancelled jobs in a batch).
+- Naturally exercises **bulk operations** (re-assign 20 jobs to a different tech, delete cancelled jobs in a batch).
 
 ## Personas
 
@@ -25,15 +25,15 @@ The platform itself is generic. The **pilot** is a service-trades business app s
 
 | Surface | Mode | Spans (tables) | Why it's interesting |
 |---|---|---|---|
-| `job_detail` ? pilot | detail | `jobs`, `customers`, `sites`, `job_lines`, `assignments`, `attachments` | Multi-table; Field-level (financials hidden from tech); row-level (own jobs); approval (change orders); audit; soft delete |
-| `job_list` | list | `jobs` + display joins | Search/filter; row-level; bulk update (assign tech, change status); bulk soft delete |
+| `job_detail` ? pilot | detail | `jobs`, `customers`, `sites`, `job_lines`, `assignments`, `attachments` | Multi-table; Field-level (financials hidden from tech); row-level (own jobs); approval (change orders); audit; hard delete |
+| `job_list` | list | `jobs` + display joins | Search/filter; row-level; bulk update (assign tech, change status); bulk delete |
 | `customer_detail` | detail | `customers`, `sites`, `job_history` (view) | Cross-Surface link from job; nested data |
 
 Deferred (v1.1+): `estimate_detail`, `invoice_detail`, `time_entry_list`, `schedule_board`, `inventory_*`.
 
 ## Scenarios (concrete walks)
 
-### S1 ó Field Tech opens a job
+### S1 ù Field Tech opens a job
 
 1. Tech logs in ? manifest resolved for nav: `[jobs]` only.
 2. Opens `/jobs` (`job_list`) ? manifest restricts rows to `assignments.user_id = me`; columns: id, customer name, site, status, scheduled_at. **No** financials.
@@ -41,15 +41,15 @@ Deferred (v1.1+): `estimate_detail`, `invoice_detail`, `time_entry_list`, `sched
 4. Tech adds a time entry ? Server Action ? re-authorize ? DAL insert ? audit row written.
 5. Tech tries (via crafted PATCH) to set `job.invoice_amount = 1` ? Zod `.strict()` rejects unknown key; 400. Audit row written for denied attempt (optional).
 
-### S2 ó Office Admin reassigns 20 jobs (bulk)
+### S2 ù Office Admin reassigns 20 jobs (bulk)
 
 1. Admin selects 20 jobs from `job_list`.
 2. Clicks "Reassign to tech X".
 3. Bulk action route handler called with `{ ids: [...], patch: { assigned_to: "X" } }`.
-4. Server re-resolves manifest. DAL evaluates `write` on `assignment` Field **per row**. Rows the admin can't touch are reported back as failures (no partial corruption). See [`bulk-operations.md`](./architecture/bulk-operations.md).
+4. Server re-resolves manifest. DAL evaluates `write` on `assignment` Field **per row**. Rows the admin can't touch are reported back as failures (no partial corruption). See [`bulk-operations.md`](../reference/bulk-operations.md).
 5. Each successful row produces an audit entry. Batch metadata links them via `request_id`.
 
-### S3 ó PM approves a change order
+### S3 ù PM approves a change order
 
 1. Tech submits a change-order pending change on `job_detail` (raises `job.contract_amount`).
 2. Pending row stored in `latch_pending_changes` with `status = submitted`.
@@ -57,7 +57,7 @@ Deferred (v1.1+): `estimate_detail`, `invoice_detail`, `time_entry_list`, `sched
 4. PM clicks Accept ? API re-authorizes ? transaction: apply patch to `jobs` row ? audit row (`action = approve`, `approval_id = ...`) ? pending row marked accepted.
 5. Tech sees updated job on next load.
 
-### S4 ó Field Tech tries to access another tech's job
+### S4 ù Field Tech tries to access another tech's job
 
 1. Tech crafts `GET /api/jobs/<other-job-id>`.
 2. Route handler resolves manifest for `job_detail` scope.
@@ -65,10 +65,10 @@ Deferred (v1.1+): `estimate_detail`, `invoice_detail`, `time_entry_list`, `sched
 4. Row not in result set ? 404 (existence hiding) per global option.
 5. Audit row written (denied read, optional but recommended for security-sensitive Surfaces).
 
-### S5 ó Accountant exports financials
+### S5 ù Accountant exports financials
 
 1. Accountant opens `/reports/financials`.
-2. Route handler ó not a Server Action, because we want CSV streaming + future external access.
+2. Route handler ù not a Server Action, because we want CSV streaming + future external access.
 3. DAL queries with `read` on `financials` Field; row scope is "all".
 4. CSV streamed. Audit row written (export action, row count).
 
@@ -87,7 +87,7 @@ Deferred (v1.1+): `estimate_detail`, `invoice_detail`, `time_entry_list`, `sched
 ## Out of scope (sample app)
 
 - Scheduling/dispatch UI (calendar, drag-drop, route optimization).
-- Customer portal / external sign-off (requires external reviewers ó deferred).
+- Customer portal / external sign-off (requires external reviewers ù deferred).
 - Mobile app (web-responsive is enough for v1).
 - Payments / accounting integrations.
 - Estimation / quoting (deferred to v1.1).
@@ -95,5 +95,5 @@ Deferred (v1.1+): `estimate_detail`, `invoice_detail`, `time_entry_list`, `sched
 ## Related
 
 - [`scope.md`](./scope.md)
-- [`architecture/bulk-operations.md`](./architecture/bulk-operations.md)
-- [`architecture/access-control.md`](./architecture/access-control.md)
+- [`architecture/bulk-operations.md`](../reference/bulk-operations.md)
+- [`architecture/access-control.md`](../reference/access-control.md)

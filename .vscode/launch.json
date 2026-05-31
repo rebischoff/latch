@@ -1,0 +1,78 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Next.js: dev server (CRM)",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "npm run dev:crm",
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "name": "Next.js: debug server-side (CRM)",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "npm run dev:crm -- --inspect",
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "name": "Next.js: debug client (Chrome, CRM)",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:3002",
+      "webRoot": "${workspaceFolder}/apps/crm"
+    },
+    {
+      "name": "Next.js: debug full stack (CRM)",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/node_modules/next/dist/bin/next",
+      "args": ["dev", "-p", "3002", "--webpack"],
+      "cwd": "${workspaceFolder}/apps/crm",
+      "runtimeArgs": ["--inspect"],
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"],
+      "serverReadyAction": {
+        "action": "debugWithChrome",
+        "killOnServerStop": true,
+        "pattern": "- Local:.+(https?://[^\\s]+)",
+        "uriFormat": "%s",
+        "webRoot": "${workspaceFolder}/apps/crm"
+      }
+    },
+    {
+      "name": "Vitest: current file",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/node_modules/vitest/vitest.mjs",
+      "args": ["run", "${relativeFile}"],
+      "cwd": "${workspaceFolder}",
+      "autoAttachChildProcesses": true,
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"]
+    },
+    {
+      "name": "Vitest: all tests",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/node_modules/vitest/vitest.mjs",
+      "args": ["run"],
+      "cwd": "${workspaceFolder}",
+      "autoAttachChildProcesses": true,
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"]
+    },
+    {
+      "name": "Vitest: threat tests (with DB)",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/node_modules/vitest/vitest.mjs",
+      "args": ["run", "tests/threat.test.ts"],
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/apps/web/.env.local",
+      "autoAttachChildProcesses": true,
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"]
+    }
+  ]
+}

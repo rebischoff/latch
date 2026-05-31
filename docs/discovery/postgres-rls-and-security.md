@@ -1,6 +1,6 @@
 # Discovery: PostgreSQL RLS and security
 
-> **Status (2026-05-27): DEFERRED post-v1.** v1 enforcement is **DAL-only**. See [`../scope.md`](../scope.md). This doc remains the design target for the Phase 4 hardening spike ó do not implement in v1.
+> **Status (2026-05-27): DEFERRED post-v1.** v1 enforcement is **DAL-only**. See [`../scope.md`](../foundations/scope.md). This doc remains the design target for the Phase 4 hardening spike ù do not implement in v1.
 
 Evaluate whether the platform should layer Postgres-native enforcement (RLS, column privileges, views) underneath the DAL as a safety net.
 
@@ -20,14 +20,14 @@ Evaluate whether the platform should layer Postgres-native enforcement (RLS, col
 | [Row Level Security](https://www.postgresql.org/docs/current/ddl-rowsecurity.html) | `ENABLE ROW LEVEL SECURITY`, policies per command |
 | `current_setting('app.*', true)` | Bind principal/company from Next.js per request/transaction |
 | [SECURITY BARRIER views](https://www.postgresql.org/docs/current/rules-privileges.html) | Prevent optimizer bypass on security views |
-| Column privileges | `GRANT SELECT (col) ON ...` ó static, poor fit for dynamic Field sets |
+| Column privileges | `GRANT SELECT (col) ON ...` ù static, poor fit for dynamic Field sets |
 
-## Spike plan (Phase 4 ó post-v1)
+## Spike plan (Phase 4 ù post-v1)
 
-1. **Spike A ó Company/row RLS:** policy keyed on `app.principal_id` / `app.company_id`.
-2. **Spike B ó Field mask view:** base table + view exposing subset of columns; role connects to view only.
-3. **Spike C ó Audit trigger hardening:** trigger writes to audit table as a role that can only INSERT.
-4. **Spike D ó Pending table RLS:** submitter vs reviewer policies.
+1. **Spike A ù Company/row RLS:** policy keyed on `app.principal_id` / `app.company_id`.
+2. **Spike B ù Field mask view:** base table + view exposing subset of columns; role connects to view only.
+3. **Spike C ù Audit trigger hardening:** trigger writes to audit table as a role that can only INSERT.
+4. **Spike D ù Pending table RLS:** submitter vs reviewer policies.
 
 Document results below under **Findings**.
 
@@ -51,11 +51,11 @@ _Empty until spikes run (post-v1)._
 ## Alternatives considered
 
 - TypeScript-only policy engine (current v1 choice).
-- OPA / Cedar for policy DSL ó too heavy for our use case.
-- Supabase / PostgREST patterns ó reference only; opposite architectural direction.
+- OPA / Cedar for policy DSL ù too heavy for our use case.
+- Supabase / PostgREST patterns ù reference only; opposite architectural direction.
 
 ## References
 
 - PostgreSQL docs: RLS, triggers, `SECURITY INVOKER` vs `DEFINER` views
 - OWASP: indirect object references / mass assignment (Field abstraction helps)
-- Cross-link: [`../threat-model.md`](../threat-model.md) T5, T6, T9, T12.
+- Cross-link: [`../threat-model.md`](../foundations/threat-model.md) T5, T6, T9, T12.
