@@ -27,8 +27,8 @@ A **Surface** is the unit that matches **one user-facing screen or flow**: a **f
 | **UX scope** | One page or form (and its list, if any) � what the user sees and edits |
 | **Data scope** | **Spans** one or more **tables and/or views** joined for that screen |
 | **Tables** | A physical table may appear in **multiple** Surfaces (e.g. `customers` on `customer_detail` and `job_detail`) |
-| **Identity** | Stable `id` in repo YAML (e.g. `job_detail`, `job_list`) |
-| **Policy boundary** | Manifest and policies are resolved **per Surface** (and per record when in detail mode) |
+| **Identity** | Stable `id` in repo YAML (e.g. `job`, `customer_detail`) |
+| **Policy boundary** | Manifest resolved **per Surface** + **`mode`** (`list` / `detail` / `create`); see **List vs detail** below |
 
 ### What it is not
 
@@ -38,23 +38,32 @@ A **Surface** is the unit that matches **one user-facing screen or flow**: a **f
 
 ### Example
 
-Surface `job_detail`:
+Surface `job` (anchor `jobs`):
 
-- UI: one detail form
-- Data: `jobs`, `customers`, `sites`, `job_lines`, `assignments`, `attachments`
-- Fields: `summary`, `scope`, `financials`, `assignments`, `attachments`
+- **Modes:** `list` (searchable grid + bulk), `detail` (single-record form), `create` (deferred patterns)
+- **Data:** `jobs`, `customers`, `sites`, `assignments` (and more on detail)
+- **Fields:** shared ids across modes where the same logical data appears (e.g. `summary`, `financial_terms`, `assignments`); mode metadata may include/exclude Fields from projection (e.g. `scope` on detail only, `customer_site` on list only)
 
-Surface `job_list`:
+> **Transitional (Phase 01):** Repo still uses split ids `job_list` and `job_detail` for YAML/codegen until consolidated. Treat them as **`job` + mode** for policy semantics; keep `read` / `rowScope` aligned across both until merge.
 
-- UI: searchable list
-- Data: mainly `jobs` (+ joins for display columns)
-- Same table `jobs` as `job_detail`, different Field set and Surface id.
+### Decision: list and detail are modes, not separate role surfaces (2026-06-01)
 
-### List vs detail
+**Choice:** For a domain (e.g. jobs), use **one Surface id** and **`mode`** on `PolicyScope` (`list` | `detail` | `create`). **Roles are not defined separately per list vs detail.** Role bindings live in a single **base** policy for that Surface id. **Mode overlays** adjust which actions apply on a given screen (e.g. `submit` on detail only, bulk `write` on `assignments` in list mode) and which Fields appear in structure metadata — overlays **may only restrict**, never grant `read` on a Field the base policy denied.
 
-One Surface can declare **modes** (list / detail / create) or split into two ids. Convention TBD in metadata schema. **Invariant:** permissions and manifests are scoped to the Surface (and mode) the user opened.
+**Rationale:** Row scope (`own` / `all`) and sensitive Field visibility (e.g. no `read` on `financial_terms` for `field_tech`) must hold for list queries, detail `get`, and bulk on the same anchor table. Split Surface ids duplicated role YAML and invited drift. List vs detail remains a real UX/API difference (projection, bulk, entity id) without a second role matrix.
 
-See [`architecture/metadata-and-codegen.md`](../reference/metadata-and-codegen.md).
+**Invariants:**
+
+| Concern | Rule |
+|--------|------|
+| Row scope | Set once per role in **base** policy; same filter for list, detail, bulk |
+| Field `read` | Base policy; if denied, omitted on **all** modes |
+| Mode overlay | Narrow actions / surfaceActions only; no widening `read` |
+| Resolve | `manifest = merge(basePolicy(role, surfaceId), modeOverlay(role, surfaceId, mode))` |
+| RLS (post-v1) | Row rules on anchor **table** + principal, not on `*_list` vs `*_detail` ids |
+| Enforcement | Still one manifest per request; DAL + `PolicyService` only |
+
+See [`../reference/access-control.md`](../reference/access-control.md) and [`../reference/metadata-and-codegen.md`](../reference/metadata-and-codegen.md).
 
 ## Field
 
@@ -64,7 +73,9 @@ A **Field** is a **logical** data element for permissions and UI, not necessaril
 - One Field ? multiple columns (e.g. `home_address` ? street, city, postcode)
 - One Field ? a computed or joined value (e.g. `primary_contact_name`)
 
-Policies grant `read` / `write` / `approve` on Fields within a Surface. Storage mapping is defined in Surface metadata.
+Policies grant `read` / `write` / `approve` on Fields on a Surface (**base** bindings, all modes). Mode overlays may restrict actions per screen. Storage mapping (which columns belong to a Field) is defined in Surface metadata, optionally per mode.
+
+See **Decision: list and detail are modes** under [Surface](#surface).
 
 ## Entity / record / row
 

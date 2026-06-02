@@ -3,6 +3,22 @@ import type { AssignmentRow, JobRow, LatchUserRow } from "../schema.js";
 export type MemoryJobRecord = Omit<JobRow, "createdAt" | "updatedAt"> & {
   createdAt?: Date;
   updatedAt?: Date;
+  /** Pilot join columns for `job_list` `customer_site` Field. */
+  customerName?: string;
+  siteLabel?: string;
+};
+
+export type ListJobsOpts = {
+  principalId: string;
+  rowScope: "own" | "all";
+  status?: string;
+  limit: number;
+  offset: number;
+};
+
+export type ListJobsResult = {
+  rows: MemoryJobRecord[];
+  total: number;
 };
 
 export type MemoryAssignmentRecord = AssignmentRow;
@@ -70,4 +86,28 @@ export class MemoryJobStore {
 
   isUserAssignedToJob = (jobId: string, userId: string): boolean =>
     this.getAssignmentsForJob(jobId).some((a) => a.userId === userId);
+
+  listJobs = (opts: ListJobsOpts): ListJobsResult => {
+    let rows = [...this.jobs.values()];
+
+    if (opts.rowScope === "own") {
+      rows = rows.filter((job) =>
+        this.isUserAssignedToJob(job.id, opts.principalId),
+      );
+    }
+
+    if (opts.status !== undefined) {
+      rows = rows.filter((job) => job.status === opts.status);
+    }
+
+    rows.sort((a, b) => {
+      const aMs = a.scheduledAt?.getTime() ?? 0;
+      const bMs = b.scheduledAt?.getTime() ?? 0;
+      return aMs - bMs;
+    });
+
+    const total = rows.length;
+    const page = rows.slice(opts.offset, opts.offset + opts.limit);
+    return { rows: page, total };
+  };
 }

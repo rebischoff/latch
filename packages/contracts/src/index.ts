@@ -1,4 +1,10 @@
 export type {
+  BulkOperationMode,
+  BulkSkipReason,
+  BulkUpdateFailed,
+  BulkUpdateOptions,
+  BulkUpdateResult,
+  BulkUpdateSkipped,
   FieldAction,
   FieldId,
   FieldPolicyGrant,

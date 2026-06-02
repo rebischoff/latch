@@ -1,9 +1,10 @@
 import type { MemoryAssignmentRecord, MemoryJobRecord } from "./memory-store.js";
-import type { JobDetailPatchDto } from "./schemas.js";
+import type { JobDetailPatchDto, JobListPatchDto } from "./schemas.js";
 
 /** Field ids present in a parsed PATCH body (top-level keys only). */
-export const patchedFieldIds = (patch: JobDetailPatchDto): string[] =>
-  Object.keys(patch);
+export const patchedFieldIds = (
+  patch: JobDetailPatchDto | JobListPatchDto,
+): string[] => Object.keys(patch);
 
 const parseScheduledAt = (value: string | null): Date | null =>
   value == null ? null : new Date(value);
@@ -14,7 +15,7 @@ const parseScheduledAt = (value: string | null): Date | null =>
  */
 export const applyJobPatch = (
   row: MemoryJobRecord,
-  patch: JobDetailPatchDto,
+  patch: JobDetailPatchDto | JobListPatchDto,
 ): MemoryJobRecord => {
   const next: MemoryJobRecord = { ...row, updatedAt: new Date() };
 
@@ -30,7 +31,7 @@ export const applyJobPatch = (
     }
   }
 
-  if (patch.scope?.description !== undefined) {
+  if ("scope" in patch && patch.scope?.description !== undefined) {
     next.description = patch.scope.description;
   }
 
@@ -43,7 +44,7 @@ export const applyJobPatch = (
 
 export const applyAssignmentsPatch = (
   jobId: string,
-  patch: JobDetailPatchDto,
+  patch: JobDetailPatchDto | JobListPatchDto,
 ): MemoryAssignmentRecord[] | undefined => {
   if (patch.assignments === undefined) {
     return undefined;

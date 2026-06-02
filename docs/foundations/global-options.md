@@ -19,8 +19,16 @@ Platform-wide configuration defaults. Exact storage (env, `<project>_config` tab
 | `authzModel` | `rbac` | (v1) | Role-based. |
 | `multiRoleCombine` | `union_grants` | (v1, single mode) | **v1 implements `union_grants` only.** Other modes designed but deferred. See [`access-control.md`](../reference/access-control.md). |
 | `denyWins` | `true` | (v1) | Explicit `deny` overrides any allow. |
-| `forbiddenFieldResponse` | `403` | (v1) | Optional `404` for sensitive Fields (existence hiding). |
+| `forbiddenFieldResponse` | `403` | (v1) | Platform default. Surfaces may override — see Decision below. |
 | `auditDeniedAccess` | `false` | (v1) | When `true`, denied reads/writes log to audit. Recommended `true` for sensitive Surfaces. |
+
+### Decision: per-Surface `forbiddenFieldResponse` override (2026-06-01)
+
+**Choice:** Global default remains **`403`**. A Surface may set **`forbiddenFieldResponse: 404`** in its structure metadata (e.g. `customer_detail.surface.yaml`) when the whole Surface should use existence-hiding for principals with no grant (not only high-sensitivity Fields). Other Surfaces keep the platform default unless explicitly overridden.
+
+**Phase 02 usage:** `customer_detail` uses **`404`** so `field_tech` (no binding) receives the same hide semantics as cross-tech job denial (S4). Explicit requests for forbidden Fields on that Surface also return **404**, not **403**.
+
+**Rationale:** Locks the seam documented in [`access-control.md`](../reference/access-control.md) without changing the default for `job_detail` / `job_list`. See [`../phases/02-ui-sync/decisions.md`](../phases/02-ui-sync/decisions.md).
 
 ### `multiRoleCombine` modes
 

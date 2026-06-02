@@ -26,10 +26,10 @@ Minimal list UI at `/jobs`: manifest-driven columns, row link to `/jobs/[id]`, o
 
 ## Verify (stop gate)
 
-- [ ] Tech opens `/jobs` — sees assigned jobs only; no financial column
-- [ ] Admin opens `/jobs` — sees financial column when granted
-- [ ] Row link navigates to detail page
-- [ ] [`../STATUS.md`](../STATUS.md) → **20-e2e-job-list.md**
+- [x] Tech opens `/jobs` — sees assigned jobs only; no financial column
+- [x] Admin opens `/jobs` — sees financial column when granted
+- [x] Row link navigates to detail page
+- [x] [`../STATUS.md`](../STATUS.md) → **20-e2e-job-list.md**
 
 ## Out of scope
 

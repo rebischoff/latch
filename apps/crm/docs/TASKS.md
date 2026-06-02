@@ -1,7 +1,7 @@
 # CRM — task checklist (planning)
 
 >
-> Build order and timing follow [`../../../docs/reference/crm-and-phases.md`](../../../docs/reference/crm-and-phases.md). Only **Step A** and the **`job_detail` pane** rest on `done` phases (Phase 00) and are safe to build first. The **list pane** waits for Phase 01 `dal.jobs.list`.
+> Build order and timing follow [`../../../docs/reference/crm-and-phases.md`](../../../docs/reference/crm-and-phases.md). Phase 01 `dal.jobs.list` is merged — **Step B-list** (list pane) is unblocked.
 
 ## Conventions
 
@@ -42,7 +42,7 @@ This checklist covers what is **already planned**. If a step reaches an unplanne
 **Proves:** `@latch/dal` `get`/`patch`/`delete`, `@latch/react` `<FieldControl>`/`<Can>`, manifest field omission, strict writes, hard delete + audit.
 **Depends on:** Phase 00 (done). Safe now.
 
-> Built as the **right pane** of the Jobs split view; left (list) pane is a placeholder until Step B-list.
+> Built as the **right pane** of the Jobs split view; left list pane is Step B-list.
 
 - [x] `app/jobs/page.tsx` — split view shell; right pane reads `?id=` or selection state; placeholder when none.
 - [x] Detail data: `resolveContext({ surfaceId: "job_detail", entityId })` → `dal.jobs.get`.
@@ -73,14 +73,14 @@ Or use the Neon SQL Editor in the dashboard. See [`../../../docs/foundations/dev
 **Proves:** Phase 01 `list`, projection, row scope.
 **Depends on:** Phase 01 `dal.jobs.list` **merged to `main`** — do not start before then (timing rule).
 
-- [ ] Left pane `Table` from list DTO; `rowKey="id"`; `onRow` click sets selected id → detail pane.
-- [ ] Columns derived from list DTO keys ∩ manifest (no forbidden columns).
-- [ ] Loading (`Table loading`) + empty (`Empty`) states.
-- [ ] (Optional) bulk select + one toolbar action if Phase 01 bulk is trivial to surface; else skip — tests cover bulk.
+- [x] Left pane `Table` from list DTO; `rowKey="id"`; `onRow` click sets selected id → detail pane.
+- [x] Columns derived from list DTO keys ∩ manifest (no forbidden columns).
+- [x] Loading (`Table loading`) + empty (`Empty`) states.
+- [ ] (Optional) bulk select + one toolbar action — **skipped**; `tests/job-list.e2e.test.ts` covers bulk.
 
 **Verify (stop gate):**
-- [ ] Tech row count ≤ admin row count (row scope visible live).
-- [ ] No financial column for tech.
+- [x] Tech row count ≤ admin row count (row scope visible live).
+- [x] No financial column for tech.
 
 ---
 

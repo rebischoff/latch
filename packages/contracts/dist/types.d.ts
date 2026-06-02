@@ -1,9 +1,9 @@
 /**
  * Client-safe permission types shared across server and UI.
- * @see docs/planning/architecture/permissions-and-ui-sync.md
+ * @see docs/reference/permissions-and-ui-sync.md
  */
 /** Actions grantable on a Surface or Field. */
-export type FieldAction = "read" | "write" | "delete" | "restore" | "approve" | "hard_delete";
+export type FieldAction = "read" | "write" | "submit" | "delete" | "restore" | "approve" | "hard_delete";
 export type SurfaceId = string;
 export type FieldId = string;
 export type RoleId = string;
@@ -22,7 +22,7 @@ export interface Manifest {
     surface: SurfaceId;
     /** Present in detail/edit scope when anchored to one record. */
     entityId?: string;
-    /** Surface-level actions (e.g. open detail, soft-delete surface). */
+    /** Surface-level actions (e.g. open detail, delete surface). */
     actions: FieldAction[];
     fields: Record<FieldId, FieldAction[]>;
     /** Row filter for list/detail queries; set by PolicyService. */
@@ -59,5 +59,29 @@ export interface RoleSurfacePolicy {
 export interface SurfacePolicies {
     surface: SurfaceId;
     roles: Record<RoleId, RoleSurfacePolicy>;
+}
+/** Why a row was excluded from a bulk DAL operation. */
+export type BulkSkipReason = "forbidden_row" | "forbidden_field" | "not_found" | "validation_error";
+export type BulkUpdateSkipped = {
+    id: string;
+    reason: BulkSkipReason;
+    detail?: unknown;
+};
+export type BulkUpdateFailed = {
+    id: string;
+    reason: "db_error";
+    detail?: unknown;
+};
+/** Per-row outcome of `bulkUpdate` / `bulkDelete` (see bulk-operations.md). */
+export interface BulkUpdateResult {
+    succeeded: string[];
+    skipped: BulkUpdateSkipped[];
+    failed: BulkUpdateFailed[];
+}
+export type BulkOperationMode = "partial" | "all_or_nothing";
+export interface BulkUpdateOptions {
+    mode?: BulkOperationMode;
+    /** Links per-row audit rows and optional `bulk_summary` entry. */
+    requestId?: string;
 }
 //# sourceMappingURL=types.d.ts.map

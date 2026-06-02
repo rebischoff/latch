@@ -1,6 +1,6 @@
 # Trades CRM (`apps/crm`)
 
-> **Status:** Step A scaffold — shell, stub auth, policy nav. Job UI in Step B.
+> **Status:** Steps A + B (jobs split view: `job_list` table + `job_detail` pane). Customers and real auth gated on later phases.
 
 ## Purpose
 

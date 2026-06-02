@@ -5,11 +5,13 @@ import {
   ForbiddenError,
   narrowPatchSchema,
   NotFoundError,
-  surfaceAllows,
   ValidationError,
+  type BulkUpdateOptions,
+  type BulkUpdateResult,
   type PermissionContext,
 } from "@latch/contracts";
 
+import { bulkDelete as runBulkDelete, bulkUpdate as runBulkUpdate } from "./bulk.js";
 import {
   applyAssignmentsPatch,
   applyJobPatch,
@@ -17,8 +19,20 @@ import {
   patchedFieldIds,
 } from "./apply-patch.js";
 import type { MemoryJobStore } from "./memory-store.js";
+import {
+  projectJobListRow,
+  type JobListJoins,
+  type ProjectedJobListRow,
+} from "./list-project.js";
+import { canDeleteJob, deleteJobWithAudit } from "./job-delete.js";
 import { projectJobRow, type ProjectedJobDetail } from "./project.js";
-import { JobDetailPatchSchema, type JobDetailPatchDto } from "./schemas.js";
+import {
+  JobDetailPatchSchema,
+  type JobDetailPatchDto,
+  JobListQuerySchema,
+  LIST_DEFAULT_PAGE_SIZE,
+  type JobListQueryDto,
+} from "./schemas.js";
 
 const assertPermissionContext = (ctx: PermissionContext): void => {
   if (ctx.manifest.surface !== ctx.surface) {
@@ -27,6 +41,31 @@ const assertPermissionContext = (ctx: PermissionContext): void => {
     );
   }
 };
+
+const assertJobListContext = (ctx: PermissionContext): void => {
+  assertPermissionContext(ctx);
+  if (ctx.surface !== "job_list") {
+    throw new Error(
+      `list requires PermissionContext.surface "job_list", got "${ctx.surface}"`,
+    );
+  }
+};
+
+const jobListJoins = (row: {
+  customerName?: string;
+  siteLabel?: string;
+}): JobListJoins => ({
+  customerName: row.customerName ?? "",
+  siteLabel: row.siteLabel ?? "",
+});
+
+const normalizeListQuery = (
+  raw: JobListQueryDto | undefined,
+): { status?: string; limit: number; offset: number } => ({
+  status: raw?.status,
+  limit: raw?.limit ?? LIST_DEFAULT_PAGE_SIZE,
+  offset: raw?.offset ?? 0,
+});
 
 const rowVisibleToPrincipal = (
   ctx: PermissionContext,
@@ -38,10 +77,6 @@ const rowVisibleToPrincipal = (
   }
   return store.isUserAssignedToJob(jobId, ctx.principal.id);
 };
-
-const canDeleteJob = (ctx: PermissionContext): boolean =>
-  surfaceAllows(ctx.manifest, "delete") ||
-  fieldAllows(ctx.manifest, "summary", "delete");
 
 const financialNeedsPending = (
   ctx: PermissionContext,
@@ -58,7 +93,27 @@ const stripFinancialFromPatch = (
   return rest;
 };
 
+export type JobListResult = {
+  rows: ProjectedJobListRow[];
+  total: number;
+};
+
 export type JobsDal = {
+  list: (
+    ctx: PermissionContext,
+    opts?: JobListQueryDto,
+  ) => JobListResult;
+  bulkUpdate: (
+    ctx: PermissionContext,
+    ids: string[],
+    patch: unknown,
+    opts?: BulkUpdateOptions,
+  ) => Promise<BulkUpdateResult>;
+  bulkDelete: (
+    ctx: PermissionContext,
+    ids: string[],
+    opts?: BulkUpdateOptions,
+  ) => Promise<BulkUpdateResult>;
   get: (ctx: PermissionContext, id: string) => ProjectedJobDetail;
   patch: (
     ctx: PermissionContext,
@@ -76,6 +131,42 @@ export const createJobsDal = (
   store: MemoryJobStore,
   pendingStore: PendingStore,
 ): JobsDal => ({
+  list: (ctx, rawOpts) => {
+    assertJobListContext(ctx);
+
+    const parsed = JobListQuerySchema.safeParse(rawOpts ?? {});
+    if (!parsed.success) {
+      throw new ValidationError("Validation failed", parsed.error.flatten());
+    }
+
+    const query = normalizeListQuery(parsed.data);
+    const { rows, total } = store.listJobs({
+      principalId: ctx.principal.id,
+      rowScope: ctx.manifest.rowScope ?? "all",
+      status: query.status,
+      limit: query.limit,
+      offset: query.offset,
+    });
+
+    return {
+      rows: rows.map((row) => {
+        const assignments = store.getAssignmentsForJob(row.id);
+        return projectJobListRow(
+          row,
+          ctx.manifest,
+          assignments,
+          jobListJoins(row),
+        );
+      }),
+      total,
+    };
+  },
+
+  bulkUpdate: (ctx, ids, patch, opts) =>
+    runBulkUpdate(store, ctx, ids, patch, opts),
+
+  bulkDelete: (ctx, ids, opts) => runBulkDelete(store, ctx, ids, opts),
+
   get: (ctx, id) => {
     assertPermissionContext(ctx);
 
@@ -247,18 +338,6 @@ export const createJobsDal = (
       throw new NotFoundError();
     }
 
-    const beforeSnapshot = jobRowAuditSnapshot(row);
-    store.deleteJob(id);
-
-    await writeAudit({
-      actorId: ctx.principal.id,
-      action: "delete",
-      tableName: "jobs",
-      recordId: id,
-      moduleId: ctx.surface,
-      fieldIds: ["summary"],
-      before: beforeSnapshot,
-      after: null,
-    });
+    await deleteJobWithAudit(store, ctx, row);
   },
 });

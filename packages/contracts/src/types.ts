@@ -78,3 +78,37 @@ export interface SurfacePolicies {
   surface: SurfaceId;
   roles: Record<RoleId, RoleSurfacePolicy>;
 }
+
+/** Why a row was excluded from a bulk DAL operation. */
+export type BulkSkipReason =
+  | "forbidden_row"
+  | "forbidden_field"
+  | "not_found"
+  | "validation_error";
+
+export type BulkUpdateSkipped = {
+  id: string;
+  reason: BulkSkipReason;
+  detail?: unknown;
+};
+
+export type BulkUpdateFailed = {
+  id: string;
+  reason: "db_error";
+  detail?: unknown;
+};
+
+/** Per-row outcome of `bulkUpdate` / `bulkDelete` (see bulk-operations.md). */
+export interface BulkUpdateResult {
+  succeeded: string[];
+  skipped: BulkUpdateSkipped[];
+  failed: BulkUpdateFailed[];
+}
+
+export type BulkOperationMode = "partial" | "all_or_nothing";
+
+export interface BulkUpdateOptions {
+  mode?: BulkOperationMode;
+  /** Links per-row audit rows and optional `bulk_summary` entry. */
+  requestId?: string;
+}

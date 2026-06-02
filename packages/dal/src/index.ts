@@ -21,8 +21,32 @@ export type { JobsDal } from "./jobs/repository.js";
 
 export type { PendingStore } from "@latch/approval";
 export { createMemoryPendingStore } from "@latch/approval";
+export { projectJobListRow } from "./jobs/list-project.js";
+export type {
+  JobListJoins,
+  ProjectedJobListRow,
+} from "./jobs/list-project.js";
+
 export { projectJobRow } from "./jobs/project.js";
 export type { ProjectedJobDetail } from "./jobs/project.js";
+
+export {
+  BULK_MAX_BATCH,
+  JobListPatchSchema,
+  JobListQuerySchema,
+  JobListRowSchema,
+  LIST_DEFAULT_PAGE_SIZE,
+  LIST_MAX_PAGE_SIZE,
+} from "./jobs/schemas.js";
+export type {
+  JobListPatchDto,
+  JobListQueryDto,
+  JobListRowDto,
+} from "./jobs/schemas.js";
+
+export type { BulkUpdateResult } from "@latch/contracts";
+
+export type { JobListResult } from "./jobs/repository.js";
 
 export { MemoryJobStore } from "./jobs/memory-store.js";
 export type {

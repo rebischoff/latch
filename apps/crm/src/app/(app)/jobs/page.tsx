@@ -2,11 +2,7 @@ import { isNotFoundError } from "@latch/contracts";
 import { Suspense } from "react";
 
 import { JobsSplitView } from "@/components/jobs/JobsSplitView";
-import {
-  getJobsDal,
-  listVisibleSeedJobIds,
-  resolveContext,
-} from "@/lib/latch";
+import { getJobsDal, resolveContext } from "@/lib/latch";
 
 export const dynamic = "force-dynamic";
 
@@ -14,18 +10,32 @@ type JobsPageProps = {
   searchParams: Promise<{ id?: string }>;
 };
 
+const fetchJobList = async () => {
+  const listCtx = await resolveContext({ surfaceId: "job_list" });
+  const { rows, total } = getJobsDal().list(listCtx);
+  return { rows, total, manifest: listCtx.manifest };
+};
+
 const JobsPageContent = async ({ selectedId }: { selectedId?: string }) => {
-  const visibleJobIds = await listVisibleSeedJobIds();
+  const { rows, total, manifest } = await fetchJobList();
 
   if (!selectedId) {
-    return <JobsSplitView visibleJobIds={visibleJobIds} />;
-  }
-
-  if (!visibleJobIds.includes(selectedId)) {
     return (
       <JobsSplitView
+        listRows={rows}
+        listTotal={total}
+        listManifest={manifest}
+      />
+    );
+  }
+
+  if (!rows.some((row) => row.id === selectedId)) {
+    return (
+      <JobsSplitView
+        listRows={rows}
+        listTotal={total}
+        listManifest={manifest}
         selectedId={selectedId}
-        visibleJobIds={visibleJobIds}
         notFound
       />
     );
@@ -39,8 +49,10 @@ const JobsPageContent = async ({ selectedId }: { selectedId?: string }) => {
     const job = getJobsDal().get(ctx, selectedId);
     return (
       <JobsSplitView
+        listRows={rows}
+        listTotal={total}
+        listManifest={manifest}
         selectedId={selectedId}
-        visibleJobIds={visibleJobIds}
         detail={{ job, manifest: ctx.manifest }}
       />
     );
@@ -48,8 +60,10 @@ const JobsPageContent = async ({ selectedId }: { selectedId?: string }) => {
     if (isNotFoundError(error)) {
       return (
         <JobsSplitView
+          listRows={rows}
+          listTotal={total}
+          listManifest={manifest}
           selectedId={selectedId}
-          visibleJobIds={visibleJobIds}
           notFound
         />
       );
@@ -62,7 +76,11 @@ export default async function JobsPage({ searchParams }: JobsPageProps) {
   const { id } = await searchParams;
 
   return (
-    <Suspense fallback={<JobsSplitView selectedId={id} />}>
+    <Suspense
+      fallback={
+        <JobsSplitView selectedId={id} listLoading />
+      }
+    >
       <JobsPageContent selectedId={id} />
     </Suspense>
   );

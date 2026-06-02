@@ -39,6 +39,48 @@ const buildCtx = (
   return { principal, manifest, surface: "job_detail" };
 };
 
+const buildListCtx = (userId: string, roles: string[]): PermissionContext => {
+  const policy = new PolicyService();
+  const principal = { id: userId, roles };
+  const manifest = policy.resolve(principal, {
+    surface: "job_list",
+    mode: "list",
+  });
+  return { principal, manifest, surface: "job_list" };
+};
+
+/** Synthetic ctx: rowScope own + assignments write (T15 row-filter partial bulk). */
+const buildOwnScopeBulkWriteCtx = (userId: string): PermissionContext => ({
+  principal: { id: userId, roles: ["field_tech"] },
+  surface: "job_list",
+  manifest: {
+    surface: "job_list",
+    actions: ["read", "write"],
+    rowScope: "own",
+    fields: {
+      summary: ["read"],
+      customer_site: ["read"],
+      assignments: ["read", "write"],
+    },
+  },
+});
+
+/** Synthetic ctx: rowScope own + delete (T15 row-filter partial bulk delete). */
+const buildOwnScopeBulkDeleteCtx = (userId: string): PermissionContext => ({
+  principal: { id: userId, roles: ["field_tech"] },
+  surface: "job_list",
+  manifest: {
+    surface: "job_list",
+    actions: ["read", "delete"],
+    rowScope: "own",
+    fields: {
+      summary: ["read"],
+      customer_site: ["read"],
+      assignments: ["read"],
+    },
+  },
+});
+
 const audit = createMemoryAuditWriter();
 
 const createDal = (store: MemoryJobStore) =>
@@ -215,6 +257,413 @@ describe("createJobsDal.patch", () => {
         summary: { title: "Nope" },
       }),
     ).rejects.toThrow(NotFoundError);
+  });
+});
+
+describe("createJobsDal.list", () => {
+  it("field_tech: rows only for assigned jobs; no financial_terms key", () => {
+    const store = new MemoryJobStore();
+    seedPilotJobs(store);
+    const dal = createDal(store);
+
+    const { rows } = dal.list(buildListCtx(SEED_TECH_ID, ["field_tech"]));
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.id).toBe(SEED_JOB_OWNED);
+    expect(rows[0]?.summary?.title).toContain("Panel upgrade");
+    expect(rows[0]).not.toHaveProperty("financial_terms");
+    for (const row of rows) {
+      expect(row).not.toHaveProperty("financial_terms");
+    }
+  });
+
+  it("office_admin: all jobs in scope with financial_terms when granted", () => {
+    const store = new MemoryJobStore();
+    seedPilotJobs(store);
+    const dal = createDal(store);
+
+    const { rows, total } = dal.list(
+      buildListCtx(SEED_ADMIN_ID, ["office_admin"]),
+    );
+
+    expect(total).toBe(2);
+    expect(rows).toHaveLength(2);
+    const ids = rows.map((r) => r.id).sort();
+    expect(ids).toEqual([SEED_JOB_OTHER, SEED_JOB_OWNED].sort());
+
+    const owned = rows.find((r) => r.id === SEED_JOB_OWNED);
+    expect(owned?.financial_terms?.contract_amount).toBe("12500.00");
+  });
+
+  it("field_tech with no assignments returns empty array", () => {
+    const store = new MemoryJobStore();
+    seedPilotJobs(store);
+    const dal = createDal(store);
+
+    const { rows, total } = dal.list(
+      buildListCtx("seed-unassigned-tech", ["field_tech"]),
+    );
+
+    expect(rows).toEqual([]);
+    expect(total).toBe(0);
+  });
+
+  it("rejects limit above listMaxPageSize with ValidationError", () => {
+    const store = new MemoryJobStore();
+    seedPilotJobs(store);
+    const dal = createDal(store);
+
+    expect(() =>
+      dal.list(buildListCtx(SEED_ADMIN_ID, ["office_admin"]), { limit: 201 }),
+    ).toThrow(ValidationError);
+  });
+
+  it("filters by status when opts.status is set", () => {
+    const store = new MemoryJobStore();
+    seedPilotJobs(store);
+    const dal = createDal(store);
+
+    const { rows } = dal.list(buildListCtx(SEED_ADMIN_ID, ["office_admin"]), {
+      status: "scheduled",
+    });
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.id).toBe(SEED_JOB_OWNED);
+  });
+});
+
+const NEW_TECH_ID = "seed-bulk-target-tech";
+
+const seedBulkJobs = (
+  store: MemoryJobStore,
+  count: number,
+  prefix = "seed-bulk-job",
+): string[] => {
+  const ids: string[] = [];
+  for (let i = 0; i < count; i++) {
+    const id = `${prefix}-${i}`;
+    ids.push(id);
+    store.upsertJob({
+      id,
+      title: `Bulk job ${i}`,
+      status: "scheduled",
+      scheduledAt: new Date("2026-05-01T12:00:00.000Z"),
+      contractAmount: "1000.00",
+      customerName: "Bulk Co",
+      siteLabel: `Site ${i}`,
+    });
+    store.addAssignment({ jobId: id, userId: SEED_ADMIN_ID });
+  }
+  return ids;
+};
+
+describe("createJobsDal.bulkUpdate", () => {
+  it("office_admin: partial mode — 15 succeeded, 5 not_found skipped; assignments updated", async () => {
+    setAuditWriter(audit.writer);
+    const store = new MemoryJobStore();
+    seedPilotJobs(store);
+    store.upsertUser({ id: NEW_TECH_ID, displayName: "Bulk target tech" });
+    const jobIds = seedBulkJobs(store, 15);
+    const dal = createDal(store);
+    const ctx = buildListCtx(SEED_ADMIN_ID, ["office_admin"]);
+
+    const ids = [
+      ...jobIds,
+      "missing-0",
+      "missing-1",
+      "missing-2",
+      "missing-3",
+      "missing-4",
+    ];
+
+    const result = await dal.bulkUpdate(
+      ctx,
+      ids,
+      { assignments: [{ user_id: NEW_TECH_ID }] },
+      { mode: "partial", requestId: "req-bulk-1" },
+    );
+
+    expect(result.succeeded).toHaveLength(15);
+    expect(result.skipped).toHaveLength(5);
+    expect(result.skipped.every((s) => s.reason === "not_found")).toBe(true);
+    expect(result.failed).toHaveLength(0);
+
+    for (const id of jobIds) {
+      const assignees = store.getAssignmentsForJob(id).map((a) => a.userId);
+      expect(assignees).toEqual([NEW_TECH_ID]);
+    }
+
+    expect(audit.entries.filter((e) => e.action === "update")).toHaveLength(15);
+    expect(audit.entries.some((e) => e.action === "bulk_summary")).toBe(true);
+  });
+
+  it("office_admin: all_or_nothing with any skip applies no changes", async () => {
+    setAuditWriter(audit.writer);
+    const store = new MemoryJobStore();
+    seedPilotJobs(store);
+    store.upsertUser({ id: NEW_TECH_ID, displayName: "Bulk target tech" });
+    const jobIds = seedBulkJobs(store, 15);
+    const dal = createDal(store);
+
+    const before = jobIds.map((id) =>
+      store.getAssignmentsForJob(id).map((a) => a.userId),
+    );
+
+    const result = await dal.bulkUpdate(
+      buildListCtx(SEED_ADMIN_ID, ["office_admin"]),
+      [...jobIds, "missing-0"],
+      { assignments: [{ user_id: NEW_TECH_ID }] },
+      { mode: "all_or_nothing" },
+    );
+
+    expect(result.succeeded).toHaveLength(0);
+    expect(result.skipped).toHaveLength(1);
+    expect(result.skipped[0]).toMatchObject({
+      id: "missing-0",
+      reason: "not_found",
+    });
+
+    for (let i = 0; i < jobIds.length; i++) {
+      const assignees = store.getAssignmentsForJob(jobIds[i]!).map(
+        (a) => a.userId,
+      );
+      expect(assignees).toEqual(before[i]);
+    }
+
+    expect(audit.entries).toHaveLength(0);
+  });
+
+  it("rejects unknown patch keys with ValidationError and touches no rows", async () => {
+    setAuditWriter(audit.writer);
+    const store = new MemoryJobStore();
+    seedPilotJobs(store);
+    const jobIds = seedBulkJobs(store, 3);
+    const dal = createDal(store);
+    const ctx = buildListCtx(SEED_ADMIN_ID, ["office_admin"]);
+
+    const before = jobIds.map((id) =>
+      store.getAssignmentsForJob(id).map((a) => a.userId),
+    );
+
+    await expect(
+      dal.bulkUpdate(ctx, jobIds, {
+        assignments: [{ user_id: NEW_TECH_ID }],
+        evil: true,
+      }),
+    ).rejects.toThrow(ValidationError);
+
+    for (let i = 0; i < jobIds.length; i++) {
+      const assignees = store.getAssignmentsForJob(jobIds[i]!).map(
+        (a) => a.userId,
+      );
+      expect(assignees).toEqual(before[i]);
+    }
+
+    expect(audit.entries).toHaveLength(0);
+  });
+
+  it("rejects batch larger than bulkMaxBatch", async () => {
+    const store = new MemoryJobStore();
+    seedPilotJobs(store);
+    const dal = createDal(store);
+    const ctx = buildListCtx(SEED_ADMIN_ID, ["office_admin"]);
+    const ids = Array.from({ length: 501 }, (_, i) => `id-${i}`);
+
+    await expect(
+      dal.bulkUpdate(ctx, ids, {
+        assignments: [{ user_id: NEW_TECH_ID }],
+      }),
+    ).rejects.toThrow(ValidationError);
+  });
+
+  it("own scope: partial mode — permitted + forbidden row ids; DB consistent (T15)", async () => {
+    setAuditWriter(audit.writer);
+    const store = new MemoryJobStore();
+    seedPilotJobs(store);
+    store.upsertUser({ id: NEW_TECH_ID, displayName: "Bulk target tech" });
+    const dal = createDal(store);
+    const ctx = buildOwnScopeBulkWriteCtx(SEED_TECH_ID);
+
+    const beforeOtherAssignees = store
+      .getAssignmentsForJob(SEED_JOB_OTHER)
+      .map((a) => a.userId);
+
+    const result = await dal.bulkUpdate(
+      ctx,
+      [SEED_JOB_OWNED, SEED_JOB_OTHER],
+      { assignments: [{ user_id: NEW_TECH_ID }] },
+      { mode: "partial" },
+    );
+
+    expect(result.succeeded).toEqual([SEED_JOB_OWNED]);
+    expect(result.skipped).toEqual([
+      { id: SEED_JOB_OTHER, reason: "not_found" },
+    ]);
+
+    expect(store.getAssignmentsForJob(SEED_JOB_OWNED).map((a) => a.userId)).toEqual(
+      [NEW_TECH_ID],
+    );
+    expect(store.getAssignmentsForJob(SEED_JOB_OTHER).map((a) => a.userId)).toEqual(
+      beforeOtherAssignees,
+    );
+
+    expect(audit.entries.filter((e) => e.action === "update")).toHaveLength(1);
+  });
+
+  it("forbidden_field when patch Field is submit-only (not write)", async () => {
+    setAuditWriter(audit.writer);
+    const store = new MemoryJobStore();
+    seedPilotJobs(store);
+    const dal = createDal(store);
+    const ctx: PermissionContext = {
+      principal: { id: SEED_ADMIN_ID, roles: ["office_admin"] },
+      surface: "job_list",
+      manifest: {
+        surface: "job_list",
+        actions: ["read"],
+        rowScope: "all",
+        fields: {
+          assignments: ["read", "submit"],
+        },
+      },
+    };
+
+    const result = await dal.bulkUpdate(
+      ctx,
+      [SEED_JOB_OWNED],
+      { assignments: [{ user_id: NEW_TECH_ID }] },
+      { mode: "partial" },
+    );
+
+    expect(result.succeeded).toHaveLength(0);
+    expect(result.skipped).toEqual([
+      {
+        id: SEED_JOB_OWNED,
+        reason: "forbidden_field",
+        detail: { fields: ["assignments"] },
+      },
+    ]);
+    expect(
+      store.getAssignmentsForJob(SEED_JOB_OWNED).some(
+        (a) => a.userId === SEED_TECH_ID,
+      ),
+    ).toBe(true);
+    expect(audit.entries).toHaveLength(0);
+  });
+});
+
+describe("createJobsDal.bulkDelete", () => {
+  it("office_admin: partial mode deletes visible jobs; audit per row; absent from list", async () => {
+    setAuditWriter(audit.writer);
+    const store = new MemoryJobStore();
+    seedPilotJobs(store);
+    const jobIds = seedBulkJobs(store, 10);
+    const dal = createDal(store);
+    const ctx = buildListCtx(SEED_ADMIN_ID, ["office_admin"]);
+
+    const ids = [...jobIds, "missing-0", "missing-1"];
+
+    const result = await dal.bulkDelete(ctx, ids, {
+      mode: "partial",
+      requestId: "req-bulk-del-1",
+    });
+
+    expect(result.succeeded).toHaveLength(10);
+    expect(result.skipped).toHaveLength(2);
+    expect(result.skipped.every((s) => s.reason === "not_found")).toBe(true);
+    expect(result.failed).toHaveLength(0);
+
+    for (const id of jobIds) {
+      expect(store.getJob(id)).toBeUndefined();
+      expect(store.getAssignmentsForJob(id)).toHaveLength(0);
+    }
+
+    const { rows } = dal.list(ctx, { limit: 200 });
+    for (const id of jobIds) {
+      expect(rows.some((r) => r.id === id)).toBe(false);
+    }
+
+    expect(audit.entries.filter((e) => e.action === "delete")).toHaveLength(10);
+    expect(audit.entries.some((e) => e.action === "bulk_summary")).toBe(true);
+    for (const entry of audit.entries.filter((e) => e.action === "delete")) {
+      expect(entry).toMatchObject({ after: null, fieldIds: ["summary"] });
+    }
+  });
+
+  it("office_admin: all_or_nothing with any skip deletes no rows", async () => {
+    setAuditWriter(audit.writer);
+    const store = new MemoryJobStore();
+    seedPilotJobs(store);
+    const jobIds = seedBulkJobs(store, 5);
+    const dal = createDal(store);
+
+    const result = await dal.bulkDelete(
+      buildListCtx(SEED_ADMIN_ID, ["office_admin"]),
+      [...jobIds, "missing-0"],
+      { mode: "all_or_nothing" },
+    );
+
+    expect(result.succeeded).toHaveLength(0);
+    expect(result.skipped).toHaveLength(1);
+    expect(result.skipped[0]).toMatchObject({
+      id: "missing-0",
+      reason: "not_found",
+    });
+
+    for (const id of jobIds) {
+      expect(store.getJob(id)).toBeDefined();
+    }
+
+    expect(audit.entries).toHaveLength(0);
+  });
+
+  it("rejects batch larger than bulkMaxBatch", async () => {
+    const store = new MemoryJobStore();
+    seedPilotJobs(store);
+    const dal = createDal(store);
+    const ctx = buildListCtx(SEED_ADMIN_ID, ["office_admin"]);
+    const ids = Array.from({ length: 501 }, (_, i) => `id-${i}`);
+
+    await expect(dal.bulkDelete(ctx, ids)).rejects.toThrow(ValidationError);
+  });
+
+  it("own scope: partial mode — deletes permitted row; forbidden id skipped (T15)", async () => {
+    setAuditWriter(audit.writer);
+    const store = new MemoryJobStore();
+    seedPilotJobs(store);
+    const dal = createDal(store);
+    const ctx = buildOwnScopeBulkDeleteCtx(SEED_TECH_ID);
+
+    const result = await dal.bulkDelete(ctx, [SEED_JOB_OWNED, SEED_JOB_OTHER], {
+      mode: "partial",
+    });
+
+    expect(result.succeeded).toEqual([SEED_JOB_OWNED]);
+    expect(result.skipped).toEqual([
+      { id: SEED_JOB_OTHER, reason: "not_found" },
+    ]);
+
+    expect(store.getJob(SEED_JOB_OWNED)).toBeUndefined();
+    expect(store.getJob(SEED_JOB_OTHER)).toBeDefined();
+
+    expect(audit.entries.filter((e) => e.action === "delete")).toHaveLength(1);
+  });
+
+  it("field_tech: bulkDelete throws ForbiddenError and touches no rows", async () => {
+    setAuditWriter(audit.writer);
+    const store = new MemoryJobStore();
+    seedPilotJobs(store);
+    const jobIds = seedBulkJobs(store, 3);
+    const dal = createDal(store);
+    const ctx = buildListCtx(SEED_TECH_ID, ["field_tech"]);
+
+    await expect(dal.bulkDelete(ctx, jobIds)).rejects.toThrow(ForbiddenError);
+
+    for (const id of jobIds) {
+      expect(store.getJob(id)).toBeDefined();
+    }
+
+    expect(audit.entries).toHaveLength(0);
   });
 });
 

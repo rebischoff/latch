@@ -30,6 +30,8 @@ The single most important document for keeping v1 shippable solo. **If a feature
 - `job_list`
 - `customer_detail`
 
+> **Policy model (2026-06-01):** `job_list` and `job_detail` are one logical Surface **`job`** with modes `list` | `detail`; roles bind once, not per suffix. Split ids remain in repo/code until merge ([`glossary.md`](./glossary.md)).
+
 ### Access control
 - RBAC with **built-in roles** seeded in code.
 - **`union_grants` only** for role merge. `denyWins = true`.

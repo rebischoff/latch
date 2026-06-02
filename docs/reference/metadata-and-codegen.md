@@ -89,18 +89,25 @@ export const ContractBusinessRules = ContractSchema.refine(
 
 Apply business rules only after authz and structural parse.
 
+### Decision: structure YAML may vary by mode (2026-06-01)
+
+**Choice:** One Surface id (e.g. `job`) may declare **per-mode Field lists** (which Fields/columns appear on list vs detail). **Role policy is not duplicated per mode** — see [access-control.md](./access-control.md) (**list and detail are modes**). Codegen may emit separate Zod shapes per mode (`list` row vs `detail` DTO) from one or more structure files.
+
+**Rationale:** List and detail need different projections (e.g. `customer_site` on list, `scope` on detail) without maintaining two role matrices.
+
 ## Workflow
 
 ```text
-apps/web/modules/job/job_detail.surface.yaml
+apps/web/modules/job/job.surface.yaml          # target: modes list | detail
+  (transitional: job_list.surface.yaml + job_detail.surface.yaml)
        │
        ▼  npm run codegen (or watch)
 apps/web/modules/job/generated/*.ts
        │
-       ├── PolicyService + role bindings (packages/policy)
-       ├── DAL (column projection)         (packages/dal)
-       ├── API (Zod parse)                 (apps/web route handlers + actions)
-       └── UI (Field IDs for controls)     (apps/web + packages/react)
+       ├── PolicyService (base + mode overlay)  (packages/policy)
+       ├── DAL (column projection per mode)     (packages/dal)
+       ├── API (Zod parse)                      (apps/web route handlers + actions)
+       └── UI (Field IDs for controls)          (apps/web + packages/react)
 ```
 
 CI runs `codegen --check`; drift between YAML and committed generated files fails the build (threat T11).

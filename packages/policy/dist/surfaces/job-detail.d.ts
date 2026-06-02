@@ -1,7 +1,8 @@
 import type { FieldAction, SurfacePolicies } from "@latch/contracts";
 /**
- * Hardcoded `job_detail` policies — mirrors future `job_detail.policies.yaml` (task 07).
- * @see docs/planning/tasks/job_detail/07-policies-yaml.md
+ * Runtime `job_detail` policies — hand-synced from `apps/web/modules/job/job_detail.policies.yaml`.
+ * Policy YAML loader is out of scope for task 08; keep this file aligned when policies YAML changes.
+ * @see docs/archive/tasks/job_detail/07-policies-yaml.md
  */
 export declare const jobDetailPolicies: SurfacePolicies;
 export declare const JOB_DETAIL_FIELD_IDS: readonly ["summary", "scope", "financial_terms", "assignments"];

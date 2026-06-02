@@ -27,14 +27,14 @@ Extend CI threat coverage for bulk atomicity (**T15**) and list DTO forbidden-fi
 
 ## Verify (stop gate)
 
-- [ ] `npm run test` — threat + e2e + packages green
-- [ ] `npm run codegen:check` passes
-- [ ] `npm run build` passes
-- [ ] Phase README definition of done items satisfied:
-  - [ ] Tech `GET /api/jobs` omits financial columns; assigned rows only
-  - [ ] Admin bulk partial: 15 succeeded / 5 skipped scenario
-  - [ ] `all_or_nothing` → 409, no rows changed
-- [ ] [`../STATUS.md`](../STATUS.md) → Phase 01 complete; root STATUS repointed
+- [x] `npm run test` — threat + e2e + packages green (58 passed / 1 skipped)
+- [x] `npm run codegen:check` passes
+- [x] `npm run build` passes
+- [x] Phase README definition of done items satisfied:
+  - [x] Tech `GET /api/jobs` omits financial columns; assigned rows only
+  - [x] Admin bulk partial: 15 succeeded / 5 skipped scenario
+  - [x] `all_or_nothing` → 409, no rows changed
+- [x] [`../STATUS.md`](../STATUS.md) → Phase 01 complete; root STATUS repointed
 
 ## Out of scope
 

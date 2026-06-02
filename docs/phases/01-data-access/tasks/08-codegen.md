@@ -25,9 +25,9 @@
 
 ## Verify (stop gate)
 
-- [ ] `npm run codegen:check` passes
-- [ ] Generated file references `job_list` surface id
-- [ ] [`../STATUS.md`](../STATUS.md) → **09-dal-list.md**
+- [x] `npm run codegen:check` passes
+- [x] Generated file references `job_list` surface id
+- [x] [`../STATUS.md`](../STATUS.md) → **09-dal-list.md**
 
 ## Out of scope
 

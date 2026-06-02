@@ -16,6 +16,9 @@ export declare class NotFoundError extends LatchError {
     readonly code = "NOT_FOUND";
     constructor(message?: string);
 }
+/** Duck-typed check — safe when multiple `@latch/contracts` copies exist (e.g. Next RSC). */
+export declare const isLatchError: (error: unknown, code?: LatchError["code"]) => error is LatchError;
+export declare const isNotFoundError: (error: unknown) => error is NotFoundError;
 /** Body or params failed structural validation (strict write, Zod parse). */
 export declare class ValidationError extends LatchError {
     readonly details?: unknown | undefined;

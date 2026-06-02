@@ -2,7 +2,7 @@
 
 > **The "quarterback" file.** When in doubt, start here. Always read this first.
 > This is the **global pointer**: it names the **active phase**. Detailed, per-phase status lives in each phase's own `STATUS.md`.
-> Updated: 2026-05-29.
+> Updated: 2026-06-01.
 
 ---
 
@@ -17,14 +17,18 @@
 
 ## Active phase
 
-### → Phase 01 — Data access (`@latch/dal`)
+### → Phase 02b — Platform extraction (genericize `@latch/*`)
 
 | | |
 |---|---|
-| **Plan** | [`docs/phases/01-data-access/README.md`](./docs/phases/01-data-access/README.md) |
-| **Phase STATUS** | [`docs/phases/01-data-access/STATUS.md`](./docs/phases/01-data-access/STATUS.md) |
-| **Focus** | List Surface, column manifest, bulk update/delete (`job_list`) — reuses the foundation stack |
-| **Do next** | Execute [`docs/phases/01-data-access/tasks/06-surface-yaml.md`](./docs/phases/01-data-access/tasks/06-surface-yaml.md) (task chain documented; 00–01 done) |
+| **Plan** | [`docs/phases/02b-platform-extraction/README.md`](./docs/phases/02b-platform-extraction/README.md) |
+| **Phase STATUS** | [`docs/phases/02b-platform-extraction/STATUS.md`](./docs/phases/02b-platform-extraction/STATUS.md) |
+| **Focus** | Make `@latch/*` domain-agnostic; `apps/crm` sole consumer; retire `apps/web`. **Parity refactor — no new features.** |
+| **Do next** | [`tasks/00-decisions.md`](./docs/phases/02b-platform-extraction/tasks/00-decisions.md) — lock boundary + policy/DAL engine contracts + homes (docs only) |
+
+> **Inserted change order (2026-06-01):** the jobs domain was found baked into `@latch/dal` + `@latch/policy`. Genericize **before** adding `customer_detail`. **Phase 02 (UI sync) is paused** on this; it resumes at [`02-ui-sync/tasks/04-db-schema.md`](./docs/phases/02-ui-sync/tasks/04-db-schema.md) (now targeting `apps/crm`) when 02b's DoD passes.
+
+> **Phase 01 (Data access) complete** — `job_list` list + bulk proven end-to-end; threat T2 (list) + T15 in CI. See [`docs/phases/01-data-access/STATUS.md`](./docs/phases/01-data-access/STATUS.md).
 
 To switch focus (a "change order"), re-point this section at another phase folder — no other file needs rewriting. See [how phases work](./docs/phases/README.md).
 
@@ -39,8 +43,9 @@ To switch focus (a "change order"), re-point this section at another phase folde
 | Phase | Capability | State |
 |-------|-----------|-------|
 | [00 Foundation](./docs/phases/00-foundation/STATUS.md) | contracts, policy, codegen, single-record DAL | mostly done |
-| **[01 Data access](./docs/phases/01-data-access/STATUS.md)** | list, projection, bulk (`job_list`) | **active** |
-| [02 UI sync](./docs/phases/02-ui-sync/STATUS.md) | `<Can>`/`<FieldControl>`, `customer_detail` | partial |
+| [01 Data access](./docs/phases/01-data-access/STATUS.md) | list, projection, bulk (`job_list`) | complete |
+| **[02b Platform extraction](./docs/phases/02b-platform-extraction/STATUS.md)** | genericize `@latch/*`; retire `apps/web` | **active** |
+| [02 UI sync](./docs/phases/02-ui-sync/STATUS.md) | `<Can>`/`<FieldControl>`, `customer_detail` | paused (resumes after 02b) |
 | [03 Identity & IAM](./docs/phases/03-identity-iam/STATUS.md) | users/roles in DB, IAM + Data master, auth | not started |
 | [04 Audit & lifecycle](./docs/phases/04-audit-lifecycle/STATUS.md) | full audit, hard delete + recovery | partial |
 | [05 Verification](./docs/phases/05-verification/STATUS.md) | accept/reject, verification gates | partial |

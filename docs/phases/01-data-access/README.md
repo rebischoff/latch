@@ -1,6 +1,6 @@
 # Phase 01 — Data access (`@latch/dal`)
 
-> **Home package:** `@latch/dal` · **Status:** active · **Phase STATUS:** [`STATUS.md`](./STATUS.md)
+> **Home package:** `@latch/dal` · **Status:** complete · **Phase STATUS:** [`STATUS.md`](./STATUS.md)
 >
 > **Execution:** Work one file at a time under [`tasks/`](./tasks/). After each task passes its **Verify** gate, update this phase's [`STATUS.md`](./STATUS.md) (and the root [`STATUS.md`](../../../STATUS.md) if the active phase changes).
 
@@ -104,12 +104,12 @@ Tasks **14–15, 17–19** are unchanged from the pilot (Server Action, stub pri
 
 ## Definition of done
 
-- [ ] Tasks above pass verify gates
-- [ ] `field_tech` `GET /api/jobs` omits financial columns; row set = assigned jobs only
-- [ ] `office_admin` bulk PATCH 20 ids with 5 forbidden → `partial` returns 15 `succeeded`, 5 `skipped`; DB consistent
-- [ ] `all_or_nothing` with any forbidden → `409`, no rows changed (T15)
-- [ ] `npm run codegen:check` and `npm run test` green
-- [ ] Root [`STATUS.md`](../../../STATUS.md) points at the next phase
+- [x] Tasks above pass verify gates
+- [x] `field_tech` `GET /api/jobs` omits financial columns; row set = assigned jobs only
+- [x] `office_admin` bulk PATCH 20 ids with 5 forbidden → `partial` returns 15 `succeeded`, 5 `skipped`; DB consistent
+- [x] `all_or_nothing` with any forbidden → `409`, no rows changed (T15)
+- [x] `npm run codegen:check` and `npm run test` green
+- [x] Root [`STATUS.md`](../../../STATUS.md) points at the next phase
 
 ## References
 

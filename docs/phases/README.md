@@ -31,8 +31,9 @@ This is cheaper than building on an imagined contract and reworking. CRM slices 
 | Phase | Home package(s) | Capability | State |
 |-------|-----------------|-----------|-------|
 | [`00-foundation`](./00-foundation/README.md) | `contracts`, `policy`, `codegen` | Manifest, PolicyService, YAML→TS, single-record DAL | mostly done |
-| [`01-data-access`](./01-data-access/README.md) | `dal` | List, projection, bulk update/delete (`job_list`) | **active** |
-| [`02-ui-sync`](./02-ui-sync/README.md) | `react`, `apps/web` | `<Can>`/`<FieldControl>`, sample Surfaces (`customer_detail`) | partial |
+| [`01-data-access`](./01-data-access/README.md) | `dal` | List, projection, bulk update/delete (`job_list`) | complete |
+| [`02b-platform-extraction`](./02b-platform-extraction/README.md) | `policy`, `dal` | Genericize `@latch/*`; `apps/crm` sole consumer; retire `apps/web` | **active** |
+| [`02-ui-sync`](./02-ui-sync/README.md) | `react`, `dal`, `apps/crm` | `<Can>`/`<FieldControl>`, `customer_detail` stack + CRM proof | paused (resumes after 02b) |
 | [`03-identity-iam`](./03-identity-iam/README.md) | `policy` + `iam` | Users/roles in DB, IAM master + Data master, real auth | not started |
 | [`04-audit-lifecycle`](./04-audit-lifecycle/README.md) | `audit` | Full audit, hard delete + recovery | partial |
 | [`05-verification`](./05-verification/README.md) | `approval` | Accept/reject, field/surface verification gates | partial |

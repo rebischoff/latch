@@ -18,3 +18,9 @@ export {
   JOB_DETAIL_FIELD_IDS,
   JOB_DETAIL_SURFACE_ACTIONS_BY_ROLE,
 } from "./surfaces/job-detail.js";
+
+export {
+  jobListPolicies,
+  JOB_LIST_FIELD_IDS,
+  JOB_LIST_SURFACE_ACTIONS_BY_ROLE,
+} from "./surfaces/job-list.js";

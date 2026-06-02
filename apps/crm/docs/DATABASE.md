@@ -1,12 +1,14 @@
 # CRM — database plan (docs only)
 
-CRM does not own a separate database. It uses the **same company Postgres** (or in-memory pilot store) as the rest of Latch.
+> **⚠ Superseded pending [Phase 02b](../../../docs/phases/02b-platform-extraction/STATUS.md) (2026-06-01).** The principles below reflect the old "schema lives with the platform" model. After 02b, **`apps/crm` owns the schema, seed, store, and migrations** (`@latch/*` are domain-agnostic; `apps/web` is retired). This file is rewritten in [`02b task 05`](../../../docs/phases/02b-platform-extraction/tasks/05-retire-web.md).
+
+CRM does not own a separate database. It uses the **same company Postgres** (or in-memory store) as the rest of Latch.
 
 ## Principles
 
-1. **DAL is the only app path to data** — routes and Server Actions call `@latch/dal`, never Drizzle from `apps/crm`.
-2. **Schema lives with the platform** — migrations under `apps/web/migrations/` (or future shared `packages/dal/migrations/`) until a dedicated migration home is chosen.
-3. **CRM adds no tables** — only consumes `jobs`, `assignments`, `latch_users`, `latch_audit`, and future customer tables when Surfaces define them.
+1. **DAL is the only app path to data** — routes and Server Actions call `@latch/dal`, never Drizzle directly from UI/route code.
+2. **Schema home** — *(old)* `apps/web/migrations/`. *(new, per 02b)* `apps/crm/migrations/` + `apps/crm/db/`.
+3. **Tables** — *(old)* "CRM adds no tables." *(new, per 02b)* CRM **owns** `jobs`, `assignments`, `latch_users`, `customers`, `sites`; `@latch/audit` still owns `latch_audit`.
 
 ## Environments
 

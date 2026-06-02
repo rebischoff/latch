@@ -37,6 +37,8 @@ export const seedPilotJobs = (store: MemoryJobStore): void => {
     scheduledAt: PILOT_NOW,
     description: "Replace main panel and two subpanels.",
     contractAmount: "12500.00",
+    customerName: "Acme Electric",
+    siteLabel: "123 Main St",
   });
   store.addAssignment({ jobId: SEED_JOB_OWNED, userId: SEED_TECH_ID });
 
@@ -47,6 +49,8 @@ export const seedPilotJobs = (store: MemoryJobStore): void => {
     scheduledAt: PILOT_NOW,
     description: "New split system installation.",
     contractAmount: "8900.00",
+    customerName: "Oak Properties",
+    siteLabel: "456 Oak Ave",
   });
   store.addAssignment({ jobId: SEED_JOB_OTHER, userId: SEED_ADMIN_ID });
 };

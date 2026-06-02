@@ -1,6 +1,6 @@
 # Phase 02 — UI sync (`@latch/react`, `apps/web`)
 
-> **Home packages:** `@latch/react`, `apps/web` (pilot), `apps/crm` (proof harness, planned) · **Status:** partial · **Phase STATUS:** [`STATUS.md`](./STATUS.md)
+> **Home packages:** `@latch/react`, `@latch/dal`, `apps/crm` (canonical proof), `apps/web` (thin API pilot) · **Status:** active · **Phase STATUS:** [`STATUS.md`](./STATUS.md) · **Tasks:** [`tasks/01-task-index.md`](./tasks/01-task-index.md)
 
 ## Goal
 
@@ -19,7 +19,8 @@ Make the UI render **entirely from the manifest** — hidden / read-only / edita
 | `<Can>` for conditional sections | Verification reviewer UX (Phase 05) |
 | `<FieldControl>`: hidden / read-only / editable from manifest | Restore-from-audit UI (Phase 04) |
 | Nav manifest with `minimal` scope | Polished theming beyond consistent Tailwind |
-| `customer_detail` Surface (detail, cross-Surface link) | — |
+| **`customer_detail` backend slice** — schema (`customers`, `sites`, `jobs.customer_id`), Surface YAML + policies, codegen, DAL `get`/`patch`, API routes | `customer_list`; customer `delete` (jobs already prove hard delete) |
+| `customer_detail` CRM page + cross-Surface link (`customer_ref` on `job_detail`) | — |
 
 ## Sub-goals — what this phase proves
 

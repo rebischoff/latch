@@ -20,6 +20,11 @@ import {
   JOB_DETAIL_SURFACE_ACTIONS_BY_ROLE,
   jobDetailPolicies,
 } from "./surfaces/job-detail.js";
+import {
+  JOB_LIST_FIELD_IDS,
+  JOB_LIST_SURFACE_ACTIONS_BY_ROLE,
+  jobListPolicies,
+} from "./surfaces/job-list.js";
 
 export type MultiRoleCombine = "union_grants";
 
@@ -51,10 +56,12 @@ export const unionGrantsStrategy: RoleMergeStrategy = {
 
 const surfaceRegistry: Record<SurfaceId, SurfacePolicies> = {
   job_detail: jobDetailPolicies,
+  job_list: jobListPolicies,
 };
 
 const knownFieldsBySurface: Record<SurfaceId, readonly string[]> = {
   job_detail: JOB_DETAIL_FIELD_IDS,
+  job_list: JOB_LIST_FIELD_IDS,
 };
 
 const surfaceActionsBySurface: Record<
@@ -62,6 +69,7 @@ const surfaceActionsBySurface: Record<
   Record<string, FieldAction[]>
 > = {
   job_detail: JOB_DETAIL_SURFACE_ACTIONS_BY_ROLE,
+  job_list: JOB_LIST_SURFACE_ACTIONS_BY_ROLE,
 };
 
 export class PolicyService {

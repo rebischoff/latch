@@ -17,11 +17,9 @@ These are tracked in [`STATUS.md`](../../STATUS.md) "Active decisions":
 
 ### Authorization model
 - [ ] Deny policy YAML syntax
-- [ ] Sensitive Field: 403 default vs optional 404 per Surface (which Surfaces get 404?)
 
 ### Surface / Field metadata
 - [ ] Versioning of Field definitions when columns rename
-- [ ] One Surface id with `modes: [list, detail]` vs separate ids
 - [ ] Primary / anchor entity when a Surface spans many tables
 
 ### Bulk operations
@@ -41,7 +39,7 @@ These are tracked in [`STATUS.md`](../../STATUS.md) "Active decisions":
 - [ ] When to enable `gdprErasureMode` (deferred behavior)
 
 ### Monorepo
-- [ ] When to extract `packages/*` to a separate publishable repo (post-v1)
+- [ ] When to extract `packages/*` to a separate publishable **repo** (post-v1) — note: in-repo **genericization** is no longer deferred (resolved 2026-06-01, below).
 
 ## Resolved (chronological)
 
@@ -70,3 +68,6 @@ These are tracked in [`STATUS.md`](../../STATUS.md) "Active decisions":
 | 2026-05-28 | **D3** Pilot Surface | **`job_detail`** ? S1/S3/S4 in Step 3 | [`use-cases.md`](./use-cases.md), [`architecture/access-control.md`](../reference/access-control.md) |
 | 2026-05-28 | **D4** Role merge (v1 confirm) | **`union_grants` only**; global **`denyWins: true`** | [`architecture/access-control.md`](../reference/access-control.md), [`scope.md`](./scope.md) |
 | 2026-05-28 | **D5** RLS (v1 confirm) | **Deferred** post-v1; enforcement is **DAL-only** | [`scope.md`](./scope.md), [`discovery/postgres-rls-and-security.md`](../discovery/postgres-rls-and-security.md) |
+| 2026-06-01 | List vs detail (`job_list` / `job_detail`) | **One Surface id per domain** (e.g. `job`) with **`mode`**: `list` \| `detail` \| `create`. Roles bind to **base** policy on that id; **mode overlays** restrict only (never widen `read`). Row scope once per role on the Surface. `job_list` / `job_detail` are **transitional** split ids until merge. | [`glossary.md`](./glossary.md), [`../reference/access-control.md`](../reference/access-control.md) |
+| 2026-06-01 | Sensitive Field / Surface 403 vs 404 | Platform default **`403`**; per-Surface override **`404`** allowed. Phase 02: **`customer_detail`** uses **`404`** (no grant for `field_tech`). Jobs keep default. | [`global-options.md`](./global-options.md), [`../phases/02-ui-sync/decisions.md`](../phases/02-ui-sync/decisions.md) |
+| 2026-06-01 | Package genericization timing | **Pull forward now (in-repo).** `@latch/*` carry no consumer domain (table/Zod/Surface/UI); `apps/crm` is the sole consumer; `apps/web` retired. Separate publishable repo remains post-v1. | [`../phases/02b-platform-extraction/decisions.md`](../phases/02b-platform-extraction/decisions.md) |

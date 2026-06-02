@@ -14,6 +14,7 @@ import {
   createJobsDal,
   MemoryJobStore,
   SEED_ADMIN_ID,
+  SEED_JOB_OTHER,
   SEED_JOB_OWNED,
   SEED_TECH_ID,
   seedPilotJobs,
@@ -34,6 +35,15 @@ const buildCtx = (
     mode: "detail",
   });
   return { principal, manifest, surface: "job_detail" };
+};
+
+const buildListCtx = (userId: string, roles: string[]): PermissionContext => {
+  const principal = { id: userId, roles };
+  const manifest = policy.resolve(principal, {
+    surface: "job_list",
+    mode: "list",
+  });
+  return { principal, manifest, surface: "job_list" };
 };
 
 const stripApproveOnFinancial = (manifest: Manifest): Manifest => ({
@@ -91,6 +101,27 @@ describe("threat model — T2 forbidden field read", () => {
     expect(techDto).not.toHaveProperty("financial_terms");
     expect(adminDto.financial_terms?.contract_amount).toBe("12500.00");
     expect(Object.keys(techDto).sort()).not.toEqual(Object.keys(adminDto).sort());
+  });
+});
+
+describe("threat model — T2 forbidden field read (list)", () => {
+  it("tech list DTO omits financial_terms (key absent, not null)", () => {
+    const store = new MemoryJobStore();
+    seedPilotJobs(store);
+    const dal = createJobsDal(store, createMemoryPendingStore());
+
+    const techRows = dal.list(buildListCtx(SEED_TECH_ID, ["field_tech"])).rows;
+    const adminRows = dal.list(buildListCtx(SEED_ADMIN_ID, ["office_admin"])).rows;
+
+    expect(techRows.length).toBeGreaterThan(0);
+    for (const row of techRows) {
+      // Property absence, not a `null` placeholder (T2 control).
+      expect(row).not.toHaveProperty("financial_terms");
+      expect(Object.keys(row)).not.toContain("financial_terms");
+    }
+
+    const adminOwned = adminRows.find((r) => r.id === SEED_JOB_OWNED);
+    expect(adminOwned?.financial_terms?.contract_amount).toBe("12500.00");
   });
 });
 
@@ -199,5 +230,102 @@ describe("threat model — T13 field reference forgery", () => {
 
     expect(err).toBeInstanceOf(ValidationError);
     expect((err as ValidationError).statusCode).toBe(400);
+  });
+});
+
+describe("threat model — T15 bulk operation partial-corruption", () => {
+  const audit = createMemoryAuditWriter();
+
+  afterEach(() => {
+    audit.reset();
+    setAuditWriter(null);
+  });
+
+  // A row-scoped writer: granted `write` on `assignments` but limited to its
+  // own rows (`rowScope: "own"`). Out-of-scope rows are "forbidden" and surface
+  // as `not_found` (no existence side-channel). No real role grants this combo,
+  // so we craft it from the admin manifest to isolate the bulk control.
+  const rowScopedWriterCtx = (): PermissionContext => {
+    const admin = buildListCtx(SEED_ADMIN_ID, ["office_admin"]);
+    return {
+      principal: { id: SEED_TECH_ID, roles: ["field_tech"] },
+      manifest: { ...admin.manifest, rowScope: "own" },
+      surface: "job_list",
+    };
+  };
+
+  const REASSIGN_PATCH = { assignments: [{ user_id: SEED_ADMIN_ID }] };
+
+  it("all_or_nothing with a forbidden (out-of-scope) row → zero DB mutation", async () => {
+    setAuditWriter(audit.writer);
+    const store = new MemoryJobStore();
+    seedPilotJobs(store);
+    const dal = createJobsDal(store, createMemoryPendingStore());
+    const ctx = rowScopedWriterCtx();
+
+    const ownedBefore = store
+      .getAssignmentsForJob(SEED_JOB_OWNED)
+      .map((a) => a.userId);
+    const otherBefore = store
+      .getAssignmentsForJob(SEED_JOB_OTHER)
+      .map((a) => a.userId);
+
+    const result = await dal.bulkUpdate(
+      ctx,
+      [SEED_JOB_OWNED, SEED_JOB_OTHER],
+      REASSIGN_PATCH,
+      { mode: "all_or_nothing", requestId: "threat-t15-aon" },
+    );
+
+    expect(result.succeeded).toHaveLength(0);
+    expect(result.skipped).toEqual([{ id: SEED_JOB_OTHER, reason: "not_found" }]);
+    expect(result.failed).toHaveLength(0);
+
+    // Permitted row stays untouched because the batch was rejected wholesale.
+    expect(store.getAssignmentsForJob(SEED_JOB_OWNED).map((a) => a.userId)).toEqual(
+      ownedBefore,
+    );
+    expect(store.getAssignmentsForJob(SEED_JOB_OTHER).map((a) => a.userId)).toEqual(
+      otherBefore,
+    );
+    // No row mutated ⇒ no audit rows (not even a bulk_summary).
+    expect(audit.entries).toHaveLength(0);
+  });
+
+  it("partial with mixed rows → permitted applied, forbidden skipped, DB consistent", async () => {
+    setAuditWriter(audit.writer);
+    const store = new MemoryJobStore();
+    seedPilotJobs(store);
+    const dal = createJobsDal(store, createMemoryPendingStore());
+    const ctx = rowScopedWriterCtx();
+
+    const otherBefore = store
+      .getAssignmentsForJob(SEED_JOB_OTHER)
+      .map((a) => a.userId);
+
+    const result = await dal.bulkUpdate(
+      ctx,
+      [SEED_JOB_OWNED, SEED_JOB_OTHER],
+      REASSIGN_PATCH,
+      { mode: "partial", requestId: "threat-t15-partial" },
+    );
+
+    expect(result.succeeded).toEqual([SEED_JOB_OWNED]);
+    expect(result.skipped).toEqual([{ id: SEED_JOB_OTHER, reason: "not_found" }]);
+    expect(result.failed).toHaveLength(0);
+
+    // Permitted row reflects the write...
+    expect(store.getAssignmentsForJob(SEED_JOB_OWNED).map((a) => a.userId)).toEqual(
+      [SEED_ADMIN_ID],
+    );
+    // ...the forbidden row is left exactly as it was (no partial corruption).
+    expect(store.getAssignmentsForJob(SEED_JOB_OTHER).map((a) => a.userId)).toEqual(
+      otherBefore,
+    );
+
+    // One row mutated ⇒ one update audit row + one bulk_summary.
+    const actions = audit.entries.map((e) => e.action);
+    expect(actions).toContain("update");
+    expect(actions).toContain("bulk_summary");
   });
 });

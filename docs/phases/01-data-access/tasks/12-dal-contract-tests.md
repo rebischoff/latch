@@ -28,8 +28,8 @@ Automated tests for list projection, row scope, strict bulk patch, and bulk mode
 
 ## Verify (stop gate)
 
-- [ ] `npm run test` — dal contract tests green
-- [ ] [`../STATUS.md`](../STATUS.md) → **13-api-routes.md**
+- [x] `npm run test` — dal contract tests green
+- [x] [`../STATUS.md`](../STATUS.md) → **13-api-routes.md**
 
 ## Out of scope
 

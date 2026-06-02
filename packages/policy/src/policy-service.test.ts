@@ -115,3 +115,48 @@ describe("PolicyService — job_detail matrix", () => {
     ).toThrow(/Unknown surface/);
   });
 });
+
+describe("PolicyService — job_list matrix", () => {
+  const policy = new PolicyService();
+
+  it("field_tech: list columns without financial_terms", () => {
+    const manifest = policy.resolve(principal("field_tech"), {
+      surface: "job_list",
+      mode: "list",
+    });
+
+    expect(manifest.surface).toBe("job_list");
+    expect(manifest.rowScope).toBe("own");
+    expect(manifest.fields.financial_terms).toEqual([]);
+    expect(manifest.fields.summary).toEqual(["read"]);
+    expect(manifest.fields.customer_site).toEqual(["read"]);
+    expect(manifest.fields.assignments).toEqual(["read"]);
+    expect(manifest.actions).toEqual(["read"]);
+    expect(manifest.actions).not.toContain("delete");
+  });
+
+  it("office_admin: read all fields, write assignments, bulk surface actions", () => {
+    const manifest = policy.resolve(principal("office_admin"), {
+      surface: "job_list",
+      mode: "list",
+    });
+
+    expect(manifest.rowScope).toBe("all");
+    expect(manifest.fields.financial_terms).toEqual(["read"]);
+    expect(manifest.fields.assignments).toEqual(["read", "write"]);
+    expect(manifest.actions).toEqual(
+      expect.arrayContaining(["read", "write", "delete"]),
+    );
+    expect(manifest.actions).not.toContain("restore");
+  });
+
+  it("multi-role union: admin write on assignments when tech also listed", () => {
+    const manifest = policy.resolve(principal("field_tech", "office_admin"), {
+      surface: "job_list",
+    });
+
+    expect(manifest.rowScope).toBe("all");
+    expect(manifest.fields.assignments).toContain("write");
+    expect(manifest.fields.financial_terms).toEqual(["read"]);
+  });
+});

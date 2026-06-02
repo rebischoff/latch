@@ -51,28 +51,39 @@ const ensurePilotStore = (): MemoryJobStore => {
     ensureAuditWriter();
     g.store = new MemoryJobStore();
     seedPilotJobs(g.store);
-    g.jobsDal = createJobsDal(g.store, createMemoryPendingStore());
   }
   return g.store;
 };
 
-export const getJobsDal = (): JobsDal => {
-  ensurePilotStore();
-  return pilotGlobal().jobsDal!;
+/** Recreate when HMR reloads `@latch/dal` but the global pilot cache still holds a pre-list DAL. */
+const ensureJobsDal = (): JobsDal => {
+  const g = pilotGlobal();
+  const store = ensurePilotStore();
+  if (!g.jobsDal || typeof g.jobsDal.list !== "function") {
+    g.jobsDal = createJobsDal(store, createMemoryPendingStore());
+  }
+  return g.jobsDal;
 };
 
-export type ResolveContextInput = {
-  surfaceId: "job_detail";
-  entityId: string;
-};
+export const getJobsDal = (): JobsDal => ensureJobsDal();
+
+export type ResolveContextInput =
+  | { surfaceId: "job_detail"; entityId: string }
+  | { surfaceId: "job_list" };
 
 export const resolveContext = (input: ResolveContextInput): PermissionContext => {
   const principal = getPrincipal();
-  const manifest = policyService.resolve(principal, {
-    surface: input.surfaceId,
-    entityId: input.entityId,
-    mode: "detail",
-  });
+  const manifest =
+    input.surfaceId === "job_detail"
+      ? policyService.resolve(principal, {
+          surface: "job_detail",
+          entityId: input.entityId,
+          mode: "detail",
+        })
+      : policyService.resolve(principal, {
+          surface: "job_list",
+          mode: "list",
+        });
 
   return {
     principal,
