@@ -32,7 +32,9 @@ export {
 } from "./narrow.js";
 
 export {
+  ConflictError,
   ForbiddenError,
+  isConflictError,
   isLatchError,
   isNotFoundError,
   LatchError,

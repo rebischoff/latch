@@ -1,4 +1,12 @@
 export {
+  DEFAULT_AUDIT_CONFIG,
+  DEFAULT_AUDIT_RETENTION_YEARS,
+  getAuditConfig,
+  resetAuditConfig,
+  setAuditConfig,
+  type AuditConfig,
+} from "./config.js";
+export {
   createMemoryAuditWriter,
   setAuditWriter,
   writeAudit,
@@ -6,3 +14,8 @@ export {
   type MemoryAuditWriter,
 } from "./audit-service.js";
 export type { AuditAction, AuditEntryInput, AuditJson } from "./types.js";
+export {
+  restoreFromAuditEntry,
+  type RestoreFromAuditDeps,
+  type StoredAuditEntry,
+} from "./restore.js";

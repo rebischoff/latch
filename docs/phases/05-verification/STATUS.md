@@ -1,19 +1,19 @@
 # STATUS — Phase 05 Verification
 
 > Phase-local quarterback. Global pointer: [`../../../STATUS.md`](../../../STATUS.md).
-> Updated: 2026-05-29.
+> Updated: 2026-06-02.
 
 - **Home package:** `@latch/approval`
-- **State:** partial — minimal all-or-nothing approval on `financial_terms` exists; store is in-memory.
+- **State:** **active (partial)** — minimal all-or-nothing approval on `financial_terms` exists; store is in-memory.
 
 ## Right now — do this next
 
-Not active. Entry point when picked up: persist `latch_pending_changes`, then make verification gates metadata-driven (per Field/Surface) and add the reviewer accept/reject API with audit linkage.
+[`README.md`](./README.md) — persist `latch_pending_changes`, metadata-driven verification gates, reviewer accept/reject API with Phase 04 audit linkage (`approve` action).
 
 ## Blockers
 
-- Apply-on-accept audit linkage depends on Phase 04 audit actions; coordinate if Phase 04 hasn't landed.
+- None — Phase 04 audit actions (`delete`, `restore`, `bulk_summary`) landed; `approve`/`reject` audit wiring is Phase 05 scope.
 
 ## Recently completed
 
-- `@latch/approval` memory pending store; pilot routes financial-term writes to pending when the user lacks direct write.
+- (none this phase yet)

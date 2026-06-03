@@ -1,12 +1,14 @@
 {
   "name": "latch-monorepo",
   "private": true,
-  "workspaces": ["apps/*", "packages/*"],
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
-    "dev": "npm -w @latch/web run dev",
-    "dev:crm": "npm -w @latch/crm run dev",
-    "build": "npm -w @latch/web run build",
-    "start": "npm -w @latch/web run start",
+    "dev": "npm -w @latch/crm run dev",
+    "build": "npm -w @latch/crm run build",
+    "start": "npm -w @latch/crm run start",
     "lint": "eslint .",
     "db:docker:up": "docker compose up -d",
     "db:docker:down": "docker compose down",
@@ -14,6 +16,7 @@
     "db:migrate": "node scripts/db-migrate.mjs",
     "db:check": "node scripts/db-migrate.mjs --check",
     "test": "vitest run",
+    "restore-audit": "tsx apps/crm/scripts/restore-audit.ts",
     "codegen": "npm -w @latch/codegen run generate",
     "codegen:check": "npm -w @latch/codegen run check"
   },
@@ -21,6 +24,8 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
     "typescript": "^5",
+    "tsx": "^4.19.3",
     "vitest": "^3.0.5"
-  }
+  },
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
 }

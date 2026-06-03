@@ -3,7 +3,7 @@
 import { DeleteOutlined, SaveOutlined } from "@ant-design/icons";
 import type { Manifest } from "@latch/contracts";
 import { fieldAllows, surfaceAllows, writableFieldIds } from "@latch/contracts";
-import type { ProjectedJobDetail } from "@latch/dal";
+import type { ProjectedJobDetail } from "@/lib/jobs/project";
 import { CapabilitiesProvider, FieldControl } from "@latch/react";
 import {
   Alert,
@@ -15,6 +15,7 @@ import {
   Space,
   Typography,
 } from "antd";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import {
@@ -30,6 +31,8 @@ type JobDetailPaneProps = {
   jobId: string;
   job: ProjectedJobDetail;
   manifest: Manifest;
+  /** Resolved for cross-Surface link gate (`customer_detail` surface `read`). */
+  customerDetailManifest?: Manifest;
 };
 
 type JobFormValues = {
@@ -202,6 +205,33 @@ const FinancialSection = ({
   </FieldControl>
 );
 
+type CustomerRefSectionProps = {
+  job: ProjectedJobDetail;
+  manifest: Manifest;
+  customerDetailManifest: Manifest;
+};
+
+const CustomerRefSection = ({
+  job,
+  manifest,
+  customerDetailManifest,
+}: CustomerRefSectionProps) => {
+  const ref = job.customer_ref;
+  if (!ref || !surfaceAllows(customerDetailManifest, "read")) {
+    return null;
+  }
+
+  return (
+    <FieldControl manifest={manifest} field="customer_ref">
+      <Card title="Customer" size="small" style={{ marginBottom: 16 }}>
+        <Link href={`/customers?id=${encodeURIComponent(ref.id)}`}>
+          {ref.name}
+        </Link>
+      </Card>
+    </FieldControl>
+  );
+};
+
 const AssignmentsSection = ({
   job,
   manifest,
@@ -233,7 +263,12 @@ const AssignmentsSection = ({
   </FieldControl>
 );
 
-const JobDetailForm = ({ jobId, job, manifest }: JobDetailPaneProps) => {
+const JobDetailForm = ({
+  jobId,
+  job,
+  manifest,
+  customerDetailManifest,
+}: JobDetailPaneProps) => {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [actionError, setActionError] = useState<string | undefined>();
@@ -332,6 +367,13 @@ const JobDetailForm = ({ jobId, job, manifest }: JobDetailPaneProps) => {
         control={control}
         editable={canWriteAssignments}
       />
+      {customerDetailManifest ? (
+        <CustomerRefSection
+          job={displayJob}
+          manifest={manifest}
+          customerDetailManifest={customerDetailManifest}
+        />
+      ) : null}
       <Space>
         {hasWritableFields ? (
           <Button
@@ -358,8 +400,18 @@ const JobDetailForm = ({ jobId, job, manifest }: JobDetailPaneProps) => {
   );
 };
 
-export const JobDetailPane = ({ jobId, job, manifest }: JobDetailPaneProps) => (
+export const JobDetailPane = ({
+  jobId,
+  job,
+  manifest,
+  customerDetailManifest,
+}: JobDetailPaneProps) => (
   <CapabilitiesProvider manifest={manifest}>
-    <JobDetailForm jobId={jobId} job={job} manifest={manifest} />
+    <JobDetailForm
+      jobId={jobId}
+      job={job}
+      manifest={manifest}
+      customerDetailManifest={customerDetailManifest}
+    />
   </CapabilitiesProvider>
 );

@@ -110,7 +110,7 @@ Additional knobs (exact schema TBD):
 | `@latch/contracts` | Generated + shared Zod, Field IDs (client-safe) |
 | `@latch/core` | PolicyService, manifest types, audit helpers |
 | `@latch/dal` | DB access, migrations, RLS templates |
-| `apps/web` | Next.js app (current repo root may split later) |
+| `apps/crm` | The single Next.js app + Latch proof harness; owns its schema, migrations, and Surface descriptors |
 
 Phase 0?2 may use `src/modules/*/generated/` instead of packages.
 

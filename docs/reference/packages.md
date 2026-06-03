@@ -37,17 +37,18 @@ How the codebase is partitioned. The repo is a **monorepo from day one** so pack
 ??? package.json                   # Root: workspaces + dev scripts
 ??? tsconfig.base.json
 ??? apps/
-?   ??? web/                       # Thin pilot (job_detail)
-?   ??? crm/                       # Latch proof harness (docs only; Ant Design, no Tailwind)
-?       ??? app/                   # App Router (future)
-?       ??? lib/
+?   ??? crm/                       # Sole app + Latch proof harness (Ant Design, no Tailwind)
+?       ??? src/app/               # App Router
+?       ??? src/lib/               # latch.ts: assembles Surface descriptors + policy registry
+?       ??? db/                    # Owns Drizzle schema + seed + store
 ?       ??? modules/               # Surface YAML + generated/ per Surface
+?       ??? migrations/            # Owns SQL migrations
 ?       ??? package.json
 ?       ??? ...
 ??? packages/
     ??? contracts/                 # Manifest schema, Field IDs, base Zod (client-safe)
-    ??? policy/                    # PolicyService, role merge, deny-wins (server)
-    ??? dal/                       # DAL kernel, narrowing, Drizzle helpers (server)
+    ??? policy/                    # PolicyService + metadata-driven registry loader (server)
+    ??? dal/                       # Generic DAL kernel (createSurfaceDal), narrowing, Drizzle helpers (server)
     ??? audit/                     # Audit table, triggers, retention helpers (server)
     ??? approval/                  # Pending store + state machine (server)
     ??? react/                     # CapabilitiesProvider, <Can>, <FieldControl> (client)
@@ -65,7 +66,7 @@ How the codebase is partitioned. The repo is a **monorepo from day one** so pack
 | `@<project>/approval` | server | `contracts`, `audit` | `react`, `dal` |
 | `@<project>/react` | client | `contracts` | `policy`, `dal`, `audit`, `approval` |
 | `@<project>/codegen` | dev CLI | `contracts` | `react`, `dal` |
-| `apps/web` | both | all packages, role-appropriate | ? |
+| `apps/crm` | both | all packages, role-appropriate | ? |
 
 **Enforcement:**
 
@@ -80,7 +81,7 @@ How the codebase is partitioned. The repo is a **monorepo from day one** so pack
 - **`policy` is below `dal`** so the DAL can require a `PermissionContext` produced by policy, but policy never knows about DB queries.
 - **`audit` and `approval` are siblings of `dal`** (not under it), so they can be wired in as middleware/triggers without circular deps. `dal` orchestrates them; they don't reach into `dal`.
 - **`react` only knows `contracts`.** This is the contract that lets the UI render without ever importing server code.
-- **`codegen` is dev-time.** It produces files committed to `apps/web/modules/*/generated/`. It does not run in production.
+- **`codegen` is dev-time.** It produces files committed to `apps/crm/modules/*/generated/`. It does not run in production.
 
 ## Migration plan (Step 2 in `STATUS.md`)
 

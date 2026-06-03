@@ -1,7 +1,7 @@
 "use client";
 
 import { fieldAllows, type Manifest } from "@latch/contracts";
-import type { ProjectedJobListRow } from "@latch/dal";
+import type { ProjectedJobListRow } from "@/lib/jobs/list-project";
 import { Empty, Table, type TableColumnsType } from "antd";
 import { usePathname, useRouter } from "next/navigation";
 import { useMemo } from "react";

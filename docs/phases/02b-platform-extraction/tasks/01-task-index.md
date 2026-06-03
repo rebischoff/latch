@@ -54,8 +54,8 @@ After each task's **Verify** passes: check its boxes, set [`../STATUS.md`](../ST
 
 ## Verify (stop gate)
 
-- [ ] You know which file [`../STATUS.md`](../STATUS.md) names as **Execute now**
-- [ ] You understand 02/03 are additive; removals land in 04
+- [x] You know which file [`../STATUS.md`](../STATUS.md) names as **Execute now** (Phase 02 UI sync → task **06**)
+- [x] You understand 02/03 are additive; removals land in 04
 
 ## Out of scope
 

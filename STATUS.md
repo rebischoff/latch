@@ -2,7 +2,7 @@
 
 > **The "quarterback" file.** When in doubt, start here. Always read this first.
 > This is the **global pointer**: it names the **active phase**. Detailed, per-phase status lives in each phase's own `STATUS.md`.
-> Updated: 2026-06-01.
+> Updated: 2026-06-02 (Phase 05 active).
 
 ---
 
@@ -17,16 +17,22 @@
 
 ## Active phase
 
-### → Phase 02b — Platform extraction (genericize `@latch/*`)
+### → Phase 05 — Verification (accept/reject, pending store)
 
 | | |
 |---|---|
-| **Plan** | [`docs/phases/02b-platform-extraction/README.md`](./docs/phases/02b-platform-extraction/README.md) |
-| **Phase STATUS** | [`docs/phases/02b-platform-extraction/STATUS.md`](./docs/phases/02b-platform-extraction/STATUS.md) |
-| **Focus** | Make `@latch/*` domain-agnostic; `apps/crm` sole consumer; retire `apps/web`. **Parity refactor — no new features.** |
-| **Do next** | [`tasks/00-decisions.md`](./docs/phases/02b-platform-extraction/tasks/00-decisions.md) — lock boundary + policy/DAL engine contracts + homes (docs only) |
+| **Plan** | [`docs/phases/05-verification/README.md`](./docs/phases/05-verification/README.md) |
+| **Phase STATUS** | [`docs/phases/05-verification/STATUS.md`](./docs/phases/05-verification/STATUS.md) |
+| **Focus** | Persist `latch_pending_changes`; metadata-driven verification gates; reviewer accept/reject + audit (`approve`). |
+| **Do next** | [`docs/phases/05-verification/README.md`](./docs/phases/05-verification/README.md) — definition of done and sub-goals; in-memory pending store is the starting gap. |
 
-> **Inserted change order (2026-06-01):** the jobs domain was found baked into `@latch/dal` + `@latch/policy`. Genericize **before** adding `customer_detail`. **Phase 02 (UI sync) is paused** on this; it resumes at [`02-ui-sync/tasks/04-db-schema.md`](./docs/phases/02-ui-sync/tasks/04-db-schema.md) (now targeting `apps/crm`) when 02b's DoD passes.
+> **Phase 04 (Audit & lifecycle) complete (2026-06-02)** — T6 immutability + T16 delete audit in CI; hard delete + CASCADE snapshots; `restoreFromAuditEntry` + e2e restore; retention seam. See [`docs/phases/04-audit-lifecycle/STATUS.md`](./docs/phases/04-audit-lifecycle/STATUS.md).
+
+> **Phase 03 (Identity & IAM) complete (2026-06-02)** — `latch_user_roles` + DB-backed `getPrincipal`; Auth.js wired; `user_roles_detail` IAM API (assign/revoke, audited); threat T8 (route 404 hide + positive) and `data_master` auto-access regression in CI. See [`docs/phases/03-identity-iam/STATUS.md`](./docs/phases/03-identity-iam/STATUS.md).
+
+> **Phase 02 (UI sync) complete (2026-06-02)** — `customer_detail` Surface + CRM page; cross-Surface link; nav minimal scope; threat T14 + customer T2 in CI. See [`docs/phases/02-ui-sync/STATUS.md`](./docs/phases/02-ui-sync/STATUS.md).
+
+> **Phase 02b (Platform extraction) complete (2026-06-02)** — `@latch/*` domain-agnostic; `apps/crm` sole consumer; `apps/web` retired. See [`docs/phases/02b-platform-extraction/STATUS.md`](./docs/phases/02b-platform-extraction/STATUS.md).
 
 > **Phase 01 (Data access) complete** — `job_list` list + bulk proven end-to-end; threat T2 (list) + T15 in CI. See [`docs/phases/01-data-access/STATUS.md`](./docs/phases/01-data-access/STATUS.md).
 
@@ -44,11 +50,11 @@ To switch focus (a "change order"), re-point this section at another phase folde
 |-------|-----------|-------|
 | [00 Foundation](./docs/phases/00-foundation/STATUS.md) | contracts, policy, codegen, single-record DAL | mostly done |
 | [01 Data access](./docs/phases/01-data-access/STATUS.md) | list, projection, bulk (`job_list`) | complete |
-| **[02b Platform extraction](./docs/phases/02b-platform-extraction/STATUS.md)** | genericize `@latch/*`; retire `apps/web` | **active** |
-| [02 UI sync](./docs/phases/02-ui-sync/STATUS.md) | `<Can>`/`<FieldControl>`, `customer_detail` | paused (resumes after 02b) |
-| [03 Identity & IAM](./docs/phases/03-identity-iam/STATUS.md) | users/roles in DB, IAM + Data master, auth | not started |
-| [04 Audit & lifecycle](./docs/phases/04-audit-lifecycle/STATUS.md) | full audit, hard delete + recovery | partial |
-| [05 Verification](./docs/phases/05-verification/STATUS.md) | accept/reject, verification gates | partial |
+| [02b Platform extraction](./docs/phases/02b-platform-extraction/STATUS.md) | genericize `@latch/*`; retire `apps/web` | complete |
+| [02 UI sync](./docs/phases/02-ui-sync/STATUS.md) | `<Can>`/`<FieldControl>`, `customer_detail` | complete |
+| [03 Identity & IAM](./docs/phases/03-identity-iam/STATUS.md) | users/roles in DB, IAM + Data master, auth | complete |
+| [04 Audit & lifecycle](./docs/phases/04-audit-lifecycle/STATUS.md) | full audit, hard delete + recovery | complete |
+| **[05 Verification](./docs/phases/05-verification/STATUS.md)** | accept/reject, verification gates | **active** (partial) |
 | [06 Performance & safety](./docs/phases/06-performance-safety/STATUS.md) | manifest cache, RLS surface-gate | not started |
 | [07 Scale-out](./docs/phases/07-scale-out/STATUS.md) | multi-company, publish packages | deferred |
 
@@ -59,7 +65,7 @@ To switch focus (a "change order"), re-point this section at another phase folde
 | Area | State |
 |---|---|
 | Docs | Reorganized into `foundations` / `reference` / `phases` / `discovery` / `archive` (2026-05-29) |
-| Code | `job_detail` stack proven end-to-end (archived pilot) |
+| Code | `job_detail` + `customer_detail` stacks proven end-to-end in `apps/crm` |
 | Tests | `npm run test` — contracts, policy, dal, audit, e2e, threat |
 | CI | GitHub Actions on `main` PRs |
 

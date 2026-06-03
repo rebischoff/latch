@@ -9,12 +9,37 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      AUTH_SECRET: ci-build-secret-not-for-production-use
+      DATABASE_URL: postgresql://latch:latch@localhost:5432/latch
+      LATCH_APP_DATABASE_URL: postgresql://latch_app:latch_app@localhost:5432/latch
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: latch
+          POSTGRES_PASSWORD: latch
+          POSTGRES_DB: latch
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U latch -d latch"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
           cache: "npm"
+      - name: Install psql client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Apply CRM migrations
+        run: |
+          for migration in apps/crm/migrations/*.sql; do
+            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$migration"
+          done
       - run: npm ci
       - run: npm run codegen:check
       - run: npm run test

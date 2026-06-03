@@ -1,6 +1,6 @@
 # Phase 04 — Audit & lifecycle (`@latch/audit`)
 
-> **Home package:** `@latch/audit` · **Status:** partial · **Phase STATUS:** [`STATUS.md`](./STATUS.md)
+> **Home package:** `@latch/audit` · **Status:** complete (2026-06-02) · **Phase STATUS:** [`STATUS.md`](./STATUS.md)
 
 ## Goal
 
@@ -31,11 +31,11 @@ Make the **audit trail the system of record** for deletes and **recovery sourced
 
 ## Definition of done
 
-- [ ] Audit action set complete (`delete`, `reject`, `bulk_summary` as needed)
-- [ ] DB-level immutability (no UPDATE/DELETE) verified for the app role
-- [ ] Hard delete path with documented cascade per Surface
-- [ ] Restore-from-audit script/tool (privileged) with a test
-- [ ] Retention/partition options honored (or seam in place with note)
+- [x] Audit action set complete (`delete`, `restore`, `bulk_summary` as needed; `approve`/`reject` deferred to Phase 05)
+- [x] DB-level immutability (no UPDATE/DELETE) verified for the app role (T6)
+- [x] Hard delete path with documented cascade per Surface
+- [x] Restore-from-audit script/tool (privileged) with a test
+- [x] Retention/partition options honored (seam + docs; task **08**)
 - [x] Pilot schema: no `deleted_at` on new tables (2026-05-30)
 
 ## References

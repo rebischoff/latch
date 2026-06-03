@@ -23,7 +23,7 @@ We **do not** use shared-schema multi-tenancy. Each company has its own database
 **Implications:**
 
 - Company ? `DATABASE_URL` routing (TBD)
-- User/role tables inside each company DB (or control plane ? TBD)
+- User/role assignment in each company DB (`latch_users`, `latch_user_roles` — see Phase 03 decisions)
 - RLS for row/owner rules **within** a company DB
 - Hosted Postgres on Vercel (e.g. Neon) ? see [development.md](../foundations/development.md)
 
@@ -33,9 +33,34 @@ Actions (draft): `read`, `write`, `delete`, `restore`, `approve`, `hard_delete`.
 
 **Choice:**
 
-- Platform ships **built-in roles** (exact catalog TBD).
-- **Users are assigned to one or more roles** (Latch tables; IdP sync later).
+- Platform ships **built-in roles** (catalog locked 2026-06-02 — see below).
+- **Users are assigned to one or more roles** via `latch_user_roles` in the company DB; IdP group sync deferred.
 - Surface/Field policies per role in **repo YAML/JSON**.
+
+### Decision: built-in role catalog (2026-06-02)
+
+**Choice:** v1 role ids (app + built-in):
+
+| Role id | Kind | Purpose |
+|---------|------|---------|
+| `field_tech` | App | Pilot job row-scope `own`; no `customer_detail` |
+| `office_admin` | App | Pilot business admin |
+| `iam_master` | Built-in | Users + role assignments on IAM Surfaces; audit read (configurable) |
+| `data_master` | Built-in | Read/write all **business** Surfaces/Fields (not IAM metadata) |
+
+Pilot CRM seeds map `seed-field-tech` → `field_tech`, `seed-office-admin` → `office_admin`. Optional `seed-iam-admin` → `iam_master` for QA.
+
+**Rationale:** Separates pilot personas from platform administration; built-ins satisfy Phase 03 sub-goals without a `roles` table.
+
+Canonical detail: [`../phases/03-identity-iam/decisions.md`](../phases/03-identity-iam/decisions.md).
+
+### Decision: data_master wildcard (2026-06-02)
+
+**Choice:** `@latch/policy` treats `data_master` as a built-in with wildcard grants on all **registered business** Surface ids in the app policy registry. IAM Surface ids (at minimum `user_roles_detail`) are **excluded**. No `data_master` block in per-Surface `*.policies.yaml`.
+
+**Rationale:** New business Surfaces gain `data_master` access when registered + app-role policies are added — no hand-edited `data_master` YAML. Regression-tested in Phase 03 task **21**.
+
+Implementation: `PolicyService.resolve` synthesizes `read`/`write` on all `fieldIds` (+ surface `read`/`write` actions) when `principal.roles` includes `data_master` and the registry entry has `kind: "business"`. IAM entries use `kind: "iam"` (e.g. `user_roles_detail`). Shipped in task **08** (`synthesizeDataMasterBinding` in `@latch/policy`).
 
 ### Decision: multiple roles ? `multiRoleCombine` (2026-05-27, revised)
 
@@ -148,4 +173,6 @@ Bulk update/delete is part of v1. The per-row evaluation model is documented in 
 
 ## Open points
 
-Deny policy YAML syntax, built-in role catalog, break-glass audit, per-Surface override of `multiRoleCombine`. Multi-company DB routing is deferred ([`../scope.md`](../foundations/scope.md)).
+Deny policy YAML syntax, break-glass audit, per-Surface override of `multiRoleCombine`. Multi-company DB routing is deferred ([`../scope.md`](../foundations/scope.md)).
+
+Identity storage, D2 auth provider (Auth.js), and built-in catalog are locked in [`../phases/03-identity-iam/decisions.md`](../phases/03-identity-iam/decisions.md).

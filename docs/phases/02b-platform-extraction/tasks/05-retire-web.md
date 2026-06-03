@@ -30,10 +30,10 @@ Delete `apps/web` (nothing should reference it after `04`) and update the docs t
 
 ## Verify (stop gate)
 
-- [ ] `apps/web` deleted; no `@latch/web` / `apps/web` references remain in code or tooling
-- [ ] `packages.md`, `architecture-overview.md`, `crm-and-phases.md`, `DATABASE.md`, `scope.md`, `docs/README.md` updated
-- [ ] `npm run build` / `test` / `codegen:check` green
-- [ ] `../STATUS.md` **Execute now** → `06-verify-parity.md`
+- [x] `apps/web` deleted; no `@latch/web` / `apps/web` references remain in code or tooling
+- [x] `packages.md`, `architecture-overview.md`, `crm-and-phases.md`, `DATABASE.md`, `scope.md`, `docs/README.md` updated
+- [x] `npm run build` / `test` / `codegen:check` green
+- [x] `../STATUS.md` **Execute now** → `06-verify-parity.md`
 
 ## Out of scope
 

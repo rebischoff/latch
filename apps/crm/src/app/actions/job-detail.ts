@@ -1,7 +1,7 @@
 "use server";
 
 import { LatchError } from "@latch/contracts";
-import type { ProjectedJobDetail } from "@latch/dal";
+import type { ProjectedJobDetail } from "@/lib/jobs/project";
 import { revalidatePath } from "next/cache";
 
 import { getJobsDal, resolveContext } from "@/lib/latch";

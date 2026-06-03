@@ -1,7 +1,8 @@
 "use client";
 
 import type { Manifest } from "@latch/contracts";
-import type { ProjectedJobDetail, ProjectedJobListRow } from "@latch/dal";
+import type { ProjectedJobDetail } from "@/lib/jobs/project";
+import type { ProjectedJobListRow } from "@/lib/jobs/list-project";
 import { Card, Col, Empty, Result, Row } from "antd";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -12,6 +13,7 @@ import { JobListPane } from "./JobListPane";
 export type JobsDetailPayload = {
   job: ProjectedJobDetail;
   manifest: Manifest;
+  customerDetailManifest?: Manifest;
 };
 
 type JobsSplitViewProps = {
@@ -64,6 +66,7 @@ export const JobsSplitView = ({
               jobId={selectedId}
               job={detail.job}
               manifest={detail.manifest}
+              customerDetailManifest={detail.customerDetailManifest}
             />
           ) : (
             <Empty description="Loading…" />

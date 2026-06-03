@@ -5,14 +5,14 @@
       "name": "Next.js: dev server (CRM)",
       "type": "node-terminal",
       "request": "launch",
-      "command": "npm run dev:crm",
+      "command": "npm run dev",
       "cwd": "${workspaceFolder}"
     },
     {
       "name": "Next.js: debug server-side (CRM)",
       "type": "node-terminal",
       "request": "launch",
-      "command": "npm run dev:crm -- --inspect",
+      "command": "npm run dev -- --inspect",
       "cwd": "${workspaceFolder}"
     },
     {
@@ -69,7 +69,7 @@
       "program": "${workspaceFolder}/node_modules/vitest/vitest.mjs",
       "args": ["run", "tests/threat.test.ts"],
       "cwd": "${workspaceFolder}",
-      "envFile": "${workspaceFolder}/apps/web/.env.local",
+      "envFile": "${workspaceFolder}/apps/crm/.env.local",
       "autoAttachChildProcesses": true,
       "console": "integratedTerminal",
       "skipFiles": ["<node_internals>/**", "**/node_modules/**"]

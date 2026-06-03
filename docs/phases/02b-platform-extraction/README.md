@@ -34,12 +34,12 @@ Building `customer_detail` on this pattern would **deepen** the coupling (a seco
 
 ## Definition of done (parity, not new features)
 
-- [ ] `packages/**` contains **zero** jobs/customers identifiers (grep clean: no `jobs`, `createJobsDal`, `seedPilotJobs`, `job_detail`, `job_list` in `packages/`).
-- [ ] No `packages/**` file references `apps/**` (ESLint-enforced).
-- [ ] `@latch/codegen` reads consumer metadata from `apps/crm` (no `apps/web` path).
-- [ ] `npm run test`, `npm run build`, `npm run codegen:check` all green.
-- [ ] Jobs proof still works in `apps/crm` clicked through as both seed roles (tech vs admin row scope + `financial_terms` omission unchanged).
-- [ ] `apps/web` deleted; `packages.md`, `architecture-overview.md`, `crm-and-phases.md`, `apps/crm/docs/DATABASE.md`, `scope.md` updated.
+- [x] `packages/**` contains **zero** jobs/customers identifiers (grep clean: no `jobs`, `createJobsDal`, `seedPilotJobs`, `job_detail`, `job_list` in `packages/`).
+- [x] No `packages/**` file references `apps/**` (ESLint-enforced).
+- [x] `@latch/codegen` reads consumer metadata from `apps/crm` (no `apps/web` path).
+- [x] `npm run test`, `npm run build`, `npm run codegen:check` all green.
+- [x] Jobs proof still works in `apps/crm` clicked through as both seed roles (tech vs admin row scope + `financial_terms` omission unchanged).
+- [x] `apps/web` deleted; `packages.md`, `architecture-overview.md`, `crm-and-phases.md`, `apps/crm/docs/DATABASE.md`, `scope.md` updated.
 
 ## Heaviest changes (answer to "is policy/dal heavily rewritten?")
 

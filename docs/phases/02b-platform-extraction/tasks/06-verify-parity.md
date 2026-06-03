@@ -19,11 +19,11 @@ Prove the genericized stack behaves exactly as the Phase 01 jobs pilot did, then
 
 ## Verify (stop gate)
 
-- [ ] Test / build / codegen:check green
-- [ ] Boundary grep clean (no domain in packages; no `apps/**` imports in packages)
-- [ ] Two-role jobs proof matches pre-refactor behavior
-- [ ] Phase 02b **Definition of done** ([`../README.md`](../README.md)) fully checked
-- [ ] Repoint root [`../../../STATUS.md`](../../../STATUS.md) active phase → **02 UI sync**; Phase 02 STATUS **Execute now** → `04-db-schema.md` (now targeting `apps/crm`)
+- [x] Test / build / codegen:check green
+- [x] Boundary grep clean (no domain in packages; no `apps/**` imports in packages)
+- [x] Two-role jobs proof matches pre-refactor behavior
+- [x] Phase 02b **Definition of done** ([`../README.md`](../README.md)) fully checked
+- [x] Repoint root [`../../../STATUS.md`](../../../STATUS.md) active phase → **02 UI sync**; Phase 02 STATUS **Execute now** → `04-db-schema.md` (now targeting `apps/crm`)
 
 ## Out of scope
 

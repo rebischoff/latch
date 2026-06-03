@@ -1,6 +1,6 @@
-# Phase 02 — UI sync (`@latch/react`, `apps/web`)
+# Phase 02 — UI sync (`@latch/react`, `apps/crm`)
 
-> **Home packages:** `@latch/react`, `@latch/dal`, `apps/crm` (canonical proof), `apps/web` (thin API pilot) · **Status:** active · **Phase STATUS:** [`STATUS.md`](./STATUS.md) · **Tasks:** [`tasks/01-task-index.md`](./tasks/01-task-index.md)
+> **Home packages:** `@latch/react`, `@latch/dal`, `apps/crm` (canonical proof) · **Status:** active · **Phase STATUS:** [`STATUS.md`](./STATUS.md) · **Tasks:** [`tasks/01-task-index.md`](./tasks/01-task-index.md)
 
 ## Goal
 
@@ -31,10 +31,11 @@ Make the UI render **entirely from the manifest** — hidden / read-only / edita
 
 ## Definition of done
 
-- [ ] `CapabilitiesProvider` + `<Can>` + `<FieldControl>` consumed by `apps/web` or `apps/crm`
-- [ ] `customer_detail` Surface YAML + policies + page
-- [ ] Cross-Surface link job → customer respects manifest
-- [ ] Snapshot tests: nav + DTO per role (no unauthorized Surface IDs / Fields)
+- [x] `CapabilitiesProvider` + `<Can>` + `<FieldControl>` consumed by `apps/crm` (jobs — pilot)
+- [x] Same components on `customer_detail` CRM page
+- [x] `customer_detail` Surface YAML + policies + page
+- [x] Cross-Surface link job → customer respects manifest
+- [x] Snapshot tests: nav + DTO per role (no unauthorized Surface IDs / Fields)
 
 ## References
 

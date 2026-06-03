@@ -28,11 +28,11 @@ None beyond Phase 01 complete + Phase 02 task 00 locked. First task in this phas
 
 ## Verify (stop gate)
 
-- [ ] `../decisions.md` has Decision blocks for the policy contract, DAL kernel contract, and homes/tooling
-- [ ] `open-questions.md` Resolved table has the genericization row
-- [ ] `scope.md` notes the single-app (`apps/crm`) direction
-- [ ] No code added or moved by this task
-- [ ] `../STATUS.md` **Execute now** → `02-policy-generic.md`
+- [x] `../decisions.md` has Decision blocks for the policy contract, DAL kernel contract, and homes/tooling
+- [x] `open-questions.md` Resolved table has the genericization row
+- [x] `scope.md` notes the single-app (`apps/crm`) direction
+- [x] No code added or moved by this task
+- [x] `../STATUS.md` **Execute now** → `02-policy-generic.md`
 
 ## Out of scope
 

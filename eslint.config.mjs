@@ -3,7 +3,6 @@ import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
 
 const nextAppScopes = [
-  { files: ["apps/web/**/*.{js,jsx,ts,tsx,mjs,cjs}"], rootDir: "apps/web/" },
   { files: ["apps/crm/**/*.{js,jsx,ts,tsx,mjs,cjs}"], rootDir: "apps/crm/" },
 ];
 
@@ -145,6 +144,22 @@ const eslintConfig = defineConfig([
             { name: "@latch/react", message: "@latch/approval must not import @latch/react." },
             { name: "@latch/dal", message: "@latch/approval must not import @latch/dal." },
             { name: "@latch/codegen", message: "@latch/approval must not import @latch/codegen." },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ["packages/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["apps/*", "**/apps/*"],
+              message: "packages/** must not import apps/**.",
+            },
           ],
         },
       ],

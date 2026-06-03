@@ -2,9 +2,9 @@
 
 import { redirect } from "next/navigation";
 
-import { clearSessionCookie } from "@/lib/auth/session";
+import { signOut } from "@/lib/auth/auth";
 
 export const logoutAction = async (): Promise<void> => {
-  await clearSessionCookie();
+  await signOut({ redirect: false });
   redirect("/login");
 };

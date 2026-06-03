@@ -12,7 +12,7 @@ Author Surface metadata for the list: Fields, columns, anchor table, display joi
 
 | File | Action |
 |------|--------|
-| `apps/web/modules/job/job_list.surface.yaml` | **Create** |
+| `apps/crm/modules/job/job_list.surface.yaml` | **Create** |
 
 ## Steps
 
@@ -27,10 +27,10 @@ Author Surface metadata for the list: Fields, columns, anchor table, display joi
 
 ## Verify (stop gate)
 
-- [ ] YAML parses; `id` is `job_list`
-- [ ] All Field ids are `snake_case`
-- [ ] No hand-written files in `generated/` for `job_list` yet
-- [ ] [`../STATUS.md`](../STATUS.md) → **07-policies-yaml.md**
+- [x] YAML parses; `id` is `job_list`
+- [x] All Field ids are `snake_case`
+- [x] No hand-written files in `generated/` for `job_list` yet
+- [x] [`../STATUS.md`](../STATUS.md) → **07-policies-yaml.md**
 
 ## Out of scope
 

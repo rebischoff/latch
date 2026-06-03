@@ -9,6 +9,7 @@ Detailed rules live in [`.cursor/rules/`](./.cursor/rules/). Highlights:
 - [`20-naming.mdc`](./.cursor/rules/20-naming.mdc) — project name + domain terms
 - [`30-nextjs.mdc`](./.cursor/rules/30-nextjs.mdc) — Next.js 16 traps
 - [`40-docs.mdc`](./.cursor/rules/40-docs.mdc) — documentation style
+- [`45-phase-tasks.mdc`](./.cursor/rules/45-phase-tasks.mdc) — mark task verify gates complete; update phase STATUS
 - [`50-typescript.mdc`](./.cursor/rules/50-typescript.mdc) — arrow functions, TS conventions
 
 <!-- BEGIN:nextjs-agent-rules -->

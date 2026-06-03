@@ -16,6 +16,12 @@ The single most important document for keeping v1 shippable solo. **If a feature
 
 **Canonical detail:** [`../reference/audit-and-lifecycle.md`](../reference/audit-and-lifecycle.md) · Phase 04 restore tooling: [`../phases/04-audit-lifecycle/decisions.md`](../phases/04-audit-lifecycle/decisions.md).
 
+### Decision: sole consumer app — `apps/crm` (2026-06-01)
+
+**Choice:** **`apps/crm`** is the only runnable consumer app and proof harness for v1. The former **`apps/web`** pilot was retired in Phase 02b (codegen, migrations, build, and tests repointed; doc/code sweep in [`../phases/02b-platform-extraction/tasks/05-retire-web.md`](../phases/02b-platform-extraction/tasks/05-retire-web.md)).
+
+**Rationale:** The jobs pilot incorrectly lived in both `packages/*` and `apps/web`. Platform extraction genericizes `@latch/*` and consolidates domain metadata, DDL, schema, seed, and wiring under one app. See [`../phases/02b-platform-extraction/decisions.md`](../phases/02b-platform-extraction/decisions.md).
+
 ---
 
 ## In v1
@@ -82,7 +88,7 @@ The single most important document for keeping v1 shippable solo. **If a feature
 - Tests for T1, T2, T3, T11, T13 at minimum.
 
 ### Sample app
-- Trades CRM (codename) � uses only `@latch/*` packages.
+- Trades CRM in **`apps/crm`** — sole consumer; uses only `@latch/*` packages.
 - Login (auth provider TBD), job list, job detail, customer detail.
 - Two seed users in two roles (e.g. `field_tech`, `office_admin`).
 
@@ -125,7 +131,7 @@ These are good ideas, just not now. Listed so we can say "no" with grace.
 ### Distribution
 - Public npm publication of `@latch/*` packages.
 - Plugin / extension system.
-- Second runnable app beyond `apps/web` / `apps/crm` (CRM scaffold is **docs-only** until implementation — see [`../../apps/crm/README.md`](../../apps/crm/README.md)).
+- Second runnable consumer app beyond **`apps/crm`** (the retired `apps/web` pilot is not revived).
 
 ---
 

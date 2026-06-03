@@ -41,3 +41,5 @@ roles:
         actions: [read, write]
       - field: financial_terms
         actions: [read, write, approve]
+      - field: customer_ref
+        actions: [read]

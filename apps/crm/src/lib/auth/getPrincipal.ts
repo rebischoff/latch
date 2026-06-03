@@ -1,15 +1,21 @@
 import type { Principal } from "@latch/contracts";
 
-import { readSessionCookie } from "./session.js";
+import { loadRolesForUser } from "@/lib/iam/load-roles";
+
+import { readProviderSession } from "./provider-session.js";
 
 /**
- * Resolves the request principal from the session cookie.
- * For automated tests only: when no cookie, `LATCH_STUB_USER` + `LATCH_STUB_ROLE` apply.
+ * Resolves the request principal: Auth.js session supplies user id only; roles come from DB/store.
+ * For automated tests only: when no session, `LATCH_STUB_USER` + `LATCH_STUB_ROLE` apply
+ * (env role only — not merged with seed DB rows — so CI threat/e2e stay deterministic).
  */
 export const getPrincipal = async (): Promise<Principal> => {
-  const session = await readSessionCookie();
+  const session = await readProviderSession();
   if (session) {
-    return { id: session.userId, roles: session.roles };
+    return {
+      id: session.userId,
+      roles: await loadRolesForUser(session.userId),
+    };
   }
 
   const stubUser = process.env.LATCH_STUB_USER;

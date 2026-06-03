@@ -73,4 +73,10 @@
 
 ## Deferred (does not block 04–08)
 
-- [ ] `job_history` data source — DB view vs DAL join query (lock in task **09** `09-dal-get.md` when written).
+- [x] `job_history` data source — lock in task **09** ([`09-dal-get.md`](./tasks/09-dal-get.md)).
+
+### Decision: `job_history` data source (2026-06-02)
+
+**Choice:** DAL join query in the consumer store (`MemoryJobStore.listJobsByCustomerId`), not a Postgres view.
+
+**Rationale:** Memory store is the primary test harness; a view adds DDL without new package signal. Postgres adapter can use the same query shape later.

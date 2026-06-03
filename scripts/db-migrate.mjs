@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 /**
- * Apply apps/web/migrations/001_init.sql.
- * Loads DATABASE_URL from apps/web/.env.local first, then the shell env.
+ * Apply apps/crm/migrations/001_init.sql.
+ * Loads DATABASE_URL from apps/crm/.env.local first, then the shell env.
  */
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-const envLocalPath = resolve("apps/web/.env.local");
+const envLocalPath = resolve("apps/crm/.env.local");
 const checkOnly = process.argv.includes("--check");
 
 const parseEnvValue = (raw) => {
@@ -45,7 +45,7 @@ const validateDatabaseUrl = (databaseUrl, source) => {
     console.error(
       "DATABASE_URL is not set.\n" +
         `  Looked in: ${envLocalPath} and process.env.DATABASE_URL\n` +
-        "  Add a Neon direct connection string to apps/web/.env.local:\n" +
+        "  Add a Neon direct connection string to apps/crm/.env.local:\n" +
         "    DATABASE_URL=postgresql://...@ep-....neon.tech/neondb?sslmode=require",
     );
     process.exit(1);
@@ -77,7 +77,7 @@ const fromFile = readDatabaseUrlFromFile();
 const fromEnv = process.env.DATABASE_URL?.trim() || undefined;
 const databaseUrl = fromFile ?? fromEnv;
 const source = fromFile
-  ? "apps/web/.env.local"
+  ? "apps/crm/.env.local"
   : fromEnv
     ? "process.env.DATABASE_URL"
     : "none";
@@ -86,7 +86,7 @@ const host = validateDatabaseUrl(databaseUrl, source);
 
 if (fromEnv && fromFile && fromEnv !== fromFile) {
   console.warn(
-    "Note: shell DATABASE_URL differs from apps/web/.env.local — using .env.local for migrate.",
+    "Note: shell DATABASE_URL differs from apps/crm/.env.local — using .env.local for migrate.",
   );
   console.warn(
     "  To use the shell value instead: unset DATABASE_URL or remove .env.local entry.",
@@ -104,7 +104,7 @@ if (checkOnly) {
   process.exit(0);
 }
 
-const migration = resolve("apps/web/migrations/001_init.sql");
+const migration = resolve("apps/crm/migrations/001_init.sql");
 const result = spawnSync("psql", ["-d", databaseUrl, "-f", migration], {
   stdio: "inherit",
 });

@@ -2,8 +2,7 @@
 
 import { redirect } from "next/navigation";
 
-import { getDevPassword, lookupUser } from "@/lib/auth/users";
-import { setSessionCookie } from "@/lib/auth/session";
+import { signIn } from "@/lib/auth/auth";
 
 export type LoginState = {
   error?: string;
@@ -20,16 +19,15 @@ export const loginAction = async (
     return { error: "Username and password are required." };
   }
 
-  const user = lookupUser(username);
-  if (!user || password !== getDevPassword()) {
+  const result = await signIn("credentials", {
+    username,
+    password,
+    redirect: false,
+  });
+
+  if (result?.error) {
     return { error: "Invalid username or password." };
   }
-
-  await setSessionCookie({
-    userId: user.id,
-    roles: user.roles,
-    label: user.label,
-  });
 
   redirect("/jobs");
 };

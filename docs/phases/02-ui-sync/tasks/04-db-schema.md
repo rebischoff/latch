@@ -33,12 +33,13 @@ Add `customers`, `sites`, and `jobs.customer_id` per the locked [`customer_detai
 
 ## Verify (stop gate)
 
-- [ ] `npm run build` passes (`apps/crm` schema + seed constants compile)
-- [ ] `apps/crm` store seed includes 2 customers, sites, and jobs with `customer_id`
-- [ ] Migration SQL valid; documented apply command if Postgres path used
-- [ ] Seed customer ids listed below for QA:
-  - `SEED_CUSTOMER_*` = _(fill on complete)_
-- [ ] [`../STATUS.md`](../STATUS.md) **Execute now** → `06-surface-yaml.md`
+- [x] `npm run build` passes (`apps/crm` schema + seed constants compile)
+- [x] `apps/crm` store seed includes 2 customers, sites, and jobs with `customer_id`
+- [x] Migration SQL valid; documented apply command if Postgres path used
+- [x] Seed customer ids listed below for QA:
+  - `SEED_CUSTOMER_ACME` = `seed-customer-acme` — `/customers?id=seed-customer-acme`
+  - `SEED_CUSTOMER_OAK` = `seed-customer-oak` — `/customers?id=seed-customer-oak`
+- [x] [`../STATUS.md`](../STATUS.md) **Execute now** → `06-surface-yaml.md`
 
 ## Out of scope
 

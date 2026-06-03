@@ -16,6 +16,7 @@ This repo is a **data-governance platform** for Next.js + Postgres business apps
 ## Working principles
 
 - **Docs-first.** Update the relevant doc *before* writing code that contradicts it. Add a dated **Decision** block (e.g. `### Decision: <topic> (YYYY-MM-DD)`) when locking a choice.
+- **Close phase tasks.** After each `docs/phases/**/tasks/*.md` implementation, mark verify gates `[x]`, add the task **Status** line, and update that phase?s `STATUS.md` ? see [`45-phase-tasks.mdc`](./45-phase-tasks.mdc).
 - **Don't ship features that aren't in v1 scope.** Suggest, don't build. If the user asks for something out of scope, confirm before proceeding.
 - **Product name is Latch** (`@latch/*`, `latch_*` schema prefix) ù see [`docs/foundations/naming.md`](../../docs/foundations/naming.md).
 

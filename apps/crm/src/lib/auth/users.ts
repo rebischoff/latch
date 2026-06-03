@@ -1,22 +1,27 @@
-import type { RoleId } from "@latch/contracts";
-import { SEED_ADMIN_ID, SEED_TECH_ID } from "@latch/dal";
+import {
+  SEED_ADMIN_ID,
+  SEED_IAM_ID,
+  SEED_TECH_ID,
+} from "../../../db/seed.js";
 
+/** Dev login map — role assignments live in `latch_user_roles` (see `seedPilotJobs`). */
 export type CrmUser = {
   id: string;
-  roles: RoleId[];
   label: string;
 };
 
 const USERS_BY_LOGIN: Record<string, CrmUser> = {
   "tech@demo.local": {
     id: SEED_TECH_ID,
-    roles: ["field_tech"],
     label: "tech@demo.local",
   },
   "admin@demo.local": {
     id: SEED_ADMIN_ID,
-    roles: ["office_admin"],
     label: "admin@demo.local",
+  },
+  "iam@demo.local": {
+    id: SEED_IAM_ID,
+    label: "iam@demo.local",
   },
 };
 

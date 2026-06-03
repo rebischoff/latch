@@ -4,8 +4,6 @@ import type {
   PolicyScope,
   Principal,
   RoleSurfacePolicy,
-  SurfaceId,
-  SurfacePolicies,
 } from "@latch/contracts";
 
 import {
@@ -15,22 +13,35 @@ import {
   unionSurfaceActions,
   type MergeOptions,
 } from "./merge.js";
-import {
-  JOB_DETAIL_FIELD_IDS,
-  JOB_DETAIL_SURFACE_ACTIONS_BY_ROLE,
-  jobDetailPolicies,
-} from "./surfaces/job-detail.js";
-import {
-  JOB_LIST_FIELD_IDS,
-  JOB_LIST_SURFACE_ACTIONS_BY_ROLE,
-  jobListPolicies,
-} from "./surfaces/job-list.js";
+import type { PolicyRegistry, SurfacePolicyDefinition } from "./registry.js";
+
+/** Built-in role id — wildcard grants on business surfaces only (no per-Surface YAML). */
+export const DATA_MASTER_ROLE_ID = "data_master";
+
+const DATA_MASTER_FIELD_ACTIONS: FieldAction[] = ["read", "write"];
+const DATA_MASTER_SURFACE_ACTIONS: FieldAction[] = ["read", "write"];
+
+const isBusinessSurface = (surfaceDef: SurfacePolicyDefinition): boolean =>
+  (surfaceDef.kind ?? "business") === "business";
+
+/** Synthesized grants when principal includes `data_master` on a business surface. */
+export const synthesizeDataMasterBinding = (
+  surfaceDef: SurfacePolicyDefinition,
+): RoleSurfacePolicy & { surfaceActions: FieldAction[] } => ({
+  rowScope: "all",
+  fields: surfaceDef.fieldIds.map((field) => ({
+    field,
+    actions: DATA_MASTER_FIELD_ACTIONS,
+  })),
+  surfaceActions: DATA_MASTER_SURFACE_ACTIONS,
+});
 
 export type MultiRoleCombine = "union_grants";
 
 export interface PolicyServiceConfig {
   multiRoleCombine?: MultiRoleCombine;
   denyWins?: boolean;
+  registry?: PolicyRegistry;
 }
 
 export interface RoleMergeStrategy {
@@ -54,27 +65,10 @@ export const unionGrantsStrategy: RoleMergeStrategy = {
   },
 };
 
-const surfaceRegistry: Record<SurfaceId, SurfacePolicies> = {
-  job_detail: jobDetailPolicies,
-  job_list: jobListPolicies,
-};
-
-const knownFieldsBySurface: Record<SurfaceId, readonly string[]> = {
-  job_detail: JOB_DETAIL_FIELD_IDS,
-  job_list: JOB_LIST_FIELD_IDS,
-};
-
-const surfaceActionsBySurface: Record<
-  SurfaceId,
-  Record<string, FieldAction[]>
-> = {
-  job_detail: JOB_DETAIL_SURFACE_ACTIONS_BY_ROLE,
-  job_list: JOB_LIST_SURFACE_ACTIONS_BY_ROLE,
-};
-
 export class PolicyService {
   private readonly denyWins: boolean;
   private readonly mergeStrategy: RoleMergeStrategy;
+  private readonly registry: PolicyRegistry;
 
   constructor(config: PolicyServiceConfig = {}) {
     if (
@@ -87,27 +81,41 @@ export class PolicyService {
     }
     this.denyWins = config.denyWins ?? true;
     this.mergeStrategy = unionGrantsStrategy;
+    this.registry = config.registry ?? {};
   }
 
   resolve = (principal: Principal, scope: PolicyScope): Manifest => {
-    const policies = surfaceRegistry[scope.surface];
-    if (!policies) {
+    const surfaceDef = this.registry[scope.surface];
+    if (!surfaceDef) {
       throw new Error(`Unknown surface: ${scope.surface}`);
     }
 
     const rolePolicies: RoleSurfacePolicy[] = [];
     const surfaceActionLists: FieldAction[][] = [];
 
+    if (
+      principal.roles.includes(DATA_MASTER_ROLE_ID) &&
+      isBusinessSurface(surfaceDef)
+    ) {
+      const dataMaster = synthesizeDataMasterBinding(surfaceDef);
+      rolePolicies.push({
+        rowScope: dataMaster.rowScope,
+        fields: dataMaster.fields,
+      });
+      surfaceActionLists.push(dataMaster.surfaceActions);
+    }
+
     for (const roleId of principal.roles) {
-      const rolePolicy = policies.roles[roleId];
-      if (!rolePolicy) {
+      const roleBinding = surfaceDef.roles[roleId];
+      if (!roleBinding) {
         continue;
       }
-      rolePolicies.push(rolePolicy);
-      const roleSurfaceActions =
-        surfaceActionsBySurface[scope.surface]?.[roleId];
-      if (roleSurfaceActions) {
-        surfaceActionLists.push(roleSurfaceActions);
+      rolePolicies.push({
+        rowScope: roleBinding.rowScope,
+        fields: roleBinding.fields,
+      });
+      if (roleBinding.surfaceActions) {
+        surfaceActionLists.push(roleBinding.surfaceActions);
       }
     }
 
@@ -117,8 +125,7 @@ export class PolicyService {
       mergeOptions,
     );
 
-    const knownFields = knownFieldsBySurface[scope.surface] ?? [];
-    const fields = ensureFieldKeys(merged.fields, [...knownFields]);
+    const fields = ensureFieldKeys(merged.fields, [...surfaceDef.fieldIds]);
 
     return {
       surface: scope.surface,

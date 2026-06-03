@@ -2,9 +2,9 @@
 --
 -- Apply on Neon (optional; tests use MemoryJobStore):
 --   npm run db:migrate
---   # or: psql "$DATABASE_URL" -f apps/web/migrations/001_init.sql
+--   # or: psql "$DATABASE_URL" -f apps/crm/migrations/001_init.sql
 --
--- DATABASE_URL: Neon direct connection from apps/web/.env.local
+-- DATABASE_URL: Neon direct connection from apps/crm/.env.local
 
 BEGIN;
 
@@ -66,7 +66,7 @@ CREATE TRIGGER latch_audit_no_mutation
   EXECUTE FUNCTION latch_audit_deny_mutation();
 
 -- Decision (task 17, v1 pilot): mutation audit for `jobs` comes from DAL `writeAudit`
--- (apps/web/src/lib/audit-db-writer.ts when DATABASE_URL is set). No AFTER UPDATE
+-- (apps/crm/src/lib/audit-db-writer.ts when DATABASE_URL is set). No AFTER UPDATE
 -- trigger on `jobs` — avoids duplicate rows on the normal app path. Direct SQL
 -- bypass remains a Phase 4 hardening item (session-gated trigger or RLS).
 

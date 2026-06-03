@@ -25,13 +25,19 @@ Remove domain knowledge from `@latch/policy`. The package keeps its **merge/reso
 4. Add fixture-registry unit tests proving merge semantics with **non-domain** surface ids (e.g. `alpha`, `beta`).
 5. Decide and note: does `@latch/codegen` emit a policy registry from `*.policies.yaml`, or does the app assemble it at runtime? (Lock here.)
 
+### Decision: policy registry assembly (2026-06-02)
+
+**Choice:** Consumer app assembles `PolicyRegistry` at runtime; codegen emits structure only (field ids, schemas), not policy bindings.
+
+**Rationale:** See [`../decisions.md`](../decisions.md#decision-policy-registry-assembly-2026-06-02).
+
 ## Verify (stop gate)
 
-- [ ] `PolicyService` has no import of `surfaces/job-*`; resolves from an injected registry
-- [ ] Merge semantics unchanged (existing policy tests still pass via the shim)
-- [ ] New fixture-registry tests use non-domain surface ids
-- [ ] `npm run test` green; `npm run build` green
-- [ ] `../STATUS.md` **Execute now** → `03-dal-generic.md`
+- [x] `PolicyService` has no import of `surfaces/job-*`; resolves from an injected registry
+- [x] Merge semantics unchanged (existing policy tests still pass via the shim)
+- [x] New fixture-registry tests use non-domain surface ids
+- [x] `npm run test` green; `npm run build` green
+- [x] `../STATUS.md` **Execute now** → `03-dal-generic.md`
 
 ## Out of scope
 

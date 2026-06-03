@@ -5,16 +5,17 @@ import { createMemoryAuditWriter, setAuditWriter } from "@latch/audit";
 import { ValidationError, type PermissionContext } from "@latch/contracts";
 import {
   createJobsDal,
+  createJobPolicyService,
   MemoryJobStore,
   SEED_ADMIN_ID,
+  SEED_CUSTOMER_ACME,
   SEED_JOB_OTHER,
   SEED_JOB_OWNED,
   SEED_TECH_ID,
   seedPilotJobs,
-} from "@latch/dal";
-import { PolicyService } from "@latch/policy";
+} from "@latch/crm/test-utils";
 
-const policy = new PolicyService();
+const policy = createJobPolicyService();
 
 const buildListCtx = (userId: string, roles: string[]): PermissionContext => {
   const principal = { id: userId, roles };
@@ -46,8 +47,7 @@ const seedBulkJobs = (store: MemoryJobStore, count: number): string[] => {
       status: "scheduled",
       scheduledAt: new Date("2026-05-01T12:00:00.000Z"),
       contractAmount: "1000.00",
-      customerName: "Bulk Co",
-      siteLabel: `Site ${i}`,
+      customerId: SEED_CUSTOMER_ACME,
     });
     store.addAssignment({ jobId: id, userId: SEED_ADMIN_ID });
   }

@@ -8,16 +8,16 @@ import {
 } from "@latch/contracts";
 import {
   createJobsDal,
+  createJobPolicyService,
   MemoryJobStore,
   SEED_ADMIN_ID,
   SEED_JOB_OTHER,
   SEED_JOB_OWNED,
   SEED_TECH_ID,
   seedPilotJobs,
-} from "@latch/dal";
-import { PolicyService } from "@latch/policy";
+} from "@latch/crm/test-utils";
 
-const policy = new PolicyService();
+const policy = createJobPolicyService();
 
 const buildCtx = (
   userId: string,

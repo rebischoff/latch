@@ -27,5 +27,10 @@ fields:
     columns:
       - jobs.contract_amount
 
+  - id: customer_ref
+    columns:
+      - customers.id
+      - customers.name
+
   - id: assignments
     columns: []

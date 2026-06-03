@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation";
 
-import { readSessionCookie } from "@/lib/auth/session";
+import { readProviderSession } from "@/lib/auth/provider-session";
 
 export default async function HomePage() {
-  const session = await readSessionCookie();
+  const session = await readProviderSession();
   redirect(session ? "/jobs" : "/login");
 }

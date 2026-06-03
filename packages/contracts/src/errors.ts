@@ -50,6 +50,19 @@ export const isLatchError = (
 export const isNotFoundError = (error: unknown): error is NotFoundError =>
   isLatchError(error, "NOT_FOUND");
 
+/** Target already exists — e.g. restore when anchor row is live (default 409). */
+export class ConflictError extends LatchError {
+  readonly statusCode = 409;
+  readonly code = "CONFLICT";
+
+  constructor(message = "Conflict") {
+    super(message);
+  }
+}
+
+export const isConflictError = (error: unknown): error is ConflictError =>
+  isLatchError(error, "CONFLICT");
+
 /** Body or params failed structural validation (strict write, Zod parse). */
 export class ValidationError extends LatchError {
   readonly statusCode = 400;

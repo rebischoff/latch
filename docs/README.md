@@ -19,8 +19,7 @@ docs/
 
 | Path | Status |
 |------|--------|
-| [`apps/web/`](../apps/web/) | Runnable pilot — `job_detail` |
-| [`apps/crm/`](../apps/crm/) | **Planning only** — minimal Latch proof harness ([`PLAN.md`](../apps/crm/docs/PLAN.md), Ant Design, no Tailwind) |
+| [`apps/crm/`](../apps/crm/) | The single app + Latch proof harness ([`PLAN.md`](../apps/crm/docs/PLAN.md), Ant Design, no Tailwind); owns schema, migrations, and Surface descriptors |
 
 ## Foundations — read these first
 

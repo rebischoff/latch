@@ -60,8 +60,8 @@ Platform-wide configuration defaults. Exact storage (env, `<project>_config` tab
 | Option | Default | v1? | Notes |
 |---|---|---|---|
 | `auditImmutable` | `true` | (v1) | No UPDATE/DELETE on audit rows. |
-| `auditRetentionYears` | `3` | (v1) | Default retention before archive/purge of audit partitions. |
-| `auditPartitionBy` | `month` | (v1) | Partition audit table by `occurred_at` month. |
+| `auditRetentionYears` | `3` | (v1) | Default retention before archive/purge of audit partitions. **Runtime seam:** [`@latch/audit`](../../packages/audit/src/config.ts) — `getAuditConfig().retentionYears` (default **3** via `DEFAULT_AUDIT_RETENTION_YEARS`). CRM may re-export from env later. |
+| `auditPartitionBy` | `month` | (v1) | Partition audit table by `occurred_at` month. DDL sketch: [`audit-and-lifecycle.md`](../reference/audit-and-lifecycle.md#retention), [`apps/crm/docs/DATABASE.md`](../../apps/crm/docs/DATABASE.md#audit-retention-v1-seam). |
 | `gdprErasureMode` | `off` | Deferred | `pseudonymize` optional later; legal hold overrides. |
 
 ## List operations

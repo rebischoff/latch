@@ -14,7 +14,7 @@ export const runCodegen = async (check = false): Promise<CodegenResult> => {
   const files = await generateAllSurfaces();
 
   if (files.length === 0) {
-    throw new Error("No *.surface.yaml files found under apps/web/modules/");
+    throw new Error("No *.surface.yaml files found under apps/crm/modules/");
   }
 
   if (check) {

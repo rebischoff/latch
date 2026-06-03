@@ -29,21 +29,21 @@ A library set for building **business data apps** on **Next.js + PostgreSQL** wi
 | Database | PostgreSQL — **Neon** (local dev, preview, prod) |
 | ORM | Drizzle (planned) |
 | Styling | Tailwind CSS |
-| Layout | **Monorepo** — `apps/web` + `packages/*` |
+| Layout | **Monorepo** — `apps/crm` + `packages/*` |
 
 ## Quick start
 
 ```bash
 npm install
-cp apps/web/.env.example apps/web/.env.local
-# Edit apps/web/.env.local — set DATABASE_URL to your Neon direct connection string
-npm run db:migrate   # optional: needs psql; skip if you only use the in-memory pilot store
+cp apps/crm/.env.example apps/crm/.env.local
+# Edit apps/crm/.env.local — set DATABASE_URL to your Neon direct connection string
+npm run db:migrate   # optional: needs psql; skip if you only use the in-memory store
 npm run dev
 ```
 
-Open [http://localhost:3001](http://localhost:3001). Health: `/api/health`. CRM harness: `npm run dev:crm` → [http://localhost:3002](http://localhost:3002).
+Open [http://localhost:3002/login](http://localhost:3002/login). Seed users: `tech@demo.local`, `admin@demo.local`.
 
-> Latch uses port **3001** by default so it can run alongside other local Next.js apps on 3000.
+> The CRM app uses port **3002** by default so it can run alongside other local Next.js apps on 3000.
 
 Database setup (Neon, migrations, audit): [`docs/foundations/development.md`](./docs/foundations/development.md).
 
@@ -55,8 +55,7 @@ Database setup (Neon, migrations, audit): [`docs/foundations/development.md`](./
 ├── docs/                 # Planning, glossary, discovery, roadmap
 ├── .cursor/rules/        # AI agent guidance
 ├── apps/
-│   ├── web/              # Next.js + sample app (trades-CRM)
-│   └── crm/              # Latch proof harness (Ant Design)
+│   └── crm/              # The single Next.js app + Latch proof harness (Ant Design)
 ├── packages/
 │   ├── contracts/        # Manifest schema, Field IDs, base Zod
 │   ├── policy/           # PolicyService (server)

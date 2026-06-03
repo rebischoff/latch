@@ -11,7 +11,7 @@ const PACKAGE_ROOT = path.resolve(
   "..",
 );
 export const REPO_ROOT = path.resolve(PACKAGE_ROOT, "../..");
-const MODULES_ROOT = path.join(REPO_ROOT, "apps/web/modules");
+const MODULES_ROOT = path.join(REPO_ROOT, "apps/crm/modules");
 
 /** Known column → Zod fragment (pilot tables). Extend as Surfaces grow. */
 const COLUMN_ZOD: Record<string, string> = {
@@ -21,8 +21,13 @@ const COLUMN_ZOD: Record<string, string> = {
   "jobs.scheduled_at": "z.string().nullable()",
   "jobs.description": "z.string().nullable()",
   "jobs.contract_amount": "z.string().nullable()",
+  "customers.id": "z.string()",
   "customers.name": "z.string()",
+  "customers.phone": "z.string().nullable()",
+  "customers.billing_notes": "z.string().nullable()",
   "sites.label": "z.string()",
+  "latch_users.id": "z.string()",
+  "latch_users.display_name": "z.string().nullable()",
 };
 
 const toPascalCase = (snake: string): string =>

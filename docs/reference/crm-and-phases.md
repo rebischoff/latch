@@ -52,7 +52,7 @@ A CRM slice may be implemented **only against package phases in `done` / `mostly
 | `partial` | Build the parts whose API is merged; stub nothing that an unfinished task will change |
 | `not started` / `deferred` | **Do not build** — no stubs, no placeholder screens |
 
-**Consequence today** (Phase 01 `active`, list DAL not merged): build CRM shell + `job_detail` read/write/delete now (Phase 00 = done); add the list pane only when `dal.jobs.list` is merged. Auth polish (03), restore (04), approval (05) wait for their phases.
+**Consequence today** (Phase 02 active, `customer_detail` in progress): build CRM customer UI only after `dal.customers.get` (+ `patch`) is merged (Phase 02 tasks 09–13). Jobs harness (Steps A + B) is complete against the generic kernel.
 
 Rationale: building ahead of a merged API means coding against an imagined contract and reworking when the real one lands — the exact cost this harness exists to avoid.
 
@@ -109,14 +109,9 @@ When root `STATUS.md` switches active phase (e.g. 01 → 03):
 
 Inserting a new phase folder does not require CRM doc rewrites — update the table above if a new proof row is needed.
 
-## `apps/web` vs `apps/crm`
+## The app
 
-| App | Role |
-|-----|------|
-| `apps/web` | Thin pilot; may retire routes as CRM covers them |
-| `apps/crm` | Canonical visual harness (Ant Design, split views) |
-
-Avoid duplicating the same Surface in both apps long term. Prefer one consumer for manual QA.
+`apps/crm` is the **only** app — the canonical visual harness (Ant Design, split views) and sole consumer of `@latch/*`. It owns its schema, migrations, seed, and Surface descriptors. (The former `apps/web` pilot was retired in [Phase 02b](../phases/02b-platform-extraction/STATUS.md).)
 
 ## CI
 

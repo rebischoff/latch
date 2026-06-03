@@ -1,7 +1,9 @@
 import type { Principal, SurfaceId } from "@latch/contracts";
 import { PolicyService } from "@latch/policy";
 
-const policyService = new PolicyService();
+import { jobPolicyRegistry } from "./policy/registry.js";
+
+const policyService = new PolicyService({ registry: jobPolicyRegistry });
 
 export type NavItem = {
   href: string;
@@ -15,14 +17,24 @@ export type NavItem = {
  */
 const CRM_NAV_CATALOG = [
   { href: "/jobs", label: "Jobs", surfaceId: "job_detail" as SurfaceId },
-  // Phase 02: { href: "/customers", label: "Customers", surfaceId: "customer_detail" },
+  {
+    href: "/customers",
+    label: "Customers",
+    surfaceId: "customer_detail" as SurfaceId,
+  },
 ] as const;
 
-const surfaceAllowsNav = (principal: Principal, surfaceId: SurfaceId): boolean => {
+const navResolveMode = (surfaceId: SurfaceId): "list" | "detail" =>
+  surfaceId === "customer_detail" ? "detail" : "list";
+
+const surfaceAllowsNav = (
+  principal: Principal,
+  surfaceId: SurfaceId,
+): boolean => {
   try {
     const manifest = policyService.resolve(principal, {
       surface: surfaceId,
-      mode: "list",
+      mode: navResolveMode(surfaceId),
     });
     return manifest.actions.includes("read");
   } catch {

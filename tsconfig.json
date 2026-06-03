@@ -1,7 +1,7 @@
 {
   "files": [],
   "references": [
-    { "path": "apps/web" },
+    { "path": "apps/crm" },
     { "path": "packages/contracts" },
     { "path": "packages/policy" },
     { "path": "packages/dal" },

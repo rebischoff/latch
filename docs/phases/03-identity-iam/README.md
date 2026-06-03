@@ -1,6 +1,6 @@
-# Phase 03 — Identity & IAM (`@latch/policy` + `@latch/iam`)
+# Phase 03 — Identity & IAM (`@latch/policy` + `apps/crm` IAM module)
 
-> **Home packages:** `@latch/policy` (+ a new `@latch/iam` if extraction is warranted) · **Status:** not started · **Phase STATUS:** [`STATUS.md`](./STATUS.md)
+> **Home packages:** `@latch/policy` (+ `apps/crm` IAM module; `@latch/iam` deferred) · **Status:** decisions locked (task **00**); implementation at task **04** · **Phase STATUS:** [`STATUS.md`](./STATUS.md) · **Tasks:** [`tasks/01-task-index.md`](./tasks/01-task-index.md)
 
 ## Goal
 
@@ -16,7 +16,7 @@ Replace the stub principal with **real identity**, store **user ↔ role** assig
 |----------|---------------------------|
 | `latch_user_roles` (user ↔ role, many-to-many) | ABAC / ReBAC / policy DSL |
 | Built-in role seeds incl. **`iam_master`** + **`data_master`** | Break-glass enhanced audit (design only) |
-| IAM admin Surface(s): users, role assignment | External IdP-group → role mapping internals (sketch only) |
+| IAM admin Surface (`user_roles_detail`) + HTTP API for role assignment | CRM IAM admin UI; external IdP-group sync (sketch only) |
 | DB-backed `Principal` (roles loaded from DB) | Additional role-merge modes (Phase 06) |
 | Real auth provider (resolve **D2**) | Multi-company identity (Phase 07) |
 
@@ -29,11 +29,17 @@ Replace the stub principal with **real identity**, store **user ↔ role** assig
 
 ## Definition of done
 
-- [ ] `latch_user_roles` migration + seeds for `iam_master`, `data_master`, and pilot app roles
-- [ ] `getPrincipal` resolves roles from DB (stub remains a local-dev fallback)
-- [ ] Auth provider chosen and wired (D2)
-- [ ] IAM admin Surface: assign/revoke roles, audited
-- [ ] Test: new Surface is automatically accessible to `data_master`
+- [x] `latch_user_roles` migration + seeds for `iam_master`, `data_master`, and pilot app roles
+- [x] `getPrincipal` resolves roles from DB (stub remains a local-dev fallback)
+- [x] Auth provider chosen and wired (D2)
+- [x] IAM admin Surface: assign/revoke roles, audited
+- [x] Test: new Surface is automatically accessible to `data_master`
+
+## Task chain
+
+Execute in order — see [`tasks/01-task-index.md`](./tasks/01-task-index.md):
+
+`00-decisions` → `04-db-schema` → `05-principal-db-roles` → `06`–`08` (Surface + policy + codegen) → `09`–`13` (DAL + API) → `14`–`15` (Auth.js + CRM login) → `20`–`21` (e2e + T8 + phase DoD).
 
 ## References
 

@@ -1,0 +1,26 @@
+# user_roles_detail — role → Field grants (Phase 03, threat T8)
+# @see docs/phases/03-identity-iam/tasks/07-policies-yaml.md
+# @see docs/phases/03-identity-iam/decisions.md — iam_master only; default deny
+#
+# Runtime truth: apps/crm/src/lib/policy/user-roles-detail.ts (hand-synced until codegen loads policies).
+#
+# Built-in role catalog (v1) — not all roles appear in per-Surface YAML:
+#   field_tech, office_admin — app roles; no binding on this IAM Surface (default deny / 404 hide).
+#   iam_master — built-in; sole role block below (users + role assignments on IAM Surfaces).
+#   data_master — built-in; policy engine wildcard on business Surfaces only (task 08).
+#     No data_master block in any *.policies.yaml; excluded from user_roles_detail.
+
+surface: user_roles_detail
+forbiddenFieldResponse: 404
+
+roles:
+  iam_master:
+    rowScope: all
+    surfaceActions:
+      - read
+      - write
+    fields:
+      - field: profile
+        actions: [read]
+      - field: role_assignments
+        actions: [read, write]

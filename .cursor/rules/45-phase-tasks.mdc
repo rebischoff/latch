@@ -1,0 +1,39 @@
+---
+description: Close phase tasks — check verify gates, mark complete, update STATUS
+alwaysApply: true
+---
+
+# Phase task completion
+
+When you **finish implementing** a file under `docs/phases/**/tasks/*.md` (or the user says a task is done), **close the task in the same turn** before considering the work done.
+
+## 1. Task file — mark complete
+
+Immediately under the `# <nn> —` title, add or update:
+
+```markdown
+> **Status:** Complete (YYYY-MM-DD). Next: [<nn+1>-….md](./….md).
+```
+
+Then in **Verify (stop gate)**, change **every** `- [ ]` to `- [x]`. Do not leave partial checklists.
+
+## 2. Phase `STATUS.md`
+
+Update the phase folder’s [`STATUS.md`](../../docs/phases/README.md) in the same change set:
+
+| Section | Action |
+|---------|--------|
+| **Right now — do this next** | Point at the **next** task file (link + one-line deliverable). |
+| **Recently completed** | Prepend a bullet for the task just finished (task id, short deliverable, date). |
+| **Updated:** line | Set to today’s date. |
+
+Follow [`01-task-index.md`](../../docs/phases/02-ui-sync/tasks/01-task-index.md#status-discipline) when present in the active phase.
+
+## 3. Root `STATUS.md`
+
+Update [`STATUS.md`](../../STATUS.md) **only** when the whole phase’s definition of done is met (repoint **Active phase**). Per-task progress lives in the phase `STATUS.md`.
+
+## Do not skip
+
+- Finishing code without updating the task verify checklist and STATUS is incomplete work.
+- If verify cannot pass yet, do **not** mark the task complete; leave STATUS pointing at the current task and say what blocks the gate.

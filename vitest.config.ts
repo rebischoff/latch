@@ -18,9 +18,15 @@ export default defineConfig({
       "@latch/approval": latchAlias("approval"),
       "@latch/react": latchAlias("react"),
       "@latch/codegen": latchAlias("codegen"),
+      "@latch/crm/test-utils": path.join(root, "apps/crm/test-utils/index.ts"),
+      "@": path.join(root, "apps/crm/src"),
     },
   },
   test: {
-    include: ["packages/**/*.test.ts", "tests/**/*.test.ts"],
+    include: [
+      "packages/**/*.test.ts",
+      "apps/crm/**/*.test.ts",
+      "tests/**/*.test.ts",
+    ],
   },
 });

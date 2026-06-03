@@ -28,6 +28,10 @@ alwaysApply: false
 - "Right now — do this next" should always have exactly one immediate step, with a clear deliverable.
 - When that step completes, update the file immediately (same PR/commit).
 
+## Phase tasks (`docs/phases/**/tasks/*.md`)
+
+When implementation for a task finishes, follow [`.cursor/rules/45-phase-tasks.mdc`](./45-phase-tasks.mdc): **Status** line + all verify `- [x]`, then phase `STATUS.md` (**Execute now** + **Recently completed**). Root `STATUS.md` only when the phase is done.
+
 ## Linking
 
 - Use relative links between docs (`./foo.md`, `../bar.md`).

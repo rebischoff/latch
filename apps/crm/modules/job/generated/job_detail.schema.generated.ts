@@ -6,6 +6,7 @@ export const JobDetailFieldIds = {
   summary: "summary",
   scope: "scope",
   financial_terms: "financial_terms",
+  customer_ref: "customer_ref",
   assignments: "assignments",
 } as const;
 
@@ -15,6 +16,7 @@ export const jobDetailColumnMap = {
   summary: ["jobs.title", "jobs.status", "jobs.scheduled_at"],
   scope: ["jobs.description"],
   financial_terms: ["jobs.contract_amount"],
+  customer_ref: ["customers.id", "customers.name"],
   assignments: [],
 } as const satisfies Record<JobDetailFieldId, readonly string[]>;
 
@@ -31,6 +33,10 @@ export const JobDetailSchema = z.object({
   }),
   financial_terms: z.object({
     contract_amount: z.string().nullable(),
+  }),
+  customer_ref: z.object({
+    id: z.string(),
+    name: z.string(),
   }),
   assignments: z.array(z.object({ user_id: z.string() })),
 });
@@ -52,6 +58,12 @@ export const JobDetailPatchSchema = z.object({
   financial_terms: z
     .object({
       contract_amount: z.string().nullable().optional(),
+    })
+    .optional(),
+  customer_ref: z
+    .object({
+      id: z.string().optional(),
+      name: z.string().optional(),
     })
     .optional(),
   assignments: z.array(z.object({ user_id: z.string() })).optional(),

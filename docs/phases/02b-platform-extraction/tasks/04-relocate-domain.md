@@ -38,11 +38,11 @@ Move all consumer-owned jobs artifacts out of `packages/` into `apps/crm`, wire 
 
 ## Verify (stop gate)
 
-- [ ] Grep: no `jobs` / `createJobsDal` / `seedPilotJobs` / `job_detail` / `job_list` identifiers remain under `packages/`
-- [ ] No `packages/**` file imports `apps/**` (ESLint passes)
-- [ ] `@latch/codegen` reads from `apps/crm/modules`; `codegen:check` green
-- [ ] `npm run test` green (suite retargeted); `npm run build` (`@latch/crm`) green
-- [ ] `../STATUS.md` **Execute now** → `05-retire-web.md`
+- [x] Grep: no `jobs` / `createJobsDal` / `seedPilotJobs` / `job_detail` / `job_list` identifiers remain under `packages/` (except fixture strings in generic tests)
+- [x] No `packages/**` file imports `apps/**` (ESLint passes)
+- [x] `@latch/codegen` reads from `apps/crm/modules`; `codegen:check` green
+- [x] `npm run test` green (suite retargeted); `npm run build` (`@latch/crm`) green
+- [x] `../STATUS.md` **Execute now** → `05-retire-web.md`
 
 ## Out of scope
 

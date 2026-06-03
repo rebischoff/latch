@@ -1,4 +1,9 @@
-export { PolicyService, unionGrantsStrategy } from "./policy-service.js";
+export {
+  DATA_MASTER_ROLE_ID,
+  PolicyService,
+  synthesizeDataMasterBinding,
+  unionGrantsStrategy,
+} from "./policy-service.js";
 export type {
   MultiRoleCombine,
   PolicyServiceConfig,
@@ -14,13 +19,16 @@ export {
 export type { MergeOptions } from "./merge.js";
 
 export {
-  jobDetailPolicies,
-  JOB_DETAIL_FIELD_IDS,
-  JOB_DETAIL_SURFACE_ACTIONS_BY_ROLE,
-} from "./surfaces/job-detail.js";
-
-export {
-  jobListPolicies,
-  JOB_LIST_FIELD_IDS,
-  JOB_LIST_SURFACE_ACTIONS_BY_ROLE,
-} from "./surfaces/job-list.js";
+  definePolicyRegistry,
+  defineSurfacePolicy,
+} from "./registry.js";
+export type {
+  ModePolicyOverlay,
+  PolicyMode,
+  PolicyRegistry,
+  RoleModeOverlay,
+  RolePolicyBinding,
+  SurfaceKind,
+  SurfacePolicyDefinition,
+  SurfacePolicyMeta,
+} from "./registry.js";

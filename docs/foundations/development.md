@@ -4,7 +4,7 @@ How we run Postgres for local dev, preview, and production.
 
 ## Decision: Neon for all environments (2026-05-30)
 
-**Choice:** **Neon** (hosted Postgres) is the default for **local dev**, **Vercel preview**, and **production**. Set `DATABASE_URL` to a Neon connection string in `apps/web/.env.local` (and `apps/crm/.env.local` when testing CRM audit). **Docker Compose is not required** and is not part of the documented workflow.
+**Choice:** **Neon** (hosted Postgres) is the default for **local dev**, **Vercel preview**, and **production**. Set `DATABASE_URL` to a Neon connection string in `apps/crm/.env.local`. **Docker Compose is not required** and is not part of the documented workflow.
 
 **Rationale:** One database provider, no local container setup, matches Vercel serverless (functions cannot reach a laptop-only Postgres). Optional `docker-compose.yml` remains in the repo for contributors who want a fully offline DB.
 
@@ -23,14 +23,13 @@ How we run Postgres for local dev, preview, and production.
 
 ## Recommended setup
 
-1. **Neon project:** Create a project at [neon.tech](https://neon.tech). Copy the **direct** connection string (Dashboard → Connect) into `apps/web/.env.local` as `DATABASE_URL`. Use the **pooled** string in Vercel project settings for preview/prod.
+1. **Neon project:** Create a project at [neon.tech](https://neon.tech). Copy the **direct** connection string (Dashboard → Connect) into `apps/crm/.env.local` as `DATABASE_URL`. Use the **pooled** string in Vercel project settings for preview/prod.
 2. **Migrations:** From repo root, with `psql` installed:
    ```bash
    npm run db:migrate
    ```
-   Reads `DATABASE_URL` from `apps/web/.env.local` (see `scripts/db-migrate.mjs`). Same SQL applies to any Postgres host (Neon, optional Docker, etc.).
-3. **CRM audit (optional):** Copy the same `DATABASE_URL` into `apps/crm/.env.local` when verifying `latch_audit` writes from the CRM harness.
-4. **Apps without Postgres:** Omit `DATABASE_URL` — job data uses the in-memory pilot store; audit falls back to memory.
+   Reads `DATABASE_URL` from `apps/crm/.env.local` (see `scripts/db-migrate.mjs`). Same SQL applies to any Postgres host (Neon, optional Docker, etc.).
+3. **App without Postgres:** Omit `DATABASE_URL` — job data uses the in-memory store; audit falls back to memory.
 
 **Check connection:**
 
@@ -67,9 +66,37 @@ See root `docker-compose.yml`.
 - Set env vars per environment: `DATABASE_URL` for single-company dev; later `COMPANY_*` or routing service for database-per-company.
 - Company-specific DBs on Neon: one database (or branch) per company, or one Neon project per company — provisioning spike in Phase 1.
 
-## Stub principal (Step 3 pilot)
+## Auth.js (Phase 03, D2)
 
-No IdP in Step 3. The web app resolves the request principal from env vars via `apps/web/src/lib/auth/getPrincipal.ts` (CRM uses cookie session — see `apps/crm/docs/AUTH.md`).
+### Decision: Auth.js on Next.js 16 (2026-06-02)
+
+**Choice:** **Auth.js v5** (`next-auth@beta`, minimum Next.js 14) in `apps/crm` with App Router route handler at `/api/auth/[...nextauth]`.
+
+**Rationale:** Auth.js v5 docs reference Next.js 16 (`middleware.ts` → `proxy.ts`); session uses JWT with **user id only**; roles load from `latch_user_roles` on each `getPrincipal()`. No D2 fallback required.
+
+### Environment matrix
+
+| Variable | Local dev | Vercel preview | Production |
+|----------|-----------|----------------|------------|
+| `AUTH_SECRET` | Required (`.env.local`) | Required (Vercel env) | Required |
+| `CRM_DEV_PASSWORD` | Seed Credentials login | Optional (with Vercel password protection) | **Do not set** |
+| `CRM_ENABLE_DEV_CREDENTIALS` | — | Set `true` only if preview uses Credentials | — |
+| `AUTH_GITHUB_ID` / `AUTH_GITHUB_SECRET` | Optional | When GitHub OAuth is configured | Per deployment IdP |
+| `AUTH_URL` | Usually inferred (`http://localhost:3002`) | Vercel sets automatically | Deployment URL |
+
+**Local sign-in:** `/login` → Credentials against `tech@demo.local`, `admin@demo.local`, `iam@demo.local` + `CRM_DEV_PASSWORD` (see [`../../apps/crm/docs/AUTH.md`](../../apps/crm/docs/AUTH.md)).
+
+**Production:** OAuth/OIDC provider per deployment; Credentials provider is disabled when `NODE_ENV=production` unless `CRM_ENABLE_DEV_CREDENTIALS=true` (preview only).
+
+Generate `AUTH_SECRET`:
+
+```bash
+npx auth secret
+```
+
+## Stub principal (CI / tests)
+
+Automated tests use env stubs — no Auth.js HTTP. See [`../../apps/crm/docs/AUTH.md`](../../apps/crm/docs/AUTH.md).
 
 | Env | Purpose | Default |
 |-----|---------|---------|
@@ -90,7 +117,7 @@ Optional: `LATCH_STUB_USER=seed-office-admin` when testing as the seeded admin u
 
 **Seed jobs** (in-memory store): `seed-job-owned` (tech assignment), `seed-job-other` (admin assignment). See `@latch/dal` `seed.ts`.
 
-Provider choice for production auth remains **D2** in [open-questions.md](./open-questions.md).
+**D2** (auth provider) resolved — Auth.js; see [open-questions.md](./open-questions.md) Resolved table.
 
 ## Related
 

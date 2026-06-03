@@ -4,16 +4,12 @@ Decisions still needed. Defaults: [`architecture/global-options.md`](./global-op
 
 ## Active (block work)
 
-These are tracked in [`STATUS.md`](../../STATUS.md) "Active decisions":
-
-- [ ] **D2** Auth provider for v1: NextAuth / Clerk / custom JWT / corporate SSO? ? **Step 3 uses a stub principal** (env vars; task [`15-stub-principal.md`](../archive/tasks/job_detail/15-stub-principal.md)); real IdP choice remains open.
+_None — D2 resolved 2026-06-02 (Phase 03 task **00**)._
 
 ## Active (don't block v1, but should resolve before related code)
 
 ### Identity & users
-- [ ] Where do users/roles live  platform tables vs external IdP groups?
-- [ ] Built-in role catalog (exact list, default permissions per role)
-- [ ] Break-glass audit (deferred behavior, but design now)
+- [ ] Break-glass audit (deferred behavior, but design now — not Phase 04 DoD)
 
 ### Authorization model
 - [ ] Deny policy YAML syntax
@@ -24,7 +20,7 @@ These are tracked in [`STATUS.md`](../../STATUS.md) "Active decisions":
 
 ### Bulk operations
 - [ ] `forbidden_row` vs `not_found` distinction in default response
-- [ ] Whether to log denied bulk attempts in audit by default
+- [ ] Whether to log denied bulk attempts in audit by default — **deferred** (threat **T17**; design note only in Phase 04; not Phase 04 DoD — see [`../phases/04-audit-lifecycle/decisions.md`](../phases/04-audit-lifecycle/decisions.md))
 
 ### Approval
 - [ ] Can submitter edit pending before decision?
@@ -71,3 +67,15 @@ These are tracked in [`STATUS.md`](../../STATUS.md) "Active decisions":
 | 2026-06-01 | List vs detail (`job_list` / `job_detail`) | **One Surface id per domain** (e.g. `job`) with **`mode`**: `list` \| `detail` \| `create`. Roles bind to **base** policy on that id; **mode overlays** restrict only (never widen `read`). Row scope once per role on the Surface. `job_list` / `job_detail` are **transitional** split ids until merge. | [`glossary.md`](./glossary.md), [`../reference/access-control.md`](../reference/access-control.md) |
 | 2026-06-01 | Sensitive Field / Surface 403 vs 404 | Platform default **`403`**; per-Surface override **`404`** allowed. Phase 02: **`customer_detail`** uses **`404`** (no grant for `field_tech`). Jobs keep default. | [`global-options.md`](./global-options.md), [`../phases/02-ui-sync/decisions.md`](../phases/02-ui-sync/decisions.md) |
 | 2026-06-01 | Package genericization timing | **Pull forward now (in-repo).** `@latch/*` carry no consumer domain (table/Zod/Surface/UI); `apps/crm` is the sole consumer; `apps/web` retired. Separate publishable repo remains post-v1. | [`../phases/02b-platform-extraction/decisions.md`](../phases/02b-platform-extraction/decisions.md) |
+| 2026-06-02 | **D2** Auth provider (v1) | **Auth.js (NextAuth v5)** in `apps/crm`; Credentials for local/preview; production OAuth/OIDC TBD per deployment; session = user id only | [`../phases/03-identity-iam/decisions.md`](../phases/03-identity-iam/decisions.md), [`../reference/access-control.md`](../reference/access-control.md) |
+| 2026-06-02 | Identity storage (v1) | `latch_user_roles` in company DB (`apps/crm`); composite PK; `role_id` strings match policy keys; no `roles` table | [`../phases/03-identity-iam/decisions.md`](../phases/03-identity-iam/decisions.md) |
+| 2026-06-02 | Built-in role catalog (v1) | `field_tech`, `office_admin`, `iam_master`, `data_master` | [`../phases/03-identity-iam/decisions.md`](../phases/03-identity-iam/decisions.md), [`../reference/access-control.md`](../reference/access-control.md) |
+| 2026-06-02 | Data master auto-access | Policy engine wildcard on business Surfaces; IAM surfaces excluded | [`../phases/03-identity-iam/decisions.md`](../phases/03-identity-iam/decisions.md), [`../reference/access-control.md`](../reference/access-control.md) |
+| 2026-06-02 | Cascade on hard delete (v1 pilot) | Postgres `ON DELETE CASCADE` for structural children; DAL deletes anchor only | [`../phases/04-audit-lifecycle/decisions.md`](../phases/04-audit-lifecycle/decisions.md), [`../reference/audit-and-lifecycle.md`](../reference/audit-and-lifecycle.md) |
+| 2026-06-02 | Delete audit snapshot / recoverability | Surface-scoped: full `before` + embedded children where `restore` granted; else anchor-only or metadata-only | [`../phases/04-audit-lifecycle/decisions.md`](../phases/04-audit-lifecycle/decisions.md) |
+| 2026-06-02 | Restore-from-audit operator | `@latch/audit` API + CRM CLI; `restore` Surface action; 409 on live row; no CRM admin UI in Phase 04 | [`../phases/04-audit-lifecycle/decisions.md`](../phases/04-audit-lifecycle/decisions.md), [`../reference/audit-and-lifecycle.md`](../reference/audit-and-lifecycle.md) |
+| 2026-06-02 | T6 audit immutability | Trigger + app role `INSERT` only on `latch_audit` | [`../phases/04-audit-lifecycle/decisions.md`](../phases/04-audit-lifecycle/decisions.md), [`../foundations/threat-model.md`](../foundations/threat-model.md) |
+| 2026-06-02 | Business-table audit triggers | Deferred; DAL `writeAudit` is v1 path | [`../phases/04-audit-lifecycle/decisions.md`](../phases/04-audit-lifecycle/decisions.md) |
+| 2026-06-02 | Audit retention / partitioning (v1) | Config seam (`auditRetentionYears` default 3); partition DDL documented; no automated drop in Phase 04 CI | [`../phases/04-audit-lifecycle/decisions.md`](../phases/04-audit-lifecycle/decisions.md), [`../reference/audit-and-lifecycle.md`](../reference/audit-and-lifecycle.md) |
+| 2026-06-02 | Audit actions Phase 04 vs 05 | Phase 04: `delete`, `restore`, `bulk_summary` + existing paths; Phase 05: `approve`, `reject` on accept/reject | [`../phases/04-audit-lifecycle/decisions.md`](../phases/04-audit-lifecycle/decisions.md) |
+| 2026-06-02 | Denied access audit (T17) | **Not Phase 04 DoD** — design note only; denied bulk audit remains open above | [`../phases/04-audit-lifecycle/decisions.md`](../phases/04-audit-lifecycle/decisions.md), [`../foundations/threat-model.md`](../foundations/threat-model.md) |

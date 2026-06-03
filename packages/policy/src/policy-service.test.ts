@@ -3,7 +3,12 @@ import { describe, expect, it } from "vitest";
 import type { Principal } from "@latch/contracts";
 
 import { unionGrants, mergeRowScope } from "./merge.js";
-import { PolicyService } from "./policy-service.js";
+import {
+  DATA_MASTER_ROLE_ID,
+  PolicyService,
+  synthesizeDataMasterBinding,
+} from "./policy-service.js";
+import { definePolicyRegistry, defineSurfacePolicy } from "./registry.js";
 
 const principal = (...roles: string[]): Principal => ({ id: "user-1", roles });
 
@@ -25,138 +30,227 @@ describe("merge helpers", () => {
   });
 });
 
-describe("PolicyService — job_detail matrix", () => {
-  const policy = new PolicyService();
+const fixtureRegistry = definePolicyRegistry(
+  defineSurfacePolicy(
+    {
+      surface: "alpha",
+      roles: {
+        role_a: {
+          rowScope: "own",
+          fields: [
+            { field: "foo", actions: ["read", "write"] },
+            {
+              field: "bar",
+              actions: ["read", "write"],
+              effect: "deny",
+            },
+          ],
+        },
+        role_b: {
+          rowScope: "all",
+          fields: [{ field: "foo", actions: ["read"] }],
+        },
+      },
+    },
+    {
+      fieldIds: ["foo", "bar"],
+      surfaceActionsByRole: {
+        role_a: ["read"],
+        role_b: ["read", "delete"],
+      },
+      kind: "business",
+    },
+  ),
+  defineSurfacePolicy(
+    {
+      surface: "beta",
+      roles: {
+        viewer: {
+          fields: [{ field: "qux", actions: ["read"] }],
+        },
+      },
+    },
+    {
+      fieldIds: ["qux"],
+      surfaceActionsByRole: {
+        viewer: ["read"],
+      },
+      kind: "business",
+    },
+  ),
+  defineSurfacePolicy(
+    {
+      surface: "iam_console",
+      roles: {
+        iam_master: {
+          rowScope: "all",
+          fields: [{ field: "assignments", actions: ["read", "write"] }],
+        },
+      },
+    },
+    {
+      fieldIds: ["assignments"],
+      surfaceActionsByRole: {
+        iam_master: ["read", "write"],
+      },
+      kind: "iam",
+    },
+  ),
+);
 
-  it("field_tech: financial_terms submit only (no read/write/approve)", () => {
-    const manifest = policy.resolve(principal("field_tech"), {
-      surface: "job_detail",
-      entityId: "job-1",
-      mode: "detail",
+const throwawayBusinessSurface = defineSurfacePolicy(
+  {
+    surface: "throwaway_widget",
+    roles: {
+      viewer: {
+        fields: [{ field: "widget_name", actions: ["read"] }],
+      },
+    },
+  },
+  {
+    fieldIds: ["widget_name"],
+    surfaceActionsByRole: {
+      viewer: ["read"],
+    },
+    kind: "business",
+  },
+);
+
+describe("PolicyService — fixture registry (domain-free)", () => {
+  const policy = new PolicyService({ registry: fixtureRegistry });
+
+  it("alpha / role_a: denyWins strips bar read/write", () => {
+    const manifest = policy.resolve(principal("role_a"), {
+      surface: "alpha",
     });
 
-    expect(manifest.surface).toBe("job_detail");
-    expect(manifest.entityId).toBe("job-1");
+    expect(manifest.surface).toBe("alpha");
     expect(manifest.rowScope).toBe("own");
-    expect(manifest.fields.financial_terms).toEqual(["submit"]);
-    expect(manifest.fields.summary).toContain("read");
-    expect(manifest.fields.summary).toContain("write");
-    expect(manifest.fields.scope).toEqual(["read", "write"]);
-    expect(manifest.fields.assignments).toEqual(["read"]);
-    expect(manifest.actions).toContain("read");
-    expect(manifest.actions).not.toContain("delete");
+    expect(manifest.fields.foo).toEqual(["read", "write"]);
+    expect(manifest.fields.bar).toEqual([]);
+    expect(manifest.actions).toEqual(["read"]);
   });
 
-  it("office_admin: financial_terms includes read, write, approve", () => {
-    const manifest = policy.resolve(principal("office_admin"), {
-      surface: "job_detail",
-      mode: "detail",
+  it("alpha / multi-role: all rowScope wins; surface actions union", () => {
+    const manifest = policy.resolve(principal("role_a", "role_b"), {
+      surface: "alpha",
     });
 
     expect(manifest.rowScope).toBe("all");
-    expect(manifest.fields.financial_terms).toEqual(
-      expect.arrayContaining(["read", "write", "approve"]),
-    );
-    expect(manifest.fields.financial_terms).toHaveLength(3);
-    expect(manifest.fields.assignments).toContain("write");
-    expect(manifest.actions).toContain("delete");
-    expect(manifest.actions).toContain("restore");
+    expect(manifest.fields.foo).toEqual(["read", "write"]);
+    expect(manifest.actions).toEqual(["read", "delete"]);
   });
 
-  it("multi-role union: grants from both roles combine", () => {
-    const techOnly = policy.resolve(principal("field_tech"), {
-      surface: "job_detail",
-    });
-    const both = policy.resolve(principal("field_tech", "office_admin"), {
-      surface: "job_detail",
+  it("beta / viewer: minimal surface resolves", () => {
+    const manifest = policy.resolve(principal("viewer"), {
+      surface: "beta",
     });
 
-    expect(both.rowScope).toBe("all");
-    expect(both.fields.summary).toEqual(techOnly.fields.summary);
-    expect(both.fields.assignments).toContain("write");
-    expect(both.actions).toEqual(
-      expect.arrayContaining(["read", "write", "delete", "restore"]),
-    );
-  });
-
-  it("deny wins on financial for field_tech only", () => {
-    const tech = policy.resolve(principal("field_tech"), {
-      surface: "job_detail",
-    });
-    const admin = policy.resolve(principal("office_admin"), {
-      surface: "job_detail",
-    });
-
-    expect(tech.fields.financial_terms).toEqual(["submit"]);
-    expect(admin.fields.financial_terms).toEqual(
-      expect.arrayContaining(["read", "write", "approve"]),
-    );
-  });
-
-  it("denyWins: field_tech deny blocks financial even when office_admin allows", () => {
-    const manifest = policy.resolve(principal("field_tech", "office_admin"), {
-      surface: "job_detail",
-    });
-    expect(manifest.fields.financial_terms).toEqual(["submit"]);
-  });
-
-  it("unknown role contributes nothing", () => {
-    const manifest = policy.resolve(principal("unknown_role"), {
-      surface: "job_detail",
-    });
-    expect(manifest.fields.summary).toEqual([]);
-    expect(manifest.actions).toEqual([]);
+    expect(manifest.fields.qux).toEqual(["read"]);
+    expect(manifest.actions).toEqual(["read"]);
     expect(manifest.rowScope).toBeUndefined();
   });
 
   it("unknown surface throws", () => {
     expect(() =>
-      policy.resolve(principal("field_tech"), { surface: "missing_surface" }),
+      policy.resolve(principal("role_a"), { surface: "gamma" }),
     ).toThrow(/Unknown surface/);
   });
 });
 
-describe("PolicyService — job_list matrix", () => {
-  const policy = new PolicyService();
+describe("PolicyService — data_master built-in", () => {
+  it("synthesizeDataMasterBinding: read/write on all field ids", () => {
+    const surfaceDef = throwawayBusinessSurface;
+    const binding = synthesizeDataMasterBinding(surfaceDef);
 
-  it("field_tech: list columns without financial_terms", () => {
-    const manifest = policy.resolve(principal("field_tech"), {
-      surface: "job_list",
-      mode: "list",
-    });
-
-    expect(manifest.surface).toBe("job_list");
-    expect(manifest.rowScope).toBe("own");
-    expect(manifest.fields.financial_terms).toEqual([]);
-    expect(manifest.fields.summary).toEqual(["read"]);
-    expect(manifest.fields.customer_site).toEqual(["read"]);
-    expect(manifest.fields.assignments).toEqual(["read"]);
-    expect(manifest.actions).toEqual(["read"]);
-    expect(manifest.actions).not.toContain("delete");
+    expect(binding.rowScope).toBe("all");
+    expect(binding.fields).toEqual([
+      { field: "widget_name", actions: ["read", "write"] },
+    ]);
+    expect(binding.surfaceActions).toEqual(["read", "write"]);
   });
 
-  it("office_admin: read all fields, write assignments, bulk surface actions", () => {
-    const manifest = policy.resolve(principal("office_admin"), {
-      surface: "job_list",
-      mode: "list",
+  it("data_master on business surface without per-role YAML entry", () => {
+    const registry = definePolicyRegistry(throwawayBusinessSurface);
+    const policy = new PolicyService({ registry });
+
+    const manifest = policy.resolve(principal(DATA_MASTER_ROLE_ID), {
+      surface: "throwaway_widget",
     });
 
     expect(manifest.rowScope).toBe("all");
-    expect(manifest.fields.financial_terms).toEqual(["read"]);
+    expect(manifest.fields.widget_name).toEqual(["read", "write"]);
+    expect(manifest.actions).toEqual(["read", "write"]);
+  });
+
+  it("data_master on fixture alpha: read/write all fields", () => {
+    const policy = new PolicyService({ registry: fixtureRegistry });
+
+    const manifest = policy.resolve(principal(DATA_MASTER_ROLE_ID), {
+      surface: "alpha",
+    });
+
+    expect(manifest.rowScope).toBe("all");
+    expect(manifest.fields.foo).toEqual(["read", "write"]);
+    expect(manifest.fields.bar).toEqual(["read", "write"]);
+    expect(manifest.actions).toEqual(["read", "write"]);
+  });
+
+  it("data_master does not gain IAM surface write", () => {
+    const policy = new PolicyService({ registry: fixtureRegistry });
+
+    const manifest = policy.resolve(principal(DATA_MASTER_ROLE_ID), {
+      surface: "iam_console",
+    });
+
+    expect(manifest.fields.assignments).toEqual([]);
+    expect(manifest.actions).toEqual([]);
+    expect(manifest.rowScope).toBeUndefined();
+  });
+
+  it("iam_master on IAM surface: role_assignments write equivalent", () => {
+    const policy = new PolicyService({ registry: fixtureRegistry });
+
+    const manifest = policy.resolve(principal("iam_master"), {
+      surface: "iam_console",
+    });
+
+    expect(manifest.rowScope).toBe("all");
     expect(manifest.fields.assignments).toEqual(["read", "write"]);
-    expect(manifest.actions).toEqual(
-      expect.arrayContaining(["read", "write", "delete"]),
-    );
-    expect(manifest.actions).not.toContain("restore");
+    expect(manifest.actions).toEqual(["read", "write"]);
   });
 
-  it("multi-role union: admin write on assignments when tech also listed", () => {
-    const manifest = policy.resolve(principal("field_tech", "office_admin"), {
-      surface: "job_list",
-    });
+  it("denyWins: explicit deny on a field blocks data_master read/write", () => {
+    const registry = definePolicyRegistry(
+      defineSurfacePolicy(
+        {
+          surface: "locked",
+          roles: {
+            locker: {
+              fields: [
+                {
+                  field: "secret",
+                  actions: ["read", "write"],
+                  effect: "deny",
+                },
+              ],
+            },
+          },
+        },
+        {
+          fieldIds: ["secret"],
+          surfaceActionsByRole: { locker: [] },
+          kind: "business",
+        },
+      ),
+    );
+    const policy = new PolicyService({ registry });
 
-    expect(manifest.rowScope).toBe("all");
-    expect(manifest.fields.assignments).toContain("write");
-    expect(manifest.fields.financial_terms).toEqual(["read"]);
+    const manifest = policy.resolve(
+      principal(DATA_MASTER_ROLE_ID, "locker"),
+      { surface: "locked" },
+    );
+
+    expect(manifest.fields.secret).toEqual([]);
   });
 });

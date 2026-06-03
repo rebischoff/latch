@@ -29,11 +29,17 @@ Replace the bespoke `createJobsDal` with a **domain-agnostic** repository kernel
 
 ## Verify (stop gate)
 
-- [ ] `createSurfaceDal` exists and passes fixture-descriptor tests for all six methods
-- [ ] Behavior parity: existing job DAL tests still pass through the shim
-- [ ] No new domain identifiers added to the kernel (`jobs`/`customers` only in the temporary shim)
-- [ ] `npm run test` green; `npm run build` green
-- [ ] `../STATUS.md` **Execute now** → `04-relocate-domain.md`
+- [x] `createSurfaceDal` exists and passes fixture-descriptor tests for all six methods
+- [x] Behavior parity: existing job DAL tests still pass through the shim
+- [x] No new domain identifiers added to the kernel (`jobs`/`customers` only in the temporary shim)
+- [x] `npm run test` green; `npm run build` green
+- [x] `../STATUS.md` **Execute now** → `04-relocate-domain.md`
+
+### Decision: memory store location (2026-06-02)
+
+**Choice:** Generic descriptor-keyed store only in **kernel fixture tests** (`create-surface-dal.test.ts`). Jobs `MemoryJobStore` remains in `@latch/dal` until task `04` moves it to `apps/crm`.
+
+**Rationale:** Proves the Store adapter contract without coupling the kernel to jobs; avoids a big-bang move in task `03`.
 
 ## Out of scope
 

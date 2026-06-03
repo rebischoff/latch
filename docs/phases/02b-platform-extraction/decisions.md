@@ -44,9 +44,26 @@
 
 **Rationale:** Removes the bidirectional package↔`apps/web` coupling; makes the boundary ESLint-enforceable; aligns the repo with the documented end-state ahead of schedule.
 
+### Decision: policy registry assembly (2026-06-02)
+
+**Choice:** The **consumer app assembles** the `PolicyRegistry` at runtime (e.g. `apps/crm/src/lib/latch.ts` calls `defineSurfacePolicy` / `definePolicyRegistry`). `@latch/codegen` continues to emit **structure** artifacts (field ids, Zod schemas, column maps) from `*.surface.yaml`; it does **not** emit the policy registry in this phase. Policy bindings stay in `*.policies.yaml`, hand-synced to TS modules until a future codegen pass (post-v1) if needed.
+
+**Rationale:** Policy merge semantics are platform (`@latch/policy`); the role → grant matrix is consumer data reviewed in PRs alongside YAML. App-side assembly keeps codegen focused on structure and avoids coupling the generator to merge semantics.
+
+## Decision: Surface descriptor + Store adapter (2026-06-02)
+
+**Choice:**
+
+- **`SurfaceDescriptor<TRow, TRelated>`** — consumer supplies `surfaceId`, `anchorTable`, `capabilities` (`detail` | `list`), Zod `patchSchema` (+ optional `listQuerySchema`), and hooks: `projectRow`, `applyPatch`, optional `applyRelatedPatch`, `auditSnapshot`, `canDelete`, optional `pendingWrite`, optional `listJoins`.
+- **`StoreAdapter<TRow, TRelated>`** — `get` / `list` / `upsert` / `delete` / `getRelated` / `replaceRelated` / `isRowVisibleToPrincipal`. Row-scope `own` is enforced via `isRowVisibleToPrincipal`, not in the kernel.
+- **`createSurfaceDal(descriptor, store, deps)`** — returns `get` / `patch` / `delete`; list surfaces also get `list` / `bulkUpdate` / `bulkDelete`; detail surfaces with `pendingStore` get `acceptPending`.
+- **Memory store** — generic **fixture** store lives in `packages/dal` kernel tests only. Jobs `MemoryJobStore` stays in `@latch/dal` until task `04` (wired via `createJobStoreAdapter`); moves to `apps/crm` in `04`.
+
+**Rationale:** Platform invariants (manifest projection, strict writes, re-auth, audit, pending) stay in the kernel; row shape and Field→column mapping are consumer data expressed through descriptor hooks (e.g. `financial_terms` → pending). See [`tasks/03-dal-generic.md`](./tasks/03-dal-generic.md).
+
 ## Open / to lock during tasks
 
-- [ ] Exact policy registry/loader shape — lock in `02-policy-generic.md` (does codegen emit a policy registry, or does the app assemble it?).
-- [ ] Exact Surface descriptor + Store adapter interfaces — lock in `03-dal-generic.md`.
-- [ ] Whether the memory store stays generic in `@latch/dal` (descriptor-keyed) or moves wholesale to `apps/crm` — lock in `03`/`04`.
-- [ ] Test-utils export surface from `apps/crm` for `tests/*` — lock in `04`.
+- [x] Exact policy registry/loader shape — locked in `02-policy-generic.md` (`SurfacePolicyDefinition`, `PolicyRegistry`, `defineSurfacePolicy`).
+- [x] Exact Surface descriptor + Store adapter interfaces — locked above (2026-06-02).
+- [x] Whether the memory store stays generic in `@latch/dal` — **fixture-only in kernel tests**; jobs store stays until `04` (see above).
+- [x] Test-utils export surface from `apps/crm` for `tests/*` — `@latch/crm/test-utils` (`createJobsDal`, `seedPilotJobs`, `createJobPolicyService`, seed constants) (2026-06-02).

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import * as auditModule from "@latch/audit";
 import { createMemoryPendingStore } from "@latch/approval";
@@ -6,22 +6,40 @@ import { runCodegen } from "@latch/codegen";
 import { createMemoryAuditWriter, setAuditWriter } from "@latch/audit";
 import {
   ForbiddenError,
+  NotFoundError,
   ValidationError,
   type Manifest,
   type PermissionContext,
 } from "@latch/contracts";
 import {
+  createCustomersDal,
   createJobsDal,
+  createJobPolicyService,
   MemoryJobStore,
   SEED_ADMIN_ID,
+  SEED_CUSTOMER_ACME,
+  SEED_IAM_ID,
   SEED_JOB_OTHER,
   SEED_JOB_OWNED,
   SEED_TECH_ID,
   seedPilotJobs,
-} from "@latch/dal";
-import { PolicyService } from "@latch/policy";
+} from "@latch/crm/test-utils";
 
-const policy = new PolicyService();
+import { resolveNavItems } from "../apps/crm/src/lib/nav.js";
+import * as providerSession from "@/lib/auth/provider-session.js";
+import { getPilotStore } from "@/lib/pilot-store";
+import {
+  GET as iamUsersGet,
+  PATCH as iamUsersPatch,
+} from "@/app/api/iam/users/[id]/route";
+
+vi.mock("@/lib/auth/provider-session.js", () => ({
+  readProviderSession: vi.fn(),
+}));
+
+const readProviderSession = vi.mocked(providerSession.readProviderSession);
+
+const policy = createJobPolicyService();
 
 const buildCtx = (
   userId: string,
@@ -45,6 +63,22 @@ const buildListCtx = (userId: string, roles: string[]): PermissionContext => {
   });
   return { principal, manifest, surface: "job_list" };
 };
+
+const buildCustomerCtx = (
+  userId: string,
+  roles: string[],
+  entityId?: string,
+): PermissionContext => {
+  const principal = { id: userId, roles };
+  const manifest = policy.resolve(principal, {
+    surface: "customer_detail",
+    entityId,
+    mode: "detail",
+  });
+  return { principal, manifest, surface: "customer_detail" };
+};
+
+const principal = (userId: string, ...roles: string[]) => ({ id: userId, roles });
 
 const stripApproveOnFinancial = (manifest: Manifest): Manifest => ({
   ...manifest,
@@ -101,6 +135,59 @@ describe("threat model — T2 forbidden field read", () => {
     expect(techDto).not.toHaveProperty("financial_terms");
     expect(adminDto.financial_terms?.contract_amount).toBe("12500.00");
     expect(Object.keys(techDto).sort()).not.toEqual(Object.keys(adminDto).sort());
+  });
+});
+
+describe("threat model — T2 forbidden field read (customer_detail)", () => {
+  it("admin DTO keys match grants; partial manifest omits denied Fields", () => {
+    const store = new MemoryJobStore();
+    seedPilotJobs(store);
+    const dal = createCustomersDal(store);
+
+    const adminDto = dal.get(
+      buildCustomerCtx(SEED_ADMIN_ID, ["office_admin"]),
+      SEED_CUSTOMER_ACME,
+    );
+    expect(adminDto.profile).toBeDefined();
+    expect(adminDto.billing).toBeDefined();
+    expect(adminDto.sites).toBeDefined();
+    expect(adminDto.job_history).toBeDefined();
+
+    const billingDeniedCtx: PermissionContext = {
+      principal: { id: SEED_ADMIN_ID, roles: ["office_admin"] },
+      surface: "customer_detail",
+      manifest: {
+        surface: "customer_detail",
+        actions: ["read"],
+        rowScope: "all",
+        fields: {
+          profile: ["read"],
+          sites: ["read"],
+          job_history: ["read"],
+        },
+      },
+    };
+    const partialDto = dal.get(billingDeniedCtx, SEED_CUSTOMER_ACME);
+    expect(partialDto.profile).toBeDefined();
+    expect(partialDto).not.toHaveProperty("billing");
+    expect(Object.keys(partialDto)).not.toContain("billing");
+  });
+
+  it("tech with no Surface grant → NotFoundError (404 hide); admin get succeeds", () => {
+    const store = new MemoryJobStore();
+    seedPilotJobs(store);
+    const dal = createCustomersDal(store);
+
+    const techCtx = buildCustomerCtx(SEED_TECH_ID, ["field_tech"]);
+    expect(techCtx.manifest.actions).toEqual([]);
+
+    expect(() => dal.get(techCtx, SEED_CUSTOMER_ACME)).toThrow(NotFoundError);
+
+    const adminDto = dal.get(
+      buildCustomerCtx(SEED_ADMIN_ID, ["office_admin"]),
+      SEED_CUSTOMER_ACME,
+    );
+    expect(adminDto.id).toBe(SEED_CUSTOMER_ACME);
   });
 });
 
@@ -174,11 +261,23 @@ describe("threat model — T6 audit tampering", () => {
     expect(exportNames).toContain("writeAudit");
   });
 
-  it.runIf(Boolean(process.env.DATABASE_URL))(
-    "UPDATE latch_audit from app role is rejected by DB trigger",
+  const latchAppDatabaseUrl = (): string | undefined => {
+    const appUrl = process.env.LATCH_APP_DATABASE_URL?.trim();
+    if (appUrl) {
+      return appUrl;
+    }
+    const databaseUrl = process.env.DATABASE_URL?.trim();
+    if (databaseUrl?.includes("latch_app")) {
+      return databaseUrl;
+    }
+    return undefined;
+  };
+
+  it.runIf(Boolean(latchAppDatabaseUrl()))(
+    "UPDATE latch_audit from app role is rejected (grants and/or immutability trigger)",
     async () => {
       const { Pool } = await import("pg");
-      const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+      const pool = new Pool({ connectionString: latchAppDatabaseUrl() });
 
       try {
         await pool.query(
@@ -198,13 +297,130 @@ describe("threat model — T6 audit tampering", () => {
             auditId,
           ]),
         ).rejects.toMatchObject({
-          message: expect.stringMatching(/immutable/i),
+          message: expect.stringMatching(/immutable|permission denied/i),
         });
       } finally {
         await pool.end();
       }
     },
   );
+});
+
+describe("threat model — T4 forbidden response semantics", () => {
+  it("customer_detail no-grant → NotFoundError; job delete without grant → ForbiddenError", async () => {
+    const store = new MemoryJobStore();
+    seedPilotJobs(store);
+    const customersDal = createCustomersDal(store);
+    const jobsDal = createJobsDal(store, createMemoryPendingStore());
+
+    expect(() =>
+      customersDal.get(
+        buildCustomerCtx(SEED_TECH_ID, ["field_tech"]),
+        SEED_CUSTOMER_ACME,
+      ),
+    ).toThrow(NotFoundError);
+
+    const techJobCtx = buildCtx(SEED_TECH_ID, ["field_tech"], SEED_JOB_OWNED);
+    await expect(jobsDal.delete(techJobCtx, SEED_JOB_OWNED)).rejects.toThrow(
+      ForbiddenError,
+    );
+  });
+});
+
+describe("threat model — T8 privilege escalation via role assignment", () => {
+  const patchUser = (id: string, body: unknown): Promise<Response> =>
+    iamUsersPatch(
+      new Request(`http://localhost/api/iam/users/${id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+      { params: Promise.resolve({ id }) },
+    );
+
+  const getUser = (id: string): Promise<Response> =>
+    iamUsersGet(new Request(`http://localhost/api/iam/users/${id}`), {
+      params: Promise.resolve({ id }),
+    });
+
+  beforeEach(() => {
+    // The IAM route reads the shared pilot store; re-seed for a deterministic baseline.
+    seedPilotJobs(getPilotStore());
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("field_tech PATCH /api/iam/users to self-assign iam_master → 404 hide; latch_user_roles unchanged", async () => {
+    readProviderSession.mockResolvedValue({
+      userId: SEED_TECH_ID,
+      label: "tech@demo.local",
+    });
+    const store = getPilotStore();
+    const before = store.listRolesForUser(SEED_TECH_ID);
+
+    const res = await patchUser(SEED_TECH_ID, {
+      role_assignments: ["field_tech", "iam_master"],
+    });
+
+    // `user_roles_detail` is `forbiddenFieldResponse: 404` → default-deny hides existence.
+    expect(res.status).toBe(404);
+    expect(store.listRolesForUser(SEED_TECH_ID)).toEqual(before);
+    expect(store.listRolesForUser(SEED_TECH_ID)).not.toContain("iam_master");
+  });
+
+  it("iam_master PATCH assigns a role and GET reflects the change (T8 positive)", async () => {
+    readProviderSession.mockResolvedValue({
+      userId: SEED_IAM_ID,
+      label: "iam@demo.local",
+    });
+    const store = getPilotStore();
+
+    const patchRes = await patchUser(SEED_TECH_ID, {
+      role_assignments: ["field_tech", "office_admin"],
+    });
+    expect(patchRes.status).toBe(200);
+    expect(store.listRolesForUser(SEED_TECH_ID)).toEqual([
+      "field_tech",
+      "office_admin",
+    ]);
+
+    const getRes = await getUser(SEED_TECH_ID);
+    expect(getRes.status).toBe(200);
+    const body = (await getRes.json()) as {
+      data: { role_assignments: string[] };
+    };
+    expect(body.data.role_assignments).toEqual(["field_tech", "office_admin"]);
+  });
+});
+
+describe("threat model — T14 nav manifest leakage", () => {
+  it("field_tech nav omits Customers route; no Surface ids in nav DTO", () => {
+    const techNav = resolveNavItems(principal(SEED_TECH_ID, "field_tech"));
+    expect(techNav.map((item) => item.href)).toEqual(["/jobs"]);
+    expect(JSON.stringify(techNav)).not.toMatch(/customer_detail|\/customers/);
+
+    for (const item of techNav) {
+      expect(Object.keys(item).sort()).toEqual(["href", "key", "label"]);
+    }
+  });
+
+  it("office_admin nav includes Customers; still no Surface ids leaked", () => {
+    const adminNav = resolveNavItems(principal(SEED_ADMIN_ID, "office_admin"));
+    expect(adminNav.map((item) => item.href)).toEqual(["/jobs", "/customers"]);
+    expect(JSON.stringify(adminNav)).not.toMatch(/customer_detail|job_detail/);
+  });
+
+  it("field_tech customer_detail manifest has no read grant", () => {
+    const techManifest = policy.resolve(
+      principal(SEED_TECH_ID, "field_tech"),
+      { surface: "customer_detail", mode: "detail" },
+    );
+    expect(techManifest.actions).toEqual([]);
+    expect(techManifest.fields.profile).toEqual([]);
+    expect(techManifest.fields.billing).toEqual([]);
+  });
 });
 
 describe("threat model — T11 codegen drift", () => {
@@ -327,5 +543,116 @@ describe("threat model — T15 bulk operation partial-corruption", () => {
     const actions = audit.entries.map((e) => e.action);
     expect(actions).toContain("update");
     expect(actions).toContain("bulk_summary");
+  });
+});
+
+describe("threat model — T16 delete audit gap", () => {
+  const audit = createMemoryAuditWriter();
+
+  afterEach(() => {
+    audit.reset();
+    setAuditWriter(null);
+  });
+
+  it("single delete writes exactly one delete audit row with matching entity_id and non-null before", async () => {
+    setAuditWriter(audit.writer);
+    const store = new MemoryJobStore();
+    seedPilotJobs(store);
+    const dal = createJobsDal(store, createMemoryPendingStore());
+    const ctx = buildCtx(SEED_ADMIN_ID, ["office_admin"], SEED_JOB_OWNED);
+
+    await dal.delete(ctx, SEED_JOB_OWNED);
+
+    expect(store.getJob(SEED_JOB_OWNED)).toBeUndefined();
+    expect(audit.entries).toHaveLength(1);
+    expect(audit.entries[0]).toMatchObject({
+      action: "delete",
+      tableName: "jobs",
+      recordId: SEED_JOB_OWNED,
+      moduleId: "job_detail",
+      after: null,
+    });
+    expect(audit.entries[0]?.before).toBeTruthy();
+    expect(audit.entries[0]?.before).toMatchObject({
+      title: expect.any(String),
+      customer_id: SEED_CUSTOMER_ACME,
+    });
+  });
+
+  it("bulk delete writes one delete audit row per removed entity and optional bulk_summary", async () => {
+    setAuditWriter(audit.writer);
+    const store = new MemoryJobStore();
+    seedPilotJobs(store);
+    const dal = createJobsDal(store, createMemoryPendingStore());
+    const ctx = buildListCtx(SEED_ADMIN_ID, ["office_admin"]);
+    const ids = [SEED_JOB_OWNED, SEED_JOB_OTHER];
+
+    const result = await dal.bulkDelete(ctx, ids, {
+      mode: "partial",
+      requestId: "threat-t16-bulk",
+    });
+
+    expect(result.succeeded).toEqual(ids);
+    expect(result.skipped).toHaveLength(0);
+
+    const deleteEntries = audit.entries.filter((e) => e.action === "delete");
+    expect(deleteEntries).toHaveLength(2);
+    expect(deleteEntries.map((e) => e.recordId).sort()).toEqual([...ids].sort());
+    for (const entry of deleteEntries) {
+      expect(entry).toMatchObject({
+        action: "delete",
+        tableName: "jobs",
+        moduleId: "job_list",
+        after: null,
+      });
+      expect(entry.before).toBeTruthy();
+    }
+
+    expect(audit.entries.some((e) => e.action === "bulk_summary")).toBe(true);
+    expect(
+      audit.entries.find((e) => e.action === "bulk_summary"),
+    ).toMatchObject({
+      requestId: "threat-t16-bulk",
+      patch: expect.objectContaining({ operation: "delete", succeeded: 2 }),
+    });
+  });
+
+  it("forbidden single delete writes no delete audit row for that entity", async () => {
+    setAuditWriter(audit.writer);
+    const store = new MemoryJobStore();
+    seedPilotJobs(store);
+    const dal = createJobsDal(store, createMemoryPendingStore());
+    const ctx = buildCtx(SEED_TECH_ID, ["field_tech"], SEED_JOB_OWNED);
+
+    await expect(dal.delete(ctx, SEED_JOB_OWNED)).rejects.toThrow(ForbiddenError);
+
+    expect(store.getJob(SEED_JOB_OWNED)).toBeDefined();
+    expect(audit.entries.filter((e) => e.action === "delete")).toHaveLength(0);
+    expect(
+      audit.entries.some((e) => e.recordId === SEED_JOB_OWNED),
+    ).toBe(false);
+  });
+
+  it("bulk delete skips not_found ids without delete audit rows for them", async () => {
+    setAuditWriter(audit.writer);
+    const store = new MemoryJobStore();
+    seedPilotJobs(store);
+    const dal = createJobsDal(store, createMemoryPendingStore());
+    const ctx = buildListCtx(SEED_ADMIN_ID, ["office_admin"]);
+    const missingId = "missing-job-t16";
+
+    const result = await dal.bulkDelete(
+      ctx,
+      [SEED_JOB_OWNED, missingId],
+      { mode: "partial" },
+    );
+
+    expect(result.succeeded).toEqual([SEED_JOB_OWNED]);
+    expect(result.skipped).toEqual([{ id: missingId, reason: "not_found" }]);
+
+    const deleteEntries = audit.entries.filter((e) => e.action === "delete");
+    expect(deleteEntries).toHaveLength(1);
+    expect(deleteEntries[0]?.recordId).toBe(SEED_JOB_OWNED);
+    expect(deleteEntries.some((e) => e.recordId === missingId)).toBe(false);
   });
 });

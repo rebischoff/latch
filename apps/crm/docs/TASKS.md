@@ -24,7 +24,7 @@ This checklist covers what is **already planned**. If a step reaches an unplanne
 - [x] `apps/crm/package.json` — Next 16.2.6, `antd`, `@ant-design/icons`, `react-hook-form`, `@latch/*` deps. No `tailwindcss`.
 - [x] `app/layout.tsx` — `ConfigProvider` (default theme) + AntD `Layout` shell (header, sider, content). See [`LAYOUT.md`](./LAYOUT.md).
 - [x] `lib/auth/` — cookie session helpers + `getPrincipal()` (see [`AUTH.md`](./AUTH.md)).
-- [x] `app/login/page.tsx` — RHF login (username/password); Server Action sets `latch_session` cookie.
+- [x] `app/login/page.tsx` — RHF login; Server Action → Auth.js `signIn("credentials")` (task 15).
 - [x] Logout Server Action + header user dropdown.
 - [x] Layout guard (`requireSession` in `(app)/layout`): unauthenticated → `/login`; `/login` + `/api/health` public. No `middleware.ts` / `proxy.ts`.
 - [x] `lib/latch.ts` — `resolveContext` + DAL factory (mirror `apps/web`).
@@ -32,7 +32,7 @@ This checklist covers what is **already planned**. If a step reaches an unplanne
 
 **Verify (stop gate):**
 - [x] Log in as `tech@demo.local` → see only permitted nav.
-- [ ] Log in as `admin@demo.local` → nav differs (full role nav diff when `customer_detail` policy exists; header label differs today).
+- [x] Log in as `admin@demo.local` → nav differs (Jobs + Customers vs tech Jobs-only; header label differs).
 - [x] Logout returns to `/login`; protected route while logged out redirects.
 
 ---

@@ -47,13 +47,21 @@ const JobsPageContent = async ({ selectedId }: { selectedId?: string }) => {
       entityId: selectedId,
     });
     const job = getJobsDal().get(ctx, selectedId);
+    const customerDetailManifest = job.customer_ref
+      ? (
+          await resolveContext({
+            surfaceId: "customer_detail",
+            entityId: job.customer_ref.id,
+          })
+        ).manifest
+      : undefined;
     return (
       <JobsSplitView
         listRows={rows}
         listTotal={total}
         listManifest={manifest}
         selectedId={selectedId}
-        detail={{ job, manifest: ctx.manifest }}
+        detail={{ job, manifest: ctx.manifest, customerDetailManifest }}
       />
     );
   } catch (error) {

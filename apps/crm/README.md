@@ -9,10 +9,10 @@ A **minimal** Ant Design app that proves every `@latch/*` package works together
 ## Run locally
 
 ```bash
-# From repo root (port 3002; apps/web uses 3001)
+# From repo root (port 3002)
 npm install
 cp apps/crm/.env.example apps/crm/.env.local   # optional; default password is demo
-npm run dev:crm
+npm run dev
 ```
 
 Open [http://localhost:3002/login](http://localhost:3002/login). Seed users: `tech@demo.local`, `admin@demo.local` (password: `CRM_DEV_PASSWORD` or `demo`).
