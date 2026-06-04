@@ -15,6 +15,7 @@ export const jobListPolicies: SurfacePolicies = {
       fields: [
         { field: "summary", actions: ["read"] },
         { field: "customer_site", actions: ["read"] },
+        { field: "financial_terms", actions: ["submit"] },
         { field: "assignments", actions: ["read"] },
       ],
     },

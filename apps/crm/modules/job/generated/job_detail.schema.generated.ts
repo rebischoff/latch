@@ -12,6 +12,9 @@ export const JobDetailFieldIds = {
 
 export type JobDetailFieldId = (typeof JobDetailFieldIds)[keyof typeof JobDetailFieldIds];
 
+export const JobDetailVerificationFieldIds = ["financial_terms"] as const;
+export type JobDetailVerificationFieldId = (typeof JobDetailVerificationFieldIds)[number];
+
 export const jobDetailColumnMap = {
   summary: ["jobs.title", "jobs.status", "jobs.scheduled_at"],
   scope: ["jobs.description"],

@@ -1,6 +1,6 @@
 import { jsonSuccess, withIamApiHandler } from "@/lib/api/iam-handler";
 import { requireSession } from "@/lib/auth/requireSession";
-import { getIamDal, resolveContext } from "@/lib/latch";
+import { getIamDal, resolveContext, resolveContextFresh } from "@/lib/latch";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -26,7 +26,7 @@ export const PATCH = async (
   withIamApiHandler(async () => {
     await requireSession();
     const { id } = await params;
-    const ctx = await resolveContext({
+    const ctx = await resolveContextFresh({
       surfaceId: "user_roles_detail",
       entityId: id,
     });

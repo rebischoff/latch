@@ -41,15 +41,17 @@ describe("getPrincipal", () => {
     });
   });
 
-  it("uses LATCH_STUB_* when no provider session (CI)", async () => {
+  it("uses LATCH_STUB_* when no provider session (CI) without policyVersion", async () => {
     readProviderSession.mockResolvedValue(null);
     vi.stubEnv("LATCH_STUB_USER", "stub-user");
     vi.stubEnv("LATCH_STUB_ROLE", "field_tech");
 
-    await expect(getPrincipal()).resolves.toEqual({
+    const principal = await getPrincipal();
+    expect(principal).toEqual({
       id: "stub-user",
       roles: ["field_tech"],
     });
+    expect(principal).not.toHaveProperty("policyVersion");
   });
 
   it("throws when there is no session and no stub env", async () => {

@@ -23,12 +23,10 @@ _None — D2 resolved 2026-06-02 (Phase 03 task **00**)._
 - [ ] Whether to log denied bulk attempts in audit by default — **deferred** (threat **T17**; design note only in Phase 04; not Phase 04 DoD — see [`../phases/04-audit-lifecycle/decisions.md`](../phases/04-audit-lifecycle/decisions.md))
 
 ### Approval
-- [ ] Can submitter edit pending before decision?
-- [ ] Expiry / auto-reject for stale pending?
+- [ ] Expiry / auto-reject for stale pending? (submitter edit resolved 2026-06-02: withdraw + resubmit only — [`../phases/05-verification/decisions.md`](../phases/05-verification/decisions.md))
 
 ### Data layer
 - [ ] Neon driver: standard `pg` vs `@neondatabase/serverless` for production
-- [ ] How to enforce "app role is not superuser" at runtime (`SELECT current_user` assertion in middleware?)
 
 ### Operations
 - [ ] Legal hold workflow (deferred, but document interaction with retention)
@@ -78,4 +76,8 @@ _None — D2 resolved 2026-06-02 (Phase 03 task **00**)._
 | 2026-06-02 | Business-table audit triggers | Deferred; DAL `writeAudit` is v1 path | [`../phases/04-audit-lifecycle/decisions.md`](../phases/04-audit-lifecycle/decisions.md) |
 | 2026-06-02 | Audit retention / partitioning (v1) | Config seam (`auditRetentionYears` default 3); partition DDL documented; no automated drop in Phase 04 CI | [`../phases/04-audit-lifecycle/decisions.md`](../phases/04-audit-lifecycle/decisions.md), [`../reference/audit-and-lifecycle.md`](../reference/audit-and-lifecycle.md) |
 | 2026-06-02 | Audit actions Phase 04 vs 05 | Phase 04: `delete`, `restore`, `bulk_summary` + existing paths; Phase 05: `approve`, `reject` on accept/reject | [`../phases/04-audit-lifecycle/decisions.md`](../phases/04-audit-lifecycle/decisions.md) |
+| 2026-06-02 | Verification gating (v1) | Hybrid: YAML `requires_verification` + runtime `submit` ∧ ¬`write`; Field-level only | [`../phases/05-verification/decisions.md`](../phases/05-verification/decisions.md) |
+| 2026-06-02 | Pending storage | `latch_pending_changes`; withdraw + reject; one open `submitted` per entity | [`../phases/05-verification/decisions.md`](../phases/05-verification/decisions.md) |
+| 2026-06-02 | Submitter edit pending | **No** — withdraw or resubmit after reject | [`../phases/05-verification/decisions.md`](../phases/05-verification/decisions.md) |
 | 2026-06-02 | Denied access audit (T17) | **Not Phase 04 DoD** — design note only; denied bulk audit remains open above | [`../phases/04-audit-lifecycle/decisions.md`](../phases/04-audit-lifecycle/decisions.md), [`../foundations/threat-model.md`](../foundations/threat-model.md) |
+| 2026-06-03 | App role not superuser (T5) | `SELECT current_user` = `latch_app` in DB-gated threat test; CRM/CI connect as `latch_app`; convention `LATCH_APP_DATABASE_URL` + `it.runIf` | [`../phases/06-performance-safety/decisions.md`](../phases/06-performance-safety/decisions.md), task **10** |

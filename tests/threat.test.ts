@@ -16,6 +16,8 @@ import {
   createJobsDal,
   createJobPolicyService,
   MemoryJobStore,
+  principalFromStore,
+  revokeRoleForUser,
   SEED_ADMIN_ID,
   SEED_CUSTOMER_ACME,
   SEED_IAM_ID,
@@ -24,6 +26,13 @@ import {
   SEED_TECH_ID,
   seedPilotJobs,
 } from "@latch/crm/test-utils";
+import {
+  createCachingPolicyService,
+  createMapManifestCacheStore,
+} from "@latch/policy";
+import { createSurfaceDal } from "@latch/dal";
+import { createJobStoreAdapter } from "../apps/crm/db/store.js";
+import { createJobDetailDescriptor } from "../apps/crm/src/lib/jobs/descriptors.js";
 
 import { resolveNavItems } from "../apps/crm/src/lib/nav.js";
 import * as providerSession from "@/lib/auth/provider-session.js";
@@ -86,6 +95,16 @@ const stripApproveOnFinancial = (manifest: Manifest): Manifest => ({
     ...manifest.fields,
     financial_terms: (manifest.fields.financial_terms ?? []).filter(
       (a) => a !== "approve",
+    ),
+  },
+});
+
+const stripSubmitOnFinancial = (manifest: Manifest): Manifest => ({
+  ...manifest,
+  fields: {
+    ...manifest.fields,
+    financial_terms: (manifest.fields.financial_terms ?? []).filter(
+      (a) => a !== "submit",
     ),
   },
 });
@@ -214,13 +233,214 @@ describe("threat model — T2 forbidden field read (list)", () => {
 
 describe("threat model — T3 stale manifest exploit", () => {
   const audit = createMemoryAuditWriter();
+  const jobDetailScope = (entityId: string) =>
+    ({
+      surface: "job_detail" as const,
+      mode: "detail" as const,
+      entityId,
+    }) as const;
+
+  afterEach(() => {
+    audit.reset();
+    setAuditWriter(null);
+    vi.restoreAllMocks();
+  });
+
+  const submitFinancialPending = async (
+    dal: ReturnType<typeof createJobsDal>,
+    pendingStore: ReturnType<typeof createMemoryPendingStore>,
+  ) => {
+    await dal.patch(buildCtx(SEED_TECH_ID, ["field_tech"]), SEED_JOB_OWNED, {
+      financial_terms: { contract_amount: "15000.00" },
+    });
+
+    const pending = await pendingStore.getPendingForEntity(SEED_JOB_OWNED, {
+      status: "submitted",
+    });
+    expect(pending).toHaveLength(1);
+    return pending[0]!;
+  };
+
+  it("re-resolved manifest without approve → acceptPending returns 403", async () => {
+    setAuditWriter(audit.writer);
+    const store = new MemoryJobStore();
+    seedPilotJobs(store);
+    const pendingStore = createMemoryPendingStore();
+    const dal = createJobsDal(store, pendingStore);
+
+    const pending = await submitFinancialPending(dal, pendingStore);
+
+    const staleCtx = buildCtx(SEED_ADMIN_ID, ["office_admin"]);
+    expect(staleCtx.manifest.fields.financial_terms).toContain("approve");
+
+    const freshCtx: PermissionContext = {
+      ...staleCtx,
+      manifest: stripApproveOnFinancial(staleCtx.manifest),
+    };
+
+    await expect(dal.acceptPending!(freshCtx, pending.id)).rejects.toThrow(
+      ForbiddenError,
+    );
+
+    expect(store.getJob(SEED_JOB_OWNED)?.contractAmount).toBe("12500.00");
+    expect(audit.entries).toHaveLength(0);
+  });
+
+  it("re-resolved manifest without approve → rejectPending returns 403", async () => {
+    setAuditWriter(audit.writer);
+    const store = new MemoryJobStore();
+    seedPilotJobs(store);
+    const pendingStore = createMemoryPendingStore();
+    const dal = createJobsDal(store, pendingStore);
+
+    const pending = await submitFinancialPending(dal, pendingStore);
+
+    const staleCtx = buildCtx(SEED_ADMIN_ID, ["office_admin"]);
+    const freshCtx: PermissionContext = {
+      ...staleCtx,
+      manifest: stripApproveOnFinancial(staleCtx.manifest),
+    };
+
+    await expect(dal.rejectPending!(freshCtx, pending.id)).rejects.toThrow(
+      ForbiddenError,
+    );
+
+    expect(store.getJob(SEED_JOB_OWNED)?.contractAmount).toBe("12500.00");
+    expect(audit.entries).toHaveLength(0);
+  });
+
+  it("re-resolved manifest without submit → withdrawPending returns 403", async () => {
+    const store = new MemoryJobStore();
+    seedPilotJobs(store);
+    const pendingStore = createMemoryPendingStore();
+    const dal = createJobsDal(store, pendingStore);
+
+    const pending = await submitFinancialPending(dal, pendingStore);
+
+    const staleCtx = buildCtx(SEED_ADMIN_ID, ["office_admin"]);
+    const staleWithSubmit: PermissionContext = {
+      ...staleCtx,
+      manifest: {
+        ...staleCtx.manifest,
+        fields: {
+          ...staleCtx.manifest.fields,
+          financial_terms: [
+            ...(staleCtx.manifest.fields.financial_terms ?? []),
+            "submit",
+          ],
+        },
+      },
+    };
+    const freshCtx: PermissionContext = {
+      ...staleWithSubmit,
+      manifest: stripSubmitOnFinancial(staleWithSubmit.manifest),
+    };
+
+    await expect(
+      dal.withdrawPending!(freshCtx, pending.id),
+    ).rejects.toThrow(ForbiddenError);
+
+    expect(store.getJob(SEED_JOB_OWNED)?.contractAmount).toBe("12500.00");
+  });
+
+  it("read cache: duplicate resolve hits cache before IAM revoke", () => {
+    const inner = createJobPolicyService();
+    const map = new Map<string, Manifest>();
+    const caching = createCachingPolicyService(
+      inner,
+      { mode: "request" },
+      createMapManifestCacheStore(map),
+    );
+    const scope = jobDetailScope(SEED_JOB_OWNED);
+    const principal = {
+      id: SEED_ADMIN_ID,
+      roles: ["office_admin"],
+      policyVersion: 1,
+    };
+
+    const spy = vi.spyOn(inner, "resolve");
+    caching.resolve(principal, scope);
+    caching.resolve(principal, scope);
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  it("read cache + revoked role: fresh resolve on mutation → 403 (stale cache entry not used)", async () => {
+    setAuditWriter(audit.writer);
+    const store = new MemoryJobStore();
+    seedPilotJobs(store);
+    const dal = createJobsDal(store, createMemoryPendingStore());
+    const inner = createJobPolicyService();
+    const map = new Map<string, Manifest>();
+    const caching = createCachingPolicyService(
+      inner,
+      { mode: "request" },
+      createMapManifestCacheStore(map),
+    );
+    const scope = jobDetailScope(SEED_JOB_OWNED);
+
+    const beforeRevoke = await principalFromStore(store, SEED_ADMIN_ID, {
+      policyVersion: 1,
+    });
+    const staleManifest = caching.resolve(beforeRevoke, scope);
+    expect(staleManifest.actions).toContain("delete");
+
+    revokeRoleForUser(store, SEED_ADMIN_ID, "office_admin");
+
+    const afterRevoke = await principalFromStore(store, SEED_ADMIN_ID, {
+      policyVersion: 2,
+    });
+    const freshManifest = caching.resolve(afterRevoke, scope, {
+      bypassCache: true,
+    });
+    expect(freshManifest.actions).not.toContain("delete");
+
+    const freshCtx: PermissionContext = {
+      principal: afterRevoke,
+      manifest: freshManifest,
+      surface: "job_detail",
+    };
+    await expect(dal.delete(freshCtx, SEED_JOB_OWNED)).rejects.toThrow(
+      ForbiddenError,
+    );
+    expect(store.getJob(SEED_JOB_OWNED)).toBeDefined();
+    expect(audit.entries.filter((e) => e.action === "delete")).toHaveLength(0);
+  });
+
+  it("read cache + policyVersion bump: stale generation not returned after principal version changes", () => {
+    const inner = createJobPolicyService();
+    const map = new Map<string, Manifest>();
+    const cacheStore = createMapManifestCacheStore(map);
+    const caching = createCachingPolicyService(
+      inner,
+      { mode: "request" },
+      cacheStore,
+    );
+    const scope = jobDetailScope(SEED_JOB_OWNED);
+    const v1 = { id: SEED_ADMIN_ID, roles: ["office_admin"], policyVersion: 1 };
+
+    const spy = vi.spyOn(inner, "resolve");
+    const first = caching.resolve(v1, scope);
+    expect(first.actions).toContain("delete");
+
+    cacheStore.deleteByVersion(1);
+
+    const v2 = { id: SEED_ADMIN_ID, roles: ["office_admin"], policyVersion: 2 };
+    const second = caching.resolve(v2, scope);
+    expect(spy).toHaveBeenCalledTimes(2);
+    expect(second.policyVersion).toBe(2);
+    expect(second.actions).toContain("delete");
+  });
+});
+
+describe("threat model — T7 pending tampering", () => {
+  const audit = createMemoryAuditWriter();
 
   afterEach(() => {
     audit.reset();
     setAuditWriter(null);
   });
 
-  it("re-resolved manifest without approve → acceptPending returns 403", async () => {
+  it("after accept, second accept/reject/withdraw → NotFound (terminal immutability)", async () => {
     setAuditWriter(audit.writer);
     const store = new MemoryJobStore();
     seedPilotJobs(store);
@@ -231,26 +451,209 @@ describe("threat model — T3 stale manifest exploit", () => {
       financial_terms: { contract_amount: "15000.00" },
     });
 
-    const pending = pendingStore.getPendingForEntity(SEED_JOB_OWNED, {
+    const pending = await pendingStore.getPendingForEntity(SEED_JOB_OWNED, {
       status: "submitted",
     });
     expect(pending).toHaveLength(1);
+    const pendingId = pending[0]!.id;
 
-    const staleCtx = buildCtx(SEED_ADMIN_ID, ["office_admin"]);
-    expect(staleCtx.manifest.fields.financial_terms).toContain("approve");
+    const adminCtx = buildCtx(SEED_ADMIN_ID, ["office_admin"], SEED_JOB_OWNED);
+    await dal.acceptPending!(adminCtx, pendingId);
 
-    const freshCtx: PermissionContext = {
-      ...staleCtx,
-      manifest: stripApproveOnFinancial(staleCtx.manifest),
-    };
+    expect(store.getJob(SEED_JOB_OWNED)?.contractAmount).toBe("15000.00");
 
-    await expect(dal.acceptPending(freshCtx, pending[0]!.id)).rejects.toThrow(
-      ForbiddenError,
+    await expect(dal.acceptPending!(adminCtx, pendingId)).rejects.toThrow(
+      NotFoundError,
     );
+    await expect(dal.rejectPending!(adminCtx, pendingId)).rejects.toThrow(
+      NotFoundError,
+    );
+    await expect(
+      dal.withdrawPending!(
+        buildCtx(SEED_TECH_ID, ["field_tech"], SEED_JOB_OWNED),
+        pendingId,
+      ),
+    ).rejects.toThrow(NotFoundError);
+
+    expect(store.getJob(SEED_JOB_OWNED)?.contractAmount).toBe("15000.00");
+    expect(audit.entries.filter((e) => e.action === "approve")).toHaveLength(1);
+  });
+});
+
+describe("threat model — T10 approval bypass", () => {
+  const audit = createMemoryAuditWriter();
+
+  afterEach(() => {
+    audit.reset();
+    setAuditWriter(null);
+  });
+
+  it("submit-only PATCH to verification Field routes pending; live contract_amount unchanged", async () => {
+    setAuditWriter(audit.writer);
+    const store = new MemoryJobStore();
+    seedPilotJobs(store);
+    const pendingStore = createMemoryPendingStore();
+    const dal = createJobsDal(store, pendingStore);
+    const techCtx = buildCtx(SEED_TECH_ID, ["field_tech"], SEED_JOB_OWNED);
+
+    await dal.patch(techCtx, SEED_JOB_OWNED, {
+      financial_terms: { contract_amount: "99999.00" },
+    });
 
     expect(store.getJob(SEED_JOB_OWNED)?.contractAmount).toBe("12500.00");
     expect(audit.entries).toHaveLength(0);
+
+    const open = await pendingStore.getPendingForEntity(SEED_JOB_OWNED, {
+      status: "submitted",
+    });
+    expect(open).toHaveLength(1);
+    expect(open[0]?.patch).toEqual({
+      financial_terms: { contract_amount: "99999.00" },
+    });
   });
+
+  it("verification Field without pending store or accept path → ForbiddenError", async () => {
+    const store = new MemoryJobStore();
+    seedPilotJobs(store);
+    const adapter = createJobStoreAdapter(store);
+    const dal = createSurfaceDal(createJobDetailDescriptor(store), adapter);
+    const techCtx = buildCtx(SEED_TECH_ID, ["field_tech"], SEED_JOB_OWNED);
+
+    await expect(
+      dal.patch(techCtx, SEED_JOB_OWNED, {
+        financial_terms: { contract_amount: "99999.00" },
+      }),
+    ).rejects.toThrow(ForbiddenError);
+
+    expect(store.getJob(SEED_JOB_OWNED)?.contractAmount).toBe("12500.00");
+  });
+});
+
+const latchAppDatabaseUrl = (): string | undefined => {
+  const appUrl = process.env.LATCH_APP_DATABASE_URL?.trim();
+  if (appUrl) {
+    return appUrl;
+  }
+  const databaseUrl = process.env.DATABASE_URL?.trim();
+  if (databaseUrl?.includes("latch_app")) {
+    return databaseUrl;
+  }
+  return undefined;
+};
+
+describe("threat model — T5 privileged DB role bypass", () => {
+  it.runIf(Boolean(latchAppDatabaseUrl()))(
+    "app connection is latch_app and not superuser",
+    async () => {
+      const { Pool } = await import("pg");
+      const pool = new Pool({ connectionString: latchAppDatabaseUrl() });
+
+      try {
+        const user = await pool.query<{ current_user: string }>(
+          "SELECT current_user",
+        );
+        expect(user.rows[0]?.current_user).toBe("latch_app");
+
+        const role = await pool.query<{ rolsuper: boolean }>(
+          `SELECT rolsuper FROM pg_roles WHERE rolname = current_user`,
+        );
+        expect(role.rows[0]?.rolsuper).toBe(false);
+      } finally {
+        await pool.end();
+      }
+    },
+  );
+});
+
+describe("threat model — T12 session var leak across requests", () => {
+  it.runIf(Boolean(latchAppDatabaseUrl()))(
+    "alternating principals bind session vars and attribute audit/pending rows correctly on a reused pool connection",
+    async () => {
+      const { Pool } = await import("pg");
+      const { withPermissionDb } = await import("@latch/audit");
+      const { createPostgresPendingStore } = await import("@latch/approval");
+      const { createPostgresAuditWriter } = await import(
+        "../apps/crm/src/lib/audit-db-writer.js"
+      );
+
+      const url = latchAppDatabaseUrl()!;
+      const pool = new Pool({ connectionString: url, max: 1 });
+      const audit = createPostgresAuditWriter(url);
+      const pending = createPostgresPendingStore(url);
+
+      const actorA = `t12-actor-a-${crypto.randomUUID()}`;
+      const actorB = `t12-actor-b-${crypto.randomUUID()}`;
+      const entityId = `t12-entity-${crypto.randomUUID()}`;
+
+      try {
+        for (let i = 0; i < 8; i++) {
+          const actor = i % 2 === 0 ? actorA : actorB;
+
+          await withPermissionDb(pool, actor, async (client) => {
+            const bound = await client.query<{ pid: string; cid: string }>(
+              `SELECT
+                 current_setting('app.principal_id', true) AS pid,
+                 current_setting('app.company_id', true) AS cid`,
+            );
+            expect(bound.rows[0]?.pid).toBe(actor);
+            expect(bound.rows[0]?.cid).toBe("default");
+          });
+
+          await audit.writer({
+            actorId: actor,
+            action: "update",
+            tableName: "jobs",
+            recordId: entityId,
+          });
+
+          await pending.store.submit({
+            surfaceId: "job_detail",
+            entityId: `${entityId}-${i}`,
+            fieldIds: ["financial_terms"],
+            patch: { financial_terms: { contract_amount: `${i}.00` } },
+            submittedBy: actor,
+          });
+        }
+
+        const auditRows = await pool.query<{ actor_id: string }>(
+          `SELECT actor_id FROM latch_audit
+           WHERE entity_id = $1
+           ORDER BY id ASC`,
+          [entityId],
+        );
+        expect(auditRows.rows).toHaveLength(8);
+        for (let i = 0; i < auditRows.rows.length; i++) {
+          expect(auditRows.rows[i]?.actor_id).toBe(
+            i % 2 === 0 ? actorA : actorB,
+          );
+        }
+
+        const pendingRows = await pool.query<{ submitted_by: string }>(
+          `SELECT submitted_by FROM latch_pending_changes
+           WHERE entity_id LIKE $1
+           ORDER BY submitted_at ASC`,
+          [`${entityId}-%`],
+        );
+        expect(pendingRows.rows).toHaveLength(8);
+        for (let i = 0; i < pendingRows.rows.length; i++) {
+          expect(pendingRows.rows[i]?.submitted_by).toBe(
+            i % 2 === 0 ? actorA : actorB,
+          );
+        }
+      } finally {
+        await pool.query(
+          "DELETE FROM latch_pending_changes WHERE entity_id LIKE $1",
+          [`${entityId}-%`],
+        );
+        await pool.query("DELETE FROM latch_audit WHERE entity_id = $1", [
+          entityId,
+        ]);
+        await audit.close();
+        await pending.close();
+        await pool.end();
+      }
+    },
+  );
 });
 
 describe("threat model — T6 audit tampering", () => {
@@ -260,18 +663,6 @@ describe("threat model — T6 audit tampering", () => {
     expect(exportNames).not.toContain("deleteAudit");
     expect(exportNames).toContain("writeAudit");
   });
-
-  const latchAppDatabaseUrl = (): string | undefined => {
-    const appUrl = process.env.LATCH_APP_DATABASE_URL?.trim();
-    if (appUrl) {
-      return appUrl;
-    }
-    const databaseUrl = process.env.DATABASE_URL?.trim();
-    if (databaseUrl?.includes("latch_app")) {
-      return databaseUrl;
-    }
-    return undefined;
-  };
 
   it.runIf(Boolean(latchAppDatabaseUrl()))(
     "UPDATE latch_audit from app role is rejected (grants and/or immutability trigger)",

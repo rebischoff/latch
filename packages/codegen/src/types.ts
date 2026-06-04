@@ -3,6 +3,8 @@ export interface SurfaceFieldDef {
   id: string;
   columns: string[];
   sensitivity?: string;
+  /** When true, Field may route to pending verification (DAL checks manifest `submit` ∧ ¬`write`). */
+  requires_verification?: boolean;
 }
 
 export interface SurfaceDef {

@@ -1,6 +1,11 @@
-import { fieldAllows, surfaceAllows, type PermissionContext } from "@latch/contracts";
+import {
+  fieldAllows,
+  surfaceAllows,
+  type PermissionContext,
+} from "@latch/contracts";
 import type { SurfaceDescriptor } from "@latch/dal";
 
+import { JobDetailVerificationFieldIds } from "../../../modules/job/generated/job_detail.schema.generated.js";
 import type {
   MemoryAssignmentRecord,
   MemoryJobRecord,
@@ -59,27 +64,7 @@ export const createJobDetailDescriptor = (
   auditSnapshot: jobRowAuditSnapshot,
   deleteAuditSnapshot: jobDeleteAuditSnapshot,
   canDelete: canDeleteJob,
-  pendingWrite: {
-    test: (ctx, patch) => {
-      const typed = patch as JobDetailPatchDto;
-      return (
-        typed.financial_terms?.contract_amount !== undefined &&
-        !fieldAllows(ctx.manifest, "financial_terms", "write") &&
-        fieldAllows(ctx.manifest, "financial_terms", "submit")
-      );
-    },
-    fieldIds: ["financial_terms"],
-    extractPendingPatch: (patch) => {
-      const typed = patch as JobDetailPatchDto;
-      return { financial_terms: typed.financial_terms };
-    },
-    stripFromDirectPatch: (patch) => {
-      const typed = patch as JobDetailPatchDto;
-      const { financial_terms: _, ...rest } = typed;
-      void _;
-      return rest;
-    },
-  },
+  verificationFieldIds: JobDetailVerificationFieldIds,
 });
 
 export const createJobListDescriptor = (
@@ -104,4 +89,5 @@ export const createJobListDescriptor = (
   deleteAuditSnapshot: jobDeleteAuditSnapshot,
   canDelete: canDeleteJob,
   listJoins: createJobListJoins(store),
+  verificationFieldIds: JobDetailVerificationFieldIds,
 });

@@ -1,3 +1,4 @@
+import type { PendingStore } from "@latch/approval";
 import { writeAudit } from "@latch/audit";
 import {
   fieldAllows,
@@ -11,6 +12,10 @@ import {
 } from "@latch/contracts";
 
 import { canDeleteRow, deleteRowWithAudit } from "./delete-row.js";
+import {
+  assertVerificationDirectWrite,
+  splitVerificationPatch,
+} from "./pending-routing.js";
 import { patchedFieldIds } from "./patch-utils.js";
 import type { StoreAdapter } from "./store-adapter.js";
 import type { SurfaceDescriptor } from "./surface-descriptor.js";
@@ -41,12 +46,14 @@ type RowPlan<TRow> =
   | { kind: "apply"; id: string; row: TRow & { id: string } }
   | { kind: "skip"; entry: BulkUpdateSkipped };
 
-const classifyUpdateRow = <TRow, TRelated>(
+const classifyUpdateRow = async <TRow, TRelated>(
   store: StoreAdapter<TRow, TRelated>,
   ctx: PermissionContext,
+  pendingStore: PendingStore | undefined,
   id: string,
-  fieldIds: string[],
-): RowPlan<TRow> => {
+  directFieldIds: string[],
+  pendingFieldIds: string[],
+): Promise<RowPlan<TRow>> => {
   const row = store.get(id);
   if (
     !row ||
@@ -59,18 +66,28 @@ const classifyUpdateRow = <TRow, TRelated>(
     return { kind: "skip", entry: { id, reason: "not_found" } };
   }
 
-  const deniedFields = fieldIds.filter(
+  const deniedDirect = directFieldIds.filter(
     (fieldId) => !fieldAllows(ctx.manifest, fieldId, "write"),
   );
-  if (deniedFields.length > 0) {
+  if (deniedDirect.length > 0) {
     return {
       kind: "skip",
       entry: {
         id,
         reason: "forbidden_field",
-        detail: { fields: deniedFields },
+        detail: { fields: deniedDirect },
       },
     };
+  }
+
+  if (pendingFieldIds.length > 0) {
+    const open = await pendingStore!.getPendingForEntity(id, {
+      surfaceId: ctx.surface,
+      status: "submitted",
+    });
+    if (open.length > 0) {
+      return { kind: "skip", entry: { id, reason: "forbidden_row" } };
+    }
   }
 
   return { kind: "apply", id, row: row as TRow & { id: string } };
@@ -101,6 +118,7 @@ export const bulkUpdate = async <TRow, TRelated>(
   ids: string[],
   patchBody: unknown,
   opts?: BulkUpdateOptions,
+  pendingStore?: PendingStore,
 ): Promise<BulkUpdateResult> => {
   assertListSurface(descriptor, ctx, "bulkUpdate");
 
@@ -119,11 +137,31 @@ export const bulkUpdate = async <TRow, TRelated>(
   }
 
   const patch = parsed.data as Record<string, unknown>;
-  const fieldIds = patchedFieldIds(patch);
+  const { directPatch, pendingPatch, pendingFieldIds } = splitVerificationPatch(
+    ctx,
+    patch,
+    descriptor.verificationFieldIds,
+  );
+  const directFieldIds = patchedFieldIds(directPatch);
   const mode = opts?.mode ?? "partial";
   const requestId = opts?.requestId;
 
-  const plans = ids.map((id) => classifyUpdateRow(store, ctx, id, fieldIds));
+  if (pendingFieldIds.length > 0 && !pendingStore) {
+    throw new ForbiddenError();
+  }
+
+  const plans = await Promise.all(
+    ids.map((id) =>
+      classifyUpdateRow(
+        store,
+        ctx,
+        pendingStore,
+        id,
+        directFieldIds,
+        pendingFieldIds,
+      ),
+    ),
+  );
 
   const skipped = plans
     .filter(
@@ -140,7 +178,7 @@ export const bulkUpdate = async <TRow, TRelated>(
     return { succeeded: [], skipped, failed: [] };
   }
 
-  if (fieldIds.length === 0) {
+  if (directFieldIds.length === 0 && pendingFieldIds.length === 0) {
     return {
       succeeded: toApply.map((p) => p.id),
       skipped,
@@ -148,27 +186,55 @@ export const bulkUpdate = async <TRow, TRelated>(
     };
   }
 
+  const batchId =
+    pendingFieldIds.length > 0 ? crypto.randomUUID() : undefined;
   const succeeded: string[] = [];
 
   for (const { id, row } of toApply) {
-    const beforeSnapshot = descriptor.auditSnapshot(row);
-    const updated = applyRowUpdate(descriptor, store, id, row, patch);
-    const afterSnapshot = descriptor.auditSnapshot(updated);
+    let changed = false;
 
-    await writeAudit({
-      actorId: ctx.principal.id,
-      action: "update",
-      tableName: descriptor.anchorTable,
-      recordId: id,
-      moduleId: ctx.surface,
-      fieldIds,
-      before: beforeSnapshot,
-      after: afterSnapshot,
-      patch,
-      requestId,
-    });
+    if (directFieldIds.length > 0) {
+      assertVerificationDirectWrite(
+        ctx,
+        directPatch,
+        descriptor.verificationFieldIds,
+      );
 
-    succeeded.push(id);
+      const beforeSnapshot = descriptor.auditSnapshot(row);
+      const updated = applyRowUpdate(descriptor, store, id, row, directPatch);
+      const afterSnapshot = descriptor.auditSnapshot(updated);
+
+      await writeAudit({
+        actorId: ctx.principal.id,
+        action: "update",
+        tableName: descriptor.anchorTable,
+        recordId: id,
+        moduleId: ctx.surface,
+        fieldIds: directFieldIds,
+        before: beforeSnapshot,
+        after: afterSnapshot,
+        patch: directPatch,
+        requestId,
+      });
+
+      changed = true;
+    }
+
+    if (pendingFieldIds.length > 0) {
+      await pendingStore!.submit({
+        surfaceId: ctx.surface,
+        entityId: id,
+        fieldIds: [...pendingFieldIds],
+        patch: pendingPatch,
+        submittedBy: ctx.principal.id,
+        batchId,
+      });
+      changed = true;
+    }
+
+    if (changed) {
+      succeeded.push(id);
+    }
   }
 
   if (succeeded.length > 0 && requestId !== undefined) {
@@ -183,7 +249,8 @@ export const bulkUpdate = async <TRow, TRelated>(
         succeeded: succeeded.length,
         skipped: skipped.length,
         failed: 0,
-        fieldIds,
+        fieldIds: patchedFieldIds(patch),
+        ...(batchId !== undefined ? { batch_id: batchId } : {}),
       },
       requestId,
     });

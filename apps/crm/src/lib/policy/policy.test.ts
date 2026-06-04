@@ -145,7 +145,7 @@ describe("PolicyService — customer_detail matrix", () => {
 describe("PolicyService — job_list matrix", () => {
   const policy = new PolicyService({ registry: jobPolicyRegistry });
 
-  it("field_tech: list columns without financial_terms", () => {
+  it("field_tech: list columns; financial_terms submit-only (no read)", () => {
     const manifest = policy.resolve(principal("field_tech"), {
       surface: "job_list",
       mode: "list",
@@ -153,7 +153,7 @@ describe("PolicyService — job_list matrix", () => {
 
     expect(manifest.surface).toBe("job_list");
     expect(manifest.rowScope).toBe("own");
-    expect(manifest.fields.financial_terms).toEqual([]);
+    expect(manifest.fields.financial_terms).toEqual(["submit"]);
     expect(manifest.fields.summary).toEqual(["read"]);
     expect(manifest.fields.customer_site).toEqual(["read"]);
     expect(manifest.fields.assignments).toEqual(["read"]);
@@ -183,7 +183,9 @@ describe("PolicyService — job_list matrix", () => {
 
     expect(manifest.rowScope).toBe("all");
     expect(manifest.fields.assignments).toContain("write");
-    expect(manifest.fields.financial_terms).toEqual(["read"]);
+    expect(manifest.fields.financial_terms).toEqual(
+      expect.arrayContaining(["read", "submit"]),
+    );
   });
 });
 

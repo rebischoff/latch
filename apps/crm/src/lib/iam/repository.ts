@@ -7,10 +7,14 @@ import {
 } from "@latch/contracts";
 import { createSurfaceDal } from "@latch/dal";
 
+import { getDatabaseUrl } from "@/lib/db";
+
 import { createIamUserStoreAdapter } from "../../../db/store.js";
 import type { MemoryJobStore } from "../../../db/memory-store.js";
 import { createUserRolesDetailDescriptor } from "./descriptors.js";
+import { bumpPolicyVersion } from "./policy-version.js";
 import type { ProjectedUserRolesDetail } from "./project.js";
+import type { UserRolesDetailPatchDto } from "./schemas.js";
 
 export type IamDal = {
   getUserRoles: (ctx: PermissionContext, id: string) => ProjectedUserRolesDetail;
@@ -67,7 +71,12 @@ export const createIamDal = (store: MemoryJobStore): IamDal => {
     patchUserRoles: async (ctx, id, body) => {
       assertUserRolesDetailWrite(ctx);
       assertNotSelfRolePatch(ctx, id);
-      return (await detail.patch(ctx, id, body)) as ProjectedUserRolesDetail;
+      const dto = (await detail.patch(ctx, id, body)) as ProjectedUserRolesDetail;
+      const patch = body as UserRolesDetailPatchDto;
+      if (getDatabaseUrl() && patch.role_assignments !== undefined) {
+        await bumpPolicyVersion(ctx.principal.id);
+      }
+      return dto;
     },
   };
 };

@@ -4,7 +4,7 @@ import { LatchError } from "@latch/contracts";
 import type { ProjectedCustomerDetail } from "@/lib/customers/project";
 import { revalidatePath } from "next/cache";
 
-import { getCustomersDal, resolveContext } from "@/lib/latch";
+import { getCustomersDal, resolveContextFresh } from "@/lib/latch";
 
 export type CustomerDetailActionResult =
   | { ok: true; customer?: ProjectedCustomerDetail }
@@ -20,7 +20,7 @@ export const saveCustomerDetail = async (
   body: unknown,
 ): Promise<CustomerDetailActionResult> => {
   try {
-    const ctx = await resolveContext({
+    const ctx = await resolveContextFresh({
       surfaceId: "customer_detail",
       entityId: customerId,
     });

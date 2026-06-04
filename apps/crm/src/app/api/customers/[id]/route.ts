@@ -1,5 +1,5 @@
 import { jsonSuccess, withCustomerApiHandler } from "@/lib/api/customer-handler";
-import { getCustomersDal, resolveContext } from "@/lib/latch";
+import { getCustomersDal, resolveContext, resolveContextFresh } from "@/lib/latch";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -23,7 +23,7 @@ export const PATCH = async (
 ): Promise<Response> =>
   withCustomerApiHandler(async () => {
     const { id } = await params;
-    const ctx = await resolveContext({
+    const ctx = await resolveContextFresh({
       surfaceId: "customer_detail",
       entityId: id,
     });

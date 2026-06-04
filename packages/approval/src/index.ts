@@ -7,3 +7,8 @@ export {
   type PendingStatus,
   type PendingStore,
 } from "./pending-store.js";
+export {
+  createPostgresPendingStore,
+  PostgresPendingStore,
+  type PostgresPendingStoreHandle,
+} from "./postgres-pending-store.js";

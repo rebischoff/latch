@@ -2,6 +2,7 @@ import { isNotFoundError } from "@latch/contracts";
 import { Suspense } from "react";
 
 import { JobsSplitView } from "@/components/jobs/JobsSplitView";
+import { loadProjectedJobDetail } from "@/lib/jobs/load-detail";
 import { getJobsDal, resolveContext } from "@/lib/latch";
 
 export const dynamic = "force-dynamic";
@@ -42,11 +43,8 @@ const JobsPageContent = async ({ selectedId }: { selectedId?: string }) => {
   }
 
   try {
-    const ctx = await resolveContext({
-      surfaceId: "job_detail",
-      entityId: selectedId,
-    });
-    const job = getJobsDal().get(ctx, selectedId);
+    const { ctx, job, submitterOpenPendingId } =
+      await loadProjectedJobDetail(selectedId);
     const customerDetailManifest = job.customer_ref
       ? (
           await resolveContext({
@@ -61,7 +59,12 @@ const JobsPageContent = async ({ selectedId }: { selectedId?: string }) => {
         listTotal={total}
         listManifest={manifest}
         selectedId={selectedId}
-        detail={{ job, manifest: ctx.manifest, customerDetailManifest }}
+        detail={{
+          job,
+          manifest: ctx.manifest,
+          customerDetailManifest,
+          submitterOpenPendingId,
+        }}
       />
     );
   } catch (error) {

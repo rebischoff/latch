@@ -61,9 +61,30 @@ export const createJobPolicyService = (): PolicyService =>
 export const principalFromStore = async (
   store: MemoryJobStore,
   userId: string,
+  options?: { policyVersion?: number },
 ): Promise<Principal> => ({
   id: userId,
   roles: await loadRolesForUser(userId, store),
+  ...(options?.policyVersion !== undefined
+    ? { policyVersion: options.policyVersion }
+    : {}),
+});
+
+/** Simulate IAM revoke mid-scenario (memory pilot / threat tests). */
+export const revokeRoleForUser = (
+  store: MemoryJobStore,
+  userId: string,
+  roleId: string,
+): void => {
+  store.removeUserRole(userId, roleId);
+};
+
+/** Simulate `bumpPolicyVersion` after IAM change when Postgres is unavailable. */
+export const bumpPolicyVersionForPrincipal = (
+  principal: Principal,
+): Principal => ({
+  ...principal,
+  policyVersion: (principal.policyVersion ?? 1) + 1,
 });
 
 /** Resolve a manifest for a user whose roles come from the store (no session cookies). */
@@ -78,16 +99,47 @@ export const resolveManifestFromStore = async (
   return { principal, manifest };
 };
 
-export const createSeededJobsDal = (): {
+export type SeededJobsDal = {
   store: MemoryJobStore;
   dal: JobsDal;
-} => {
+  pendingStore: ReturnType<typeof createMemoryPendingStore>;
+};
+
+export const createSeededJobsDal = (): SeededJobsDal => {
   const store = new MemoryJobStore();
   seedPilotJobs(store);
+  const pendingStore = createMemoryPendingStore();
   return {
     store,
-    dal: createJobsDal(store, createMemoryPendingStore()),
+    dal: createJobsDal(store, pendingStore),
+    pendingStore,
   };
+};
+
+/** Add `count` jobs on Acme; default assignee is `SEED_ADMIN_ID`. */
+export const seedBulkJobs = (
+  store: MemoryJobStore,
+  count: number,
+  options?: { prefix?: string; assigneeId?: string },
+): string[] => {
+  const prefix = options?.prefix ?? "seed-bulk-job";
+  const assigneeId = options?.assigneeId ?? SEED_ADMIN_ID;
+  const ids: string[] = [];
+  for (let i = 0; i < count; i++) {
+    const id = `${prefix}-${i}`;
+    ids.push(id);
+    store.upsertJob({
+      id,
+      title: `Bulk job ${i}`,
+      status: "scheduled",
+      scheduledAt: new Date("2026-05-01T12:00:00.000Z"),
+      description: null,
+      contractAmount: "1000.00",
+      customerId: SEED_CUSTOMER_ACME,
+    });
+    store.addAssignment({ jobId: id, userId: assigneeId });
+  }
+  return ids;
 };
 
 export const jobDetailScope = (entityId: string): PolicyScope => ({
@@ -157,18 +209,25 @@ export const resolveOfficeAdminJobListCtx = async (
     await resolveManifestFromStore(store, SEED_ADMIN_ID, jobListScope(), policy),
   );
 
-export type SeededJobsDalWithAudit = {
-  store: MemoryJobStore;
-  dal: JobsDal;
+/** `field_tech` on `job_list` with row-scope `own` from store assignments. */
+export const resolveFieldTechJobListCtx = async (
+  store: MemoryJobStore,
+  policy: PolicyService = createJobPolicyService(),
+): Promise<PermissionContext> =>
+  toJobListCtx(
+    await resolveManifestFromStore(store, SEED_TECH_ID, jobListScope(), policy),
+  );
+
+export type SeededJobsDalWithAudit = SeededJobsDal & {
   audit: ReturnType<typeof createMemoryAuditWriter>;
 };
 
-/** Pilot seed + DAL + in-memory audit writer (no Auth.js / HTTP). */
+/** Pilot seed + DAL + pending store + in-memory audit writer (no Auth.js / HTTP). */
 export const createSeededJobsDalWithAudit = (): SeededJobsDalWithAudit => {
   const audit = createMemoryAuditWriter();
   setAuditWriter(audit.writer);
-  const { store, dal } = createSeededJobsDal();
-  return { store, dal, audit };
+  const seeded = createSeededJobsDal();
+  return { ...seeded, audit };
 };
 
 /** Operator restore path: replay delete `before` from a catalogued audit row id. */

@@ -1,11 +1,13 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { createMemoryPendingStore } from "@latch/approval";
 import {
   createMemoryAuditWriter,
   setAuditWriter,
 } from "@latch/audit";
 import {
+  ConflictError,
   ForbiddenError,
   NotFoundError,
   ValidationError,
@@ -14,6 +16,7 @@ import {
 } from "@latch/contracts";
 
 import { createSurfaceDal } from "./create-surface-dal.js";
+import { assertVerificationDirectWrite } from "./pending-routing.js";
 import type { StoreAdapter } from "./store-adapter.js";
 import type { SurfaceDescriptor } from "./surface-descriptor.js";
 
@@ -57,6 +60,40 @@ const widgetDeleteAuditSnapshot = (
   ...formatWidgetRow(row),
   children: children.map((c) => ({ widget_id: c.widgetId, tag: c.tag })),
 });
+
+const widgetVerificationDescriptor: SurfaceDescriptor<WidgetRow, WidgetChild[]> =
+  {
+    surfaceId: "alpha_detail",
+    anchorTable: "widgets",
+    capabilities: ["detail"],
+    patchSchema: WidgetPatchSchema,
+    deleteAuditFieldId: "label",
+    verificationFieldIds: ["meta"],
+    projectRow: (row, manifest) => {
+      const dto: Record<string, unknown> = { id: row.id };
+      if (manifest.fields.label?.includes("read")) {
+        dto.label = { text: row.label };
+      }
+      if (manifest.fields.meta?.includes("read")) {
+        dto.meta = { notes: row.notes };
+      }
+      return dto;
+    },
+    applyPatch: (row, patch) => {
+      const next = { ...row };
+      const typed = patch as z.infer<typeof WidgetPatchSchema>;
+      if (typed.label?.text !== undefined) {
+        next.label = typed.label.text;
+      }
+      if (typed.meta?.notes !== undefined) {
+        next.notes = typed.meta.notes;
+      }
+      return next;
+    },
+    auditSnapshot: formatWidgetRow,
+    deleteAuditSnapshot: widgetDeleteAuditSnapshot,
+    canDelete: (ctx) => ctx.manifest.actions.includes("delete"),
+  };
 
 const widgetDetailDescriptor: SurfaceDescriptor<WidgetRow, WidgetChild[]> = {
   surfaceId: "alpha_detail",
@@ -505,5 +542,213 @@ describe("createSurfaceDal list + bulk (fixture descriptor)", () => {
 
     expect(store.get(WIDGET_ALPHA)).toBeDefined();
     expect(audit.entries).toHaveLength(0);
+  });
+});
+
+const submitMetaManifest: Manifest = {
+  surface: "alpha_detail",
+  actions: ["read"],
+  fields: {
+    label: ["read", "write"],
+    meta: ["read", "submit"],
+  },
+};
+
+const approveMetaManifest: Manifest = {
+  surface: "alpha_detail",
+  actions: ["read"],
+  fields: {
+    label: ["read"],
+    meta: ["read", "approve"],
+  },
+};
+
+const readOnlyMetaManifest: Manifest = {
+  surface: "alpha_detail",
+  actions: ["read"],
+  fields: {
+    label: ["read", "write"],
+    meta: ["read"],
+  },
+};
+
+describe("createSurfaceDal verification pending routing", () => {
+  it("routes submit-only verification Field to pending; live row unchanged", async () => {
+    const store = new WidgetMemoryStore();
+    store.seed();
+    const pendingStore = createMemoryPendingStore();
+    const dal = createSurfaceDal(widgetVerificationDescriptor, store, {
+      pendingStore,
+    });
+
+    const dto = await dal.patch(
+      buildCtx(submitMetaManifest, PRINCIPAL_A),
+      WIDGET_ALPHA,
+      { meta: { notes: "proposed" } },
+    );
+
+    expect(store.get(WIDGET_ALPHA)?.notes).toBe("note-a");
+    expect(dto.meta).toEqual({ notes: "note-a" });
+
+    const pending = await pendingStore.getPendingForEntity(WIDGET_ALPHA, {
+      surfaceId: "alpha_detail",
+      status: "submitted",
+    });
+    expect(pending).toHaveLength(1);
+    expect(pending[0]?.patch).toEqual({ meta: { notes: "proposed" } });
+  });
+
+  it("second submit while open pending throws ConflictError", async () => {
+    const store = new WidgetMemoryStore();
+    store.seed();
+    const pendingStore = createMemoryPendingStore();
+    const dal = createSurfaceDal(widgetVerificationDescriptor, store, {
+      pendingStore,
+    });
+    const ctx = buildCtx(submitMetaManifest, PRINCIPAL_A);
+
+    await dal.patch(ctx, WIDGET_ALPHA, { meta: { notes: "first" } });
+
+    await expect(
+      dal.patch(ctx, WIDGET_ALPHA, { meta: { notes: "second" } }),
+    ).rejects.toThrow(ConflictError);
+  });
+
+  it("hybrid patch: verification Field pending + other Fields apply live", async () => {
+    setAuditWriter(audit.writer);
+    const store = new WidgetMemoryStore();
+    store.seed();
+    const pendingStore = createMemoryPendingStore();
+    const dal = createSurfaceDal(widgetVerificationDescriptor, store, {
+      pendingStore,
+    });
+
+    await dal.patch(buildCtx(submitMetaManifest, PRINCIPAL_A), WIDGET_ALPHA, {
+      label: { text: "Alpha live" },
+      meta: { notes: "pending only" },
+    });
+
+    expect(store.get(WIDGET_ALPHA)?.label).toBe("Alpha live");
+    expect(store.get(WIDGET_ALPHA)?.notes).toBe("note-a");
+    expect(audit.entries).toHaveLength(1);
+    expect(audit.entries[0]?.fieldIds).toEqual(["label"]);
+  });
+
+  it("acceptPending applies verification Field via applier path", async () => {
+    setAuditWriter(audit.writer);
+    const store = new WidgetMemoryStore();
+    store.seed();
+    const pendingStore = createMemoryPendingStore();
+    const dal = createSurfaceDal(widgetVerificationDescriptor, store, {
+      pendingStore,
+    });
+
+    await dal.patch(buildCtx(submitMetaManifest, PRINCIPAL_A), WIDGET_ALPHA, {
+      meta: { notes: "approved notes" },
+    });
+
+    const pending = await pendingStore.getPendingForEntity(WIDGET_ALPHA, {
+      status: "submitted",
+    });
+    const dto = await dal.acceptPending!(
+      buildCtx(approveMetaManifest, PRINCIPAL_B),
+      pending[0]!.id,
+    );
+
+    expect(dto.meta).toEqual({ notes: "approved notes" });
+    expect(store.get(WIDGET_ALPHA)?.notes).toBe("approved notes");
+    expect(audit.entries[0]?.action).toBe("approve");
+  });
+
+  it("rejectPending leaves verification Field unchanged and audits reject", async () => {
+    setAuditWriter(audit.writer);
+    const store = new WidgetMemoryStore();
+    store.seed();
+    const pendingStore = createMemoryPendingStore();
+    const dal = createSurfaceDal(widgetVerificationDescriptor, store, {
+      pendingStore,
+    });
+
+    await dal.patch(buildCtx(submitMetaManifest, PRINCIPAL_A), WIDGET_ALPHA, {
+      meta: { notes: "rejected notes" },
+    });
+
+    const pending = await pendingStore.getPendingForEntity(WIDGET_ALPHA, {
+      status: "submitted",
+    });
+
+    await dal.rejectPending!(
+      buildCtx(approveMetaManifest, PRINCIPAL_B),
+      pending[0]!.id,
+    );
+
+    expect(store.get(WIDGET_ALPHA)?.notes).toBe("note-a");
+    expect((await pendingStore.getById(pending[0]!.id))?.status).toBe("rejected");
+    expect(audit.entries).toHaveLength(1);
+    expect(audit.entries[0]?.action).toBe("reject");
+  });
+
+  it("withdrawPending allows resubmit without audit row", async () => {
+    const store = new WidgetMemoryStore();
+    store.seed();
+    const pendingStore = createMemoryPendingStore();
+    const dal = createSurfaceDal(widgetVerificationDescriptor, store, {
+      pendingStore,
+    });
+    const submitCtx = buildCtx(submitMetaManifest, PRINCIPAL_A);
+
+    await dal.patch(submitCtx, WIDGET_ALPHA, {
+      meta: { notes: "withdraw me" },
+    });
+
+    const first = await pendingStore.getPendingForEntity(WIDGET_ALPHA, {
+      status: "submitted",
+    });
+    await dal.withdrawPending!(submitCtx, first[0]!.id);
+
+    await dal.patch(submitCtx, WIDGET_ALPHA, {
+      meta: { notes: "resubmitted" },
+    });
+
+    const open = await pendingStore.getPendingForEntity(WIDGET_ALPHA, {
+      status: "submitted",
+    });
+    expect(open).toHaveLength(1);
+    expect(open[0]?.id).not.toBe(first[0]!.id);
+  });
+});
+
+describe("T10 verification direct-write guard", () => {
+  it("submit-only verification patch without pending store throws ForbiddenError", async () => {
+    const store = new WidgetMemoryStore();
+    store.seed();
+    const dal = createSurfaceDal(widgetVerificationDescriptor, store);
+
+    await expect(
+      dal.patch(buildCtx(submitMetaManifest, PRINCIPAL_A), WIDGET_ALPHA, {
+        meta: { notes: "blocked" },
+      }),
+    ).rejects.toThrow(ForbiddenError);
+  });
+
+  it("direct write to verification Field without write or applier throws ForbiddenError", () => {
+    expect(() =>
+      assertVerificationDirectWrite(
+        buildCtx(readOnlyMetaManifest, PRINCIPAL_A),
+        { meta: { notes: "blocked" } },
+        ["meta"],
+      ),
+    ).toThrow(ForbiddenError);
+  });
+
+  it("applier path allows verification Field without manifest write", () => {
+    expect(() =>
+      assertVerificationDirectWrite(
+        buildCtx(approveMetaManifest, PRINCIPAL_B),
+        { meta: { notes: "ok" } },
+        ["meta"],
+        { applier: true },
+      ),
+    ).not.toThrow();
   });
 });

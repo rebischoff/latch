@@ -1,9 +1,18 @@
+import type { PendingChange } from "@latch/approval";
 import { fieldAllows, type Manifest } from "@latch/contracts";
 
 import type {
   MemoryAssignmentRecord,
   MemoryJobRecord,
 } from "../../../db/memory-store.js";
+
+/** Open verification bundle exposed to submitter or reviewer on `job_detail`. */
+export type JobDetailVerificationPending = {
+  id: string;
+  financial_terms: {
+    contract_amount: string | null;
+  };
+};
 
 /** Read DTO for `job_detail` — keys omitted when manifest denies `read`. */
 export type ProjectedJobDetail = {
@@ -24,10 +33,111 @@ export type ProjectedJobDetail = {
     id: string;
     name: string;
   };
+  verification_pending?: JobDetailVerificationPending;
 };
 
 const formatTimestamp = (value: Date | null | undefined): string | null =>
   value == null ? null : value.toISOString();
+
+const pendingVisibleToPrincipal = (
+  manifest: Manifest,
+  pending: PendingChange,
+  principalId: string,
+): boolean => {
+  if (pending.submittedBy === principalId) {
+    return pending.fieldIds.some((fieldId) =>
+      fieldAllows(manifest, fieldId, "submit"),
+    );
+  }
+  return pending.fieldIds.some((fieldId) =>
+    fieldAllows(manifest, fieldId, "approve"),
+  );
+};
+
+const normalizePendingPatch = (
+  patch: unknown,
+): { financial_terms?: { contract_amount?: string | null } } => {
+  if (typeof patch === "string") {
+    try {
+      return JSON.parse(patch) as {
+        financial_terms?: { contract_amount?: string | null };
+      };
+    } catch {
+      return {};
+    }
+  }
+  return (patch ?? {}) as {
+    financial_terms?: { contract_amount?: string | null };
+  };
+};
+
+const formatContractAmount = (value: unknown): string | null => {
+  if (value == null) {
+    return null;
+  }
+  if (typeof value === "string") {
+    return value.trim() === "" ? null : value;
+  }
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(value);
+  }
+  return String(value);
+};
+
+const verificationPendingFromChange = (
+  pending: PendingChange,
+): JobDetailVerificationPending | undefined => {
+  if (!pending.fieldIds.includes("financial_terms")) {
+    return undefined;
+  }
+  const patch = normalizePendingPatch(pending.patch);
+  return {
+    id: pending.id,
+    financial_terms: {
+      contract_amount: formatContractAmount(
+        patch.financial_terms?.contract_amount,
+      ),
+    },
+  };
+};
+
+/**
+ * Role-split pending overlay (Phase 05): submitter sees proposed values;
+ * reviewer sees `verification_pending` for accept/reject; others unchanged.
+ */
+export const overlayJobDetailVerificationPending = (
+  dto: ProjectedJobDetail,
+  manifest: Manifest,
+  principalId: string,
+  pending: PendingChange | undefined,
+): ProjectedJobDetail => {
+  if (!pending || pending.status !== "submitted") {
+    return dto;
+  }
+  if (!pendingVisibleToPrincipal(manifest, pending, principalId)) {
+    return dto;
+  }
+
+  const verification_pending = verificationPendingFromChange(pending);
+  if (!verification_pending) {
+    return dto;
+  }
+
+  const isSubmitter =
+    pending.submittedBy === principalId &&
+    fieldAllows(manifest, "financial_terms", "submit") &&
+    !fieldAllows(manifest, "financial_terms", "write");
+
+  if (isSubmitter) {
+    return {
+      ...dto,
+      financial_terms: { ...verification_pending.financial_terms },
+      verification_pending,
+    };
+  }
+
+  return { ...dto, verification_pending };
+};
 
 /**
  * Build a Field-keyed DTO from a job row and assignments.

@@ -1,6 +1,6 @@
 # Discovery: PostgreSQL RLS and security
 
-> **Status (2026-05-27): DEFERRED post-v1.** v1 enforcement is **DAL-only**. See [`../scope.md`](../foundations/scope.md). This doc remains the design target for the Phase 4 hardening spike  do not implement in v1.
+> **Status (2026-06-03): Spike and adoption retargeted to Phase 07.** v1 enforcement remains **DAL-only** ([`../foundations/scope.md`](../foundations/scope.md)). **No RLS spikes in Phase 06** ? the pilot job store is in-memory; RLS becomes meaningful with the Postgres job store and multi-company work in Phase 07. Phase 06 still lands **`SET LOCAL` actor binding (T12)** and **`latch_app` connection checks (T5)** on existing Postgres paths (audit, pending, IAM). See [`../phases/06-performance-safety/decisions.md`](../phases/06-performance-safety/decisions.md) and [`../phases/07-scale-out/README.md`](../phases/07-scale-out/README.md). Historical "Phase 4" references below mean **Phase 07**.
 
 Evaluate whether the platform should layer Postgres-native enforcement (RLS, column privileges, views) underneath the DAL as a safety net.
 

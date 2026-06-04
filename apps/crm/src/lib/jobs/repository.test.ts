@@ -222,7 +222,7 @@ describe("createJobsDal.patch", () => {
     expect(store.getJob(SEED_JOB_OWNED)?.contractAmount).toBe("12500.00");
     expect(dto).not.toHaveProperty("financial_terms");
 
-    const pending = pendingStore.getPendingForEntity(SEED_JOB_OWNED, {
+    const pending = await pendingStore.getPendingForEntity(SEED_JOB_OWNED, {
       surfaceId: "job_detail",
       status: "submitted",
     });
@@ -246,7 +246,7 @@ describe("createJobsDal.patch", () => {
       financial_terms: { contract_amount: "18750.00" },
     });
 
-    const pending = pendingStore.getPendingForEntity(SEED_JOB_OWNED, {
+    const pending = await pendingStore.getPendingForEntity(SEED_JOB_OWNED, {
       status: "submitted",
     });
     expect(pending).toHaveLength(1);
@@ -256,7 +256,7 @@ describe("createJobsDal.patch", () => {
 
     expect(dto.financial_terms?.contract_amount).toBe("18750.00");
     expect(store.getJob(SEED_JOB_OWNED)?.contractAmount).toBe("18750.00");
-    expect(pendingStore.getById(pending[0]!.id)?.status).toBe("accepted");
+    expect((await pendingStore.getById(pending[0]!.id))?.status).toBe("accepted");
 
     expect(audit.entries).toHaveLength(1);
     expect(audit.entries[0]).toMatchObject({
@@ -273,6 +273,82 @@ describe("createJobsDal.patch", () => {
     });
     expect(audit.entries[0]?.after).toMatchObject({
       contract_amount: "18750.00",
+    });
+  });
+
+  it("office_admin: rejectPending leaves contract_amount unchanged and audit reject", async () => {
+    setAuditWriter(audit.writer);
+    const store = new MemoryJobStore();
+    seedPilotJobs(store);
+    const pendingStore = createMemoryPendingStore();
+    const dal = createJobsDal(store, pendingStore);
+
+    const techCtx = buildCtx(SEED_TECH_ID, ["field_tech"]);
+    await dal.patch(techCtx, SEED_JOB_OWNED, {
+      financial_terms: { contract_amount: "99999.00" },
+    });
+
+    const pending = await pendingStore.getPendingForEntity(SEED_JOB_OWNED, {
+      status: "submitted",
+    });
+    expect(pending).toHaveLength(1);
+
+    const adminCtx = buildCtx(SEED_ADMIN_ID, ["office_admin"]);
+    await dal.rejectPending(adminCtx, pending[0]!.id, {
+      comment: "Amount not approved",
+    });
+
+    expect(store.getJob(SEED_JOB_OWNED)?.contractAmount).toBe("12500.00");
+    expect((await pendingStore.getById(pending[0]!.id))?.status).toBe("rejected");
+    expect((await pendingStore.getById(pending[0]!.id))?.comment).toBe(
+      "Amount not approved",
+    );
+
+    expect(audit.entries).toHaveLength(1);
+    expect(audit.entries[0]).toMatchObject({
+      actorId: SEED_ADMIN_ID,
+      action: "reject",
+      tableName: "jobs",
+      recordId: SEED_JOB_OWNED,
+      moduleId: "job_detail",
+      fieldIds: ["financial_terms"],
+      approvalId: pending[0]!.id,
+      patch: { financial_terms: { contract_amount: "99999.00" } },
+    });
+  });
+
+  it("field_tech: withdrawPending allows a new submit after withdraw", async () => {
+    setAuditWriter(audit.writer);
+    const store = new MemoryJobStore();
+    seedPilotJobs(store);
+    const pendingStore = createMemoryPendingStore();
+    const dal = createJobsDal(store, pendingStore);
+    const techCtx = buildCtx(SEED_TECH_ID, ["field_tech"]);
+
+    await dal.patch(techCtx, SEED_JOB_OWNED, {
+      financial_terms: { contract_amount: "15000.00" },
+    });
+
+    const first = await pendingStore.getPendingForEntity(SEED_JOB_OWNED, {
+      status: "submitted",
+    });
+    await dal.withdrawPending(techCtx, first[0]!.id);
+
+    expect((await pendingStore.getById(first[0]!.id))?.status).toBe("withdrawn");
+    expect(store.getJob(SEED_JOB_OWNED)?.contractAmount).toBe("12500.00");
+    expect(audit.entries).toHaveLength(0);
+
+    await dal.patch(techCtx, SEED_JOB_OWNED, {
+      financial_terms: { contract_amount: "16000.00" },
+    });
+
+    const open = await pendingStore.getPendingForEntity(SEED_JOB_OWNED, {
+      status: "submitted",
+    });
+    expect(open).toHaveLength(1);
+    expect(open[0]?.id).not.toBe(first[0]!.id);
+    expect(open[0]?.patch).toEqual({
+      financial_terms: { contract_amount: "16000.00" },
     });
   });
 
@@ -537,6 +613,86 @@ describe("createJobsDal.bulkUpdate", () => {
     );
 
     expect(audit.entries.filter((e) => e.action === "update")).toHaveLength(1);
+  });
+
+  it("field_tech: bulk financial_terms → per-row pending, shared batch_id; live unchanged", async () => {
+    setAuditWriter(audit.writer);
+    const store = new MemoryJobStore();
+    seedPilotJobs(store);
+    const pendingStore = createMemoryPendingStore();
+    const jobIds = seedBulkJobs(store, 2);
+    for (const id of jobIds) {
+      store.addAssignment({ jobId: id, userId: SEED_TECH_ID });
+    }
+    const dal = createJobsDal(store, pendingStore);
+    const ctx = buildListCtx(SEED_TECH_ID, ["field_tech"]);
+
+    const result = await dal.bulkUpdate(ctx, jobIds, {
+      financial_terms: { contract_amount: "22000.00" },
+    });
+
+    expect(result.succeeded).toEqual(jobIds);
+    expect(result.skipped).toHaveLength(0);
+
+    for (const id of jobIds) {
+      expect(store.getJob(id)?.contractAmount).toBe("1000.00");
+      const pending = await pendingStore.getPendingForEntity(id, {
+        surfaceId: "job_list",
+        status: "submitted",
+      });
+      expect(pending).toHaveLength(1);
+      expect(pending[0]?.patch).toEqual({
+        financial_terms: { contract_amount: "22000.00" },
+      });
+      expect(pending[0]?.batchId).toBeDefined();
+    }
+
+    const batchIds = new Set(
+      (
+        await Promise.all(
+          jobIds.map((id) =>
+            pendingStore.getPendingForEntity(id, {
+              surfaceId: "job_list",
+              status: "submitted",
+            }),
+          ),
+        )
+      )
+        .flat()
+        .map((p) => p.batchId),
+    );
+    expect(batchIds.size).toBe(1);
+    expect(audit.entries).toHaveLength(0);
+  });
+
+  it("field_tech: bulk financial skips row with open pending (forbidden_row)", async () => {
+    const store = new MemoryJobStore();
+    seedPilotJobs(store);
+    const pendingStore = createMemoryPendingStore();
+    const dal = createJobsDal(store, pendingStore);
+    const ctx = buildListCtx(SEED_TECH_ID, ["field_tech"]);
+
+    await pendingStore.submit({
+      surfaceId: "job_list",
+      entityId: SEED_JOB_OWNED,
+      fieldIds: ["financial_terms"],
+      patch: { financial_terms: { contract_amount: "15000.00" } },
+      submittedBy: SEED_TECH_ID,
+    });
+
+    const result = await dal.bulkUpdate(ctx, [SEED_JOB_OWNED, SEED_JOB_OTHER], {
+      financial_terms: { contract_amount: "30000.00" },
+    });
+
+    expect(result.succeeded).toHaveLength(0);
+    expect(result.skipped).toContainEqual({
+      id: SEED_JOB_OWNED,
+      reason: "forbidden_row",
+    });
+    expect(result.skipped).toContainEqual({
+      id: SEED_JOB_OTHER,
+      reason: "not_found",
+    });
   });
 
   it("forbidden_field when patch Field is submit-only (not write)", async () => {

@@ -1,7 +1,7 @@
 export { createSurfaceDal } from "./create-surface-dal.js";
 export type { SurfaceDal, SurfaceDalDeps } from "./create-surface-dal.js";
 
-export type { SurfaceDescriptor, PendingWriteHook, SurfaceCapability } from "./surface-descriptor.js";
+export type { SurfaceDescriptor, SurfaceCapability } from "./surface-descriptor.js";
 
 export type { StoreAdapter, ListQuery, ListResult } from "./store-adapter.js";
 
@@ -14,3 +14,9 @@ export type { PendingStore } from "@latch/approval";
 export { createMemoryPendingStore } from "@latch/approval";
 
 export type { BulkUpdateResult } from "@latch/contracts";
+
+export {
+  bindPermissionSession,
+  LATCH_DEFAULT_COMPANY_ID,
+  withPermissionDb,
+} from "@latch/audit";

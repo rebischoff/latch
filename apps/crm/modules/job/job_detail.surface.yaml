@@ -24,6 +24,7 @@ fields:
 
   - id: financial_terms
     sensitivity: high
+    requires_verification: true
     columns:
       - jobs.contract_amount
 

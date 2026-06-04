@@ -2,7 +2,7 @@
 
 > **The "quarterback" file.** When in doubt, start here. Always read this first.
 > This is the **global pointer**: it names the **active phase**. Detailed, per-phase status lives in each phase's own `STATUS.md`.
-> Updated: 2026-06-02 (Phase 05 active).
+> Updated: 2026-06-03 (Phase 06 complete; Phase 07 deferred).
 
 ---
 
@@ -17,14 +17,18 @@
 
 ## Active phase
 
-### → Phase 05 — Verification (accept/reject, pending store)
+### → Phase 07 — Scale-out (multi-company, RLS, publish packages) — **deferred**
 
 | | |
 |---|---|
-| **Plan** | [`docs/phases/05-verification/README.md`](./docs/phases/05-verification/README.md) |
-| **Phase STATUS** | [`docs/phases/05-verification/STATUS.md`](./docs/phases/05-verification/STATUS.md) |
-| **Focus** | Persist `latch_pending_changes`; metadata-driven verification gates; reviewer accept/reject + audit (`approve`). |
-| **Do next** | [`docs/phases/05-verification/README.md`](./docs/phases/05-verification/README.md) — definition of done and sub-goals; in-memory pending store is the starting gap. |
+| **Plan** | [`docs/phases/07-scale-out/README.md`](./docs/phases/07-scale-out/README.md) |
+| **Phase STATUS** | [`docs/phases/07-scale-out/STATUS.md`](./docs/phases/07-scale-out/STATUS.md) |
+| **Focus** | Company routing, Postgres job store, RLS spikes/adoption (carried from Phase 06), business-table audit triggers, `@latch/*` publish. |
+| **Do next** | Not scheduled. Pull when a real driver appears (second company, second app, or external package consumer). |
+
+> **Phase 06 (Performance & safety) complete (2026-06-03)** — `manifestCacheMode` (`none` / `request` / `ttl`); `policyVersion` invalidation; request-scoped cache on reads, fresh resolve on writes (T3); T5 `latch_app` + T12 `SET LOCAL` on audit/pending/IAM PG paths; RLS deferred to Phase 07. See [`docs/phases/06-performance-safety/STATUS.md`](./docs/phases/06-performance-safety/STATUS.md).
+
+> **Phase 05 (Verification) complete (2026-06-03)** — `latch_pending_changes` persisted store; metadata-driven `requires_verification`; accept/reject/withdraw API + audit; bulk pending with `batch_id`; T7/T10 + e2e harness in CI. See [`docs/phases/05-verification/STATUS.md`](./docs/phases/05-verification/STATUS.md).
 
 > **Phase 04 (Audit & lifecycle) complete (2026-06-02)** — T6 immutability + T16 delete audit in CI; hard delete + CASCADE snapshots; `restoreFromAuditEntry` + e2e restore; retention seam. See [`docs/phases/04-audit-lifecycle/STATUS.md`](./docs/phases/04-audit-lifecycle/STATUS.md).
 
@@ -54,9 +58,9 @@ To switch focus (a "change order"), re-point this section at another phase folde
 | [02 UI sync](./docs/phases/02-ui-sync/STATUS.md) | `<Can>`/`<FieldControl>`, `customer_detail` | complete |
 | [03 Identity & IAM](./docs/phases/03-identity-iam/STATUS.md) | users/roles in DB, IAM + Data master, auth | complete |
 | [04 Audit & lifecycle](./docs/phases/04-audit-lifecycle/STATUS.md) | full audit, hard delete + recovery | complete |
-| **[05 Verification](./docs/phases/05-verification/STATUS.md)** | accept/reject, verification gates | **active** (partial) |
-| [06 Performance & safety](./docs/phases/06-performance-safety/STATUS.md) | manifest cache, RLS surface-gate | not started |
-| [07 Scale-out](./docs/phases/07-scale-out/STATUS.md) | multi-company, publish packages | deferred |
+| [05 Verification](./docs/phases/05-verification/STATUS.md) | accept/reject, verification gates | complete |
+| [06 Performance & safety](./docs/phases/06-performance-safety/STATUS.md) | manifest cache, T5/T12 connection safety | complete |
+| **[07 Scale-out](./docs/phases/07-scale-out/STATUS.md)** | multi-company, RLS, Postgres job store, publish | **deferred** |
 
 ---
 
@@ -66,7 +70,7 @@ To switch focus (a "change order"), re-point this section at another phase folde
 |---|---|
 | Docs | Reorganized into `foundations` / `reference` / `phases` / `discovery` / `archive` (2026-05-29) |
 | Code | `job_detail` + `customer_detail` stacks proven end-to-end in `apps/crm` |
-| Tests | `npm run test` — contracts, policy, dal, audit, e2e, threat |
+| Tests | `npm run test` — contracts, policy, dal, audit, e2e, threat, performance-safety |
 | CI | GitHub Actions on `main` PRs |
 
 ---

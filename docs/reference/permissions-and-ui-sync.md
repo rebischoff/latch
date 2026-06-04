@@ -146,6 +146,41 @@ User has `write` on `title` only → validation error or 403; DAL never updates 
 
 **Rationale:** UI manifest is a **rendering cache**, not a security token.
 
+### Decision: server-side manifest cache (2026-06-03)
+
+**Choice:** `PolicyService.resolve` may be wrapped by a cache (`CachingPolicyService` / `createManifestCache`) controlled by global option **`manifestCacheMode`** (CRM default **`request`**).
+
+| Mode | Behavior |
+|------|----------|
+| `none` | No cache; every read calls `resolve` |
+| `request` | One resolved manifest per cache key per HTTP/RSC request |
+| `ttl` | In-process LRU/TTL keyed by `policyVersion` |
+| `session` | Seam only — deferred |
+
+**Invariant:** Cache holds **resolved `Manifest` objects only**. It does **not** replace `PermissionContext`, DAL narrowing, strict writes, or forbidden-field omission.
+
+**Writes:** Always bypass the read cache (`stalePolicyOnWrite: recheck`). Mutations (`patch`, `delete`, `acceptPending`, bulk) call `resolve` fresh regardless of mode.
+
+**Cache key:** `(principalId, policyVersion, surfaceId, mode, entityId?)`
+
+- `policyVersion` comes from `latch_policy_version` (bumped on IAM role assign/revoke) and is copied onto `Principal`.
+- `mode` (`list` / `detail` / `create`) is required — same surface id resolves differently per mode.
+- `entityId` only for entity-scoped detail; list/create omit it.
+
+**Invalidation:** IAM role change bumps `policyVersion` → TTL entries with the old version miss; request-scoped entries die with the request. Stub principals without `policyVersion` use a documented sentinel bucket (task **04**).
+
+**Storage seam:** `ManifestCacheStore` (`get` / `set` / `deleteByVersion`); Phase 06 ships **in-memory** only. Redis / shared cache = Phase 07+.
+
+**Security tier (future):** v1 is single-tier (`request` for CRM). Document env mapping for a future `securityTier`; no multi-tier impl in Phase 06.
+
+See [`../phases/06-performance-safety/decisions.md`](../phases/06-performance-safety/decisions.md), [`../foundations/global-options.md`](../foundations/global-options.md).
+
+### Decision: `policyVersion` on manifest (2026-06-03)
+
+**Choice:** Optional **`manifest.policyVersion`** echo of the version used at resolve time — for future client strict mode, not required in Phase 06 UI.
+
+**Strict write 409 (deferred):** Requiring the client to send `policyVersion` on writes and returning **409** when it lags admin changes is **out of Phase 06**. v1 denied writes after fresh re-resolve return **403**. Phase 06 proves correctness via threat **T3** (cached read + revoke/bump → write 403).
+
 ## Decision: RBAC with built-in roles (2026-05)
 
 **Choice:**

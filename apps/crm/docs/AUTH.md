@@ -62,6 +62,8 @@ Next.js 16: use layouts and route handlers, not `middleware.ts`, for auth guaran
 | `/api/health` | Public |
 | Server Actions / API (mutations) | `requireSession()` before DAL |
 | `/api/iam/*` | `requireSession()` + `iam_master` manifest |
+| `/api/pending` | `requireSession()` + `job_detail` manifest (v1: `surface=job_detail` + `entity_id`; list per entity) |
+| `/api/pending/:id/accept` \| `reject` \| `withdraw` | `requireSession()`; pending id → `job_detail` entity context, then DAL |
 
 ## IAM API (`user_roles_detail`)
 

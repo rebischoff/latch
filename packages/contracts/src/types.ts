@@ -21,6 +21,11 @@ export type RoleId = string;
 export interface Principal {
   id: string;
   roles: RoleId[];
+  /**
+   * Global policy generation from `latch_policy_version` (Postgres).
+   * Omitted for stub principals (`LATCH_STUB_*`) and when `DATABASE_URL` is unset.
+   */
+  policyVersion?: number;
 }
 
 /** Row filter applied by the DAL after policy resolution. */
@@ -32,6 +37,8 @@ export type RowScope = "own" | "all";
  */
 export interface Manifest {
   surface: SurfaceId;
+  /** Echo of `Principal.policyVersion` at resolve time (future UI strict mode). */
+  policyVersion?: number;
   /** Present in detail/edit scope when anchored to one record. */
   entityId?: string;
   /** Surface-level actions (e.g. open detail, delete surface). */

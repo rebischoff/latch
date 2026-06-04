@@ -8,6 +8,22 @@ export const fieldAllows = (
   action: FieldAction,
 ): boolean => manifest.fields[fieldId]?.includes(action) ?? false;
 
+const UI_VISIBLE_FIELD_ACTIONS: FieldAction[] = [
+  "read",
+  "write",
+  "submit",
+  "approve",
+];
+
+/** True when the Field should appear in the UI (any actionable or readable grant). */
+export const fieldVisibleForUi = (
+  manifest: Manifest,
+  fieldId: FieldId,
+): boolean =>
+  UI_VISIBLE_FIELD_ACTIONS.some((action) =>
+    fieldAllows(manifest, fieldId, action),
+  );
+
 export const surfaceAllows = (
   manifest: Manifest,
   action: FieldAction,

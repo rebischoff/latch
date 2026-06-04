@@ -6,7 +6,7 @@
 
 1. **DAL is the only app path to data** — routes and Server Actions call `@latch/dal`, never Drizzle directly from UI/route code.
 2. **Schema home** — `apps/crm/db/` (Drizzle schema + seed + store) and `apps/crm/migrations/` (SQL).
-3. **Tables** — CRM owns `jobs`, `assignments`, `latch_users`, `latch_user_roles`, `customers`, `sites`. `@latch/audit` still owns `latch_audit`.
+3. **Tables** — CRM owns `jobs`, `assignments`, `latch_users`, `latch_user_roles`, `customers`, `sites`, `latch_pending_changes`. `@latch/audit` still owns `latch_audit`.
 
 ## Environments
 
@@ -29,19 +29,25 @@ See [`../../../docs/foundations/development.md`](../../../docs/foundations/devel
 | | `psql "$DATABASE_URL" -f apps/crm/migrations/004_latch_user_roles.sql` |
 | 5 | Apply `apps/crm/migrations/005_latch_app_role.sql` — role **`latch_app`**, business-table CRUD, **`INSERT` only** on `latch_audit` |
 | | `psql "$DATABASE_URL" -f apps/crm/migrations/005_latch_app_role.sql` (run as DB owner / migration role) |
+| 6 | Apply `apps/crm/migrations/006_latch_pending_changes.sql` — `latch_pending_changes` + `latch_app` grants |
+| | `psql "$DATABASE_URL" -f apps/crm/migrations/006_latch_pending_changes.sql` |
+| 7 | Apply `apps/crm/migrations/007_latch_policy_version.sql` — `latch_policy_version` + `latch_app` grants |
+| | `psql "$DATABASE_URL" -f apps/crm/migrations/007_latch_policy_version.sql` |
 
 ### Application role (`latch_app`)
 
 | Connection | Role | Use |
 |------------|------|-----|
-| **Owner / migrate** | Neon project owner, Docker `latch` user, etc. | `npm run db:migrate`, applying SQL migrations **001–005** |
+| **Owner / migrate** | Neon project owner, Docker `latch` user, etc. | `npm run db:migrate`, applying SQL migrations **001–007** (CI runs all `apps/crm/migrations/*.sql` in order) |
 | **App runtime** | **`latch_app`** | `DATABASE_URL` in Vercel preview/production and anywhere the CRM app mutates data |
 
 Migration **005** creates `latch_app` with:
 
 - **`SELECT` / `INSERT` / `UPDATE` / `DELETE`** on business tables (`jobs`, `assignments`, `latch_users`, `latch_user_roles`, `customers`, `sites`).
 - **`INSERT` only** on `latch_audit` (plus sequence usage for `id`). **`UPDATE` / `DELETE` revoked** on `latch_audit`.
-- Existing **`latch_audit_deny_mutation`** trigger remains (belt + suspenders per [Phase 04 T6 decision](../../../docs/phases/04-audit-lifecycle/decisions.md)).
+- **`SELECT` / `INSERT` / `UPDATE`** on `latch_pending_changes` (migration **006**). **No `DELETE`** — pending rows are terminal-immutable in the DAL (Phase 05 T7); optional DB trigger deferred.
+- **`SELECT` / `UPDATE`** on `latch_policy_version` (migration **007**) — global manifest-cache generation counter.
+- Existing **`latch_audit_deny_mutation`** trigger remains (belt & suspenders per [Phase 04 T6 decision](../../../docs/phases/04-audit-lifecycle/decisions.md)).
 
 **Production must not** use the database owner or superuser for app `DATABASE_URL` — that bypasses T6 role grants. Local dev may keep an owner URL for migrations while the app still uses in-memory job data; when testing Postgres audit writes, prefer `latch_app` after step 5.
 
@@ -50,7 +56,7 @@ Pilot default password in **005** is `latch_app` (Docker / CI only). Rotate on r
 | Variable | Purpose |
 |----------|---------|
 | `DATABASE_URL` | App connection (production: **`latch_app`**) |
-| `LATCH_APP_DATABASE_URL` | Optional override for threat test **T6** in CI/local (`postgresql://latch_app:latch_app@…`) |
+| `LATCH_APP_DATABASE_URL` | Optional override for DB-gated threat tests **T5** / **T6** in CI/local (`postgresql://latch_app:latch_app@…`). CI sets this after migration **005**; production should use `latch_app` in `DATABASE_URL` directly. |
 
 ### `latch_user_roles`
 
@@ -70,6 +76,55 @@ Composite primary key `(user_id, role_id)`. No `roles` table in v1 — catalog i
 | `SEED_IAM_ID` (optional QA) | `seed-iam-admin` | `iam_master` |
 
 `data_master` is **not** seeded on pilot users (dedicated QA login only).
+
+### `latch_pending_changes` (Phase 05)
+
+Verification queue for gated Fields (`requires_verification` in Surface YAML). Canonical decisions: [Phase 05 decisions](../../../docs/phases/05-verification/decisions.md) · [`approval-trails.md`](../../../docs/reference/approval-trails.md).
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | `UUID` PK | Same id as `latch_audit.approval_id` on accept |
+| `surface_id` | `TEXT` NOT NULL | Surface id (e.g. `job_detail`) |
+| `entity_id` | `TEXT` NOT NULL | Anchor row id |
+| `field_ids` | `TEXT[]` NOT NULL | Gated Field ids in this bundle (all-or-nothing) |
+| `patch` | `JSONB` NOT NULL | Proposed values (strict shape at DAL) |
+| `status` | `TEXT` NOT NULL | See **Status enum** below |
+| `submitted_by` | `TEXT` NOT NULL | Principal id |
+| `submitted_at` | `TIMESTAMPTZ` NOT NULL | |
+| `decided_by` | `TEXT` | Reviewer or submitter (withdraw) |
+| `decided_at` | `TIMESTAMPTZ` | Set on terminal transition |
+| `comment` | `TEXT` | Optional reject / withdraw note |
+| `batch_id` | `UUID` | Shared id when created from bulk; nullable for single patch |
+| `supersedes_id` | `UUID` | FK → `latch_pending_changes.id`; prior row after reject/resubmit |
+
+**Status enum:** `submitted` | `accepted` | `rejected` | `withdrawn` (CHECK constraint in migration **006**).
+
+**Concurrency:** at most one row with `status = 'submitted'` per `(surface_id, entity_id)` — partial unique index `latch_pending_changes_one_submitted_per_entity`. Second submit while open → **409** at DAL.
+
+**Indexes:** `(surface_id, entity_id, status)` for entity-scoped listing (`latch_pending_changes_surface_entity_status_idx`).
+
+**Immutability (v1):** after a terminal status, the DAL refuses further updates; no app-facing DELETE. Postgres store lands in task **07**; DAL routing in task **06**.
+
+### `latch_policy_version` (Phase 06)
+
+Single-row counter for manifest cache invalidation. Canonical decisions: [Phase 06 decisions](../../../docs/phases/06-performance-safety/decisions.md).
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | `SMALLINT` PK | Always `1` (`CHECK (id = 1)`) |
+| `version` | `BIGINT` NOT NULL | Starts at `1`; bumped on IAM role assign/revoke |
+
+**Bump (v1):** `UPDATE latch_policy_version SET version = version + 1 WHERE id = 1` from [`bumpPolicyVersion`](../../src/lib/iam/policy-version.ts) after `user_roles_detail` patches that include `role_assignments` ([`createIamDal`](../../src/lib/iam/repository.ts)).
+
+**Manual bump (YAML policy changes):** When repo `*.policies.yaml` changes without an IAM role change, bump manually so cached manifests invalidate:
+
+```sql
+UPDATE latch_policy_version SET version = version + 1 WHERE id = 1;
+```
+
+Or: `psql "$DATABASE_URL" -c "UPDATE latch_policy_version SET version = version + 1 WHERE id = 1;"`
+
+**Principal:** [`getPrincipal`](../../src/lib/auth/getPrincipal.ts) loads `version` into `Principal.policyVersion` when `DATABASE_URL` is set. Stub principals (`LATCH_STUB_USER` / `LATCH_STUB_ROLE`, no session) **omit** `policyVersion` — the manifest cache uses `undefined` as its own key bucket (see [permissions-and-ui-sync.md](../../../docs/reference/permissions-and-ui-sync.md)).
 
 ## Store selection (implementation)
 
@@ -152,7 +207,7 @@ Privileged replay — **not** a tombstone column. Canonical contract: [Phase 04 
 4. **Store:** replay INSERTs into the pilot **memory** store (local dev). Postgres is used to **read** the audit row and **append** the `restore` audit entry when `DATABASE_URL` is set.
 5. **Outcomes:** success → anchor + embedded children (e.g. `assignments`) visible again + new `restore` audit row; live row already present → **409**; no `restore` grant → **403**.
 
-**App role (`latch_app`):** See [Application role](#application-role-latch_app) above. CI sets `LATCH_APP_DATABASE_URL` and runs threat **T6** as `latch_app` after migration **005**.
+**App role (`latch_app`):** See [Application role](#application-role-latch_app) above. CI sets `LATCH_APP_DATABASE_URL` and runs threat **T5** (non-superuser `current_user`) and **T6** (audit immutability) as `latch_app` after migration **005**.
 
 ## Audit retention (v1 seam)
 

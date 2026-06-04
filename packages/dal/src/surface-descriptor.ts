@@ -9,18 +9,6 @@ import type {
 
 export type SurfaceCapability = "detail" | "list";
 
-/** Routes a field patch to the pending store instead of a direct row write. */
-export type PendingWriteHook = {
-  test: (ctx: PermissionContext, patch: Record<string, unknown>) => boolean;
-  fieldIds: readonly FieldId[];
-  extractPendingPatch: (
-    patch: Record<string, unknown>,
-  ) => Record<string, unknown>;
-  stripFromDirectPatch: (
-    patch: Record<string, unknown>,
-  ) => Record<string, unknown>;
-};
-
 /**
  * Consumer-supplied surface metadata for the DAL kernel.
  * Field ids, column mapping, projection, patch application, and hooks live here.
@@ -60,7 +48,11 @@ export type SurfaceDescriptor<TRow, TRelated = unknown> = {
   ) => Record<string, unknown>;
 
   canDelete?: (ctx: PermissionContext) => boolean;
-  pendingWrite?: PendingWriteHook;
+  /**
+   * Fields marked `requires_verification` in Surface YAML (codegen tuple).
+   * DAL routes `submit` ∧ ¬`write` patches to the pending store.
+   */
+  verificationFieldIds?: readonly FieldId[];
 
   /** Optional per-row join data for list surfaces (e.g. `customer_site`). */
   listJoins?: (row: TRow) => Record<string, unknown>;

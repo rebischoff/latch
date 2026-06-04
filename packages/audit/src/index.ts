@@ -15,6 +15,11 @@ export {
 } from "./audit-service.js";
 export type { AuditAction, AuditEntryInput, AuditJson } from "./types.js";
 export {
+  bindPermissionSession,
+  LATCH_DEFAULT_COMPANY_ID,
+  withPermissionDb,
+} from "./permission-db.js";
+export {
   restoreFromAuditEntry,
   type RestoreFromAuditDeps,
   type StoredAuditEntry,

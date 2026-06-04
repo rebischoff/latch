@@ -28,5 +28,9 @@ export default defineConfig({
       "apps/crm/**/*.test.ts",
       "tests/**/*.test.ts",
     ],
+    /** Tests that spy on `PolicyService.resolve` expect no cache unless opted in. */
+    env: {
+      LATCH_MANIFEST_CACHE_MODE: "none",
+    },
   },
 });

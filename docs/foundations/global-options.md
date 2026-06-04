@@ -45,7 +45,37 @@ Platform-wide configuration defaults. Exact storage (env, `<project>_config` tab
 |---|---|---|---|
 | `manifestDelivery` | `rsc_props` | (v1) | Prefer manifest from Server Components. |
 | `navManifestScope` | `minimal` | (v1) | Nav lists only routes the user may open. |
-| `stalePolicyOnWrite` | `recheck` | (v1) | Re-resolve on every mutation; optional strict `policyVersion` ? 409 later. |
+| `manifestCacheMode` | `request` | (v1) | CRM production default. Package supports `none` / `request` / `ttl`; `session` seam-only (throws or falls back to `request`). See Decision below. |
+| `stalePolicyOnWrite` | `recheck` | (v1) | Re-resolve on every mutation; writes **never** use a cached read manifest. Client `policyVersion` → **409** strict mode deferred post–Phase 06. |
+
+### Decision: `manifestCacheMode` (2026-06-03)
+
+**Choice:**
+
+| Mode | v1 behavior |
+|------|-------------|
+| `none` | Always call `PolicyService.resolve` (tests default unless case opts in) |
+| `request` | **CRM production default** — cache per HTTP/RSC request |
+| `ttl` | In-process LRU/TTL; cache key includes `policyVersion`; for future high-traffic surfaces |
+| `session` | **Deferred** — seam exists; not productized until session store designed |
+
+Cache stores **resolved `Manifest` only**; DAL narrowing and `PermissionContext` are unchanged. Distributed cache (Redis) is Phase 07+; v1 ships in-memory `ManifestCacheStore` only.
+
+**CRM env:** `LATCH_MANIFEST_CACHE_MODE` — unset → `request` (production). Vitest sets `none` so resolve-count spies stay accurate unless a suite opts into `request`. See [`apps/crm/docs/CONFIG.md`](../../apps/crm/docs/CONFIG.md).
+
+**Rationale:** Phase 06 performance win without weakening mutation checks. Locked in [`../phases/06-performance-safety/decisions.md`](../phases/06-performance-safety/decisions.md).
+
+### `policyVersion` (Phase 06)
+
+| Topic | Choice |
+|-------|--------|
+| Storage | Single-row `latch_policy_version` (`version BIGINT NOT NULL`, default `1`) in company DB |
+| Bump | `INSERT` / `DELETE` on `latch_user_roles`; optional manual bump when repo YAML policies change |
+| On `Principal` | Included from DB read at session/request start (task **04**) |
+| On `Manifest` | Optional `manifest.policyVersion` echo for future UI strict mode |
+| Invalidation | TTL cache: entries with old version are misses; request cache dies with request |
+
+Cache key: `(principalId, policyVersion, surfaceId, mode, entityId?)` — `mode` is required (`list` / `detail` / `create` resolve differently on the same surface).
 
 ## Approval
 

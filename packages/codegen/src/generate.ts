@@ -123,6 +123,19 @@ export const generateSurfaceFile = (
     )
     .join("\n");
 
+  const verificationFieldIds = surface.fields
+    .filter((field) => field.requires_verification === true)
+    .map((field) => `"${field.id}"`)
+    .join(", ");
+
+  const verificationBlock =
+    verificationFieldIds.length > 0
+      ? `export const ${prefix}VerificationFieldIds = [${verificationFieldIds}] as const;
+export type ${prefix}VerificationFieldId = (typeof ${prefix}VerificationFieldIds)[number];
+
+`
+      : "";
+
   const content = `// DO NOT EDIT — generated from ${sourceBase}
 
 import { z } from "zod";
@@ -133,7 +146,7 @@ ${fieldIdEntries}
 
 export type ${prefix}FieldId = (typeof ${prefix}FieldIds)[keyof typeof ${prefix}FieldIds];
 
-export const ${columnMapName} = {
+${verificationBlock}export const ${columnMapName} = {
 ${columnMapEntries}
 } as const satisfies Record<${prefix}FieldId, readonly string[]>;
 

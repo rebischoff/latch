@@ -14,6 +14,8 @@ export type JobsDetailPayload = {
   job: ProjectedJobDetail;
   manifest: Manifest;
   customerDetailManifest?: Manifest;
+  /** When set, field tech must withdraw before proposing a new amount. */
+  submitterOpenPendingId?: string;
 };
 
 type JobsSplitViewProps = {
@@ -67,6 +69,7 @@ export const JobsSplitView = ({
               job={detail.job}
               manifest={detail.manifest}
               customerDetailManifest={detail.customerDetailManifest}
+              submitterOpenPendingId={detail.submitterOpenPendingId}
             />
           ) : (
             <Empty description="Loading…" />

@@ -1,14 +1,17 @@
 #!/usr/bin/env node
 /**
- * Apply apps/crm/migrations/001_init.sql.
+ * Apply apps/crm/migrations/*.sql in lexical order (matches CI).
  * Loads DATABASE_URL from apps/crm/.env.local first, then the shell env.
  */
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const envLocalPath = resolve("apps/crm/.env.local");
+const migrationsDir = resolve("apps/crm/migrations");
 const checkOnly = process.argv.includes("--check");
+const onlyArg = process.argv.find((a) => a.startsWith("--only="));
+const onlyFile = onlyArg?.slice("--only=".length);
 
 const parseEnvValue = (raw) => {
   let value = raw.trim();
@@ -104,9 +107,30 @@ if (checkOnly) {
   process.exit(0);
 }
 
-const migration = resolve("apps/crm/migrations/001_init.sql");
-const result = spawnSync("psql", ["-d", databaseUrl, "-f", migration], {
-  stdio: "inherit",
-});
+const allMigrations = readdirSync(migrationsDir)
+  .filter((name) => name.endsWith(".sql"))
+  .sort()
+  .map((name) => resolve(migrationsDir, name));
 
-process.exit(result.status ?? 1);
+const migrations = onlyFile
+  ? allMigrations.filter((path) => path.endsWith(onlyFile))
+  : allMigrations;
+
+if (onlyFile && migrations.length === 0) {
+  console.error(`No migration matching --only=${onlyFile}`);
+  process.exit(1);
+}
+
+for (const migration of migrations) {
+  console.log(`Applying ${migration}…`);
+  const result = spawnSync(
+    "psql",
+    ["-d", databaseUrl, "-v", "ON_ERROR_STOP=1", "-f", migration],
+    { stdio: "inherit" },
+  );
+  if (result.status !== 0) {
+    process.exit(result.status ?? 1);
+  }
+}
+
+console.log(`Done (${migrations.length} migration(s)).`);

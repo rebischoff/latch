@@ -16,6 +16,9 @@ Everything that only matters once Latch serves more than one internal app/compan
 |-----------------------|--------------------------------|
 | Company → `DATABASE_URL` routing; per-request client by company | Shared-schema multi-tenancy (`tenant_id`) — rejected by design |
 | Neon branch/provisioning per company | — |
+| **Postgres-backed job store** (replaces `MemoryJobStore`) — prerequisite for RLS | Per-Field RLS / column GRANT explosion — rejected (DAL owns Field masking) |
+| **RLS spikes (A/C/D) + pilot adoption** (coarse row/company gate) — deferred from Phase 06 (2026-06-03) | — |
+| **Business-table audit triggers** (direct-SQL bypass net) — deferred from Phase 06 | — |
 | Publish `@latch/*` packages | — |
 | Additional role-merge modes (`intersection_grants`, `most_restrictive`, `priority`) | — |
 | Partial / per-Field verification; external reviewers | — |
@@ -25,10 +28,23 @@ Everything that only matters once Latch serves more than one internal app/compan
 
 1. The single-company hard-coding becomes a config swap, not a refactor (the per-request client seam already exists).
 2. `@latch/*` packages are publishable with stable `exports` and no server leakage into client bundles.
+3. A Postgres-backed job store lands, enabling RLS as a real defense-in-depth net (the `SET LOCAL` actor binding from Phase 06 is reused).
+
+## RLS (carried from Phase 06, deferred 2026-06-03)
+
+RLS work was deferred out of Phase 06 because the pilot job data is in-memory, so RLS would protect tables the app never reads. When the Postgres job store lands here, run the spikes and adopt selectively:
+
+- **Spike A** — company/row RLS on `jobs` / `assignments` (`SET LOCAL app.principal_id`, assignment-join ownership).
+- **Spike C** — `SECURITY DEFINER` audit-trigger hardening (direct-SQL bypass → audit row).
+- **Spike D** — RLS on `latch_pending_changes` (submitter vs reviewer visibility).
+- **Spike B** — Field-mask views: confirmed **defer permanently** (role-cardinality explosion; DAL owns Field masking).
+
+Findings + design target: [`../../discovery/postgres-rls-and-security.md`](../../discovery/postgres-rls-and-security.md). Decision context: [`../06-performance-safety/decisions.md`](../06-performance-safety/decisions.md).
 
 ## Definition of done
 
 - [ ] Company routing behind a provider; cross-company isolation tested (T9)
+- [ ] Postgres job store replaces `MemoryJobStore`; RLS spikes run and adopt/defer recorded
 - [ ] Packages publish cleanly; client imports remain `contracts`/`react` only
 - [ ] Deferred items promoted here have their own task chains when scheduled
 

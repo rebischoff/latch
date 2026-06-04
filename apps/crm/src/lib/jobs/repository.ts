@@ -47,6 +47,15 @@ export type JobsDal = {
     ctx: PermissionContext,
     pendingId: string,
   ) => Promise<ProjectedJobDetail>;
+  rejectPending: (
+    ctx: PermissionContext,
+    pendingId: string,
+    opts?: { comment?: string },
+  ) => Promise<void>;
+  withdrawPending: (
+    ctx: PermissionContext,
+    pendingId: string,
+  ) => Promise<void>;
   delete: (ctx: PermissionContext, id: string) => Promise<void>;
 };
 
@@ -68,6 +77,10 @@ export const createJobsDal = (
       (await detail.patch(ctx, id, body)) as ProjectedJobDetail,
     acceptPending: async (ctx, pendingId) =>
       (await detail.acceptPending!(ctx, pendingId)) as ProjectedJobDetail,
+    rejectPending: async (ctx, pendingId, opts) =>
+      detail.rejectPending!(ctx, pendingId, opts),
+    withdrawPending: async (ctx, pendingId) =>
+      detail.withdrawPending!(ctx, pendingId),
     delete: detail.delete,
     list: (ctx, opts) => {
       const result = list.list!(ctx, opts);

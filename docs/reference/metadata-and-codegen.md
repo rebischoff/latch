@@ -24,9 +24,23 @@ fields:
     columns: [contracts.title]
   - id: financial_terms
     columns: [contracts.payment_terms, contracts.liability_cap]
+    requires_verification: true
   - id: salary_band
     columns: [contracts.salary_band]
     sensitivity: high
+```
+
+### Decision: `requires_verification` on Field (2026-06-03)
+
+**Choice:** Optional `requires_verification: true` on a Field in `*.surface.yaml`. Codegen emits `${SurfacePascal}VerificationFieldIds` (tuple of Field ids) and `${SurfacePascal}VerificationFieldId` in `generated/<surface>.schema.generated.ts`. Omitted or false → Field is not listed in the constant.
+
+**Rationale:** Structural eligibility for verification is metadata-driven and stable for DAL/tests; runtime routing still requires manifest `submit` ∧ ¬`write` (hybrid gating — see [Phase 05 decisions](../phases/05-verification/decisions.md)).
+
+Example emit (`job_detail`):
+
+```ts
+export const JobDetailVerificationFieldIds = ["financial_terms"] as const;
+export type JobDetailVerificationFieldId = (typeof JobDetailVerificationFieldIds)[number];
 ```
 
 ### Decision: policy bindings in repo (2026-05-27)
@@ -42,6 +56,7 @@ fields:
 | `ContractFieldIds` | Stable constants for policies, UI, audit |
 | `ContractSchema` | Base Zod object (all columns for Module) |
 | `contractColumnMap` | Field ID → physical columns for DAL |
+| `${Surface}VerificationFieldIds` | Field ids with `requires_verification: true` (DAL pending routing) |
 | Optional: RLS policy stubs, migration hints | Later phases |
 
 Example output shape:

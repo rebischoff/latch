@@ -215,4 +215,12 @@ Threat to watch: a bulk implementation that bypasses per-row `writeAudit` will s
 
 ## Relationship to approval
 
-Changes applied via **accept** generate audit with `action = approve` and reference `approval_id`. Rejected pending changes may log `reject` without touching live data.
+Changes applied via **accept** generate audit with `action = approve` and reference `approval_id`. Rejected pending changes log `reject` without touching live data.
+
+### Decision: withdraw audit (2026-06-03)
+
+**Choice:** **No** `latch_audit` row on withdraw. The terminal `latch_pending_changes` row (`status = withdrawn`, `decided_by` / `decided_at`) is the trail. `AuditAction` has no `withdraw` in v1.
+
+**Rationale:** Avoid overloading `reject` for a submitter-initiated cancel; pending storage already records who withdrew and when. Reject comments live on the pending row (`comment` column) and in `reject` audit when a reviewer rejects.
+
+**Canonical detail:** Phase 05 task **08** · [`approval-trails.md`](./approval-trails.md).

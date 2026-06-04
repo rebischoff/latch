@@ -1,7 +1,8 @@
-import type { PendingStore } from "@latch/approval";
+import type { PendingChange, PendingStore } from "@latch/approval";
 import { writeAudit } from "@latch/audit";
 import {
   fieldAllows,
+  ConflictError,
   ForbiddenError,
   narrowPatchSchema,
   NotFoundError,
@@ -13,6 +14,10 @@ import {
 
 import { bulkDelete, bulkUpdate } from "./bulk.js";
 import { canDeleteRow, deleteRowWithAudit } from "./delete-row.js";
+import {
+  assertVerificationDirectWrite,
+  splitVerificationPatch,
+} from "./pending-routing.js";
 import { patchedFieldIds } from "./patch-utils.js";
 import { projectRow } from "./project.js";
 import type { StoreAdapter } from "./store-adapter.js";
@@ -37,6 +42,15 @@ export type SurfaceDal = {
     ctx: PermissionContext,
     pendingId: string,
   ) => Promise<Record<string, unknown>>;
+  rejectPending?: (
+    ctx: PermissionContext,
+    pendingId: string,
+    opts?: { comment?: string },
+  ) => Promise<void>;
+  withdrawPending?: (
+    ctx: PermissionContext,
+    pendingId: string,
+  ) => Promise<void>;
   bulkUpdate?: (
     ctx: PermissionContext,
     ids: string[],
@@ -141,24 +155,39 @@ export const createSurfaceDal = <TRow extends { id: string }, TRelated>(
       return projectEntity(descriptor, store, row, ctx.manifest);
     }
 
-    if (descriptor.pendingWrite?.test(ctx, patchBody) && pendingStore) {
-      pendingStore.submit({
+    const { directPatch, pendingPatch, pendingFieldIds } = splitVerificationPatch(
+      ctx,
+      patchBody,
+      descriptor.verificationFieldIds,
+    );
+
+    if (pendingFieldIds.length > 0) {
+      if (!pendingStore) {
+        throw new ForbiddenError();
+      }
+      const open = await pendingStore.getPendingForEntity(id, {
+        surfaceId: ctx.surface,
+        status: "submitted",
+      });
+      if (open.length > 0) {
+        throw new ConflictError("An open pending change already exists for this entity");
+      }
+      await pendingStore.submit({
         surfaceId: ctx.surface,
         entityId: id,
-        fieldIds: [...descriptor.pendingWrite.fieldIds],
-        patch: descriptor.pendingWrite.extractPendingPatch(patchBody),
+        fieldIds: [...pendingFieldIds],
+        patch: pendingPatch,
         submittedBy: ctx.principal.id,
       });
     }
 
-    const directPatch = descriptor.pendingWrite?.test(ctx, patchBody)
-      ? descriptor.pendingWrite.stripFromDirectPatch(patchBody)
-      : patchBody;
     const directFieldIds = patchedFieldIds(directPatch);
 
     if (directFieldIds.length === 0) {
       return projectEntity(descriptor, store, row, ctx.manifest);
     }
+
+    assertVerificationDirectWrite(ctx, directPatch, descriptor.verificationFieldIds);
 
     const beforeSnapshot = descriptor.auditSnapshot(row);
     const updated = descriptor.applyPatch(row, directPatch);
@@ -186,33 +215,71 @@ export const createSurfaceDal = <TRow extends { id: string }, TRelated>(
     return projectEntity(descriptor, store, updated, ctx.manifest);
   };
 
+  const loadSubmittedPending = async (
+    ctx: PermissionContext,
+    pendingId: string,
+  ): Promise<PendingChange> => {
+    assertSurface(descriptor, ctx);
+
+    const pending = await pendingStore!.getById(pendingId);
+    if (!pending || pending.status !== "submitted") {
+      throw new NotFoundError();
+    }
+
+    if (pending.surfaceId !== ctx.surface) {
+      throw new NotFoundError();
+    }
+
+    return pending;
+  };
+
+  const assertReviewerApprove = (
+    ctx: PermissionContext,
+    pending: PendingChange,
+  ): void => {
+    for (const fieldId of pending.fieldIds) {
+      if (!fieldAllows(ctx.manifest, fieldId, "approve")) {
+        throw new ForbiddenError();
+      }
+    }
+  };
+
+  const assertEntityVisibleForPending = (
+    store: StoreAdapter<TRow, TRelated>,
+    ctx: PermissionContext,
+    entityId: string,
+  ): TRow => {
+    const row = store.get(entityId);
+    if (!row || !rowVisible(store, ctx, entityId)) {
+      throw new NotFoundError();
+    }
+    return row;
+  };
+
+  const assertSubmitterMayWithdraw = (
+    ctx: PermissionContext,
+    pending: PendingChange,
+  ): void => {
+    if (pending.submittedBy === ctx.principal.id) {
+      return;
+    }
+    for (const fieldId of pending.fieldIds) {
+      if (!fieldAllows(ctx.manifest, fieldId, "submit")) {
+        throw new ForbiddenError();
+      }
+    }
+  };
+
   const acceptPending = pendingStore
     ? async (
         ctx: PermissionContext,
         pendingId: string,
       ): Promise<Record<string, unknown>> => {
-        assertSurface(descriptor, ctx);
-
-        const pending = pendingStore.getById(pendingId);
-        if (!pending || pending.status !== "submitted") {
-          throw new NotFoundError();
-        }
-
-        if (pending.surfaceId !== ctx.surface) {
-          throw new NotFoundError();
-        }
-
-        for (const fieldId of pending.fieldIds) {
-          if (!fieldAllows(ctx.manifest, fieldId, "approve")) {
-            throw new ForbiddenError();
-          }
-        }
+        const pending = await loadSubmittedPending(ctx, pendingId);
+        assertReviewerApprove(ctx, pending);
 
         const id = pending.entityId;
-        const row = store.get(id);
-        if (!row || !rowVisible(store, ctx, id)) {
-          throw new NotFoundError();
-        }
+        const row = assertEntityVisibleForPending(store, ctx, id);
 
         const patchBody = pending.patch as Record<string, unknown>;
         const fieldIds = patchedFieldIds(patchBody);
@@ -220,7 +287,17 @@ export const createSurfaceDal = <TRow extends { id: string }, TRelated>(
           throw new ValidationError("Pending change has no fields to apply");
         }
 
+        assertVerificationDirectWrite(ctx, patchBody, descriptor.verificationFieldIds, {
+          applier: true,
+        });
+
         const beforeSnapshot = descriptor.auditSnapshot(row);
+
+        await pendingStore.resolve(pendingId, {
+          status: "accepted",
+          decidedBy: ctx.principal.id,
+        });
+
         const updated = descriptor.applyPatch(row, patchBody);
         store.upsert(updated);
 
@@ -228,11 +305,6 @@ export const createSurfaceDal = <TRow extends { id: string }, TRelated>(
         if (relatedPatch !== undefined) {
           store.replaceRelated(id, relatedPatch);
         }
-
-        pendingStore.resolve(pendingId, {
-          status: "accepted",
-          decidedBy: ctx.principal.id,
-        });
 
         const afterSnapshot = descriptor.auditSnapshot(updated);
 
@@ -250,6 +322,53 @@ export const createSurfaceDal = <TRow extends { id: string }, TRelated>(
         });
 
         return projectEntity(descriptor, store, updated, ctx.manifest);
+      }
+    : undefined;
+
+  const rejectPending = pendingStore
+    ? async (
+        ctx: PermissionContext,
+        pendingId: string,
+        opts?: { comment?: string },
+      ): Promise<void> => {
+        const pending = await loadSubmittedPending(ctx, pendingId);
+        assertReviewerApprove(ctx, pending);
+
+        const id = pending.entityId;
+        assertEntityVisibleForPending(store, ctx, id);
+
+        const patchBody = pending.patch as Record<string, unknown>;
+        const fieldIds = patchedFieldIds(patchBody);
+
+        await pendingStore.resolve(pendingId, {
+          status: "rejected",
+          decidedBy: ctx.principal.id,
+          ...(opts?.comment !== undefined ? { comment: opts.comment } : {}),
+        });
+
+        await writeAudit({
+          actorId: ctx.principal.id,
+          action: "reject",
+          tableName: descriptor.anchorTable,
+          recordId: id,
+          moduleId: ctx.surface,
+          fieldIds,
+          patch: patchBody,
+          approvalId: pendingId,
+        });
+      }
+    : undefined;
+
+  const withdrawPending = pendingStore
+    ? async (ctx: PermissionContext, pendingId: string): Promise<void> => {
+        const pending = await loadSubmittedPending(ctx, pendingId);
+        assertSubmitterMayWithdraw(ctx, pending);
+        assertEntityVisibleForPending(store, ctx, pending.entityId);
+
+        await pendingStore.resolve(pendingId, {
+          status: "withdrawn",
+          decidedBy: ctx.principal.id,
+        });
       }
     : undefined;
 
@@ -322,13 +441,21 @@ export const createSurfaceDal = <TRow extends { id: string }, TRelated>(
     dal.acceptPending = acceptPending;
   }
 
+  if (rejectPending) {
+    dal.rejectPending = rejectPending;
+  }
+
+  if (withdrawPending) {
+    dal.withdrawPending = withdrawPending;
+  }
+
   if (list) {
     dal.list = list;
   }
 
   if (descriptor.capabilities.includes("list")) {
     dal.bulkUpdate = (ctx, ids, patchBody, opts) =>
-      bulkUpdate(descriptor, store, ctx, ids, patchBody, opts);
+      bulkUpdate(descriptor, store, ctx, ids, patchBody, opts, pendingStore);
     dal.bulkDelete = (ctx, ids, opts) =>
       bulkDelete(descriptor, store, ctx, ids, opts);
   }

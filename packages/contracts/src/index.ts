@@ -22,6 +22,7 @@ export type {
 
 export {
   fieldAllows,
+  fieldVisibleForUi,
   narrowPatchSchema,
   narrowSchema,
   patchableFieldIds,
