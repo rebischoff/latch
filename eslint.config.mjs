@@ -4,6 +4,7 @@ import nextTs from "eslint-config-next/typescript";
 
 const nextAppScopes = [
   { files: ["apps/crm/**/*.{js,jsx,ts,tsx,mjs,cjs}"], rootDir: "apps/crm/" },
+  { files: ["apps/test1/**/*.{js,jsx,ts,tsx,mjs,cjs}"], rootDir: "apps/test1/" },
 ];
 
 function scopeToNextApps(configs) {

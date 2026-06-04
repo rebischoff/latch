@@ -107,6 +107,7 @@ Skip E if bulk UI would take more than a few hours — API proof in tests is eno
 
 ## References
 
-- [`LAYOUT.md`](./LAYOUT.md) · [`DATABASE.md`](./DATABASE.md) · [`AUTH.md`](./AUTH.md)
+- [`LAYOUT.md`](./LAYOUT.md) · [`DATABASE.md`](./DATABASE.md) · [`AUTH.md`](./AUTH.md) · [`CONFIG.md`](./CONFIG.md) · [`CODEGEN.md`](./CODEGEN.md)
 - [`../../../docs/reference/crm-and-phases.md`](../../../docs/reference/crm-and-phases.md)
 - [`../../../docs/foundations/scope.md`](../../../docs/foundations/scope.md)
+- Second consumer (learning): [`../../test1/docs/STATUS.md`](../../test1/docs/STATUS.md)

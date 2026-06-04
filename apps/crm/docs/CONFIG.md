@@ -2,6 +2,26 @@
 
 Latch global options for the CRM app are read at bootstrap from environment variables. Canonical defaults: [`docs/foundations/global-options.md`](../../../docs/foundations/global-options.md).
 
+## Per-app environment files
+
+Each runnable app in the monorepo owns its **own** env files under `apps/<app>/`. They are **not** shared at the repo root.
+
+| File | Committed? | Purpose |
+|------|------------|---------|
+| `apps/crm/.env.example` | Yes | Template; copy to `.env.local` |
+| `apps/crm/.env.local` | **No** (gitignored) | Local secrets and `DATABASE_URL` for this app only |
+
+**Why separate files matter**
+
+- **Different databases** — CRM and test1 use separate Neon projects/branches; each app’s `DATABASE_URL` must not overwrite the other’s.
+- **Different auth** — CRM uses Auth.js (`AUTH_SECRET`, `CRM_DEV_PASSWORD`); test1 uses Better Auth (`BETTER_AUTH_*`) on port **3003**. Mixing vars in one root `.env` causes wrong-app logins or migrate scripts targeting the wrong DB.
+- **Tooling paths** — `scripts/db-migrate.mjs` reads `apps/crm/.env.local` by design; test1 will get `db:migrate:test1` reading `apps/test1/.env.local` (task **05**).
+- **Deploy** — Vercel (or similar) sets env per project; one app per deployment matches one env namespace.
+
+Next.js loads `.env*` from the **app directory** when you run `npm -w apps/crm run dev` (or `dev:test1` for test1). No implementation is required in CRM when adding test1; keep CRM vars in `apps/crm/` only.
+
+test1 env matrix: [`../../test1/docs/CONFIG.md`](../../test1/docs/CONFIG.md).
+
 ## Manifest cache (`manifestCacheMode`)
 
 | Env | Global option | Default (CRM prod) | Vitest default |

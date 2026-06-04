@@ -26,6 +26,7 @@ export default defineConfig({
     include: [
       "packages/**/*.test.ts",
       "apps/crm/**/*.test.ts",
+      "apps/test1/**/*.test.ts",
       "tests/**/*.test.ts",
     ],
     /** Tests that spy on `PolicyService.resolve` expect no cache unless opted in. */

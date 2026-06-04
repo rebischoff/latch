@@ -12,7 +12,7 @@
 
 | Environment | `DATABASE_URL` | Notes |
 |-------------|----------------|-------|
-| Local / preview / prod | **Neon** connection string | Set in `apps/crm/.env.local` |
+| Local / preview / prod | **Neon** connection string | Set in `apps/crm/.env.local` (per-app env — see [`CONFIG.md`](./CONFIG.md#per-app-environment-files)) |
 | No Postgres | Omit `DATABASE_URL` | In-memory store + in-memory audit (default for UI-only work) |
 
 See [`../../../docs/foundations/development.md`](../../../docs/foundations/development.md) for Neon setup and `npm run db:migrate`.
