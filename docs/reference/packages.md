@@ -122,6 +122,35 @@ Current state: monorepo scaffold. Migration steps below are historical reference
 - Sample app could move to `apps/trades-crm` if a second app appears (e.g. an admin-only console).
 - Move `packages/*` to a separate publishable repo only when the platform stabilizes (post-v1).
 
+### Decision: extract `@latch/pg-session` when Postgres surface grows (2026-06-04)
+
+**Choice:** **Defer** a new package until extraction is clearly worth the churn. **Do not** move `withPermissionDb` into `@latch/dal` (would force `@latch/audit` / `@latch/approval` to import `dal` — circular with today’s graph). When triggered, extract shared Postgres session binding from [`packages/audit/src/permission-db.ts`](../../packages/audit/src/permission-db.ts) into **`@latch/pg-session`** (preferred name; **`@latch/db`** acceptable if shared pool/Drizzle helpers ship in the same package).
+
+**Exports (target):** `withPermissionDb`, `bindPermissionSession`, `LATCH_DEFAULT_COMPANY_ID`.
+
+**Dependency target:**
+
+```
+@latch/contracts
+@latch/pg-session          ← pg only; no dal / audit / policy
+@latch/policy              ← contracts only (unchanged)
+@latch/audit, @latch/approval, @latch/dal, apps/*  → import pg-session
+```
+
+`@latch/audit` may **re-export** `withPermissionDb` during a deprecation window; new code should import `@latch/pg-session`.
+
+**Trigger — extract when any of:**
+
+1. **Second consumer app** (`apps/test1` or beyond) has **Postgres-backed business `StoreAdapter`s** (not only audit/IAM), so IAM + contacts + audit all import session binding from `@latch/audit` by name.
+2. **Phase 07 RLS** work needs a documented home for session vars + future `SET LOCAL` helpers beyond T12.
+3. **Import confusion** repeats (e.g. “why is role load in audit?”) and a sweep is already planned.
+
+**Not a trigger alone:** test1 task 05 IAM scaffold using `withPermissionDb` — keep status quo until task **10** store wiring or Phase 07.
+
+**Rationale:** Session binding is infrastructure shared by audit, approval, IAM, policy version, and future business stores — not audit domain logic. A bottom-layer package preserves the rule that `@latch/audit` must not import `@latch/dal` while every Postgres path uses the same T12 envelope. `@latch/policy` stays DB-free.
+
+See also: [Phase 06 T12 decision](../phases/06-performance-safety/decisions.md#decision-db-session-vars--t12-2026-06-03), [test1 discussion `05-pg-session-package-home.md`](../../apps/test1/docs/discussions/05-pg-session-package-home.md).
+
 ## Related
 
 - [`STATUS.md`](../../STATUS.md) ? Step 2

@@ -1,4 +1,4 @@
-# test1 — database plan (docs only)
+# test1 — database plan
 
 test1 **owns** its schema, seed, store, and migrations. `@latch/*` packages stay domain-agnostic.
 
@@ -13,7 +13,7 @@ test1 **owns** its schema, seed, store, and migrations. `@latch/*` packages stay
 | Environment | `DATABASE_URL` | Notes |
 |-------------|----------------|-------|
 | Local / preview / prod | Neon connection string | `apps/test1/.env.local` |
-| No Postgres (early dev) | Omit URL | In-memory store acceptable until task 05 |
+| No Postgres (early dev) | Omit URL | In-memory user/role store until task 05 wiring |
 
 Setup: [`docs/foundations/development.md`](../../../docs/foundations/development.md). CRM reference: [`apps/crm/docs/DATABASE.md`](../../crm/docs/DATABASE.md).
 
@@ -26,33 +26,78 @@ Reuse Phase 06 convention:
 | Owner / migrate | Neon owner | `npm run db:migrate:test1` |
 | App runtime | `latch_app` | `DATABASE_URL` in dev/prod |
 
-- Business tables: `SELECT` / `INSERT` / `UPDATE` / `DELETE`
+- Business tables (task 10+): `SELECT` / `INSERT` / `UPDATE` / `DELETE`
 - `latch_audit`: `INSERT` only
 - `latch_pending_changes`: deferred for test1 v1 unless verification added later
 
-## Table sketch (not migrations yet)
+**Production must not** use the database owner for app `DATABASE_URL`. Migration **002** reads `LATCH_APP_ROLE_PASSWORD` from `apps/test1/.env.local` (Neon requires a strong password; Docker / CI may omit it and use the `latch_app` default). Rotate on real deployments.
 
-### Latch platform tables
+| Variable | Purpose |
+|----------|---------|
+| `DATABASE_URL` | App connection (production: **`latch_app`**) |
+| `LATCH_APP_DATABASE_URL` | Optional override for DB-gated tests as `latch_app` |
 
-| Table | Purpose |
-|-------|---------|
-| `latch_users` | Identity rows (id, display_name, login email) |
-| `latch_roles` | **New vs CRM** — role definitions (`id`, `display_name`, `kind`: `system` \| `custom`) |
-| `latch_user_roles` | User ↔ role assignment (composite PK) |
-| `latch_role_grants` | **New** — `(role_id, surface_id, field_id NULL, actions[], effect?)` |
-| `latch_role_row_scope` | **Optional** — `(role_id, surface_id, row_scope)` |
-| `latch_policy_version` | Manifest cache invalidation counter |
-| `latch_audit` | Append-only audit log |
+## Migration plan
 
-### Business tables (TBD in task 10)
+| Step | Action |
+|------|--------|
+| 1 | `001_init.sql` — `latch_users`, `latch_user_roles`, `latch_audit`, `latch_policy_version` + admin seed |
+| 2 | `002_latch_app_role.sql` — role **`latch_app`**, platform-table grants, audit INSERT-only |
+| 3 | Business tables — with first Surface (task 10) |
+| 4 | `latch_roles` + grants — task 20–21 |
 
-| Table | Surface anchor |
-|-------|----------------|
-| `contacts` | `contact` |
-| `projects` | `project` |
-| `tasks` | `task` |
+```bash
+# From repo root (reads apps/test1/.env.local)
+npm run db:migrate:test1
+npm run db:check:test1
+```
 
-Exact columns defined when first Surface YAML lands (task 10).
+Local Docker (optional):
+
+```bash
+npm run db:docker:up
+# apps/test1/.env.local:
+# DATABASE_URL=postgresql://latch:latch@localhost:5432/latch
+npm run db:migrate:test1
+```
+
+## Platform tables (task 05)
+
+### `latch_users`
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | `TEXT` PK | Stable `Principal.id` (e.g. `seed-admin`) |
+| `display_name` | `TEXT` NOT NULL | UI label |
+| `login_email` | `TEXT` NOT NULL UNIQUE | Better Auth email → latch user id |
+| `created_at` | `TIMESTAMPTZ` | Default `now()` |
+
+Better Auth user rows are separate from `latch_users` in v1 (no sync plugin). `getPrincipal()` resolves `Principal.id` by `login_email`.
+
+### `latch_user_roles`
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `user_id` | `TEXT` | FK → `latch_users.id`, `ON DELETE CASCADE` |
+| `role_id` | `TEXT` | Policy catalog key (e.g. `iam_master`) |
+
+Composite primary key `(user_id, role_id)`. No `latch_roles` table until task 20.
+
+**Seed data:** `apps/test1/db/seed.ts` mirrors `001_init.sql`.
+
+| Login | User id | Role(s) |
+|-------|---------|---------|
+| `admin@test1.local` | `seed-admin` | `iam_master`, `data_master` |
+| `user@test1.local` | `seed-user` | (custom role — task 20) |
+| `readonly@test1.local` | `seed-readonly` | (custom role — task 20) |
+
+### `latch_audit`
+
+Append-only audit log. Immutability enforced by trigger (invariant §6). App role: `INSERT` only.
+
+### `latch_policy_version`
+
+Single-row counter (`id = 1`) for manifest cache invalidation. `latch_app` may `SELECT` / `UPDATE`. Wired in task **90**.
 
 ## Phased storage
 
@@ -61,21 +106,6 @@ Exact columns defined when first Surface YAML lands (task 10).
 | Learn loop | 10–12 | Repo `*.policies.yaml` (like CRM) |
 | DB RBAC | 20–23 | Grants in `latch_role_grants`; `@latch/policy` loader extension (task 22) |
 
-## Seed data (planned)
-
-- System roles: `iam_master`, `data_master` in `latch_roles`
-- Seed users per [AUTH.md](./AUTH.md)
-- Sample business rows for click-testing after task 10
-
-## Migration plan (future — task 05)
-
-| Step | Action |
-|------|--------|
-| 1 | `001_init.sql` — users, audit, policy_version |
-| 2 | `002_latch_app_role.sql` — app runtime role |
-| 3 | Business tables — with first Surface (task 10) |
-| 4 | `latch_roles` + grants — task 20–21 |
-
 ## Related
 
-- [PLAN.md](./PLAN.md) · [CONFIG.md](./CONFIG.md) · [decisions.md](./decisions.md)
+- [PLAN.md](./PLAN.md) · [CONFIG.md](./CONFIG.md) · [AUTH.md](./AUTH.md) · [decisions.md](./decisions.md)

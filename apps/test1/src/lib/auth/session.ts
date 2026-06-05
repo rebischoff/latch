@@ -2,4 +2,5 @@
 export type SessionPayload = {
   userId: string;
   label: string;
+  email: string;
 };

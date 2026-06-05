@@ -1,5 +1,11 @@
 import type { Pool, PoolClient } from "pg";
 
+/**
+ * Postgres transaction + `SET LOCAL` actor binding (T12).
+ * Interim home: `@latch/audit` — extract to `@latch/pg-session` when triggers in
+ * docs/reference/packages.md#decision-extract-latchpg-session-when-postgres-surface-grows-2026-06-04.
+ */
+
 /** v1 single-company id bound as `app.company_id` (Phase 07 multi-co replaces). */
 export const LATCH_DEFAULT_COMPANY_ID = "default";
 

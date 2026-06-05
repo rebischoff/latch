@@ -1,6 +1,6 @@
 # 05 — Neon migrations skeleton
 
-> **Status:** Not scheduled. Next: [10-contact-surface.md](./10-contact-surface.md).
+> **Status:** Complete (2026-06-04). Next: [10-contact-surface.md](./10-contact-surface.md).
 
 ## Goal
 
@@ -34,10 +34,10 @@ Neon-ready migration path: `latch_users`, `latch_user_roles`, `latch_audit`, `la
 
 ## Verify (stop gate)
 
-- [ ] Migrations apply on fresh Neon DB
-- [ ] Logged-in admin has `iam_master` in `getPrincipal().roles` from DB
-- [ ] App connects as `latch_app` documented for production
-- [ ] [../STATUS.md](../STATUS.md) → **10-contact-surface.md**
+- [x] Migrations apply on fresh Neon DB (`DATABASE_URL` + `LATCH_APP_ROLE_PASSWORD` in `apps/test1/.env.local`; `npm run db:migrate:test1`)
+- [x] Logged-in admin has `iam_master` in `getPrincipal().roles` from DB
+- [x] App connects as `latch_app` documented for production
+- [x] [../STATUS.md](../STATUS.md) → **10-contact-surface.md**
 
 ## Out of scope
 

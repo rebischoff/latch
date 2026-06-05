@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { SEED_ADMIN_EMAIL, SEED_ADMIN_ID } from "../../../db/seed";
+
 import { getPrincipal } from "./getPrincipal";
 import * as providerSession from "./provider-session";
 
@@ -15,15 +17,16 @@ describe("getPrincipal", () => {
     vi.clearAllMocks();
   });
 
-  it("returns empty roles for a logged-in session until task 05 loads DB roles", async () => {
+  it("loads roles from memory store for a logged-in admin (no DATABASE_URL)", async () => {
     readProviderSession.mockResolvedValue({
-      userId: "user-1",
-      label: "user@test1.local",
+      userId: "better-auth-uuid",
+      label: "Admin (dev)",
+      email: SEED_ADMIN_EMAIL,
     });
 
     await expect(getPrincipal()).resolves.toEqual({
-      id: "user-1",
-      roles: [],
+      id: SEED_ADMIN_ID,
+      roles: ["data_master", "iam_master"],
     });
   });
 

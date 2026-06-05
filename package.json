@@ -16,6 +16,8 @@
     "db:docker:logs": "docker compose logs -f postgres",
     "db:migrate": "node scripts/db-migrate.mjs",
     "db:check": "node scripts/db-migrate.mjs --check",
+    "db:migrate:test1": "node scripts/db-migrate.mjs --app=test1",
+    "db:check:test1": "node scripts/db-migrate.mjs --app=test1 --check",
     "test": "vitest run",
     "restore-audit": "tsx apps/crm/scripts/restore-audit.ts",
     "codegen": "npm -w @latch/codegen run generate",

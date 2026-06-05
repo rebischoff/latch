@@ -72,6 +72,10 @@
 
 **Rationale:** Running CRM (3002) and test1 (3003) locally must not share one auth secret namespace.
 
+## Platform (repo-wide, deferred)
+
+- **`@latch/pg-session` extraction** — `withPermissionDb` interim home is `@latch/audit`; extract when Postgres store surface grows (test1 task 10+, Phase 07 RLS). Locked in [`docs/reference/packages.md`](../../../docs/reference/packages.md#decision-extract-latchpg-session-when-postgres-surface-grows-2026-06-04); discussion [05-pg-session-package-home.md](./discussions/05-pg-session-package-home.md).
+
 ## Open / to lock (before task 22)
 
 - Normalized grant rows vs JSON blob per role (recommend normalized — task 21).

@@ -12,8 +12,14 @@ export const readProviderSession = async (): Promise<SessionPayload | null> => {
   if (!userId) {
     return null;
   }
+  const email = result.user.email;
+  if (!email) {
+    return null;
+  }
+
   return {
     userId,
     label: result.user.name ?? userId,
+    email,
   };
 };

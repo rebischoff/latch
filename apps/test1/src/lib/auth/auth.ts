@@ -4,9 +4,9 @@ import { nextCookies } from "better-auth/next-js";
 /**
  * Better Auth server config — authentication only (no org/role plugins).
  *
- * No `database` option → built-in in-memory store until task 05 wires Neon.
- * Better Auth user rows are separate from `latch_users`; seed alignment is task 05.
- * Login E2E waits for task 05 seed — see docs/CONFIG.md § Better Auth (dev).
+ * No `database` option → built-in in-memory store (authn only).
+ * Better Auth user rows are separate from `latch_users`; `getPrincipal()` resolves
+ * `Principal.id` by `login_email` against seed rows — see docs/AUTH.md.
  */
 export const auth = betterAuth({
   secret: process.env.BETTER_AUTH_SECRET,

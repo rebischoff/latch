@@ -32,7 +32,7 @@ Next.js loads `.env*` from **`apps/test1/`** when the workspace runs `@latch/tes
 |-------|---------------------|
 | **02+03** — monorepo + shell | No (optional). Commit **`.env.example`** only. |
 | **04** — Better Auth | Yes — `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` |
-| **05** — Neon + migrations | Yes — `DATABASE_URL` (test1 Neon branch) |
+| **05** — Neon + migrations | Yes — `DATABASE_URL` (test1 Neon branch); `LATCH_APP_ROLE_PASSWORD` on Neon |
 | **10+** — Surfaces + DAL | Yes — same `DATABASE_URL` |
 
 ## Required (when those tasks run)
@@ -40,6 +40,7 @@ Next.js loads `.env*` from **`apps/test1/`** when the workspace runs `@latch/tes
 | Variable | Purpose | First needed |
 |----------|---------|--------------|
 | `DATABASE_URL` | Neon connection string (direct for migrate; pooled on Vercel) | Task **05** |
+| `LATCH_APP_ROLE_PASSWORD` | Password for `latch_app` role created in migration **002** (Neon requires a strong value) | Task **05** on Neon |
 | `BETTER_AUTH_SECRET` | Better Auth session secret | Task **04** |
 | `BETTER_AUTH_URL` | App base URL (e.g. `http://localhost:3003`) | Task **04** |
 | `TEST1_DEV_PASSWORD` | Seed user password for local dev (default `demo`) | Task **04** / **05** seed |
@@ -56,6 +57,9 @@ TEST1_DEV_PASSWORD=demo
 
 # Neon — required from task 05 (separate project/branch from CRM)
 # DATABASE_URL=postgresql://USER:PASSWORD@ep-xxxx.region.aws.neon.tech/neondb?sslmode=require
+
+# latch_app role password for migration 002 (required on Neon)
+# LATCH_APP_ROLE_PASSWORD=replace-with-openssl-rand-base64-24
 
 # Optional — DB-gated tests as latch_app role (after migrations)
 # LATCH_APP_DATABASE_URL=postgresql://latch_app:...@host/db?sslmode=require

@@ -1,14 +1,39 @@
 #!/usr/bin/env node
 /**
- * Apply apps/crm/migrations/*.sql in lexical order (matches CI).
- * Loads DATABASE_URL from apps/crm/.env.local first, then the shell env.
+ * Apply apps/<app>/migrations/*.sql in lexical order (matches CI).
+ * Loads DATABASE_URL from apps/<app>/.env.local first, then the shell env.
+ *
+ * Usage:
+ *   node scripts/db-migrate.mjs              # CRM (default)
+ *   node scripts/db-migrate.mjs --app=test1
+ *   node scripts/db-migrate.mjs --app=crm --check
  */
 import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-const envLocalPath = resolve("apps/crm/.env.local");
-const migrationsDir = resolve("apps/crm/migrations");
+const APPS = {
+  crm: {
+    envLocalPath: resolve("apps/crm/.env.local"),
+    migrationsDir: resolve("apps/crm/migrations"),
+  },
+  test1: {
+    envLocalPath: resolve("apps/test1/.env.local"),
+    migrationsDir: resolve("apps/test1/migrations"),
+  },
+};
+
+const appArg = process.argv.find((a) => a.startsWith("--app="))?.slice("--app=".length) ?? "crm";
+const appConfig = APPS[appArg];
+
+if (!appConfig) {
+  console.error(
+    `Unknown --app=${appArg}. Supported: ${Object.keys(APPS).join(", ")}`,
+  );
+  process.exit(1);
+}
+
+const { envLocalPath, migrationsDir } = appConfig;
 const checkOnly = process.argv.includes("--check");
 const onlyArg = process.argv.find((a) => a.startsWith("--only="));
 const onlyFile = onlyArg?.slice("--only=".length);
@@ -24,31 +49,34 @@ const parseEnvValue = (raw) => {
   return value;
 };
 
-const readDatabaseUrlFromFile = () => {
+const readEnvLocal = () => {
   if (!existsSync(envLocalPath)) {
-    return undefined;
+    return {};
   }
+  const values = {};
   const content = readFileSync(envLocalPath, "utf8").replace(/^\uFEFF/, "");
   for (const line of content.split("\n")) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith("#")) {
       continue;
     }
-    const match = trimmed.match(/^(?:export\s+)?DATABASE_URL\s*=\s*(.*)$/);
+    const match = trimmed.match(/^(?:export\s+)?([A-Z0-9_]+)\s*=\s*(.*)$/);
     if (!match) {
       continue;
     }
-    return parseEnvValue(match[1]);
+    values[match[1]] = parseEnvValue(match[2]);
   }
-  return undefined;
+  return values;
 };
+
+const readEnvLocalValue = (name) => readEnvLocal()[name];
 
 const validateDatabaseUrl = (databaseUrl, source) => {
   if (!databaseUrl) {
     console.error(
       "DATABASE_URL is not set.\n" +
         `  Looked in: ${envLocalPath} and process.env.DATABASE_URL\n` +
-        "  Add a Neon direct connection string to apps/crm/.env.local:\n" +
+        `  Add a Neon direct connection string to ${envLocalPath}:\n` +
         "    DATABASE_URL=postgresql://...@ep-....neon.tech/neondb?sslmode=require",
     );
     process.exit(1);
@@ -76,11 +104,12 @@ const validateDatabaseUrl = (databaseUrl, source) => {
   return host;
 };
 
-const fromFile = readDatabaseUrlFromFile();
+const envLocal = readEnvLocal();
+const fromFile = envLocal.DATABASE_URL;
 const fromEnv = process.env.DATABASE_URL?.trim() || undefined;
 const databaseUrl = fromFile ?? fromEnv;
 const source = fromFile
-  ? "apps/crm/.env.local"
+  ? envLocalPath
   : fromEnv
     ? "process.env.DATABASE_URL"
     : "none";
@@ -89,7 +118,7 @@ const host = validateDatabaseUrl(databaseUrl, source);
 
 if (fromEnv && fromFile && fromEnv !== fromFile) {
   console.warn(
-    "Note: shell DATABASE_URL differs from apps/crm/.env.local — using .env.local for migrate.",
+    `Note: shell DATABASE_URL differs from ${envLocalPath} — using .env.local for migrate.`,
   );
   console.warn(
     "  To use the shell value instead: unset DATABASE_URL or remove .env.local entry.",
@@ -103,8 +132,26 @@ if (host.includes("-pooler")) {
 }
 
 if (checkOnly) {
-  console.log(`OK  source=${source}  host=${host}`);
+  console.log(`OK  app=${appArg}  source=${source}  host=${host}`);
   process.exit(0);
+}
+
+const LATCH_APP_ROLE_PASSWORD_DEFAULT = "latch_app";
+const latchAppRolePassword =
+  envLocal.LATCH_APP_ROLE_PASSWORD?.trim() ||
+  process.env.LATCH_APP_ROLE_PASSWORD?.trim() ||
+  LATCH_APP_ROLE_PASSWORD_DEFAULT;
+
+if (
+  host.includes(".neon.") &&
+  latchAppRolePassword === LATCH_APP_ROLE_PASSWORD_DEFAULT
+) {
+  console.error(
+    "Neon rejects the default latch_app role password.\n" +
+      `  Set LATCH_APP_ROLE_PASSWORD in ${envLocalPath}\n` +
+      "  Example: openssl rand -base64 24",
+  );
+  process.exit(1);
 }
 
 const allMigrations = readdirSync(migrationsDir)
@@ -125,7 +172,16 @@ for (const migration of migrations) {
   console.log(`Applying ${migration}…`);
   const result = spawnSync(
     "psql",
-    ["-d", databaseUrl, "-v", "ON_ERROR_STOP=1", "-f", migration],
+    [
+      "-d",
+      databaseUrl,
+      "-v",
+      "ON_ERROR_STOP=1",
+      "-v",
+      `latch_app_password=${latchAppRolePassword}`,
+      "-f",
+      migration,
+    ],
     { stdio: "inherit" },
   );
   if (result.status !== 0) {

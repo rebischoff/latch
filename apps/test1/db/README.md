@@ -1,3 +1,3 @@
-# Database layer (future)
+# Database layer
 
-Drizzle schema, seed, and store adapters. Populated starting at task **05**.
+Drizzle schema (`schema.ts`), seed (`seed.ts`), and in-memory store for latch platform tables. Business tables arrive in task **10**.

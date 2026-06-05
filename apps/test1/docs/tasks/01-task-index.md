@@ -63,7 +63,7 @@ flowchart TD
 | 04d | [04d-session-guards.md](./04d-session-guards.md) | Code | Not scheduled | `requireSession`, drop placeholders |
 | 04e | [04e-login-logout.md](./04e-login-logout.md) | Code | Not scheduled | Login/logout UI + parent verify |
 | 05 | [05-neon-migrations-skeleton.md](./05-neon-migrations-skeleton.md) | Code | Not scheduled | Migrations hook, `latch_users`, audit |
-| 10 | [10-contact-surface.md](./10-contact-surface.md) | Code | Planning stub | First business Surface (YAML policies) |
+| 10 | [10-contact-surface.md](./10-contact-surface.md) | Code | Not started (**10a–10e**) | First business Surface (`contact`, YAML policies, DAL, `/contacts`) |
 | 11 | [11-nav-minimal.md](./11-nav-minimal.md) | Code | Planning stub | Policy-driven nav catalog |
 | 12 | [12-second-surface.md](./12-second-surface.md) | Code | Planning stub | Second business Surface (repeat loop) |
 | 20 | [20-latch-roles-schema.md](./20-latch-roles-schema.md) | Code | Planning stub | `latch_roles` + seed system roles |

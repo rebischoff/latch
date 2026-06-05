@@ -1,24 +1,19 @@
 # test1 — STATUS
 
 > **Quarterback for test1 only.** Root [`STATUS.md`](../../../STATUS.md) is unchanged.
-> Updated: 2026-06-03
+> Updated: 2026-06-04
 
 ---
 
 ## Right now — do this next
 
-**→ [tasks/05-neon-migrations-skeleton.md](./tasks/05-neon-migrations-skeleton.md)** — Neon migrations, `latch_users` / roles tables, `getPrincipal()` loads roles from DB. Parent **04** complete.
-
----
-
-## Blocked
-
-Nothing — **05** needs a test1 Neon branch and `DATABASE_URL` in `.env.local`.
+**→ [tasks/10-contact-surface.md](./tasks/10-contact-surface.md)** — first business Surface; start at sub-phase **10a** (codegen + `contacts` migration + store).
 
 ---
 
 ## Recently completed
 
+- **2026-06-04** — **05** — Neon migrations skeleton complete: `001` / `002` applied on Neon, `LATCH_APP_ROLE_PASSWORD` migrate path, Drizzle schema + seed, `loadRolesForUser` + DB-backed `getPrincipal()`.
 - **2026-06-03** — **04e** — Login/logout: RHF form + `signInAction` / `signOutAction`, dev user auto-create, post-login redirect to `/`; parent **04** complete.
 - **2026-06-03** — **04d** — Session guards: `requireSession()` redirects to `/login`; `(app)/layout` uses `getPrincipal()` + real session label; placeholder auth modules removed.
 - **2026-06-03** — **04c** — Principal seam: `provider-session.ts` (Better Auth → `{ userId, label }`), `getPrincipal()` with stub `roles: []` + `LATCH_STUB_*`, Vitest coverage.
@@ -38,6 +33,7 @@ Nothing — **05** needs a test1 Neon branch and `DATABASE_URL` in `.env.local`.
 | **Decisions** | [decisions.md](./decisions.md) |
 | **Env** | [CONFIG.md](./CONFIG.md) — `apps/test1/.env.example` committed |
 | **Auth** | Better Auth → [AUTH.md](./AUTH.md) (task **04**) |
+| **Database** | [DATABASE.md](./DATABASE.md) — migrations + `latch_app` (task **05**) |
 | **Reference app** | [`apps/crm`](../../crm/) (Auth.js, YAML policies) |
 | **Codegen** | [`../../crm/docs/CODEGEN.md`](../../crm/docs/CODEGEN.md) |
 
@@ -49,7 +45,7 @@ Nothing — **05** needs a test1 Neon branch and `DATABASE_URL` in `.env.local`.
 |------|-------|-------|
 | Scaffold | 02–03 | **Complete** |
 | Scaffold | 04 | **Complete** (04a–04e) |
-| Scaffold | 05 | **Next** — Neon + migrations |
-| Learn Latch (YAML) | 10–12 | Planning stub |
+| Scaffold | 05 | **Complete** |
+| Learn Latch (YAML) | 10–12 | **10** next |
 | DB RBAC | 20–23 | Planning stub |
 | Harden | 90, 99 | Planning stub |

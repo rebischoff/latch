@@ -103,6 +103,8 @@ Middleware/tests assert vars do not carry across requests (task **17**).
 
 **Rationale:** Establishes the actor-binding seam now on real PG paths; avoids pretending RLS protects data the app never reads.
 
+**Implementation home (interim):** [`packages/audit/src/permission-db.ts`](../../../packages/audit/src/permission-db.ts) exports `withPermissionDb` / `bindPermissionSession`. Extraction to **`@latch/pg-session`** is deferred — see [packages.md — extract pg-session](../../reference/packages.md#decision-extract-latchpg-session-when-postgres-surface-grows-2026-06-04).
+
 ### Decision: App DB role — T5 (2026-06-03)
 
 **Choice:** **No new role.** `latch_app` already exists ([`005_latch_app_role.sql`](../../../apps/crm/migrations/005_latch_app_role.sql)); [`006`](../../../apps/crm/migrations/006_latch_pending_changes.sql) grants pending table access. Phase 06 (a) **extends grants** for new tables (`latch_policy_version`, task **04**), (b) ensures CRM/CI connect **as** `latch_app` (not Neon owner), (c) adds **T5** `current_user` assertion. **No `BYPASSRLS`.**
