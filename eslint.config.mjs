@@ -1,33 +1,12 @@
 import { defineConfig, globalIgnores } from "eslint/config";
-import nextVitals from "eslint-config-next/core-web-vitals";
-import nextTs from "eslint-config-next/typescript";
+import tseslint from "typescript-eslint";
 
-const nextAppScopes = [
-  { files: ["apps/crm/**/*.{js,jsx,ts,tsx,mjs,cjs}"], rootDir: "apps/crm/" },
-  { files: ["apps/test1/**/*.{js,jsx,ts,tsx,mjs,cjs}"], rootDir: "apps/test1/" },
+const tsFiles = [
+  "packages/**/*.{ts,tsx}",
+  "apps/**/*.{ts,tsx}",
+  "*.{ts,mjs}",
+  "scripts/**/*.{ts,mjs}",
 ];
-
-function scopeToNextApps(configs) {
-  return nextAppScopes.flatMap(({ files, rootDir }) =>
-    configs.map((config) => {
-      if (config.ignores) {
-        return null;
-      }
-
-      return {
-        ...config,
-        files: config.files ?? files,
-        settings: {
-          ...config.settings,
-          next: {
-            ...config.settings?.next,
-            rootDir,
-          },
-        },
-      };
-    }),
-  ).filter(Boolean);
-}
 
 const eslintConfig = defineConfig([
   globalIgnores([
@@ -37,9 +16,13 @@ const eslintConfig = defineConfig([
     "**/build/**",
     "**/dist/**",
     "**/next-env.d.ts",
+    "**/generated/**",
+    "tests/**",
   ]),
-  ...scopeToNextApps(nextVitals),
-  ...scopeToNextApps(nextTs),
+  ...tseslint.configs.recommended.map((config) => ({
+    ...config,
+    files: config.files ?? tsFiles,
+  })),
   {
     files: ["packages/contracts/**/*.{ts,tsx}"],
     rules: {

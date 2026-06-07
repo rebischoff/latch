@@ -10,6 +10,7 @@ Design, planning, and architecture for **Latch**.
 docs/
   foundations/   stable, cross-cutting truth (vision, scope, glossary, threat model, …)
   reference/     topic deep-dives (access control, DAL/UI sync, bulk, audit, packages, …)
+  discussions/   alignment docs — overall picture + each major point (pre-planning)
   phases/        the delivery plan — self-contained phase folders, each with its own STATUS
   discovery/     spikes (RLS, post-v1)
   archive/       completed work kept as read-only history (the job_detail pilot)
@@ -56,9 +57,11 @@ docs/
 | Document | Purpose |
 |---|---|
 | [`reference/packages.md`](./reference/packages.md) | **Monorepo layout & import boundaries** |
+| [`reference/compartments.md`](./reference/compartments.md) | **Compartment map** — codebase as independently testable concerns |
 | [`reference/crm-and-phases.md`](./reference/crm-and-phases.md) | **CRM harness vs package phases** (side-by-side dev) |
 | [`reference/access-control.md`](./reference/access-control.md) | RBAC, Fields, Surfaces, role merge |
 | [`reference/permissions-and-ui-sync.md`](./reference/permissions-and-ui-sync.md) | Manifest, DAL, Zod, UI sync (decisions) |
+| [`reference/codegen-scope.md`](./reference/codegen-scope.md) | **Codegen scope & source-of-truth** — owns / verifies / must-not-own |
 | [`reference/metadata-and-codegen.md`](./reference/metadata-and-codegen.md) | Surface YAML → Zod / types codegen |
 | [`reference/api-style.md`](./reference/api-style.md) | REST handlers + Server Actions decision |
 | [`reference/bulk-operations.md`](./reference/bulk-operations.md) | Bulk update/delete design |

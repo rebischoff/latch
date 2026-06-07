@@ -6,20 +6,11 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "npm -w @latch/crm run dev",
-    "dev:test1": "npm -w apps/test1 run dev",
-    "build": "npm -w @latch/crm run build",
-    "start": "npm -w @latch/crm run start",
     "lint": "eslint .",
     "db:docker:up": "docker compose up -d",
     "db:docker:down": "docker compose down",
     "db:docker:logs": "docker compose logs -f postgres",
-    "db:migrate": "node scripts/db-migrate.mjs",
-    "db:check": "node scripts/db-migrate.mjs --check",
-    "db:migrate:test1": "node scripts/db-migrate.mjs --app=test1",
-    "db:check:test1": "node scripts/db-migrate.mjs --app=test1 --check",
     "test": "vitest run",
-    "restore-audit": "tsx apps/crm/scripts/restore-audit.ts",
     "codegen": "npm -w @latch/codegen run generate",
     "codegen:check": "npm -w @latch/codegen run check"
   },

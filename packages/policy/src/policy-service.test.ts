@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { Principal } from "@latch/contracts";
 
+import { createMemoryRoleGrantProvider } from "./grant-provider.js";
 import { unionGrants, mergeRowScope } from "./merge.js";
 import {
   DATA_MASTER_ROLE_ID,
@@ -30,94 +31,87 @@ describe("merge helpers", () => {
   });
 });
 
+const fixtureGrantProvider = createMemoryRoleGrantProvider({
+  alpha: {
+    role_a: {
+      rowScope: "own",
+      fields: [
+        { field: "foo", actions: ["read", "write"] },
+        {
+          field: "bar",
+          actions: ["read", "write"],
+          effect: "deny",
+        },
+      ],
+      surfaceActions: ["read"],
+    },
+    role_b: {
+      rowScope: "all",
+      fields: [{ field: "foo", actions: ["read"] }],
+      surfaceActions: ["read", "delete"],
+    },
+  },
+  beta: {
+    viewer: {
+      fields: [{ field: "qux", actions: ["read"] }],
+      surfaceActions: ["read"],
+    },
+  },
+  iam_console: {
+    iam_master: {
+      rowScope: "all",
+      fields: [{ field: "assignments", actions: ["read", "write"] }],
+      surfaceActions: ["read", "write"],
+    },
+  },
+});
+
 const fixtureRegistry = definePolicyRegistry(
-  defineSurfacePolicy(
-    {
-      surface: "alpha",
-      roles: {
-        role_a: {
-          rowScope: "own",
-          fields: [
-            { field: "foo", actions: ["read", "write"] },
-            {
-              field: "bar",
-              actions: ["read", "write"],
-              effect: "deny",
-            },
-          ],
-        },
-        role_b: {
-          rowScope: "all",
-          fields: [{ field: "foo", actions: ["read"] }],
-        },
-      },
-    },
-    {
-      fieldIds: ["foo", "bar"],
-      surfaceActionsByRole: {
-        role_a: ["read"],
-        role_b: ["read", "delete"],
-      },
-      kind: "business",
-    },
-  ),
-  defineSurfacePolicy(
-    {
-      surface: "beta",
-      roles: {
-        viewer: {
-          fields: [{ field: "qux", actions: ["read"] }],
-        },
-      },
-    },
-    {
-      fieldIds: ["qux"],
-      surfaceActionsByRole: {
-        viewer: ["read"],
-      },
-      kind: "business",
-    },
-  ),
-  defineSurfacePolicy(
-    {
-      surface: "iam_console",
-      roles: {
-        iam_master: {
-          rowScope: "all",
-          fields: [{ field: "assignments", actions: ["read", "write"] }],
-        },
-      },
-    },
-    {
-      fieldIds: ["assignments"],
-      surfaceActionsByRole: {
-        iam_master: ["read", "write"],
-      },
-      kind: "iam",
-    },
-  ),
+  defineSurfacePolicy({
+    surface: "alpha",
+    fieldIds: ["foo", "bar"],
+    fieldActions: ["read", "write"],
+    surfaceActions: ["read", "delete"],
+    kind: "business",
+  }),
+  defineSurfacePolicy({
+    surface: "beta",
+    fieldIds: ["qux"],
+    fieldActions: ["read"],
+    surfaceActions: ["read"],
+    kind: "business",
+  }),
+  defineSurfacePolicy({
+    surface: "iam_console",
+    fieldIds: ["assignments"],
+    fieldActions: ["read", "write"],
+    surfaceActions: ["read", "write"],
+    kind: "iam",
+  }),
 );
 
-const throwawayBusinessSurface = defineSurfacePolicy(
-  {
-    surface: "throwaway_widget",
-    roles: {
-      viewer: {
-        fields: [{ field: "widget_name", actions: ["read"] }],
-      },
+const throwawayBusinessSurface = defineSurfacePolicy({
+  surface: "throwaway_widget",
+  fieldIds: ["widget_name"],
+  fieldActions: ["read", "write"],
+  surfaceActions: ["read"],
+  kind: "business",
+});
+
+const throwawayGrantProvider = createMemoryRoleGrantProvider({
+  throwaway_widget: {
+    viewer: {
+      fields: [{ field: "widget_name", actions: ["read"] }],
+      surfaceActions: ["read"],
     },
   },
-  {
-    fieldIds: ["widget_name"],
-    surfaceActionsByRole: {
-      viewer: ["read"],
-    },
-    kind: "business",
-  },
-);
+});
 
 describe("PolicyService — fixture registry (domain-free)", () => {
-  const policy = new PolicyService({ registry: fixtureRegistry });
+  const policy = new PolicyService({
+    registry: fixtureRegistry,
+    grantProvider: fixtureGrantProvider,
+  });
 
   it("alpha / role_a: denyWins strips bar read/write", () => {
     const manifest = policy.resolve(principal("role_a"), {
@@ -160,8 +154,7 @@ describe("PolicyService — fixture registry (domain-free)", () => {
 
 describe("PolicyService — data_master built-in", () => {
   it("synthesizeDataMasterBinding: read/write on all field ids", () => {
-    const surfaceDef = throwawayBusinessSurface;
-    const binding = synthesizeDataMasterBinding(surfaceDef);
+    const binding = synthesizeDataMasterBinding(throwawayBusinessSurface);
 
     expect(binding.rowScope).toBe("all");
     expect(binding.fields).toEqual([
@@ -170,9 +163,12 @@ describe("PolicyService — data_master built-in", () => {
     expect(binding.surfaceActions).toEqual(["read", "write"]);
   });
 
-  it("data_master on business surface without per-role YAML entry", () => {
+  it("data_master on business surface without per-role grant entry", () => {
     const registry = definePolicyRegistry(throwawayBusinessSurface);
-    const policy = new PolicyService({ registry });
+    const policy = new PolicyService({
+      registry,
+      grantProvider: throwawayGrantProvider,
+    });
 
     const manifest = policy.resolve(principal(DATA_MASTER_ROLE_ID), {
       surface: "throwaway_widget",
@@ -184,7 +180,10 @@ describe("PolicyService — data_master built-in", () => {
   });
 
   it("data_master on fixture alpha: read/write all fields", () => {
-    const policy = new PolicyService({ registry: fixtureRegistry });
+    const policy = new PolicyService({
+      registry: fixtureRegistry,
+      grantProvider: fixtureGrantProvider,
+    });
 
     const manifest = policy.resolve(principal(DATA_MASTER_ROLE_ID), {
       surface: "alpha",
@@ -197,7 +196,10 @@ describe("PolicyService — data_master built-in", () => {
   });
 
   it("data_master does not gain IAM surface write", () => {
-    const policy = new PolicyService({ registry: fixtureRegistry });
+    const policy = new PolicyService({
+      registry: fixtureRegistry,
+      grantProvider: fixtureGrantProvider,
+    });
 
     const manifest = policy.resolve(principal(DATA_MASTER_ROLE_ID), {
       surface: "iam_console",
@@ -209,7 +211,10 @@ describe("PolicyService — data_master built-in", () => {
   });
 
   it("iam_master on IAM surface: role_assignments write equivalent", () => {
-    const policy = new PolicyService({ registry: fixtureRegistry });
+    const policy = new PolicyService({
+      registry: fixtureRegistry,
+      grantProvider: fixtureGrantProvider,
+    });
 
     const manifest = policy.resolve(principal("iam_master"), {
       surface: "iam_console",
@@ -222,29 +227,28 @@ describe("PolicyService — data_master built-in", () => {
 
   it("denyWins: explicit deny on a field blocks data_master read/write", () => {
     const registry = definePolicyRegistry(
-      defineSurfacePolicy(
-        {
-          surface: "locked",
-          roles: {
-            locker: {
-              fields: [
-                {
-                  field: "secret",
-                  actions: ["read", "write"],
-                  effect: "deny",
-                },
-              ],
-            },
-          },
-        },
-        {
-          fieldIds: ["secret"],
-          surfaceActionsByRole: { locker: [] },
-          kind: "business",
-        },
-      ),
+      defineSurfacePolicy({
+        surface: "locked",
+        fieldIds: ["secret"],
+        fieldActions: ["read", "write"],
+        surfaceActions: [],
+        kind: "business",
+      }),
     );
-    const policy = new PolicyService({ registry });
+    const grantProvider = createMemoryRoleGrantProvider({
+      locked: {
+        locker: {
+          fields: [
+            {
+              field: "secret",
+              actions: ["read", "write"],
+              effect: "deny",
+            },
+          ],
+        },
+      },
+    });
+    const policy = new PolicyService({ registry, grantProvider });
 
     const manifest = policy.resolve(
       principal(DATA_MASTER_ROLE_ID, "locker"),

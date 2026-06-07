@@ -69,8 +69,6 @@ const readEnvLocal = () => {
   return values;
 };
 
-const readEnvLocalValue = (name) => readEnvLocal()[name];
-
 const validateDatabaseUrl = (databaseUrl, source) => {
   if (!databaseUrl) {
     console.error(

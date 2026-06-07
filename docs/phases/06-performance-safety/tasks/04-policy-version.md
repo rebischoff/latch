@@ -1,6 +1,8 @@
 # 04 — `policyVersion` storage and bump
 
 > **Status:** Complete (2026-06-03). Next: [`05-manifest-cache-seam.md`](./05-manifest-cache-seam.md).
+>
+> **Update (2026-06-06 — "roles are runtime data"):** This task shipped when the only runtime permission change was **assignment** (`latch_user_roles`). After the [runtime-roles decision](../../../discussions/02-identity-and-permissions.md), **editing a role definition — `latch_roles` rows and their `latch_role_grants` / `latch_role_surfaces` grants — also changes effective permissions**, so the role editor ([policy task 03](../../../../packages/policy/docs/tasks/03-role-editor-surface.md)) must bump `policyVersion` too, or `ttl`/cross-request cached manifests stay stale after a grant edit. Step 3 and step 4 are revised below; no schema change to `latch_policy_version` itself.
 
 ## Goal
 
@@ -25,8 +27,8 @@ Add **`latch_policy_version`** (single-row counter), bump on IAM role assign/rev
 
 1. Create `latch_policy_version` (single row `version BIGINT NOT NULL DEFAULT 1`). Use repo migration style: `BEGIN; … COMMIT;`, header comment, idempotent guards (`CREATE TABLE IF NOT EXISTS`, seed row with `ON CONFLICT DO NOTHING`).
 2. **Grant `latch_app`** `SELECT, UPDATE` on `latch_policy_version` inside the migration (guarded `IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'latch_app')`), matching the pattern in [`006`](../../../../apps/crm/migrations/006_latch_pending_changes.sql).
-3. Add `bumpPolicyVersion()` (SQL `UPDATE … SET version = version + 1`) called from IAM assign/revoke paths only in v1 (runs as `latch_app`).
-4. Document manual bump when repo YAML policies change (no codegen hook required in Phase 06).
+3. Add `bumpPolicyVersion()` (SQL `UPDATE … SET version = version + 1`, runs as `latch_app`) called from **every audited IAM mutation that changes effective permissions**: role **assign/revoke** (`latch_user_roles`) **and** — per the 2026-06-06 update above — **role-definition edits**: create/update/delete of `latch_roles` rows and their `latch_role_grants` / `latch_role_surfaces` grants (the role editor, [policy task 03](../../../../packages/policy/docs/tasks/03-role-editor-surface.md)). Built-in synthesis (`data_master` / `iam_master`) needs **no** bump — it is code-defined and never edited at runtime.
+4. ~~Document manual bump when repo YAML policies change.~~ **Obsolete (2026-06-06):** grants are no longer repo YAML; every grant change flows through the audited role-editor path in step 3, which bumps automatically. No manual/codegen bump hook remains in v1.
 5. `getPrincipal` ([`apps/crm/src/lib/auth/getPrincipal.ts`](../../../../apps/crm/src/lib/auth/getPrincipal.ts)) reads current version into `Principal.policyVersion`. **Stub path** (`LATCH_STUB_USER`/`LATCH_STUB_ROLE`, no DB) → `policyVersion` undefined or `0`; cache treats undefined as its own key bucket (document).
 6. `policyVersion?: number` already absent on `Principal` ([`packages/contracts/src/types.ts`](../../../../packages/contracts/src/types.ts)) — add it (optional, client-safe).
 7. Unit test: assign role → version increments; two consecutive reads return new version.
@@ -40,4 +42,4 @@ Add **`latch_policy_version`** (single-row counter), bump on IAM role assign/rev
 
 ## Out of scope
 
-Manifest cache wrapper (task **05**). YAML-change auto-bump (document only).
+Manifest cache wrapper (task **05**). ~~YAML-change auto-bump~~ — moot (grants aren't YAML; see the 2026-06-06 update above). Wiring the role-editor bump call sites lands with [policy task 03](../../../../packages/policy/docs/tasks/03-role-editor-surface.md), not here.

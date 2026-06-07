@@ -29,13 +29,60 @@ We **do not** use shared-schema multi-tenancy. Each company has its own database
 
 Actions (draft): `read`, `write`, `delete`, `restore`, `approve`, `hard_delete`.
 
+## Decision: app-defined roles are runtime data (2026-06-06)
+
+**Choice:** **Supersedes the "Surface/Field policies per role in repo YAML/JSON" line in the RBAC decision below.** Role definitions — the role catalog and each role's Field/action grants + `rowScope` — are **runtime DB data** (`latch_roles` catalog, `latch_role_surfaces` bindings, `latch_role_grants`), created/updated/deleted by app users through a permission-gated IAM Surface, audited. Codegen still owns the per-Surface **Field/action vocabulary**; the role editor validates each grant against it. The two built-ins (`data_master`, `iam_master`) stay synthesized/seeded in code. Canonical detail: [`../foundations/scope.md`](../foundations/scope.md), [`../discussions/02-identity-and-permissions.md`](../discussions/02-identity-and-permissions.md). Runtime tasks: [`../../packages/policy/docs/tasks/README.md`](../../packages/policy/docs/tasks/README.md).
+
+**Rationale:** Assignments were already runtime (`latch_user_roles`); leaving definitions at build time forced a dev redeploy for every permission tweak. Splitting **vocabulary (codegen, build time) from grants (DB, runtime)** preserves the safety property — a runtime grant can never reference a Field the Surface doesn't define, because the role editor and the resolver both read the codegen catalog — while letting business admins own the policy.
+
+### Decision: runtime role catalog tables + FK semantics (2026-06-06)
+
+**Choice:**
+
+| Table | Purpose |
+|-------|---------|
+| `latch_roles` | Role catalog (`id`, `display_name`, `kind`, `is_builtin`, …) |
+| `latch_role_surfaces` | One row per **(role, surface)** — authoritative `row_scope` (`own` \| `all`) |
+| `latch_role_grants` | Sparse allow-rows: one per **(role, surface, field, action)**; no `row_scope` |
+| `latch_user_roles` | Assignments (unchanged); `role_id` FK → `latch_roles.id` |
+
+**FK on delete:**
+
+| Child | Parent | `ON DELETE` |
+|-------|--------|-------------|
+| `latch_user_roles.role_id` | `latch_roles.id` | **RESTRICT** — cannot delete role while assigned; revoke first |
+| `latch_role_grants.role_id` | `latch_roles.id` | **CASCADE** |
+| `latch_role_surfaces.role_id` | `latch_roles.id` | **CASCADE** |
+
+**Built-ins:** Only `data_master` and `iam_master` are seeded `is_builtin = true` and non-deletable via the role editor. Grants for **both** are **synthesized in `PolicyService`** (`data_master` → `kind: business`; `iam_master` → `kind: iam`), not stored as grant rows. Storage, exclusivity, and bootstrap are locked below (see P4 / P4a / P4b in [`../../packages/policy/docs/tasks/00-decisions-needed.md`](../../packages/policy/docs/tasks/00-decisions-needed.md)).
+
+**Sparse grants:** New roles need **no** grant rows until configured; missing grants → default deny. Only surfaces the editor touches get `latch_role_surfaces` rows.
+
+**Seed order:** `latch_roles` before `latch_user_roles` assignment seeds.
+
+**Rationale:** RESTRICT on assignments preserves an explicit, auditable revoke path. CASCADE on definition children avoids orphan grant/binding rows. Pilot app roles (`field_tech`, `office_admin`) seed as deletable `kind: app` rows with sparse grants.
+
+Canonical parking-lot detail: [`../../packages/policy/docs/tasks/00-decisions-needed.md`](../../packages/policy/docs/tasks/00-decisions-needed.md) (P1, P2, P2a, P3, P4, P4a, P4b).
+
+### Decision: built-in roles — synthesis, storage, exclusivity, bootstrap (2026-06-06)
+
+**Choice:**
+
+- **Synthesize both.** `data_master` (wildcard on `kind: business`) and `iam_master` (wildcard on `kind: iam`) are synthesized in `PolicyService`; neither is stored in `latch_role_grants`. Synthesis reads the codegen `fieldIds`, so a built-in can't reference an undefined Field.
+- **Uniform storage.** Built-in assignments are ordinary `latch_user_roles` rows. No built-in columns on `latch_users`; "built-in" is the catalog flag `latch_roles.is_builtin`. `Principal.roles` stays a flat list.
+- **Separation of duties.** `data_master` (data plane) ≠ `iam_master` (control plane). Composable on one user; `data_master` alone cannot escalate.
+- **Exclusivity (write-time validation).** `data_master` may not combine with app roles (may combine with `iam_master`); app roles only when `data_master` absent. Only `iam_master` may assign/revoke an `is_builtin` role.
+- **Bootstrap.** Provisioning seeds one initial super admin (`data_master` + `iam_master`); the assignment DAL refuses to remove the **last** `iam_master`; env break-glass (`LATCH_BOOTSTRAP_ADMIN_EMAIL`) promotes when zero `iam_master` exist.
+
+**Rationale:** One assignment table keeps a single source of truth and a uniform resolver; `is_builtin` as a catalog flag makes privileged-assignment a single check and is forward-compatible with future built-ins. Synthesizing both removes the bootstrap lockout risk; separation of duties + exclusivity stop a data-superuser from self-escalating. Scoped delegation for non-`iam_master` assigners is deferred to [discussion 09](../discussions/09-role-delegation-and-scope.md).
+
 ## Decision: RBAC with built-in roles (2026-05)
 
 **Choice:**
 
 - Platform ships **built-in roles** (catalog locked 2026-06-02 — see below).
 - **Users are assigned to one or more roles** via `latch_user_roles` in the company DB; IdP group sync deferred.
-- Surface/Field policies per role in **repo YAML/JSON**.
+- ~~Surface/Field policies per role in **repo YAML/JSON**.~~ **Superseded (2026-06-06):** role→Field grants are **runtime DB data**, not repo YAML — see the Decision above. Repo YAML now owns only the Field/action *vocabulary*.
 
 ### Decision: built-in role catalog (2026-06-02)
 
@@ -45,12 +92,14 @@ Actions (draft): `read`, `write`, `delete`, `restore`, `approve`, `hard_delete`.
 |---------|------|---------|
 | `field_tech` | App | Pilot job row-scope `own`; no `customer_detail` |
 | `office_admin` | App | Pilot business admin |
-| `iam_master` | Built-in | Users + role assignments on IAM Surfaces; audit read (configurable) |
+| `iam_master` | Built-in | Users, role **assignments**, and role **definitions** (editor) on IAM Surfaces; audit read (configurable) |
 | `data_master` | Built-in | Read/write all **business** Surfaces/Fields (not IAM metadata) |
 
 Pilot CRM seeds map `seed-field-tech` → `field_tech`, `seed-office-admin` → `office_admin`. Optional `seed-iam-admin` → `iam_master` for QA.
 
 **Rationale:** Separates pilot personas from platform administration; built-ins satisfy Phase 03 sub-goals without a `roles` table.
+
+> **Updated (2026-06-06):** only `data_master` / `iam_master` remain code-defined built-ins. App roles like `field_tech` / `office_admin` become **runtime rows** in `latch_roles` (seeded, then app-editable), not fixed-in-code ids — see the "app-defined roles are runtime data" Decision above.
 
 Canonical detail: [`../phases/03-identity-iam/decisions.md`](../phases/03-identity-iam/decisions.md).
 
@@ -142,13 +191,30 @@ Optional global setting: **404** instead of **403** for sensitive Fields.
 
 ## Row-level rules
 
+### Decision: row scope v1 + expansion deferred (2026-06-06)
+
+**Choice:** v1 exposes two `row_scope` values on `latch_role_surfaces`, resolved into `manifest.rowScope`:
+
+| Value | Meaning |
+|-------|---------|
+| **`own`** | Principal sees only rows **linked to them** — implemented per Surface in the store's `isRowVisibleToPrincipal` (pilot jobs: assignment join). |
+| **`all`** | No row filter; all rows on the Surface (subject to field grants). |
+
+Set **once per (role, surface)** on `latch_role_surfaces`; applies to list, detail, and bulk alike. When a user holds multiple roles, `mergeRowScope` takes the most permissive (`all` beats `own`).
+
+**Deferred (post-v1):** richer scopes (team/colleagues, manager subtree, site-scoped, etc.) via additional `row_scope` enum values and/or Surface row-rule metadata; ABAC/ReBAC remains out of v1 ([`scope.md`](../foundations/scope.md)). Keep `row_scope` as a string column so new values do not require a breaking DDL change.
+
+**Rationale:** Covers the pilot personas without committing to a full row-rule language. Policy passes `own`/`all`; the store owns *how* “own” is evaluated.
+
+### Future patterns (proposal)
+
 Common patterns within a company database:
 
 - Owner: `created_by = current_user`
 - Assignment: join to `assignments` table
 - Hierarchy: manager sees subtree
 
-**Proposal:** row rules in metadata; compile to RLS where useful; DAL applies `WHERE` clauses.
+**Proposal:** row rules in Surface metadata; compile to RLS where useful; DAL applies `WHERE` clauses.
 
 ## DAL (application layer)
 

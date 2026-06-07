@@ -7,6 +7,10 @@ import type {
 } from "@latch/contracts";
 
 import {
+  emptyRoleGrantProvider,
+  type RoleGrantProvider,
+} from "./grant-provider.js";
+import {
   ensureFieldKeys,
   mergeRowScope,
   unionGrants,
@@ -15,7 +19,7 @@ import {
 } from "./merge.js";
 import type { PolicyRegistry, SurfacePolicyDefinition } from "./registry.js";
 
-/** Built-in role id — wildcard grants on business surfaces only (no per-Surface YAML). */
+/** Built-in role id — wildcard grants on business surfaces only. */
 export const DATA_MASTER_ROLE_ID = "data_master";
 
 const DATA_MASTER_FIELD_ACTIONS: FieldAction[] = ["read", "write"];
@@ -42,6 +46,7 @@ export interface PolicyServiceConfig {
   multiRoleCombine?: MultiRoleCombine;
   denyWins?: boolean;
   registry?: PolicyRegistry;
+  grantProvider?: RoleGrantProvider;
 }
 
 export interface RoleMergeStrategy {
@@ -69,6 +74,7 @@ export class PolicyService {
   private readonly denyWins: boolean;
   private readonly mergeStrategy: RoleMergeStrategy;
   private readonly registry: PolicyRegistry;
+  private readonly grantProvider: RoleGrantProvider;
 
   constructor(config: PolicyServiceConfig = {}) {
     if (
@@ -82,6 +88,7 @@ export class PolicyService {
     this.denyWins = config.denyWins ?? true;
     this.mergeStrategy = unionGrantsStrategy;
     this.registry = config.registry ?? {};
+    this.grantProvider = config.grantProvider ?? emptyRoleGrantProvider;
   }
 
   resolve = (principal: Principal, scope: PolicyScope): Manifest => {
@@ -105,17 +112,16 @@ export class PolicyService {
       surfaceActionLists.push(dataMaster.surfaceActions);
     }
 
-    for (const roleId of principal.roles) {
-      const roleBinding = surfaceDef.roles[roleId];
-      if (!roleBinding) {
-        continue;
-      }
+    for (const grant of this.grantProvider.grantsFor(
+      principal.roles,
+      scope.surface,
+    )) {
       rolePolicies.push({
-        rowScope: roleBinding.rowScope,
-        fields: roleBinding.fields,
+        rowScope: grant.rowScope,
+        fields: grant.fields,
       });
-      if (roleBinding.surfaceActions) {
-        surfaceActionLists.push(roleBinding.surfaceActions);
+      if (grant.surfaceActions) {
+        surfaceActionLists.push(grant.surfaceActions);
       }
     }
 

@@ -4,6 +4,8 @@
 
 ## Decided
 
+> **Superseded in part (2026-06-06) — roles are runtime data.** Phase 03 locked "no `roles` table in v1; catalog is built-in + app YAML" and fixed app role ids (`field_tech`, `office_admin`). The later "[app-defined roles are runtime data](../../foundations/scope.md)" decision adds `latch_roles` + `latch_role_grants` and moves role definitions/grants to runtime CRUD by app users; only `data_master` / `iam_master` stay code-defined. The IAM-Surface pattern (`user_roles_detail`) and "self-patch denied" guard below still hold and extend to a new **role-editor** Surface. Implementation: [`../../../packages/policy/docs/tasks/README.md`](../../../packages/policy/docs/tasks/README.md). The locked items below remain accurate for what Phase 03 shipped (historical).
+
 | Date | Topic | Choice |
 |------|-------|--------|
 | 2026-05-27 | Authz model | RBAC; users assigned to one or more roles |

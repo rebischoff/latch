@@ -18,17 +18,10 @@ export default defineConfig({
       "@latch/approval": latchAlias("approval"),
       "@latch/react": latchAlias("react"),
       "@latch/codegen": latchAlias("codegen"),
-      "@latch/crm/test-utils": path.join(root, "apps/crm/test-utils/index.ts"),
-      "@": path.join(root, "apps/crm/src"),
     },
   },
   test: {
-    include: [
-      "packages/**/*.test.ts",
-      "apps/crm/**/*.test.ts",
-      "apps/test1/**/*.test.ts",
-      "tests/**/*.test.ts",
-    ],
+    include: ["packages/**/*.test.ts"],
     /** Tests that spy on `PolicyService.resolve` expect no cache unless opted in. */
     env: {
       LATCH_MANIFEST_CACHE_MODE: "none",

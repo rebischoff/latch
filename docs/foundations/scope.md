@@ -22,6 +22,12 @@ The single most important document for keeping v1 shippable solo. **If a feature
 
 **Rationale:** The jobs pilot incorrectly lived in both `packages/*` and `apps/web`. Platform extraction genericizes `@latch/*` and consolidates domain metadata, DDL, schema, seed, and wiring under one app. See [`../phases/02b-platform-extraction/decisions.md`](../phases/02b-platform-extraction/decisions.md).
 
+### Decision: app-defined roles are runtime data, not codegen (2026-06-06)
+
+**Choice:** Role **definitions** — the role catalog and each role's Field/action grants + `rowScope` — become **runtime DB data**, created/updated/deleted by app users through a permission-gated IAM Surface (sibling of `user_roles_detail`), audited like any other mutation. New platform tables `latch_roles` (catalog) and `latch_role_grants` (one row per role × surface × field × action, optional `mode`) join `latch_users` / `latch_user_roles`. Codegen still owns the **vocabulary** (which Surfaces/Fields/actions *exist*) and emits it as the allowed-options catalog the role editor validates against; it **no longer emits role→Field grants**. The two built-in roles (`data_master`, `iam_master`) stay synthesized/seeded in code and are not app-deletable rows. This moves "DB-backed role catalog" from deferred into v1 and reverses the grant-generation half of Decision H (see [`../discussions/02-identity-and-permissions.md`](../discussions/02-identity-and-permissions.md), [`../discussions/01-codegen.md`](../discussions/01-codegen.md)).
+
+**Rationale:** Assignments were already runtime (`latch_user_roles`), so leaving definitions at build time forced a dev redeploy for every permission tweak. Splitting **vocabulary (dev/codegen, build time) from grants (DB, runtime data)** preserves the safety property — a runtime grant can never reference a Field the Surface doesn't define, because the role editor and the resolver both read the codegen-emitted Field/action catalog — while letting business admins own the policy. Grant-row granularity and mode-overlay editing are accepted to be fine-tuned in a later discussion.
+
 ---
 
 ## In v1
@@ -39,7 +45,8 @@ The single most important document for keeping v1 shippable solo. **If a feature
 > **Policy model (2026-06-01):** `job_list` and `job_detail` are one logical Surface **`job`** with modes `list` | `detail`; roles bind once, not per suffix. Split ids remain in repo/code until merge ([`glossary.md`](./glossary.md)).
 
 ### Access control
-- RBAC with **built-in roles** seeded in code.
+- RBAC. **Two built-in roles** (`data_master`, `iam_master`) synthesized/seeded in code; **app-defined roles are runtime DB data** (`latch_roles` + `latch_role_grants`), CRUD'd by app users via a permission-gated IAM Surface.
+- Field/action **vocabulary** per Surface is codegen-emitted; the role editor validates grants against it (build-time `--check` guards the catalog; write-time validation guards each grant).
 - **`union_grants` only** for role merge. `denyWins = true`.
 - Field-level `read` / `write`.
 - Row-level via owner / assignment patterns expressed in metadata, evaluated in DAL.

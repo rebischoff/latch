@@ -11,6 +11,7 @@ import {
   parseManifestCacheMode,
   POLICY_VERSION_KEY_SENTINEL,
 } from "./manifest-cache.js";
+import { createMemoryRoleGrantProvider } from "./grant-provider.js";
 import { PolicyService } from "./policy-service.js";
 import { definePolicyRegistry, defineSurfacePolicy } from "./registry.js";
 
@@ -26,22 +27,23 @@ const principal = (
 });
 
 const miniRegistry = definePolicyRegistry(
-  defineSurfacePolicy(
-    {
-      surface: "widgets",
-      roles: {
-        editor: {
-          fields: [{ field: "name", actions: ["read", "write"] }],
-        },
-      },
-    },
-    {
-      fieldIds: ["name"],
-      surfaceActionsByRole: { editor: ["read"] },
-      kind: "business",
-    },
-  ),
+  defineSurfacePolicy({
+    surface: "widgets",
+    fieldIds: ["name"],
+    fieldActions: ["read", "write"],
+    surfaceActions: ["read"],
+    kind: "business",
+  }),
 );
+
+const miniGrantProvider = createMemoryRoleGrantProvider({
+  widgets: {
+    editor: {
+      fields: [{ field: "name", actions: ["read", "write"] }],
+      surfaceActions: ["read"],
+    },
+  },
+});
 
 describe("parseManifestCacheMode", () => {
   it("defaults to request when raw is empty", () => {
@@ -105,7 +107,10 @@ describe("manifestCacheKey", () => {
 });
 
 describe("CachingPolicyService", () => {
-  const inner = new PolicyService({ registry: miniRegistry });
+  const inner = new PolicyService({
+    registry: miniRegistry,
+    grantProvider: miniGrantProvider,
+  });
   const scope = { surface: "widgets" as const, mode: "list" as const };
 
   it("mode none returns inner PolicyService unchanged", () => {
@@ -264,7 +269,10 @@ describe("CachingPolicyService", () => {
  * Run: `npm run test -- -t "Phase 06"`
  */
 describe("manifest cache benchmark (Phase 06 DoD)", () => {
-  const inner = new PolicyService({ registry: miniRegistry });
+  const inner = new PolicyService({
+    registry: miniRegistry,
+    grantProvider: miniGrantProvider,
+  });
   const scope = { surface: "widgets" as const, mode: "list" as const };
   const p = principal(["editor"], { policyVersion: 2 });
 

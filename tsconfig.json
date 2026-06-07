@@ -1,7 +1,8 @@
 {
   "files": [],
   "references": [
-    { "path": "apps/crm" },
+    { "path": "apps/spike_codegen" },
+    { "path": "apps/spike_policy" },
     { "path": "packages/contracts" },
     { "path": "packages/policy" },
     { "path": "packages/dal" },

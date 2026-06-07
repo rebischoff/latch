@@ -37,6 +37,17 @@ export {
 export type { MergeOptions } from "./merge.js";
 
 export {
+  createMemoryRoleGrantProvider,
+  emptyRoleGrantProvider,
+  MemoryRoleGrantProvider,
+} from "./grant-provider.js";
+export type {
+  MemoryRoleGrantBinding,
+  RoleGrant,
+  RoleGrantProvider,
+} from "./grant-provider.js";
+
+export {
   definePolicyRegistry,
   defineSurfacePolicy,
 } from "./registry.js";
@@ -48,5 +59,4 @@ export type {
   RolePolicyBinding,
   SurfaceKind,
   SurfacePolicyDefinition,
-  SurfacePolicyMeta,
 } from "./registry.js";

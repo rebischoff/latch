@@ -19,7 +19,8 @@ Everything that only matters once Latch serves more than one internal app/compan
 | **Postgres-backed job store** (replaces `MemoryJobStore`) — prerequisite for RLS | Per-Field RLS / column GRANT explosion — rejected (DAL owns Field masking) |
 | **RLS spikes (A/C/D) + pilot adoption** (coarse row/company gate) — deferred from Phase 06 (2026-06-03) | — |
 | **Business-table audit triggers** (direct-SQL bypass net) — deferred from Phase 06 | — |
-| Publish `@latch/*` packages | — |
+| Publish `@latch/*` packages; `latch` CLI runnable from an external app root (cwd/config scan root) | — |
+| One-time project scaffolder (`create-latch-app` / `latch new`) | Codegen *owning/overwriting* app pages (sync ≠ scaffold) |
 | Additional role-merge modes (`intersection_grants`, `most_restrictive`, `priority`) | — |
 | Partial / per-Field verification; external reviewers | — |
 | OpenAPI generation; async bulk for >cap batches | tRPC / GraphQL (no current driver) |
@@ -29,6 +30,7 @@ Everything that only matters once Latch serves more than one internal app/compan
 1. The single-company hard-coding becomes a config swap, not a refactor (the per-request client seam already exists).
 2. `@latch/*` packages are publishable with stable `exports` and no server leakage into client bundles.
 3. A Postgres-backed job store lands, enabling RLS as a real defense-in-depth net (the `SET LOCAL` actor binding from Phase 06 is reused).
+4. **Latch is consumable as an installable SDK + CLI from a business app in its own repo** — not just from in-repo `apps/*`. Target model and the sync/scaffold split are locked in [`../../discussions/01-codegen.md`](../../discussions/01-codegen.md#decision-latch-is-an-installable-sdk--cli-monorepo-apps-are-dev-only-2026-06-06). Includes: drop `private`/build to `dist`, and fix codegen's `import.meta.url`-anchored scan root to resolve from the **invocation root (`process.cwd()` / config)**. Driver (2026-06-06): new business apps developed outside this monorepo once Latch is proven.
 
 ## RLS (carried from Phase 06, deferred 2026-06-03)
 
@@ -46,6 +48,7 @@ Findings + design target: [`../../discovery/postgres-rls-and-security.md`](../..
 - [ ] Company routing behind a provider; cross-company isolation tested (T9)
 - [ ] Postgres job store replaces `MemoryJobStore`; RLS spikes run and adopt/defer recorded
 - [ ] Packages publish cleanly; client imports remain `contracts`/`react` only
+- [ ] A business app in a **separate repo** can install `@latch/*` + run `latch codegen` from its own root (codegen scan root resolves from cwd/config, not `import.meta.url`)
 - [ ] Deferred items promoted here have their own task chains when scheduled
 
 ## References

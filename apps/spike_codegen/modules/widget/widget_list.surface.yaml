@@ -1,0 +1,28 @@
+# Smoke-test surface for codegen discovery + typed columns (tasks 01/02).
+id: widget_list
+displayName: Widget list
+anchorTable: widgets
+kind: business
+
+fieldActions:
+  - read
+  - write
+
+surfaceActions:
+  - read
+  - write
+
+tables:
+  - widgets
+
+fields:
+  - id: summary
+    columns:
+      - column: widgets.id
+        type: string
+      - column: widgets.label
+        type: string
+  - id: status
+    columns:
+      - column: widgets.status
+        type: string
