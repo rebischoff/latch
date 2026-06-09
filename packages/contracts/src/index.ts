@@ -13,6 +13,7 @@ export type {
   PolicyEffect,
   PolicyScope,
   Principal,
+  RoleClass,
   RoleId,
   RoleSurfacePolicy,
   RowScope,

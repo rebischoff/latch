@@ -17,10 +17,25 @@ export type SurfaceId = string;
 export type FieldId = string;
 export type RoleId = string;
 
+/**
+ * Catalog `latch_roles.role_class`. System classes drive `PolicyService`
+ * synthesis (business / IAM wildcards); `app` roles resolve grants via the
+ * `RoleGrantProvider`. The class — not a fixed UUID — identifies system rows,
+ * so role ids stay DB-generated (`gen_random_uuid()`).
+ */
+export type RoleClass = "system_data" | "system_iam" | "app";
+
 /** Who is acting on a request. */
 export interface Principal {
   id: string;
   roles: RoleId[];
+  /**
+   * `role_class` for the held `roles`, keyed by role id. Populated where the
+   * principal is built from the DB (`getPrincipal` joins `latch_roles`).
+   * `PolicyService` synthesizes system grants from this, never from a hard-coded
+   * role id. Absent → no system synthesis (e.g. app-role-only stub principals).
+   */
+  roleClasses?: Partial<Record<RoleId, RoleClass>>;
   /**
    * Global policy generation from `latch_policy_version` (Postgres).
    * Omitted for stub principals (`LATCH_STUB_*`) and when `DATABASE_URL` is unset.

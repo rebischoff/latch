@@ -6,6 +6,7 @@
  * Usage:
  *   node scripts/db-migrate.mjs              # CRM (default)
  *   node scripts/db-migrate.mjs --app=test1
+ *   node scripts/db-migrate.mjs --app=spike_policy
  *   node scripts/db-migrate.mjs --app=crm --check
  */
 import { spawnSync } from "node:child_process";
@@ -20,6 +21,10 @@ const APPS = {
   test1: {
     envLocalPath: resolve("apps/test1/.env.local"),
     migrationsDir: resolve("apps/test1/migrations"),
+  },
+  spike_policy: {
+    envLocalPath: resolve("apps/spike_policy/.env.local"),
+    migrationsDir: resolve("apps/spike_policy/migrations"),
   },
 };
 

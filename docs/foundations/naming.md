@@ -14,7 +14,7 @@ Former in-repo codename **Modula** was retired 2026-05-27.
 
 **Choice:** **Latch**
 
-**Rationale:** Short, pronounceable, avoids "module" / ESM confusion, and fits the v1 story (permissions enforced and UI kept in lockstep at the DAL). `@latch/core` looked unclaimed on npm at decision time ó verify domain/GitHub org before external launch.
+**Rationale:** Short, pronounceable, avoids "module" / ESM confusion, and fits the v1 story (permissions enforced and UI kept in lockstep at the DAL). `@latch/core` looked unclaimed on npm at decision time ù verify domain/GitHub org before external launch.
 
 ## Decision: rename before code lands (2026-05-27)
 
@@ -24,11 +24,11 @@ Former in-repo codename **Modula** was retired 2026-05-27.
 
 ## Constraints / wishlist (used to pick Latch)
 
-- Short (1ñ2 syllables ideal).
+- Short (1ù2 syllables ideal).
 - Pronounceable.
 - npm scope available (`@latch/*`).
-- Domain available (`.dev` or `.io`) ó **verify before marketing**.
-- Github org available ó **verify before marketing**.
+- Domain available (`.dev` or `.io`) ù **verify before marketing**.
+- Github org available ù **verify before marketing**.
 - Not already a major software project (search npm, github, google).
 - Doesn't strongly imply one vertical (generic platform; trades pilot only).
 - Doesn't clash with "module" / ESM concepts.
@@ -50,13 +50,34 @@ Mechanical sweep applied across the repo:
 4. `modula_*` ? `latch_*` in docs and planned schema names
 5. `MODULA_*` ? `LATCH_*` in env examples
 6. `.cursor/rules/20-naming.mdc` updated
-7. `STATUS.md` ó Step 1 removed; Step 2 is current
+7. `STATUS.md` ù Step 1 removed; Step 2 is current
 
-**Not renamed:** local clone directory (`Sites/modula`) ó rename on disk if desired.
+**Not renamed:** local clone directory (`Sites/modula`) ù rename on disk if desired.
 
 **Local dev:** Use a Neon connection string in `apps/web/.env.local` (see [`development.md`](./development.md)). If you still use optional Docker Postgres, credentials default to `postgresql://latch:latch@localhost:5432/latch`.
+
+## Decision: platform anchor PKs are UUID (2026-06-08)
+
+**Choice:** Template platform tables and per-app **business anchor** rows use **`UUID` primary keys**, **DB-generated** by default (`gen_random_uuid()`). The client picks a UUID only when it needs the id up front (related-data inserts, optimistic-UI new records). Singleton seeds (e.g. `latch_roles` system rows) are identified by a **stable column** (`role_class` + partial unique index), not a hard-coded id. Natural business identifiers (SKU, email, code) are **`UNIQUE` columns**, not PKs.
+
+**Postgres schema:** Stay on **`public`** + `latch_*` table prefix ù no separate PG `SCHEMA` for platform tables in v1.
+
+**`latch_roles` catalog** ([P11](../../packages/policy/docs/tasks/00-decisions-needed.md#p11--role-catalog-shape-uuid--role_class-2026-06-08)):
+
+| Column | Convention |
+|--------|------------|
+| `id` | `UUID` PK |
+| `role_class` | `system_data` \| `system_iam` \| `app` |
+| `display_name` | Human label (not unique) |
+
+No `slug` on catalog rows. No row `created_at` on `latch_roles` ù IAM mutation times live in `latch_audit`.
+
+**`RoleId` in `@latch/contracts`:** UUID string (catalog `latch_roles.id`). Distinct from Surface/Field ids (`snake_case` vocabulary).
+
+**Rationale:** Uniform surrogate keys across platform and business data; role catalog does not mint string slugs at create time; audit is the time axis for IAM mutations.
 
 ## Related
 
 - [`STATUS.md`](../../STATUS.md)
 - [`open-questions.md`](./open-questions.md)
+- [`../reference/access-control.md`](../reference/access-control.md)

@@ -1,0 +1,27 @@
+# role_detail — IAM Surface (runtime role catalog + grants, task 03)
+# kind: iam → excluded from system_data wildcard synthesis.
+# @see packages/policy/docs/tasks/03-role-editor-surface.md
+
+id: role_detail
+displayName: Role detail
+anchorTable: latch_roles
+
+tables:
+  - latch_roles
+  - latch_role_surfaces
+  - latch_role_grants
+
+fields:
+  - id: catalog
+    columns:
+      - latch_roles.id
+      - latch_roles.display_name
+      - latch_roles.role_class
+
+  # Logical projection: binding rows per (role, surface) → { surface_id, row_scope }[]
+  - id: surface_bindings
+    columns: []
+
+  # Logical projection: sparse grant rows → { surface_id, field_id, action }[]
+  - id: grants
+    columns: []

@@ -19,6 +19,13 @@ export declare class NotFoundError extends LatchError {
 /** Duck-typed check — safe when multiple `@latch/contracts` copies exist (e.g. Next RSC). */
 export declare const isLatchError: (error: unknown, code?: LatchError["code"]) => error is LatchError;
 export declare const isNotFoundError: (error: unknown) => error is NotFoundError;
+/** Target already exists — e.g. restore when anchor row is live (default 409). */
+export declare class ConflictError extends LatchError {
+    readonly statusCode = 409;
+    readonly code = "CONFLICT";
+    constructor(message?: string);
+}
+export declare const isConflictError: (error: unknown) => error is ConflictError;
 /** Body or params failed structural validation (strict write, Zod parse). */
 export declare class ValidationError extends LatchError {
     readonly details?: unknown | undefined;

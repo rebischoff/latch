@@ -1,7 +1,7 @@
 export {
-  DATA_MASTER_ROLE_ID,
   PolicyService,
   synthesizeDataMasterBinding,
+  synthesizeIamMasterBinding,
   unionGrantsStrategy,
 } from "./policy-service.js";
 export type {
@@ -51,6 +51,13 @@ export {
   definePolicyRegistry,
   defineSurfacePolicy,
 } from "./registry.js";
+
+export {
+  resolveGrantSurfaceDef,
+  validateGrantAgainstCatalog,
+  validateGrantTuple,
+} from "./validate-grant.js";
+export type { GrantTuple } from "./validate-grant.js";
 export type {
   ModePolicyOverlay,
   PolicyMode,

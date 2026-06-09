@@ -2,10 +2,23 @@
   "name": "@latch/spike-policy",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
+  "scripts": {
+    "db:migrate": "node ../../scripts/db-migrate.mjs --app=spike_policy",
+    "test": "vitest run"
+  },
   "dependencies": {
-    "drizzle-orm": "^0.45.2"
+    "@latch/audit": "0.0.0",
+    "@latch/contracts": "0.0.0",
+    "@latch/dal": "0.0.0",
+    "@latch/policy": "0.0.0",
+    "drizzle-orm": "^0.45.2",
+    "pg": "^8.16.0",
+    "zod": "^3.24.2"
   },
   "devDependencies": {
-    "typescript": "^5"
+    "@types/pg": "^8.15.4",
+    "typescript": "^5",
+    "vitest": "^3.0.5"
   }
 }

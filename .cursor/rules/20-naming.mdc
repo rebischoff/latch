@@ -32,7 +32,7 @@ See [`docs/foundations/naming.md`](../../docs/foundations/naming.md). Former cod
 | Surface id | `snake_case` | `job_detail`, `customer_list` |
 | Field id | `snake_case` | `financial_terms`, `salary_band` |
 | Action | lowercase verb | `read`, `write`, `approve`, `delete`, `restore`, `hard_delete` |
-| Role id | `snake_case` | `platform_admin`, `field_tech` |
+| Role catalog id (`RoleId`) | UUID string | `latch_roles.id` (not `snake_case`; distinct from Surface/Field vocabulary) |
 | Generated file | `*.generated.ts` under `generated/` | `job.schema.generated.ts` |
 | Metadata file | `<surface>.surface.yaml`, `<surface>.policies.yaml` | `job.surface.yaml` |
 

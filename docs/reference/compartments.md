@@ -53,7 +53,7 @@ Three sub-things, two categories. Platform tables are template candidates; the p
 |---|---|---|
 | `latch_users` | identity | crm `001`, test1 `001` |
 | `latch_user_roles` | user → role assignments (runtime data) | crm `004`, test1 `001` |
-| `latch_roles` | role catalog (runtime data; seeded built-ins) | **proposed** — see [policy tasks](../../packages/policy/docs/tasks/README.md) |
+| `latch_roles` | role catalog (`UUID`, `role_class`; seeded `system_data` / `system_iam`) | `apps/spike_policy` (P11 shape; [01b](../../packages/policy/docs/tasks/01b-p11-catalog-realignment.md) complete) |
 | `latch_role_grants` | role → surface → field → action grants (runtime data) | **proposed** — see [policy tasks](../../packages/policy/docs/tasks/README.md) |
 | `latch_policy_version` | manifest cache invalidation | crm `007`, test1 `001` |
 
@@ -83,7 +83,7 @@ Managing assignments is itself a permission-gated Surface, persisting to `latch_
 | IAM DAL + projection | `apps/crm/src/lib/iam/{repository,project,apply-patch,descriptors,schemas}.ts` |
 | IAM API | `apps/crm/src/lib/api/iam-handler.ts`, `apps/crm/src/app/api/iam/users/[id]/route.ts` |
 
-**Built-in roles (standardized):** `data_master` (business wildcard) and `iam_master` (IAM). One user may hold both. `data_master` is synthesized in [`policy-service.ts`](../../packages/policy/src/policy-service.ts); seeds in `001` migrations.
+**System roles (standardized):** `system_data` (business wildcard) and `system_iam` (IAM) — catalog `role_class` ([P11](../../packages/policy/docs/tasks/00-decisions-needed.md#p11--role-catalog-shape-uuid--role_class-2026-06-08)). One user may hold both. Synthesized in [`policy-service.ts`](../../packages/policy/src/policy-service.ts) from `role_class` via `Principal.roleClasses` (DB-generated ids; no fixed UUID constants).
 
 **Pure-function test:** `PolicyService.resolve(principal, scope)` needs only a registry → assert manifests per role. No DB.
 

@@ -3,6 +3,7 @@ import type {
   Manifest,
   PolicyScope,
   Principal,
+  RoleClass,
   RoleSurfacePolicy,
 } from "@latch/contracts";
 
@@ -19,25 +20,50 @@ import {
 } from "./merge.js";
 import type { PolicyRegistry, SurfacePolicyDefinition } from "./registry.js";
 
-/** Built-in role id — wildcard grants on business surfaces only. */
-export const DATA_MASTER_ROLE_ID = "data_master";
-
-const DATA_MASTER_FIELD_ACTIONS: FieldAction[] = ["read", "write"];
-const DATA_MASTER_SURFACE_ACTIONS: FieldAction[] = ["read", "write"];
+const BUILTIN_FIELD_ACTIONS: FieldAction[] = ["read", "write"];
+const BUILTIN_SURFACE_ACTIONS: FieldAction[] = ["read", "write"];
 
 const isBusinessSurface = (surfaceDef: SurfacePolicyDefinition): boolean =>
   (surfaceDef.kind ?? "business") === "business";
 
-/** Synthesized grants when principal includes `data_master` on a business surface. */
+const isIamSurface = (surfaceDef: SurfacePolicyDefinition): boolean =>
+  surfaceDef.kind === "iam";
+
+/**
+ * Does the principal hold any role of the given system class? System rows are
+ * identified by `latch_roles.role_class` (DB-generated UUID), not by a fixed
+ * role id — see `Principal.roleClasses` and P11.
+ */
+const holdsSystemClass = (
+  principal: Principal,
+  roleClass: RoleClass,
+): boolean =>
+  principal.roles.some(
+    (roleId) => principal.roleClasses?.[roleId] === roleClass,
+  );
+
+/** Synthesized grants when principal holds `system_data` on a business surface. */
 export const synthesizeDataMasterBinding = (
   surfaceDef: SurfacePolicyDefinition,
 ): RoleSurfacePolicy & { surfaceActions: FieldAction[] } => ({
   rowScope: "all",
   fields: surfaceDef.fieldIds.map((field) => ({
     field,
-    actions: DATA_MASTER_FIELD_ACTIONS,
+    actions: BUILTIN_FIELD_ACTIONS,
   })),
-  surfaceActions: DATA_MASTER_SURFACE_ACTIONS,
+  surfaceActions: BUILTIN_SURFACE_ACTIONS,
+});
+
+/** Synthesized grants when principal holds `system_iam` on an IAM surface. */
+export const synthesizeIamMasterBinding = (
+  surfaceDef: SurfacePolicyDefinition,
+): RoleSurfacePolicy & { surfaceActions: FieldAction[] } => ({
+  rowScope: "all",
+  fields: surfaceDef.fieldIds.map((field) => ({
+    field,
+    actions: [...surfaceDef.fieldActions],
+  })),
+  surfaceActions: [...surfaceDef.surfaceActions],
 });
 
 export type MultiRoleCombine = "union_grants";
@@ -101,7 +127,7 @@ export class PolicyService {
     const surfaceActionLists: FieldAction[][] = [];
 
     if (
-      principal.roles.includes(DATA_MASTER_ROLE_ID) &&
+      holdsSystemClass(principal, "system_data") &&
       isBusinessSurface(surfaceDef)
     ) {
       const dataMaster = synthesizeDataMasterBinding(surfaceDef);
@@ -110,6 +136,18 @@ export class PolicyService {
         fields: dataMaster.fields,
       });
       surfaceActionLists.push(dataMaster.surfaceActions);
+    }
+
+    if (
+      holdsSystemClass(principal, "system_iam") &&
+      isIamSurface(surfaceDef)
+    ) {
+      const iamMaster = synthesizeIamMasterBinding(surfaceDef);
+      rolePolicies.push({
+        rowScope: iamMaster.rowScope,
+        fields: iamMaster.fields,
+      });
+      surfaceActionLists.push(iamMaster.surfaceActions);
     }
 
     for (const grant of this.grantProvider.grantsFor(

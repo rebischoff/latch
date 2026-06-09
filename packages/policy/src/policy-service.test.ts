@@ -5,13 +5,34 @@ import type { Principal } from "@latch/contracts";
 import { createMemoryRoleGrantProvider } from "./grant-provider.js";
 import { unionGrants, mergeRowScope } from "./merge.js";
 import {
-  DATA_MASTER_ROLE_ID,
   PolicyService,
   synthesizeDataMasterBinding,
+  synthesizeIamMasterBinding,
 } from "./policy-service.js";
 import { definePolicyRegistry, defineSurfacePolicy } from "./registry.js";
 
 const principal = (...roles: string[]): Principal => ({ id: "user-1", roles });
+
+// System rows carry DB-generated UUIDs; `role_class` (via roleClasses) identifies
+// them, not the id value — so any UUID works here. See P11.
+const SYSTEM_DATA_ID = "11111111-1111-4111-8111-111111111111";
+const SYSTEM_IAM_ID = "22222222-2222-4222-8222-222222222222";
+
+/** Principal holding the given system class(es), tagged via `roleClasses`. */
+const systemPrincipal = (
+  ...classes: Array<"system_data" | "system_iam">
+): Principal => {
+  const idByClass = {
+    system_data: SYSTEM_DATA_ID,
+    system_iam: SYSTEM_IAM_ID,
+  } as const;
+  const roles = classes.map((c) => idByClass[c]);
+  return {
+    id: "user-1",
+    roles,
+    roleClasses: Object.fromEntries(classes.map((c) => [idByClass[c], c])),
+  };
+};
 
 describe("merge helpers", () => {
   it("mergeRowScope: all wins over own", () => {
@@ -57,13 +78,6 @@ const fixtureGrantProvider = createMemoryRoleGrantProvider({
       surfaceActions: ["read"],
     },
   },
-  iam_console: {
-    iam_master: {
-      rowScope: "all",
-      fields: [{ field: "assignments", actions: ["read", "write"] }],
-      surfaceActions: ["read", "write"],
-    },
-  },
 });
 
 const fixtureRegistry = definePolicyRegistry(
@@ -105,6 +119,14 @@ const throwawayGrantProvider = createMemoryRoleGrantProvider({
       surfaceActions: ["read"],
     },
   },
+});
+
+const throwawayIamSurface = defineSurfacePolicy({
+  surface: "throwaway_iam",
+  fieldIds: ["role_assignments"],
+  fieldActions: ["read", "write"],
+  surfaceActions: ["read", "write"],
+  kind: "iam",
 });
 
 describe("PolicyService — fixture registry (domain-free)", () => {
@@ -152,7 +174,7 @@ describe("PolicyService — fixture registry (domain-free)", () => {
   });
 });
 
-describe("PolicyService — data_master built-in", () => {
+describe("PolicyService — system_data synthesis", () => {
   it("synthesizeDataMasterBinding: read/write on all field ids", () => {
     const binding = synthesizeDataMasterBinding(throwawayBusinessSurface);
 
@@ -163,14 +185,14 @@ describe("PolicyService — data_master built-in", () => {
     expect(binding.surfaceActions).toEqual(["read", "write"]);
   });
 
-  it("data_master on business surface without per-role grant entry", () => {
+  it("system_data UUID on business surface without per-role grant entry", () => {
     const registry = definePolicyRegistry(throwawayBusinessSurface);
     const policy = new PolicyService({
       registry,
       grantProvider: throwawayGrantProvider,
     });
 
-    const manifest = policy.resolve(principal(DATA_MASTER_ROLE_ID), {
+    const manifest = policy.resolve(systemPrincipal("system_data"), {
       surface: "throwaway_widget",
     });
 
@@ -179,13 +201,13 @@ describe("PolicyService — data_master built-in", () => {
     expect(manifest.actions).toEqual(["read", "write"]);
   });
 
-  it("data_master on fixture alpha: read/write all fields", () => {
+  it("system_data UUID on fixture alpha: read/write all fields", () => {
     const policy = new PolicyService({
       registry: fixtureRegistry,
       grantProvider: fixtureGrantProvider,
     });
 
-    const manifest = policy.resolve(principal(DATA_MASTER_ROLE_ID), {
+    const manifest = policy.resolve(systemPrincipal("system_data"), {
       surface: "alpha",
     });
 
@@ -195,13 +217,13 @@ describe("PolicyService — data_master built-in", () => {
     expect(manifest.actions).toEqual(["read", "write"]);
   });
 
-  it("data_master does not gain IAM surface write", () => {
+  it("system_data UUID does not gain IAM surface write", () => {
     const policy = new PolicyService({
       registry: fixtureRegistry,
       grantProvider: fixtureGrantProvider,
     });
 
-    const manifest = policy.resolve(principal(DATA_MASTER_ROLE_ID), {
+    const manifest = policy.resolve(systemPrincipal("system_data"), {
       surface: "iam_console",
     });
 
@@ -210,22 +232,7 @@ describe("PolicyService — data_master built-in", () => {
     expect(manifest.rowScope).toBeUndefined();
   });
 
-  it("iam_master on IAM surface: role_assignments write equivalent", () => {
-    const policy = new PolicyService({
-      registry: fixtureRegistry,
-      grantProvider: fixtureGrantProvider,
-    });
-
-    const manifest = policy.resolve(principal("iam_master"), {
-      surface: "iam_console",
-    });
-
-    expect(manifest.rowScope).toBe("all");
-    expect(manifest.fields.assignments).toEqual(["read", "write"]);
-    expect(manifest.actions).toEqual(["read", "write"]);
-  });
-
-  it("denyWins: explicit deny on a field blocks data_master read/write", () => {
+  it("denyWins: explicit deny on a field blocks system_data read/write", () => {
     const registry = definePolicyRegistry(
       defineSurfacePolicy({
         surface: "locked",
@@ -251,10 +258,73 @@ describe("PolicyService — data_master built-in", () => {
     const policy = new PolicyService({ registry, grantProvider });
 
     const manifest = policy.resolve(
-      principal(DATA_MASTER_ROLE_ID, "locker"),
+      {
+        id: "user-1",
+        roles: [SYSTEM_DATA_ID, "locker"],
+        roleClasses: { [SYSTEM_DATA_ID]: "system_data" },
+      },
       { surface: "locked" },
     );
 
     expect(manifest.fields.secret).toEqual([]);
+  });
+});
+
+describe("PolicyService — system_iam synthesis", () => {
+  it("synthesizeIamMasterBinding: read/write on all field ids", () => {
+    const binding = synthesizeIamMasterBinding(throwawayIamSurface);
+
+    expect(binding.rowScope).toBe("all");
+    expect(binding.fields).toEqual([
+      { field: "role_assignments", actions: ["read", "write"] },
+    ]);
+    expect(binding.surfaceActions).toEqual(["read", "write"]);
+  });
+
+  it("system_iam UUID on IAM surface without per-role grant entry", () => {
+    const registry = definePolicyRegistry(throwawayIamSurface);
+    const policy = new PolicyService({
+      registry,
+      grantProvider: throwawayGrantProvider,
+    });
+
+    const manifest = policy.resolve(systemPrincipal("system_iam"), {
+      surface: "throwaway_iam",
+    });
+
+    expect(manifest.rowScope).toBe("all");
+    expect(manifest.fields.role_assignments).toEqual(["read", "write"]);
+    expect(manifest.actions).toEqual(["read", "write"]);
+  });
+
+  it("system_iam UUID on fixture iam_console: read/write all fields", () => {
+    const policy = new PolicyService({
+      registry: fixtureRegistry,
+      grantProvider: fixtureGrantProvider,
+    });
+
+    const manifest = policy.resolve(systemPrincipal("system_iam"), {
+      surface: "iam_console",
+    });
+
+    expect(manifest.rowScope).toBe("all");
+    expect(manifest.fields.assignments).toEqual(["read", "write"]);
+    expect(manifest.actions).toEqual(["read", "write"]);
+  });
+
+  it("system_iam UUID does not gain business surface write", () => {
+    const policy = new PolicyService({
+      registry: fixtureRegistry,
+      grantProvider: fixtureGrantProvider,
+    });
+
+    const manifest = policy.resolve(systemPrincipal("system_iam"), {
+      surface: "alpha",
+    });
+
+    expect(manifest.fields.foo).toEqual([]);
+    expect(manifest.fields.bar).toEqual([]);
+    expect(manifest.actions).toEqual([]);
+    expect(manifest.rowScope).toBeUndefined();
   });
 });

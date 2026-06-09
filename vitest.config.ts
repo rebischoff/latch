@@ -21,7 +21,7 @@ export default defineConfig({
     },
   },
   test: {
-    include: ["packages/**/*.test.ts"],
+    include: ["packages/**/*.test.ts", "apps/**/*.test.ts"],
     /** Tests that spy on `PolicyService.resolve` expect no cache unless opted in. */
     env: {
       LATCH_MANIFEST_CACHE_MODE: "none",

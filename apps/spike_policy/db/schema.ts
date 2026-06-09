@@ -1,57 +1,105 @@
 /**
- * Proposed runtime-roles tables for the policy spike (drives task 01 DDL).
+ * Platform + runtime-roles tables for the policy spike (P11 catalog shape).
  *
- * Encodes the *proposals* in `packages/policy/docs/tasks/00-decisions-needed.md`:
- *  - P1: `row_scope` per grant row (nullable); provider takes the max per role×surface.
- *  - P2: `latch_role_grants.role_id` FK → `latch_roles.id`.
- *  - P3: pilot roles seeded as deletable `kind: 'app'` rows (see migrations/001).
- *  - P4: `data_master` / `iam_master` grants are NOT rows — synthesized in PolicyService.
- *  - P6: `mode` nullable and OUT of the PK (overlays deferred).
+ * Locked shape (packages/policy/docs/tasks/00-decisions-needed.md):
+ *  - P1: `row_scope` on `latch_role_surfaces` per (role, surface); not on grant rows.
+ *  - P2: `latch_user_roles.role_id` → `latch_roles.id` RESTRICT; grants/bindings CASCADE.
+ *  - P3: template seeds system catalog rows only; pilot roles in 900_fixture_pilot_roles.sql.
+ *  - P4: system grants synthesized in PolicyService, not stored as rows.
+ *  - P6: `mode` nullable on grants (overlays deferred).
+ *  - P11: UUID PK + `role_class`; no slug, no row `created_at` on catalog.
  *
- * Disposable: this is a fixture, not the template DDL. Assertions live in
- * `packages/policy/src/*.test.ts` (vitest only scans `packages/**`).
+ * Disposable fixture — graduates to business-app template migrations.
  */
 import {
-  boolean,
+  bigint,
   pgTable,
   primaryKey,
+  smallint,
   text,
   timestamp,
+  unique,
+  uuid,
 } from "drizzle-orm/pg-core";
 
-/** Role catalog. Built-ins seeded `is_builtin = true` and not app-deletable. */
-export const latchRoles = pgTable("latch_roles", {
+export const latchUsers = pgTable("latch_users", {
   id: text("id").primaryKey(),
   displayName: text("display_name").notNull(),
-  /** `app` | `builtin`. */
-  kind: text("kind").notNull().default("app"),
-  isBuiltin: boolean("is_builtin").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
 });
 
-/** One grant per role × surface × field × action (P1: row_scope per row). */
-export const latchRoleGrants = pgTable(
-  "latch_role_grants",
+/**
+ * Role catalog — UUID PK + `role_class` (P11). Ids are DB-generated; system rows
+ * are identified by `role_class` (partial unique singleton index in migration 003).
+ */
+export const latchRoles = pgTable("latch_roles", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  /** `system_data` | `system_iam` | `app`. */
+  roleClass: text("role_class").notNull(),
+  displayName: text("display_name").notNull(),
+});
+
+export const latchUserRoles = pgTable(
+  "latch_user_roles",
   {
-    roleId: text("role_id")
+    userId: text("user_id")
+      .notNull()
+      .references(() => latchUsers.id, { onDelete: "cascade" }),
+    roleId: uuid("role_id")
+      .notNull()
+      .references(() => latchRoles.id, { onDelete: "restrict" }),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.userId, table.roleId] }),
+  }),
+);
+
+/** One binding per role × surface; authoritative `row_scope` (P1). */
+export const latchRoleSurfaces = pgTable(
+  "latch_role_surfaces",
+  {
+    roleId: uuid("role_id")
       .notNull()
       .references(() => latchRoles.id, { onDelete: "cascade" }),
     surfaceId: text("surface_id").notNull(),
-    fieldId: text("field_id").notNull(),
-    /** `read` | `write` | `delete` | … (validated against codegen vocabulary). */
-    action: text("action").notNull(),
-    /** `own` | `all`; nullable (resolver defaults / merges to most-permissive). */
+    /** `own` | `all`; nullable until configured. */
     rowScope: text("row_scope"),
-    /** `allow` | `deny` (denyWins handled in PolicyService merge). */
-    effect: text("effect").notNull().default("allow"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.roleId, table.surfaceId] }),
+  }),
+);
+
+/** Sparse allow-rows per role × surface × field × action (P2a default deny). */
+export const latchRoleGrants = pgTable(
+  "latch_role_grants",
+  {
+    roleId: uuid("role_id")
+      .notNull()
+      .references(() => latchRoles.id, { onDelete: "cascade" }),
+    surfaceId: text("surface_id").notNull(),
+    /** Nullable for surface-level actions. */
+    fieldId: text("field_id"),
+    action: text("action").notNull(),
     /** P6 deferred: NULL = applies to all modes. */
     mode: text("mode"),
   },
   (table) => ({
-    pk: primaryKey({
-      columns: [table.roleId, table.surfaceId, table.fieldId, table.action],
-    }),
+    tupleUnique: unique("latch_role_grants_tuple_unique").on(
+      table.roleId,
+      table.surfaceId,
+      table.fieldId,
+      table.action,
+    ),
   }),
 );
+
+export const latchPolicyVersion = pgTable("latch_policy_version", {
+  id: smallint("id").primaryKey().default(1),
+  version: bigint("version", { mode: "number" }).notNull().default(1),
+});

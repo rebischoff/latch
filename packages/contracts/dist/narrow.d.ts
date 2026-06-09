@@ -1,6 +1,8 @@
 import { z } from "zod";
 import type { FieldAction, FieldId, Manifest } from "./types.js";
 export declare const fieldAllows: (manifest: Manifest, fieldId: FieldId, action: FieldAction) => boolean;
+/** True when the Field should appear in the UI (any actionable or readable grant). */
+export declare const fieldVisibleForUi: (manifest: Manifest, fieldId: FieldId) => boolean;
 export declare const surfaceAllows: (manifest: Manifest, action: FieldAction) => boolean;
 /** Field ids with `read` in the manifest. */
 export declare const readableFieldIds: (manifest: Manifest) => FieldId[];

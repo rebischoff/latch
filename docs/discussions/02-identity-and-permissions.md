@@ -15,7 +15,7 @@ Three sub-things, often lumped together:
 - The **manifest** is the resolved result of (principal.roles × policy definitions) for one surface — computed in memory per request, not stored as a blob.
 - **Role definitions are runtime DB data** (Decision below, 2026-06-06) — `latch_roles` (catalog), `latch_role_surfaces` (per role × surface `row_scope`), and sparse `latch_role_grants` (explicit allow-rows only; default deny). Codegen no longer emits grants; it emits only the Field/action **vocabulary** the role editor validates against. *(Supersedes Decision H's "YAML is the single source of truth for grants"; the YAML→TS hand-sync drift risk it solved is now moot because grants aren't generated at all.)*
 - **Assignments are runtime DB data** — never codegen. `latch_user_roles.role_id` FK → `latch_roles.id` with **`ON DELETE RESTRICT`** — a role cannot be deleted while users hold it; revoke via `user_roles_detail` first.
-- **`latch_roles` is a platform table** (added 2026-06-06). Only **`data_master`** and **`iam_master`** are seeded `is_builtin = true` (not app-deletable); grants for both are synthesized in `PolicyService`, not stored as grant rows.
+- **`latch_roles` is a platform table** (added 2026-06-06). Template seeds one **`system_data`** and one **`system_iam`** row (UUID PK, **DB-generated**; identified by `role_class` via the singleton index, not a fixed id; not app-deletable); grants for both are synthesized in `PolicyService` from `role_class`, not stored as grant rows ([P11](../../packages/policy/docs/tasks/00-decisions-needed.md#p11--role-catalog-shape-uuid--role_class-2026-06-08)).
 - **Two built-in roles** exist: `data_master` (business wildcard) and `iam_master` (manage users/roles). A single user can hold both.
 - **Editing users/roles is itself a Surface** (`user_roles_detail` in CRM) — permission-gated, persists to `latch_user_roles`, audited.
 
@@ -38,13 +38,14 @@ Re-evaluated the user/roles contract from scratch (supersedes an interim "boolea
 
 **Choice:**
 
-- **Synthesis (both built-ins).** `data_master` (wildcard on `kind: business`) **and** `iam_master` (wildcard on `kind: iam`) are synthesized in `PolicyService`; neither has `latch_role_grants` rows. Catalog rows seeded `is_builtin = true`.
-- **Uniform storage.** Built-in assignments are ordinary `latch_user_roles` rows. No built-in columns on `latch_users`; "built-in" is the catalog flag `latch_roles.is_builtin`. `Principal` stays `{ id, roles: RoleId[], policyVersion? }`.
-- **Separation of duties.** `data_master` = data plane; `iam_master` = control plane (users, assignments, role definitions). Composable on one user; a `data_master` alone cannot escalate.
-- **Exclusivity (write-time validation).** `data_master` may **not** combine with app roles (it may combine with `iam_master`); app roles only when `data_master` is absent. Only `iam_master` may assign/revoke an `is_builtin` role.
+- **Synthesis (both system classes).** `system_data` (wildcard on Surface `kind: business`) and `system_iam` (wildcard on Surface `kind: iam`) are synthesized in `PolicyService` from catalog `role_class`; neither has `latch_role_grants` rows.
+- **Uniform storage.** System assignments are ordinary `latch_user_roles` rows (catalog UUID FKs). No built-in columns on `latch_users`. `Principal` stays `{ id, roles: RoleId[], policyVersion? }` (`RoleId` = catalog UUID string).
+- **Separation of duties.** `system_data` = data plane; `system_iam` = control plane. Composable on one user; `system_data` alone cannot widen IAM access.
+- **Exclusivity (write-time validation).** `system_data` may **not** combine with `app` roles (may combine with `system_iam`); `app` roles only when `system_data` is absent.
+- **Privileged assignment (2026-06-08).** Assign `system_iam` only if actor holds `system_iam`; assign `system_data` only if actor holds `system_data`; hold both → assign both.
 - **Bootstrap.** Provisioning seeds one initial super admin (`data_master` + `iam_master`). The assignment DAL refuses to remove the **last** `iam_master`. An env break-glass (`LATCH_BOOTSTRAP_ADMIN_EMAIL`) promotes on login when zero `iam_master` exist; synthesis makes the promoted user immediately functional.
 
-**Rationale:** One assignment table = one source of truth for a user's roles and a uniform resolver; `is_builtin` as a catalog flag makes "assigning a built-in is privileged" a single check and lets a third built-in land with no schema change. Synthesizing both removes the bootstrap chicken-and-egg (a broken grants table can't lock IAM out) while keeping the codegen-vocabulary safety property. Separation of duties + exclusivity keep the data-superuser from silently self-escalating.
+**Rationale:** One assignment table = one source of truth for a user's roles and a uniform resolver; `role_class` encodes plane + deletability ([P11](../../packages/policy/docs/tasks/00-decisions-needed.md#p11--role-catalog-shape-uuid--role_class-2026-06-08)). Synthesizing both removes the bootstrap chicken-and-egg while keeping the codegen-vocabulary safety property. Separation of duties + per-class assignment keep cross-plane escalation in check.
 
 ## Points to confirm
 

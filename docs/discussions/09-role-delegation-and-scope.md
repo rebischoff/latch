@@ -15,8 +15,8 @@ Both ultimately ask: **does "scope" mean an organizational structure (sites, reg
 
 ## Shared understanding
 
-- `iam_master` stays **unscoped**: full assign/revoke incl. built-ins, last-`iam_master` protected ([P4a/P4b](../../packages/policy/docs/tasks/00-decisions-needed.md#p4a--built-in-role-storage--exclusivity-blocks-task-01-seeds--task-03assignment-dal)).
-- Delegated assigners are **app-roles-only**: never `is_builtin` roles, never the built-in flags.
+- `system_iam` holders stay **unscoped** on IAM assignment paths; last-`system_iam` protected ([P4a/P4b](../../packages/policy/docs/tasks/00-decisions-needed.md#p4a--built-in-role-storage--exclusivity-blocks-task-01-seeds--task-03assignment-dal)). System assignment authority is **per `role_class`** (hold `system_iam` to assign `system_iam`, etc.).
+- Delegated assigners are **`app`-roles-only**: never `system_data` / `system_iam` catalog rows.
 - Self-escalation stays denied (a delegator can't widen their own access).
 - Every delegated assignment is audited and bumps `policyVersion`, exactly like an `iam_master` assignment.
 - This is **assignment** delegation (who gets which role), distinct from **definition** editing (what a role may do) — the latter remains `iam_master`-only via the role editor ([policy task 03](../../packages/policy/docs/tasks/03-role-editor-surface.md)).

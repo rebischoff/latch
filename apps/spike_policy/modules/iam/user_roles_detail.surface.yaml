@@ -1,0 +1,20 @@
+# user_roles_detail — IAM Surface (Phase 03 threat T8; P10 harness)
+# kind: iam → excluded from system_data wildcard synthesis.
+
+id: user_roles_detail
+displayName: User roles
+anchorTable: latch_users
+
+tables:
+  - latch_users
+  - latch_user_roles
+
+fields:
+  - id: profile
+    columns:
+      - latch_users.id
+      - latch_users.display_name
+
+  # Logical projection: role_id rows for anchor user → UUID[] in DAL
+  - id: role_assignments
+    columns: []

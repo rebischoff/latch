@@ -1,6 +1,8 @@
 # CRM app and package phases — developing side by side
 
-How **`apps/crm`** (integration harness) relates to **`docs/phases/`** (package delivery plan).
+> **Update (2026-06-08):** `apps/crm` was removed. The active integration harness is [`apps/spike_policy`](../../apps/spike_policy/) (platform migrations + IAM/threat tests; [P10](../../packages/policy/docs/tasks/00-decisions-needed.md#p10--test-harness-after-appscrm-deletion)). Root [`tests/`](../tests/README.md) is orphaned until the business-app template ([discussion 07](../discussions/07-template-scaffold.md)). The sections below describe the historical CRM ↔ phase workflow.
+
+How **`apps/crm`** (integration harness) related to **`docs/phases/`** (package delivery plan).
 
 ## Two planning tracks, one repo
 
