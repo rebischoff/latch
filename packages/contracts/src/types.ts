@@ -16,6 +16,14 @@ export type FieldAction =
 export type SurfaceId = string;
 export type FieldId = string;
 export type RoleId = string;
+/** `latch_scopes.id` — bounded branch/site/crew boundary (app instantiates). */
+export type ScopeId = string;
+
+/** One role assignment: catalog role + optional scope (`null` = company-wide). */
+export interface RoleBinding {
+  roleId: RoleId;
+  scopeId: ScopeId | null;
+}
 
 /**
  * Catalog `latch_roles.role_class`. System classes drive `PolicyService`
@@ -28,10 +36,11 @@ export type RoleClass = "system_data" | "system_iam" | "app";
 /** Who is acting on a request. */
 export interface Principal {
   id: string;
-  roles: RoleId[];
+  /** Scoped role assignments from `latch_user_roles` (role + optional scope). */
+  bindings: RoleBinding[];
   /**
-   * `role_class` for the held `roles`, keyed by role id. Populated where the
-   * principal is built from the DB (`getPrincipal` joins `latch_roles`).
+   * `role_class` for held roles, keyed by role id. Populated where the
+   * principal is built from the DB (`loadPrincipalFromDb` joins `latch_roles`).
    * `PolicyService` synthesizes system grants from this, never from a hard-coded
    * role id. Absent → no system synthesis (e.g. app-role-only stub principals).
    */
@@ -43,8 +52,8 @@ export interface Principal {
   policyVersion?: number;
 }
 
-/** Row filter applied by the DAL after policy resolution. */
-export type RowScope = "own" | "all";
+/** Row filter applied by the DAL after policy resolution (`own ⊂ scope ⊂ all`). */
+export type RowScope = "own" | "scope" | "all";
 
 /**
  * Server-resolved effective access for one Surface (and optional entity).
@@ -61,6 +70,8 @@ export interface Manifest {
   fields: Record<FieldId, FieldAction[]>;
   /** Row filter for list/detail queries; set by PolicyService. */
   rowScope?: RowScope;
+  /** Union of actor scopes for a `scope`-rung role (Phase B resolve). */
+  scopeIds?: ScopeId[];
 }
 
 /** Input to PolicyService.resolve — which Surface (and record) to evaluate. */

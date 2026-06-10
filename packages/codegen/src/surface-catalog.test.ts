@@ -1,6 +1,7 @@
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
+import { principalWithRoles } from "@latch/contracts";
 import {
   createMemoryRoleGrantProvider,
   definePolicyRegistry,
@@ -106,7 +107,7 @@ describe("generated widget_list schema catalog", () => {
     });
 
     const viewer = policy.resolve(
-      { id: "user-1", roles: ["widget_viewer"] },
+      principalWithRoles("user-1", ["widget_viewer"]),
       { surface: "widget_list" },
     );
     expect(viewer.fields.summary).toEqual(["read"]);
@@ -114,7 +115,7 @@ describe("generated widget_list schema catalog", () => {
     expect(viewer.rowScope).toBe("own");
 
     const editor = policy.resolve(
-      { id: "user-2", roles: ["widget_editor"] },
+      principalWithRoles("user-2", ["widget_editor"]),
       { surface: "widget_list" },
     );
     expect(editor.fields.summary).toEqual(["read", "write"]);

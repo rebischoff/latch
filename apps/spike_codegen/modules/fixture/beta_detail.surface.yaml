@@ -1,0 +1,43 @@
+# Synthetic vocabulary fixture — policy catalog only (no backing table).
+id: beta_detail
+displayName: Beta detail
+anchorTable: fixture_beta
+kind: business
+
+fieldActions:
+  - read
+  - write
+  - submit
+
+surfaceActions:
+  - read
+  - write
+
+tables:
+  - fixture_beta
+
+fields:
+  - id: headline
+    columns:
+      - column: fixture_beta.headline
+        type: string
+  - id: body
+    columns:
+      - column: fixture_beta.body
+        type: string
+  - id: priority
+    columns:
+      - column: fixture_beta.priority
+        type: number
+  - id: due_date
+    columns:
+      - column: fixture_beta.due_date
+        type: timestamp
+  - id: assignee
+    columns:
+      - column: fixture_beta.assignee
+        type: string
+  - id: review_notes
+    columns:
+      - column: fixture_beta.review_notes
+        type: string

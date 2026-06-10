@@ -214,6 +214,28 @@ Set **once per (role, surface)** on `latch_role_surfaces`; applies to list, deta
 
 **Rationale:** Covers the pilot personas without committing to a full row-rule language. Policy passes `own`/`all`; the store owns *how* “own” is evaluated.
 
+### Decision: bounded scope primitive — `row_scope: scope` + scoped delegation (2026-06-09)
+
+**Choice (seam locked; full build is a dedicated phase):** Add a third `row_scope` value **`scope`** plus a bounded **scope primitive** for branch/site/crew isolation and local role delegation. This is *namespaced RBAC*, not ABAC/ReBAC. Canonical model + rationale: [`../discussions/09-role-delegation-and-scope.md`](../discussions/09-role-delegation-and-scope.md#decision-bounded-scope-primitive--scoped-delegation-2026-06-09).
+
+**Seam edits this flags (additive, no breaking DDL):**
+
+| Surface | Change |
+|---------|--------|
+| `row_scope` enum | gains `scope` (third rung: `own ⊂ scope ⊂ all`); `mergeRowScope` keeps most-permissive |
+| `latch_scopes` (new table) | boundary registry: `id`, `kind`, `parent_id?`, `display_name` (app instantiates) |
+| `latch_user_roles` | nullable `scope_id` FK → `latch_scopes.id` (`NULL` = company-wide) |
+| `latch_role_delegations` (new table) | `(role_id, assignable_role_id)` allow-list for delegated assigners |
+| business rows | app `scope_id` column tags each row to a boundary |
+| `Principal` (contracts) | scoped bindings `{ roleId, scopeId \| null }[]` instead of flat `RoleId[]` |
+| `Manifest` (contracts) | optional `scopeIds` (the principal's scopes for a `scope`-rung role) |
+
+**Rung-per-role:** `scope`-rung roles filter `WHERE scope_id IN (manifest.scopeIds)`; `own` ignores scope (assignment join already crosses boundaries); `all` ignores it. **Field/action grants stay role-level** — scope narrows rows only; per-scope differential field grants are **deferred**.
+
+**System classes stay unscoped:** `system_iam` / `system_data` are always company-wide (`scope_id = NULL`); scope qualifies **`app` roles only**. Scoped administration ("branch admin") is an app role on an IAM Surface + scope.
+
+**Delegation (three dials, default closed):** capability (`read`/`write` grant on IAM Surface `user_roles_detail`) × which-roles (`latch_role_delegations` allow-list) × where (scope fence: target `scope_id` ∈ actor's delegator scopes). Adopts discussion 09 **Option B + C-lite**.
+
 ### Future patterns (proposal)
 
 Common patterns within a company database:

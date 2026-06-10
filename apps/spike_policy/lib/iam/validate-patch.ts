@@ -1,4 +1,4 @@
-import { ValidationError } from "@latch/contracts";
+import { ValidationError, type FieldAction } from "@latch/contracts";
 import {
   resolveGrantSurfaceDef,
   validateGrantTuple,
@@ -31,7 +31,7 @@ export const validateRoleDetailPatch = (
         {
           surfaceId: grant.surface_id,
           fieldId: grant.field_id,
-          action: grant.action,
+          action: grant.action as FieldAction,
         },
         registry,
       );

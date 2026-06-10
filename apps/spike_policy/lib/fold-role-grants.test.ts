@@ -10,42 +10,42 @@ describe("foldRoleGrantRows", () => {
     const bindings = foldRoleGrantRows([
       {
         roleId: FIELD_TECH_ID,
-        surfaceId: "widget_list",
-        fieldId: "summary",
+        surfaceId: "alpha_list",
+        fieldId: "title",
         action: "read",
         rowScope: "own",
       },
       {
         roleId: FIELD_TECH_ID,
-        surfaceId: "widget_list",
+        surfaceId: "alpha_list",
         fieldId: "status",
         action: "read",
         rowScope: "own",
       },
       {
         roleId: OFFICE_ADMIN_ID,
-        surfaceId: "widget_list",
-        fieldId: "summary",
+        surfaceId: "alpha_list",
+        fieldId: "title",
         action: "read",
         rowScope: "all",
       },
       {
         roleId: OFFICE_ADMIN_ID,
-        surfaceId: "widget_list",
-        fieldId: "summary",
+        surfaceId: "alpha_list",
+        fieldId: "title",
         action: "write",
         rowScope: "all",
       },
       {
         roleId: OFFICE_ADMIN_ID,
-        surfaceId: "widget_list",
+        surfaceId: "alpha_list",
         fieldId: "status",
         action: "read",
         rowScope: "all",
       },
       {
         roleId: OFFICE_ADMIN_ID,
-        surfaceId: "widget_list",
+        surfaceId: "alpha_list",
         fieldId: "status",
         action: "write",
         rowScope: "all",
@@ -53,33 +53,47 @@ describe("foldRoleGrantRows", () => {
     ]);
 
     const fieldTech = bindings.find(
-      (b) => b.roleId === FIELD_TECH_ID && b.surface === "widget_list",
+      (b) => b.roleId === FIELD_TECH_ID && b.surface === "alpha_list",
     );
     const officeAdmin = bindings.find(
-      (b) => b.roleId === OFFICE_ADMIN_ID && b.surface === "widget_list",
+      (b) => b.roleId === OFFICE_ADMIN_ID && b.surface === "alpha_list",
     );
 
     expect(fieldTech).toMatchObject({
       rowScope: "own",
       fields: [
-        { field: "summary", actions: ["read"] },
+        { field: "title", actions: ["read"] },
         { field: "status", actions: ["read"] },
       ],
     });
     expect(officeAdmin).toMatchObject({
       rowScope: "all",
       fields: [
-        { field: "summary", actions: ["read", "write"] },
+        { field: "title", actions: ["read", "write"] },
         { field: "status", actions: ["read", "write"] },
       ],
     });
+  });
+
+  it("parses scope row_scope from bindings", () => {
+    const bindings = foldRoleGrantRows([
+      {
+        roleId: OFFICE_ADMIN_ID,
+        surfaceId: "alpha_list",
+        fieldId: "title",
+        action: "read",
+        rowScope: "scope",
+      },
+    ]);
+
+    expect(bindings[0]?.rowScope).toBe("scope");
   });
 
   it("collects surface-level actions when field_id is null", () => {
     const bindings = foldRoleGrantRows([
       {
         roleId: FIELD_TECH_ID,
-        surfaceId: "widget_list",
+        surfaceId: "gamma_form",
         fieldId: null,
         action: "read",
         rowScope: "own",
@@ -89,7 +103,7 @@ describe("foldRoleGrantRows", () => {
     expect(bindings).toEqual([
       {
         roleId: FIELD_TECH_ID,
-        surface: "widget_list",
+        surface: "gamma_form",
         rowScope: "own",
         fields: [],
         surfaceActions: ["read"],

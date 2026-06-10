@@ -1,6 +1,6 @@
 # 03 — Roles UI + Postgres `role_detail` DAL
 
-> **Status:** Stub (2026-06-08). **Depends on** [01](./01-next-shell.md), [02](./02-vocabulary-fixture.md) (grant matrix needs full registry). **Builds on** lib task 03 ([`role_detail`](../../../packages/policy/docs/tasks/03-role-editor-surface.md)) — today **memory-only**.
+> **Status:** Complete (2026-06-09). Next: [04 — Users UI + inspector](./04-users-ui.md). **Depends on** [01](./01-next-shell.md), [02](./02-vocabulary-fixture.md). **Builds on** lib task 03 ([`role_detail`](../../../packages/policy/docs/tasks/03-role-editor-surface.md)).
 
 ## Goal
 
@@ -38,13 +38,13 @@
 
 ## Verify (stop gate)
 
-- [ ] `system_iam` actor can CRUD app roles through UI; data persists after server restart
-- [ ] Unknown field grant rejected (400) — proves `validateGrantTuple`
-- [ ] Built-in delete disabled; assignment-blocked delete shows clear error
-- [ ] Grant matrix lists all fixture surfaces from task **02**
-- [ ] Saving grant/binding changes or deleting a role **increments nav `Policy v{N}`**
-- [ ] Display-name-only patch does **not** bump version
-- [ ] Unit/integration tests for PG DAL
+- [x] `system_iam` actor can CRUD app roles through UI; data persists after server restart
+- [x] Unknown field grant rejected (400) — proves `validateGrantTuple`
+- [x] Built-in delete disabled; assignment-blocked delete shows clear error
+- [x] Grant matrix lists all fixture surfaces from task **02**
+- [x] Saving grant/binding changes or deleting a role **increments nav `Policy v{N}`**
+- [x] Display-name-only patch does **not** bump version
+- [x] Unit/integration tests for PG DAL
 
 ## Next
 

@@ -65,7 +65,7 @@ export const unionGrants = (
 };
 
 /**
- * Row scope for union_grants: `all` beats `own` (most permissive wins).
+ * Row scope for union_grants: `all` beats `scope` beats `own` (most permissive wins).
  */
 export const mergeRowScope = (
   scopes: (RowScope | undefined)[],
@@ -76,6 +76,9 @@ export const mergeRowScope = (
   }
   if (defined.includes("all")) {
     return "all";
+  }
+  if (defined.includes("scope")) {
+    return "scope";
   }
   return "own";
 };

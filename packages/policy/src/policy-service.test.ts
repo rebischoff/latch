@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { Principal } from "@latch/contracts";
+import { principalWithRoles, type Principal } from "@latch/contracts";
 
 import { createMemoryRoleGrantProvider } from "./grant-provider.js";
 import { unionGrants, mergeRowScope } from "./merge.js";
@@ -11,7 +11,8 @@ import {
 } from "./policy-service.js";
 import { definePolicyRegistry, defineSurfacePolicy } from "./registry.js";
 
-const principal = (...roles: string[]): Principal => ({ id: "user-1", roles });
+const principal = (...roles: string[]): Principal =>
+  principalWithRoles("user-1", roles);
 
 // System rows carry DB-generated UUIDs; `role_class` (via roleClasses) identifies
 // them, not the id value — so any UUID works here. See P11.
@@ -27,16 +28,16 @@ const systemPrincipal = (
     system_iam: SYSTEM_IAM_ID,
   } as const;
   const roles = classes.map((c) => idByClass[c]);
-  return {
-    id: "user-1",
-    roles,
+  return principalWithRoles("user-1", roles, {
     roleClasses: Object.fromEntries(classes.map((c) => [idByClass[c], c])),
-  };
+  });
 };
 
 describe("merge helpers", () => {
-  it("mergeRowScope: all wins over own", () => {
+  it("mergeRowScope: all beats scope beats own", () => {
     expect(mergeRowScope(["own", "all"])).toBe("all");
+    expect(mergeRowScope(["own", "scope"])).toBe("scope");
+    expect(mergeRowScope(["scope", "all"])).toBe("all");
     expect(mergeRowScope(["own", undefined])).toBe("own");
   });
 
@@ -258,11 +259,9 @@ describe("PolicyService — system_data synthesis", () => {
     const policy = new PolicyService({ registry, grantProvider });
 
     const manifest = policy.resolve(
-      {
-        id: "user-1",
-        roles: [SYSTEM_DATA_ID, "locker"],
+      principalWithRoles("user-1", [SYSTEM_DATA_ID, "locker"], {
         roleClasses: { [SYSTEM_DATA_ID]: "system_data" },
-      },
+      }),
       { surface: "locked" },
     );
 

@@ -1,6 +1,6 @@
 # Discussion 09 — Role delegation & scope
 
-> **Status:** Open (2026-06-06). Split from [02 — identity & permissions](./02-identity-and-permissions.md) (point 4 of the user/roles re-evaluation). Relates to [`access-control.md` row scope](../reference/access-control.md#row-level-rules) and [policy P8](../../packages/policy/docs/tasks/00-decisions-needed.md#p8--self-escalation-guard-for-the-role-editor).
+> **Status:** Decided (2026-06-09) — see [Decision](#decision-bounded-scope-primitive--scoped-delegation-2026-06-09) below. Split from [02 — identity & permissions](./02-identity-and-permissions.md) (point 4 of the user/roles re-evaluation). Relates to [`access-control.md` row scope](../reference/access-control.md#row-level-rules) and [policy P8](../../packages/policy/docs/tasks/00-decisions-needed.md#p8--self-escalation-guard-for-the-role-editor).
 
 ## The question
 
@@ -21,6 +21,58 @@ Both ultimately ask: **does "scope" mean an organizational structure (sites, reg
 - Every delegated assignment is audited and bumps `policyVersion`, exactly like an `iam_master` assignment.
 - This is **assignment** delegation (who gets which role), distinct from **definition** editing (what a role may do) — the latter remains `iam_master`-only via the role editor ([policy task 03](../../packages/policy/docs/tasks/03-role-editor-surface.md)).
 
+## Decision: bounded scope primitive + scoped delegation (2026-06-09)
+
+**Choice:** Latch adds a **bounded "scope" primitive** — a named boundary (branch / site / crew) the app instantiates — and uses it for three jobs: **row scoping (RLS), scoped role assignment, and scoped delegation**. This is *namespaced RBAC* (a role binding at a scope node), **not** ABAC/ReBAC — those remain out ([`scope.md`](../foundations/scope.md)). Resolves the line-drawing fork below toward **"primitive, not org-chart template"**: no sites/regions/manager-edge tables, just a generic scope registry the app populates.
+
+This supersedes the **Option A "subset-of-self"** leaning: the model is **Option B + Option C-lite** (allow-list + scope fence). Service/construction SMBs with branches and prominent field work need scope as a **convenience + isolation** primitive on day one, not a post-v1 maybe.
+
+### 1. Data model (the seam)
+
+| Table | Change | Owner |
+|-------|--------|-------|
+| `latch_scopes` (new) | boundary registry: `id`, `kind`, `parent_id?`, `display_name`; app inserts instances | platform shape, app instances |
+| `latch_user_roles` | add **nullable `scope_id`** FK → `latch_scopes.id`; `NULL` = company-wide | platform |
+| `latch_role_surfaces.row_scope` | enum gains **`scope`** (already a string column — additive, no breaking DDL) | platform |
+| `latch_role_delegations` (new) | `(role_id, assignable_role_id)` — the delegator's allow-list | platform |
+| business rows (e.g. `jobs`) | app convention: a `scope_id` column tags each row to a boundary | app |
+
+**Contracts seam (lock now, additive):** `Principal` carries scoped bindings (`{ roleId, scopeId | null }[]`) rather than a flat `RoleId[]`; `Manifest` gains optional `scopeIds`; `RowScope` gains `"scope"`.
+
+### 2. Rung-per-role (RLS)
+
+`row_scope` is set per `(role, surface)` on `latch_role_surfaces`:
+
+| `row_scope` | Rows seen | binding `scope_id` |
+|-------------|-----------|--------------------|
+| `own` | rows linked to the principal (assignment join) | **ignored** for visibility |
+| `scope` | rows whose `scope_id` ∈ the principal's scopes for that role | **required** |
+| `all` | all rows on the surface | ignored |
+
+`own ⊂ scope ⊂ all`; `mergeRowScope` keeps the most permissive. **Field/action grants stay role-level** — scope narrows *rows* only. Per-scope *differential field grants* (e.g. read financials in branch B but not A) are **deferred** (the ReBAC-adjacent cost). Supported case: a user holding the same field-grant-bearing role across scopes (e.g. `field_tech @ A` + `@ B`).
+
+> `own` roles (e.g. `field_tech`) do **not** need scope bindings — the assignment join already crosses branch boundaries. Scope bindings matter for `scope`-rung roles (e.g. `sales_manager`) and for delegators.
+
+### 3. System classes stay unscoped
+
+`system_iam` / `system_data` are **always company-wide** (`scope_id = NULL`); scope qualifies **`app` roles only**. "Branch admin" is an app role bound to an IAM Surface + scope — **never** a scoped system class. Preserves separation-of-duties, bootstrap, and last-`system_iam` guarantees.
+
+### 4. Delegation = three independent dials (all default closed)
+
+| Dial | Question | Mechanism |
+|------|----------|-----------|
+| **Capability** | may touch assignments at all? | role holds `read`/`write` on IAM Surface `user_roles_detail` |
+| **Which roles** | what may it hand out? | `latch_role_delegations` allow-list (app roles only; never system classes) |
+| **Where** | into which boundary? | scope fence: target `scope_id` ∈ actor's scopes for that delegator role (unscoped delegator → company-wide) |
+
+`validateRoleAssignmentsPatch` ([`apps/spike_policy/lib/iam-user/validate-assignments.ts`](../../apps/spike_policy/lib/iam-user/validate-assignments.ts)) gains the allow-list + scope-fence checks alongside the existing exclusivity, last-`system_iam`, and self-patch guards. `system_iam` keeps unscoped, any-app-role authority.
+
+**Rationale:** A bounded named-scope dimension delivers branch RLS and local delegation with **additive** schema, while keeping field/action grants role-level holds it short of ReBAC. Locking the seam (nullable `scope_id`, `Principal` bindings, `row_scope` as a string) now avoids a contract migration later; **full RLS + delegation implementation is a dedicated phase**, not necessarily inside the current v1 slice.
+
+**Seam edits flagged:** [`../reference/access-control.md`](../reference/access-control.md#row-level-rules) (row-scope `scope` + delegation), [`../foundations/scope.md`](../foundations/scope.md) (in/out lines). Implementation plan: [`../../packages/policy/docs/tasks/05-scope-and-delegation.md`](../../packages/policy/docs/tasks/05-scope-and-delegation.md).
+
+---
+
 ## Options for "scope"
 
 | # | Model | "Which roles" | "To whom" | Schema cost |
@@ -30,10 +82,12 @@ Both ultimately ask: **does "scope" mean an organizational structure (sites, reg
 | **C** | Target row-scope | (A or B) | only users the assigner can "see" per `row_scope` | reuses `own`/`all` |
 | **D** | Org structure (site/region/manager) | (B) | users in same site / region / subtree | **org-chart tables** on `latch_users` |
 
-## Leaning (to confirm)
+## Leaning (superseded 2026-06-09)
 
-- **v1: Option A — subset-of-self**, no new schema. A delegator may assign only app roles they themselves hold; built-ins excluded; self-escalation denied. This satisfies the `office_admin` → `field_tech` pilot case *if* the `office_admin` also holds `field_tech` (or we relax to "any app role" for that grant). Cheapest path that unblocks delegation without committing to org modelling.
-- Everything richer (B/C/D) waits on the line-drawing decision below.
+> Resolved by the [Decision](#decision-bounded-scope-primitive--scoped-delegation-2026-06-09) above. The original "Option A subset-of-self" leaning was rejected as too weak (it can't let `branch_admin` hand out `field_tech` without holding it). The locked model is **Option B (allow-list) + Option C-lite (scope fence)** on a bounded scope primitive. Kept below for history.
+
+- ~~**v1: Option A — subset-of-self**, no new schema.~~ Too weak for the branch-delegation case.
+- Everything richer (B/C/D) was gated on the line-drawing decision — now resolved toward **primitive, not org-chart**.
 
 ## The line-drawing decision (the real fork)
 
@@ -44,12 +98,14 @@ One of Latch's purposes is to **template the roles/IAM tables** so every busines
 
 > **Bias:** keep v1 simple — primitive scope (Option A + `own`/`all`), org structure **out of the template**. Revisit org-chart templating as a post-v1 discussion only if multiple pilot apps independently need it.
 
-## Open questions
+## Open questions (resolved 2026-06-09)
 
-- Does the pilot `office_admin` need to assign `field_tech` **without** holding it? If yes, Option A alone is insufficient → minimal Option B (a per-role `delegatable_roles` list) instead.
-- Is "to whom" needed in v1 at all, or is "which roles" enough (assign app roles to *any* user, gated by holding/allow-list)?
-- If/when row scope grows past `own`/`all`, should delegation reuse the **same** scope mechanism (Option C) to avoid two scope languages?
-- Where does the line sit for the **template**: primitive-only vs optional org-chart module?
+- ~~Does the pilot `office_admin` need to assign `field_tech` **without** holding it?~~ **Yes** → `latch_role_delegations` allow-list (Option B), not subset-of-self.
+- ~~Is "to whom" needed in v1?~~ **Yes, as a scope fence** (Option C-lite) for scoped delegators; unscoped delegators are company-wide.
+- ~~Should delegation reuse the same scope mechanism as row scope?~~ **Yes** — one `scope_id` primitive serves both row filtering and the delegation fence (no second scope language).
+- ~~Where does the line sit for the template?~~ **Primitive-only** (`latch_scopes` + `scope_id`); org-chart / region / manager-subtree templating stays out.
+
+**Still deferred:** per-scope differential field grants; scope hierarchy traversal beyond one `parent_id`; ABAC/ReBAC.
 
 ## Related
 

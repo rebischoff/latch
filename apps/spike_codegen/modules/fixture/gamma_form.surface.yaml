@@ -1,0 +1,33 @@
+# Synthetic vocabulary fixture — policy catalog only (no backing table).
+id: gamma_form
+displayName: Gamma form
+anchorTable: fixture_gamma
+kind: business
+
+fieldActions:
+  - read
+  - write
+  - approve
+  - submit
+
+surfaceActions:
+  - read
+  - write
+  - approve
+
+tables:
+  - fixture_gamma
+
+fields:
+  - id: request_type
+    columns:
+      - column: fixture_gamma.request_type
+        type: string
+  - id: justification
+    columns:
+      - column: fixture_gamma.justification
+        type: string
+  - id: approver
+    columns:
+      - column: fixture_gamma.approver
+        type: string

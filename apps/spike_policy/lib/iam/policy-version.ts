@@ -1,19 +1,19 @@
 import { withPermissionDb } from "@latch/audit";
 import type { Pool } from "pg";
 
-let memoryVersion = 1;
+import {
+  bumpMemoryPolicyVersion,
+  getMemoryPolicyVersion,
+  resetMemoryPolicyVersion,
+} from "./policy-version-memory.js";
 
-/** In-memory counter when Postgres is not configured (unit tests). */
-export const getMemoryPolicyVersion = (): number => memoryVersion;
+export {
+  bumpMemoryPolicyVersion,
+  getMemoryPolicyVersion,
+  resetMemoryPolicyVersion,
+} from "./policy-version-memory.js";
 
-export const bumpMemoryPolicyVersion = (): number => {
-  memoryVersion += 1;
-  return memoryVersion;
-};
-
-export const resetMemoryPolicyVersion = (): void => {
-  memoryVersion = 1;
-};
+export { getPolicyVersion } from "./policy-version-read.js";
 
 /**
  * Increment `latch_policy_version` after role-editor grant/binding changes.

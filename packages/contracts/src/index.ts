@@ -13,13 +13,21 @@ export type {
   PolicyEffect,
   PolicyScope,
   Principal,
+  RoleBinding,
   RoleClass,
   RoleId,
   RoleSurfacePolicy,
   RowScope,
+  ScopeId,
   SurfaceId,
   SurfacePolicies,
 } from "./types.js";
+
+export {
+  principalHoldsRole,
+  principalRoleIds,
+  principalWithRoles,
+} from "./principal.js";
 
 export {
   fieldAllows,

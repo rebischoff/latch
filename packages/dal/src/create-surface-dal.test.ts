@@ -10,6 +10,7 @@ import {
   ConflictError,
   ForbiddenError,
   NotFoundError,
+  principalWithRoles,
   ValidationError,
   type Manifest,
   type PermissionContext,
@@ -280,7 +281,7 @@ const buildCtx = (
   manifest: Manifest,
   principalId: string,
 ): PermissionContext => ({
-  principal: { id: principalId, roles: ["fixture"] },
+  principal: principalWithRoles(principalId, ["fixture"]),
   manifest,
   surface: manifest.surface,
 });

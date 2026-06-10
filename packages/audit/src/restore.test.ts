@@ -4,6 +4,7 @@ import {
   ConflictError,
   ForbiddenError,
   NotFoundError,
+  principalWithRoles,
   ValidationError,
   type Manifest,
   type PermissionContext,
@@ -31,7 +32,7 @@ const noRestoreManifest: Manifest = {
 };
 
 const buildCtx = (manifest: Manifest): PermissionContext => ({
-  principal: { id: PRINCIPAL, roles: ["admin"] },
+  principal: principalWithRoles(PRINCIPAL, ["admin"]),
   manifest,
   surface: "alpha_detail",
 });

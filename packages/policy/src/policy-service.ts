@@ -5,7 +5,9 @@ import type {
   Principal,
   RoleClass,
   RoleSurfacePolicy,
+  RowScope,
 } from "@latch/contracts";
+import { principalRoleIds } from "@latch/contracts";
 
 import {
   emptyRoleGrantProvider,
@@ -38,8 +40,8 @@ const holdsSystemClass = (
   principal: Principal,
   roleClass: RoleClass,
 ): boolean =>
-  principal.roles.some(
-    (roleId) => principal.roleClasses?.[roleId] === roleClass,
+  principal.bindings.some(
+    (b) => principal.roleClasses?.[b.roleId] === roleClass,
   );
 
 /** Synthesized grants when principal holds `system_data` on a business surface. */
@@ -81,7 +83,7 @@ export interface RoleMergeStrategy {
     options: MergeOptions,
   ): {
     fields: Record<string, FieldAction[]>;
-    rowScope?: "own" | "all";
+    rowScope?: RowScope;
   };
 }
 
@@ -151,7 +153,7 @@ export class PolicyService {
     }
 
     for (const grant of this.grantProvider.grantsFor(
-      principal.roles,
+      principalRoleIds(principal),
       scope.surface,
     )) {
       rolePolicies.push({

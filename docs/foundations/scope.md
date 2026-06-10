@@ -28,6 +28,14 @@ The single most important document for keeping v1 shippable solo. **If a feature
 
 **Rationale:** Assignments were already runtime (`latch_user_roles`), so leaving definitions at build time forced a dev redeploy for every permission tweak. Splitting **vocabulary (dev/codegen, build time) from grants (DB, runtime data)** preserves the safety property — a runtime grant can never reference a Field the Surface doesn't define, because the role editor and the resolver both read the codegen-emitted Field/action catalog — while letting business admins own the policy. Grant-row granularity and mode-overlay editing are accepted to be fine-tuned in a later discussion.
 
+### Decision: bounded scope primitive — seam in, full build phased (2026-06-09)
+
+**Choice:** Adopt a **bounded "scope" primitive** (named branch/site/crew boundary) for row scoping and scoped role delegation — *namespaced RBAC*, **not** ABAC/ReBAC. The **contract + DDL seam lands as additive v1 work** (`latch_scopes`, nullable `latch_user_roles.scope_id`, `row_scope: scope`, `Principal` scoped bindings, `Manifest.scopeIds`, `latch_role_delegations`); the **full scoped-RLS + delegation implementation is a dedicated phase**, not the current v1 slice. Canonical model: [`../discussions/09-role-delegation-and-scope.md`](../discussions/09-role-delegation-and-scope.md#decision-bounded-scope-primitive--scoped-delegation-2026-06-09); seam detail: [`../reference/access-control.md`](../reference/access-control.md#decision-bounded-scope-primitive--row_scope-scope--scoped-delegation-2026-06-09).
+
+**Rationale:** Service/construction SMBs with multiple branches and prominent field work need scope as a convenience + isolation primitive on day one. A bounded named-scope dimension is additive and keeps field/action grants role-level — distinct from the ABAC/ReBAC explicitly ruled out below. Locking the seam now avoids a later migration of `Principal`/manifest/assignment contracts.
+
+**Stays out (see Deferred):** per-scope *differential field grants*, scope-hierarchy traversal beyond one `parent_id`, ABAC/ReBAC/OPA-style DSL, and org-chart (region/manager-edge) templating.
+
 ---
 
 ## In v1
@@ -115,6 +123,8 @@ These are good ideas, just not now. Listed so we can say "no" with grace.
 - Role-merge modes: `intersection_grants`, `most_restrictive`, `priority`. (Engine designed to allow adding them; not implemented or tested.)
 - Per-Surface override of `multiRoleCombine`.
 - ABAC, ReBAC, OPA-style DSL.
+- **Per-scope differential field grants** (same role granting different Fields in different scopes). The bounded scope primitive narrows *rows* only; field/action grants stay role-level ([scope decision 2026-06-09](#decision-bounded-scope-primitive--seam-in-full-build-phased-2026-06-09)).
+- **Org-chart templating** (sites/regions/manager-subtree tables). Scope stays a flat primitive (`latch_scopes` + optional one-level `parent_id`).
 - Break-glass roles with enhanced audit.
 
 ### Data lifecycle

@@ -1,6 +1,6 @@
 # 01 — Next.js shell
 
-> **Status:** Stub (2026-06-08). **Unblocked:** [policy 04 — P10](../../../packages/policy/docs/tasks/04-p10-test-harness.md) complete.
+> **Status:** Complete (2026-06-09). Next: [02 — Vocabulary fixture](./02-vocabulary-fixture.md).
 
 ## Goal
 
@@ -57,12 +57,12 @@ No runtime playground required in v1 — static reference is enough.
 
 ## Verify (stop gate)
 
-- [ ] `npm run dev` (spike_policy workspace) serves layout with nav (Users, Roles, Dev)
-- [ ] Nav shows **`Policy v{N}`** matching `SELECT version FROM latch_policy_version`
-- [ ] Ant Design theme loads; layout is usable without custom CSS framework
-- [ ] “Act as” switches `loadPrincipalFromDb` actor for server actions
-- [ ] `/dev/policy-api` documents `PolicyService`, deny semantics (3 meanings), and `policyVersion` bump rules
-- [ ] No raw `db.*` in route components — orchestration only
+- [x] `npm run dev` (spike_policy workspace) serves layout with nav (Users, Roles, Dev)
+- [x] Nav shows **`Policy v{N}`** matching `SELECT version FROM latch_policy_version`
+- [x] Ant Design theme loads; layout is usable without custom CSS framework
+- [x] “Act as” switches `loadPrincipalFromDb` actor for server actions
+- [x] `/dev/policy-api` documents `PolicyService`, deny semantics (3 meanings), and `policyVersion` bump rules
+- [x] No raw `db.*` in route components — orchestration only
 
 ## Next
 

@@ -16,7 +16,9 @@ Disposable harness for [policy tasks 01 / 01b](../../packages/policy/docs/tasks/
 | `006_latch_app_role.sql` | `latch_app` + platform GRANTs | Yes |
 | `007_bootstrap_super_admin.sql` | Bootstrap user with both system UUIDs (P4b) | Yes |
 | `008_latch_app_role_editor.sql` | `latch_app` INSERT/UPDATE/DELETE on role catalog + grants | Yes |
-| `900_fixture_pilot_roles.sql` | `field_tech` / `office_admin` + `widget_list` grants | **Spike only** |
+| `009_latch_audit.sql` | `latch_audit` + immutability trigger; `latch_app` INSERT-only | Yes |
+| `010_latch_scopes.sql` | `latch_scopes`, `latch_user_roles.scope_id`, `latch_role_delegations` (task 05 Phase A) | Yes |
+| `900_fixture_pilot_roles.sql` | `field_tech` / `office_admin` + fixture vocabulary grants | **Spike only** |
 
 ## Migrate (Neon — recommended)
 

@@ -12,7 +12,7 @@ export type RoleGrantRow = {
 };
 
 const parseRowScope = (value: string | null): RowScope | undefined => {
-  if (value === "own" || value === "all") {
+  if (value === "own" || value === "scope" || value === "all") {
     return value;
   }
   return undefined;

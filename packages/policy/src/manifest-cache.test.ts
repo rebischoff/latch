@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import type { Principal } from "@latch/contracts";
+import { principalWithRoles, type Principal } from "@latch/contracts";
 
 import {
   createCachingPolicyService,
@@ -18,13 +18,12 @@ import { definePolicyRegistry, defineSurfacePolicy } from "./registry.js";
 const principal = (
   roles: string[],
   opts?: { id?: string; policyVersion?: number },
-): Principal => ({
-  id: opts?.id ?? "user-1",
-  roles,
-  ...(opts?.policyVersion !== undefined
-    ? { policyVersion: opts.policyVersion }
-    : {}),
-});
+): Principal =>
+  principalWithRoles(opts?.id ?? "user-1", roles, {
+    ...(opts?.policyVersion !== undefined
+      ? { policyVersion: opts.policyVersion }
+      : {}),
+  });
 
 const miniRegistry = definePolicyRegistry(
   defineSurfacePolicy({

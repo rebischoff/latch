@@ -2,13 +2,17 @@
 
 > **Quarterback for the UI spike.** Platform lib + migrations (tasks 01–03 under [`packages/policy/docs/tasks`](../../../packages/policy/docs/tasks/README.md)) are **complete**. This folder plans turning the harness into a **visible policy console** that **proves [`@latch/policy`](../../../packages/policy)** — edit users/roles in Postgres, see effective manifests update live.
 >
-> **Updated:** 2026-06-08 (explicit deny authoring rejected for spike + v1 role editor).
+> **Updated:** 2026-06-09 (tasks 01–04, **07** complete; next **08 — scoped delegation**).
 
 ---
 
 ## Right now — do this next
 
-**→ [01 — Next.js shell](./01-next-shell.md)** — layout, nav + **policy version badge**, Ant Design 6, DB pool, “Act as”, dev policy API reference page.
+Spike UI tasks 01–04 and **07** are **complete**. Next planned proof work:
+
+- **[08 — Scoped delegation](./08-scoped-delegation.md)** — prove non-`system_iam` scoped assignment + delegation. **Blocked** on [`packages/policy` task 05](../../../packages/policy/docs/tasks/05-scope-and-delegation.md) Phase A seam (task 07 is done).
+
+Other optional follow-ups: profile write, `CachingPolicyService` (Phase 06). Discussions: [`../discussions/README.md`](../discussions/README.md) (index: [`../open-items.md`](../open-items.md)).
 
 ---
 
@@ -18,7 +22,7 @@ A minimal Next.js app on top of the existing spike:
 
 - **Users** — list + detail; name + **multi-select roles**; **merged manifest inspector** on the same detail page (auto-refreshes after save).
 - **Roles** — list + detail; CRUD app roles + grant matrix (`role_detail`, **Postgres-backed** so work persists across sessions).
-- **Vocabulary fixture** — ~12 synthetic business surfaces in [`spike_codegen`](../../../spike_codegen) (fields + actions only; **no business tables, lists, or CRUD pages**). Grant matrix + manifest inspector exercise the full registry.
+- **Vocabulary fixture** — 5 synthetic business surfaces in [`spike_codegen`](../../../spike_codegen) (fields + actions only; **no business tables, lists, or CRUD pages**). Grant matrix + manifest inspector exercise the full registry.
 - **Dev reference** — `/dev/policy-api` documents `@latch/policy` exports, spike bootstrap helpers, and **deny semantics** (see below).
 - **Policy version** — global counter visible in the **root nav**; increments on permission-affecting mutations.
 
@@ -33,12 +37,14 @@ Dev-only **“Act as”** principal picker (no Auth.js in v1). Real auth graduat
 | Step | Task | Deliverable | State |
 |------|------|-------------|-------|
 | — | *(policy)* [04 — P10 test harness](../../../packages/policy/docs/tasks/04-p10-test-harness.md) | Lock P10; DAL T8 in spike | **complete** (2026-06-08) |
-| **1** | **[01 — Next.js shell](./01-next-shell.md)** | Layout, antd, DB pool, “Act as”, nav **policy v{N}**, `/dev/policy-api` | **← next** |
-| 2 | [02 — Vocabulary fixture](./02-vocabulary-fixture.md) | ~12 synthetic surfaces in codegen + `spikePolicyRegistry` | stub |
-| 3 | [03 — Roles UI + PG DAL](./03-roles-ui.md) | `/roles`, `/roles/[id]`; Postgres `role_detail`; react-hook-form | stub |
-| 4 | [04 — Users UI + inspector](./04-users-ui.md) | `/users`, `/users/[id]`; Postgres assignments + manifest inspector | stub |
+| **1** | **[01 — Next.js shell](./01-next-shell.md)** | Layout, antd, DB pool, “Act as”, nav **policy v{N}**, `/dev/policy-api` | **complete** (2026-06-09) |
+| **2** | **[02 — Vocabulary fixture](./02-vocabulary-fixture.md)** | 5 synthetic surfaces in codegen + `spikePolicyRegistry` | **complete** (2026-06-09) |
+| **3** | **[03 — Roles UI + PG DAL](./03-roles-ui.md)** | `/roles`, `/roles/[id]`; Postgres `role_detail`; react-hook-form | **complete** (2026-06-09) |
+| **4** | **[04 — Users UI + inspector](./04-users-ui.md)** | `/users`, `/users/[id]`; Postgres assignments + manifest inspector | **complete** (2026-06-09) |
 | — | ~~05 — Manifest inspector~~ | *Folded into [04](./04-users-ui.md)* | superseded |
 | — | ~~06 — Widgets demo~~ | *Deferred — not needed for policy proof* | deferred |
+| 5 | [07 — User create](./07-user-create.md) | Admin sets up other users; `INSERT latch_users` + optional roles; audited | **complete** (2026-06-09) |
+| 6 | [08 — Scoped delegation](./08-scoped-delegation.md) | Prove scoped assignment + delegation (policy half) in the console | **planned** (blocked on policy 05 Phase A) |
 
 ### Dependency graph
 
@@ -156,7 +162,7 @@ Do **not** put `policyVersion` on each manifest inspector row — it is global, 
 ## Out of scope (v1 spike)
 
 - Production Auth.js / break-glass login UI
-- [`discussion 09`](../../../docs/discussions/09-role-delegation-and-scope.md) delegated assignment
+- Scope **row-filtering RLS** (`WHERE scope_id IN (…)`) — needs business tables the spike lacks; proven in `@latch/dal` + `apps/crm`. (The **policy half** — scoped assignment + delegation — *is* in-spike: [08](./08-scoped-delegation.md), built on [`packages/policy` task 05](../../../packages/policy/docs/tasks/05-scope-and-delegation.md).)
 - Full `@latch/react` component library
 - Business-surface list/CRUD pages (`/widgets`, `widgets` table migration)
 - `row_scope: own` row-filter demos requiring assignment joins

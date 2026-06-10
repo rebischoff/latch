@@ -12,6 +12,8 @@ import {
 import {
   ForbiddenError,
   NotFoundError,
+  principalRoleIds,
+  principalWithRoles,
   ValidationError,
   type PermissionContext,
 } from "@latch/contracts";
@@ -51,11 +53,9 @@ const systemPrincipal = (
     system_iam: SYSTEM_IAM_ID,
   } as const;
   const roles = classes.map((c) => idByClass[c]);
-  return {
-    id: userId,
-    roles,
+  return principalWithRoles(userId, roles, {
     roleClasses: Object.fromEntries(classes.map((c) => [idByClass[c], c])),
-  };
+  });
 };
 
 const buildCtx = (
@@ -177,10 +177,10 @@ describe("role_detail — IAM DAL (memory)", () => {
 
     await expect(
       dal.patchRole(buildCtx(["system_iam"]), created.id, {
-        surface_bindings: [{ surface_id: "widget_list", row_scope: "own" }],
+        surface_bindings: [{ surface_id: "alpha_list", row_scope: "own" }],
         grants: [
           {
-            surface_id: "widget_list",
+            surface_id: "alpha_list",
             field_id: "not_a_field",
             action: "read",
           },
@@ -208,16 +208,19 @@ describe("role_detail — IAM DAL (memory)", () => {
 
     store.addAssignment(created.id, "iam-admin");
 
+    const base = systemPrincipal(["system_iam"]);
     const ctx: PermissionContext = {
       ...buildCtx(["system_iam"]),
-      principal: {
-        ...systemPrincipal(["system_iam"]),
-        roles: [...systemPrincipal(["system_iam"]).roles, created.id],
-        roleClasses: {
-          ...systemPrincipal(["system_iam"]).roleClasses,
-          [created.id]: "app",
+      principal: principalWithRoles(
+        base.id,
+        [...principalRoleIds(base), created.id],
+        {
+          roleClasses: {
+            ...base.roleClasses,
+            [created.id]: "app",
+          },
         },
-      },
+      ),
     };
     const policy = new PolicyService({ registry: spikePolicyRegistry });
     ctx.manifest = policy.resolve(ctx.principal, { surface: "role_detail" });
@@ -226,8 +229,8 @@ describe("role_detail — IAM DAL (memory)", () => {
       dal.patchRole(ctx, created.id, {
         grants: [
           {
-            surface_id: "widget_list",
-            field_id: "summary",
+            surface_id: "alpha_list",
+            field_id: "title",
             action: "read",
           },
         ],
@@ -242,14 +245,14 @@ describe("role_detail — IAM DAL (memory)", () => {
     const ctx = buildCtx(["system_iam"]);
 
     const beforeVersion = getMemoryPolicyVersion();
-    const created = await dal.createRole(ctx, { display_name: "Widget reader" });
+    const created = await dal.createRole(ctx, { display_name: "Alpha reader" });
 
     await dal.patchRole(ctx, created.id, {
-      surface_bindings: [{ surface_id: "widget_list", row_scope: "all" }],
+      surface_bindings: [{ surface_id: "alpha_list", row_scope: "all" }],
       grants: [
         {
-          surface_id: "widget_list",
-          field_id: "summary",
+          surface_id: "alpha_list",
+          field_id: "title",
           action: "read",
         },
       ],
@@ -265,11 +268,11 @@ describe("role_detail — IAM DAL (memory)", () => {
       grantProvider: provider,
     });
     const manifest = policy.resolve(
-      { id: "user-x", roles: [created.id] },
-      { surface: "widget_list" },
+      principalWithRoles("user-x", [created.id]),
+      { surface: "alpha_list" },
     );
 
-    expect(manifest.fields.summary).toEqual(["read"]);
+    expect(manifest.fields.title).toEqual(["read"]);
     expect(manifest.fields.status).toEqual([]);
     expect(manifest.rowScope).toBe("all");
   });
@@ -286,7 +289,7 @@ describe("role_detail — IAM DAL (memory)", () => {
     await dal.deleteRole(ctx, created.id);
 
     expect(audit.entries.map((e) => e.action)).toEqual([
-      "create",
+      "insert",
       "update",
       "delete",
     ]);
@@ -336,13 +339,13 @@ describe("role_detail — Postgres e2e", () => {
 
       await pool.query(
         `INSERT INTO latch_role_surfaces (role_id, surface_id, row_scope)
-         VALUES ($1, 'widget_list', 'own')`,
+         VALUES ($1, 'alpha_list', 'own')`,
         [roleId],
       );
       await pool.query(
         `INSERT INTO latch_role_grants (role_id, surface_id, field_id, action)
-         VALUES ($1, 'widget_list', 'summary', 'read'),
-                ($1, 'widget_list', 'status', 'read')`,
+         VALUES ($1, 'alpha_list', 'title', 'read'),
+                ($1, 'alpha_list', 'status', 'read')`,
         [roleId],
       );
 
@@ -362,10 +365,10 @@ describe("role_detail — Postgres e2e", () => {
         principal,
         spikePolicyRegistry,
       );
-      const manifest = policy.resolve(principal, { surface: "widget_list" });
+      const manifest = policy.resolve(principal, { surface: "alpha_list" });
 
       expect(manifest.rowScope).toBe("own");
-      expect(manifest.fields.summary).toEqual(["read"]);
+      expect(manifest.fields.title).toEqual(["read"]);
       expect(manifest.fields.status).toEqual(["read"]);
 
       await pool.query(`DELETE FROM latch_user_roles WHERE user_id = $1`, [

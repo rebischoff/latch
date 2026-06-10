@@ -2,6 +2,10 @@
   "name": "@latch/spike-codegen",
   "version": "0.0.0",
   "private": true,
+  "scripts": {
+    "codegen": "LATCH_CODEGEN_APPS=spike_codegen npm run -w @latch/codegen generate",
+    "codegen:check": "LATCH_CODEGEN_APPS=spike_codegen npm run -w @latch/codegen check"
+  },
   "dependencies": {
     "drizzle-orm": "^0.45.2",
     "zod": "^3.24.2"

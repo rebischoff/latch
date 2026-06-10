@@ -1,4 +1,4 @@
-import { writeAudit } from "@latch/audit";
+import { withPermissionDb, writeAudit } from "@latch/audit";
 import type { PermissionContext } from "@latch/contracts";
 import {
   ConflictError,
@@ -10,7 +10,7 @@ import {
 } from "@latch/contracts";
 import { createSurfaceDal } from "@latch/dal";
 import type { PolicyRegistry } from "@latch/policy";
-import type { Pool } from "pg";
+import type { Pool, PoolClient } from "pg";
 
 import {
   RoleDetailCreateSchema,
@@ -19,12 +19,20 @@ import {
 import { createRoleDetailDescriptor, roleAuditSnapshot } from "./descriptors.js";
 import type { MemoryRoleStore, RoleRecord } from "./memory-role-store.js";
 import type { ProjectedRoleDetail } from "./project.js";
+import {
+  deleteRoleFromPg,
+  hydrateMemoryRoleStoreFromPg,
+  persistRoleToPg,
+} from "./pg-hydrate.js";
 import { bumpPolicyVersion } from "./policy-version.js";
 import { createRoleStoreAdapter } from "./store-adapter.js";
 import { validateRoleDetailPatch } from "./validate-patch.js";
 
 export type RoleDetailDal = {
-  getRole: (ctx: PermissionContext, id: string) => ProjectedRoleDetail;
+  getRole: (
+    ctx: PermissionContext,
+    id: string,
+  ) => ProjectedRoleDetail | Promise<ProjectedRoleDetail>;
   createRole: (
     ctx: PermissionContext,
     body: unknown,
@@ -91,7 +99,7 @@ const assertNotSelfGrantEdit = (
   targetRoleId: string,
   patch: { surface_bindings?: unknown; grants?: unknown },
 ): void => {
-  if (!ctx.principal.roles.includes(targetRoleId)) {
+  if (!ctx.principal.bindings.some((b) => b.roleId === targetRoleId)) {
     return;
   }
   if (patch.surface_bindings !== undefined || patch.grants !== undefined) {
@@ -136,7 +144,7 @@ export const createRoleDetailDal = (
 
       await writeAudit({
         actorId: ctx.principal.id,
-        action: "create",
+        action: "insert",
         tableName: "latch_roles",
         recordId: created.id,
         moduleId: ctx.surface,
@@ -213,5 +221,64 @@ export const createRoleDetailDal = (
 
       await bumpPolicyVersion(ctx.principal.id, deps.pool);
     },
+  };
+};
+
+/** Postgres-backed `role_detail` DAL — hydrates into memory per transaction, then persists. */
+export const createRoleDetailDalForPool = (
+  pool: Pool,
+  deps: { registry: PolicyRegistry },
+): RoleDetailDal => {
+  const memoryDeps = { registry: deps.registry, pool };
+
+  type PgRoleTxn = {
+    store: MemoryRoleStore;
+    dal: ReturnType<typeof createRoleDetailDal>;
+    client: PoolClient;
+    persistRole: (roleId: string, options?: { isNew?: boolean }) => Promise<void>;
+    deleteRole: (roleId: string) => Promise<void>;
+  };
+
+  const runInTransaction = async <T>(
+    principalId: string,
+    fn: (txn: PgRoleTxn) => Promise<T>,
+  ): Promise<T> =>
+    withPermissionDb(pool, principalId, async (client) => {
+      const store = await hydrateMemoryRoleStoreFromPg(client);
+      const dal = createRoleDetailDal(store, memoryDeps);
+      const txn: PgRoleTxn = {
+        store,
+        dal,
+        client,
+        persistRole: (roleId, options) =>
+          persistRoleToPg(client, store, roleId, options),
+        deleteRole: (roleId) => deleteRoleFromPg(client, roleId),
+      };
+      return fn(txn);
+    });
+
+  return {
+    getRole: (ctx, id) =>
+      runInTransaction(ctx.principal.id, async ({ dal }) => dal.getRole(ctx, id)),
+
+    createRole: (ctx, body) =>
+      runInTransaction(ctx.principal.id, async ({ dal, persistRole }) => {
+        const created = await dal.createRole(ctx, body);
+        await persistRole(created.id, { isNew: true });
+        return created;
+      }),
+
+    patchRole: (ctx, id, body) =>
+      runInTransaction(ctx.principal.id, async ({ dal, persistRole }) => {
+        const updated = await dal.patchRole(ctx, id, body);
+        await persistRole(id);
+        return updated;
+      }),
+
+    deleteRole: (ctx, id) =>
+      runInTransaction(ctx.principal.id, async ({ dal, deleteRole }) => {
+        await dal.deleteRole(ctx, id);
+        await deleteRole(id);
+      }),
   };
 };

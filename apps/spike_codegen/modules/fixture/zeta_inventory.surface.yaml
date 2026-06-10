@@ -1,0 +1,38 @@
+# Synthetic vocabulary fixture — policy catalog only (no backing table).
+id: zeta_inventory
+displayName: Zeta inventory
+anchorTable: fixture_zeta
+kind: business
+
+fieldActions:
+  - read
+  - write
+
+surfaceActions:
+  - read
+  - write
+
+tables:
+  - fixture_zeta
+
+fields:
+  - id: sku
+    columns:
+      - column: fixture_zeta.sku
+        type: string
+  - id: quantity
+    columns:
+      - column: fixture_zeta.quantity
+        type: number
+  - id: location
+    columns:
+      - column: fixture_zeta.location
+        type: string
+  - id: reorder_level
+    columns:
+      - column: fixture_zeta.reorder_level
+        type: number
+  - id: supplier
+    columns:
+      - column: fixture_zeta.supplier
+        type: string

@@ -18,7 +18,7 @@ export const roleDetailColumnMap = {
   grants: [],
 } as const satisfies Record<RoleDetailFieldId, readonly string[]>;
 
-const RowScopeSchema = z.enum(["own", "all"]);
+const RowScopeSchema = z.enum(["own", "scope", "all"]);
 
 export const SurfaceBindingSchema = z.object({
   surface_id: z.string(),

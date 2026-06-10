@@ -2,7 +2,11 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { createMemoryAuditWriter, setAuditWriter } from "@latch/audit";
-import type { Manifest, PermissionContext } from "@latch/contracts";
+import {
+  principalWithRoles,
+  type Manifest,
+  type PermissionContext,
+} from "@latch/contracts";
 import { createSurfaceDal } from "@latch/dal";
 
 import { REPO_ROOT } from "./generate.js";
@@ -142,7 +146,7 @@ describe("generated widget_list glue + DAL kernel", () => {
     };
 
     const ctx: PermissionContext = {
-      principal: { id: "user-1", roles: ["fixture"] },
+      principal: principalWithRoles("user-1", ["fixture"]),
       manifest,
       surface: "widget_list",
     };

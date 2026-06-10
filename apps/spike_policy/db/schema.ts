@@ -12,6 +12,7 @@
  * Disposable fixture — graduates to business-app template migrations.
  */
 import {
+  type AnyPgColumn,
   bigint,
   pgTable,
   primaryKey,
@@ -41,18 +42,49 @@ export const latchRoles = pgTable("latch_roles", {
   displayName: text("display_name").notNull(),
 });
 
+/** Bounded branch/site/crew boundary — app instantiates rows (task 05 Phase A). */
+export const latchScopes = pgTable("latch_scopes", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  kind: text("kind").notNull(),
+  parentId: uuid("parent_id").references((): AnyPgColumn => latchScopes.id),
+  displayName: text("display_name").notNull(),
+});
+
 export const latchUserRoles = pgTable(
   "latch_user_roles",
   {
+    id: uuid("id").primaryKey().defaultRandom(),
     userId: text("user_id")
       .notNull()
       .references(() => latchUsers.id, { onDelete: "cascade" }),
     roleId: uuid("role_id")
       .notNull()
       .references(() => latchRoles.id, { onDelete: "restrict" }),
+    /** `NULL` = company-wide assignment. */
+    scopeId: uuid("scope_id").references(() => latchScopes.id),
   },
   (table) => ({
-    pk: primaryKey({ columns: [table.userId, table.roleId] }),
+    assignmentUnique: unique("latch_user_roles_assignment_unique").on(
+      table.userId,
+      table.roleId,
+      table.scopeId,
+    ),
+  }),
+);
+
+/** Delegator allow-list: which app roles a role may assign (Phase C validation). */
+export const latchRoleDelegations = pgTable(
+  "latch_role_delegations",
+  {
+    roleId: uuid("role_id")
+      .notNull()
+      .references(() => latchRoles.id, { onDelete: "cascade" }),
+    assignableRoleId: uuid("assignable_role_id")
+      .notNull()
+      .references(() => latchRoles.id, { onDelete: "cascade" }),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.roleId, table.assignableRoleId] }),
   }),
 );
 
@@ -64,7 +96,7 @@ export const latchRoleSurfaces = pgTable(
       .notNull()
       .references(() => latchRoles.id, { onDelete: "cascade" }),
     surfaceId: text("surface_id").notNull(),
-    /** `own` | `all`; nullable until configured. */
+    /** `own` | `scope` | `all`; nullable until configured. */
     rowScope: text("row_scope"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()

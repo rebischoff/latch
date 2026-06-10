@@ -1,14 +1,4 @@
 /**
- * Minimal Drizzle schema for codegen spike (task 02 cross-check target).
+ * Placeholder Drizzle schema for codegen spike.
+ * Fixture surfaces use synthetic table names — no business tables in this harness.
  */
-import { pgTable, text } from "drizzle-orm/pg-core";
-
-export const widgets = pgTable("widgets", {
-  id: text("id").primaryKey(),
-  label: text("label").notNull(),
-});
-
-export const widgetTags = pgTable("widget_tags", {
-  widgetId: text("widget_id").notNull(),
-  tag: text("tag").notNull(),
-});

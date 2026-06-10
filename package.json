@@ -6,6 +6,7 @@
     "packages/*"
   ],
   "scripts": {
+    "dev": "npm -w @latch/spike-policy run dev",
     "lint": "eslint .",
     "db:docker:up": "docker compose up -d",
     "db:docker:down": "docker compose down",

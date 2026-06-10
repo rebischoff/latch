@@ -5,10 +5,10 @@ import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { Pool } from "pg";
 
-import { definePolicyRegistry, PolicyService } from "@latch/policy";
+import { principalWithRoles } from "@latch/contracts";
+import { PolicyService } from "@latch/policy";
 
-import { widgetListSurfacePolicyDef } from "../../spike_codegen/modules/widget/generated/widget_list.schema.generated.js";
-
+import { spikePolicyRegistry } from "./policy-registry.js";
 import {
   createPolicyServiceForPrincipal,
   loadPrincipalFromDb,
@@ -17,8 +17,6 @@ import {
 
 const FIELD_TECH_ID = "b1000001-0000-4000-8000-000000000001";
 const OFFICE_ADMIN_ID = "b1000001-0000-4000-8000-000000000002";
-
-const widgetRegistry = definePolicyRegistry(widgetListSurfacePolicyDef);
 
 const spikePolicyDatabaseUrl = (): string | undefined => {
   const fromEnv = process.env.DATABASE_URL?.trim();
@@ -74,7 +72,7 @@ describe("preloadRoleGrantProvider (Postgres)", () => {
   };
 
   it.runIf(Boolean(spikePolicyDatabaseUrl()))(
-    "field_tech and office_admin produce different widget_list manifests",
+    "field_tech and office_admin produce different manifests on multiple fixture surfaces",
     async () => {
       const pool = openPool();
       const fieldTechProvider = await preloadRoleGrantProvider(pool, [
@@ -86,28 +84,41 @@ describe("preloadRoleGrantProvider (Postgres)", () => {
 
       const policy = (grantProvider: Awaited<typeof fieldTechProvider>) =>
         new PolicyService({
-          registry: widgetRegistry,
+          registry: spikePolicyRegistry,
           grantProvider,
         });
 
-      const fieldTechManifest = policy(fieldTechProvider).resolve(
-        { id: "tech", roles: [FIELD_TECH_ID] },
-        { surface: "widget_list" },
+      const fieldTechAlpha = policy(fieldTechProvider).resolve(
+        principalWithRoles("tech", [FIELD_TECH_ID]),
+        { surface: "alpha_list" },
       );
-      const officeAdminManifest = policy(officeAdminProvider).resolve(
-        { id: "admin", roles: [OFFICE_ADMIN_ID] },
-        { surface: "widget_list" },
+      const officeAdminAlpha = policy(officeAdminProvider).resolve(
+        principalWithRoles("admin", [OFFICE_ADMIN_ID]),
+        { surface: "alpha_list" },
+      );
+      const fieldTechGamma = policy(fieldTechProvider).resolve(
+        principalWithRoles("tech", [FIELD_TECH_ID]),
+        { surface: "gamma_form" },
+      );
+      const officeAdminBeta = policy(officeAdminProvider).resolve(
+        principalWithRoles("admin", [OFFICE_ADMIN_ID]),
+        { surface: "beta_detail" },
       );
 
-      expect(fieldTechManifest.rowScope).toBe("own");
-      expect(fieldTechManifest.fields.summary).toEqual(["read"]);
-      expect(fieldTechManifest.fields.status).toEqual(["read"]);
-      expect(fieldTechManifest.actions).toEqual([]);
+      expect(fieldTechAlpha.rowScope).toBe("own");
+      expect(fieldTechAlpha.fields.title).toEqual(["read"]);
+      expect(fieldTechAlpha.fields.status).toEqual(["read"]);
 
-      expect(officeAdminManifest.rowScope).toBe("all");
-      expect(officeAdminManifest.fields.summary).toEqual(["read", "write"]);
-      expect(officeAdminManifest.fields.status).toEqual(["read", "write"]);
-      expect(officeAdminManifest.actions).toEqual([]);
+      expect(officeAdminAlpha.rowScope).toBe("all");
+      expect(officeAdminAlpha.fields.title).toEqual(["read", "write"]);
+      expect(officeAdminAlpha.fields.status).toEqual(["read", "write"]);
+
+      expect(fieldTechGamma.rowScope).toBe("own");
+      expect(fieldTechGamma.fields.request_type).toEqual(["read"]);
+
+      expect(officeAdminBeta.rowScope).toBe("all");
+      expect(officeAdminBeta.fields.headline).toEqual(["read", "write"]);
+      expect(officeAdminBeta.fields.priority).toEqual(["read"]);
     },
   );
 
@@ -119,14 +130,15 @@ describe("preloadRoleGrantProvider (Postgres)", () => {
       const policy = await createPolicyServiceForPrincipal(
         pool,
         principal,
-        widgetRegistry,
+        spikePolicyRegistry,
       );
 
-      const manifest = policy.resolve(principal, { surface: "widget_list" });
+      const manifest = policy.resolve(principal, { surface: "gamma_form" });
 
       expect(manifest.rowScope).toBe("all");
-      expect(manifest.fields.summary).toEqual(["read", "write"]);
-      expect(manifest.fields.status).toEqual(["read", "write"]);
+      expect(manifest.fields.request_type).toEqual(["read", "write"]);
+      expect(manifest.fields.justification).toEqual(["read", "write"]);
+      expect(manifest.fields.approver).toEqual(["read", "write"]);
       expect(manifest.actions).toEqual(["read", "write"]);
     },
   );

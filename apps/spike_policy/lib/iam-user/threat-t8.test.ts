@@ -8,6 +8,7 @@ import {
   ForbiddenError,
   NotFoundError,
   type PermissionContext,
+  principalWithRoles,
   type Principal,
 } from "@latch/contracts";
 import { PolicyService } from "@latch/policy";
@@ -35,17 +36,15 @@ afterEach(() => {
   resetMemoryPolicyVersion();
 });
 
-const systemIamPrincipal = (userId = SEED_IAM_USER_ID): Principal => ({
-  id: userId,
-  roles: [SYSTEM_IAM_ID],
-  roleClasses: { [SYSTEM_IAM_ID]: "system_iam" },
-});
+const systemIamPrincipal = (userId = SEED_IAM_USER_ID): Principal =>
+  principalWithRoles(userId, [SYSTEM_IAM_ID], {
+    roleClasses: { [SYSTEM_IAM_ID]: "system_iam" },
+  });
 
-const fieldTechPrincipal = (userId = SEED_TECH_USER_ID): Principal => ({
-  id: userId,
-  roles: [FIELD_TECH_ID],
-  roleClasses: { [FIELD_TECH_ID]: "app" },
-});
+const fieldTechPrincipal = (userId = SEED_TECH_USER_ID): Principal =>
+  principalWithRoles(userId, [FIELD_TECH_ID], {
+    roleClasses: { [FIELD_TECH_ID]: "app" },
+  });
 
 const buildCtx = (principal: Principal): PermissionContext => ({
   principal,

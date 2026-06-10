@@ -1,6 +1,8 @@
 # 04 — Users UI + manifest inspector (same page)
 
-> **Status:** Stub (2026-06-08). **Depends on** [01](./01-next-shell.md), [02](./02-vocabulary-fixture.md), [03](./03-roles-ui.md) (catalog must exist to assign).
+> **Status:** Complete (2026-06-09). Spike UI complete — optional follow-ups: user create, profile write, `CachingPolicyService` (Phase 06).
+>
+> **Depends on** [01](./01-next-shell.md), [02](./02-vocabulary-fixture.md), [03](./03-roles-ui.md) (catalog must exist to assign).
 >
 > **Absorbs** former task [05 — Manifest inspector](./05-manifest-inspector.md).
 
@@ -167,16 +169,16 @@ sequenceDiagram
 
 ## Verify (stop gate)
 
-- [ ] User list + detail load from Postgres; assignments persist across `npm run dev` restart
-- [ ] Assign `field_tech` (or app role from UI) → inspector shows sparse grants on **multiple** fixture surfaces
-- [ ] Assign **two overlapping app roles** to one user → inspector shows **merged** field actions and `rowScope: all` when one role has `all` (proves `unionGrants` + `mergeRowScope`)
-- [ ] Save assignments → inspector + nav **`Policy v{N}`** update on same page
-- [ ] `bootstrap-admin` inspector shows synthesis on business + IAM surfaces
-- [ ] Surfaces with no grants show empty field actions (**default deny**)
-- [ ] Edit role grants in task **03** → re-open user → inspector reflects changed effective permissions
-- [ ] Non-`system_iam` actor gets 404 hide on IAM routes (T8)
-- [ ] Exclusivity + last-admin tests pass
-- [ ] Self-patch → 403
+- [x] User list + detail load from Postgres; assignments persist across `npm run dev` restart
+- [x] Assign `field_tech` (or app role from UI) → inspector shows sparse grants on **multiple** fixture surfaces
+- [x] Assign **two overlapping app roles** to one user → inspector shows **merged** field actions and `rowScope: all` when one role has `all` (proves `unionGrants` + `mergeRowScope`)
+- [x] Save assignments → inspector + nav **`Policy v{N}`** update on same page
+- [x] `bootstrap-admin` inspector shows synthesis on business + IAM surfaces
+- [x] Surfaces with no grants show empty field actions (**default deny**)
+- [x] Edit role grants in task **03** → re-open user → inspector reflects changed effective permissions
+- [x] Non-`system_iam` actor gets 404 hide on IAM routes (T8)
+- [x] Exclusivity + last-admin tests pass
+- [x] Self-patch → 403
 
 ## Next
 
