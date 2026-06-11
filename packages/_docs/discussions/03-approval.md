@@ -27,3 +27,4 @@
 ## Related
 
 - [`../reference/approval-trails.md`](../../approval/docs/approval-trails.md), [`packages/approval/src/index.ts`](../../approval/src/index.ts)
+
