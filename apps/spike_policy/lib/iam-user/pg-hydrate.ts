@@ -2,6 +2,7 @@ import { ValidationError } from "@latch/contracts";
 import type { PoolClient } from "pg";
 
 import { MemoryUserStore } from "./memory-user-store.js";
+import type { UserRoleBinding } from "./role-assignment.js";
 
 type PgUserRow = {
   id: string;
@@ -11,6 +12,7 @@ type PgUserRow = {
 type PgAssignmentRow = {
   user_id: string;
   role_id: string;
+  scope_id: string | null;
 };
 
 /** Load users + assignments from Postgres into an in-memory store for DAL operations. */
@@ -27,16 +29,16 @@ export const hydrateMemoryUserStoreFromPg = async (
   }
 
   const assignmentsResult = await client.query<PgAssignmentRow>(
-    "SELECT user_id, role_id FROM latch_user_roles",
+    "SELECT user_id, role_id, scope_id FROM latch_user_roles",
   );
-  const byUser = new Map<string, string[]>();
+  const byUser = new Map<string, UserRoleBinding[]>();
   for (const row of assignmentsResult.rows) {
     const list = byUser.get(row.user_id) ?? [];
-    list.push(row.role_id);
+    list.push({ roleId: row.role_id, scopeId: row.scope_id });
     byUser.set(row.user_id, list);
   }
-  for (const [userId, roleIds] of byUser) {
-    store.setUserRoles(userId, roleIds);
+  for (const [userId, bindings] of byUser) {
+    store.setUserBindings(userId, bindings);
   }
 
   return store;
@@ -74,10 +76,10 @@ export const persistUserRolesToPg = async (
   userId: string,
 ): Promise<void> => {
   await client.query("DELETE FROM latch_user_roles WHERE user_id = $1", [userId]);
-  for (const roleId of store.listRolesForUser(userId)) {
+  for (const binding of store.listBindingsForUser(userId)) {
     await client.query(
-      "INSERT INTO latch_user_roles (user_id, role_id) VALUES ($1, $2)",
-      [userId, roleId],
+      "INSERT INTO latch_user_roles (user_id, role_id, scope_id) VALUES ($1, $2, $3)",
+      [userId, binding.roleId, binding.scopeId],
     );
   }
 };

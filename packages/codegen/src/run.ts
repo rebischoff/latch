@@ -7,6 +7,7 @@ export type CodegenResult = {
   ok: boolean;
   drift?: string[];
   written?: string[];
+  empty?: boolean;
 };
 
 /** Generate committed TS from Surface YAML. With `check`, compare without writing. */
@@ -14,7 +15,9 @@ export const runCodegen = async (check = false): Promise<CodegenResult> => {
   const files = await generateAllSurfaces();
 
   if (files.length === 0) {
-    throw new Error("No *.surface.yaml files found under apps/*/modules/");
+    return check
+      ? { ok: true, drift: [] }
+      : { ok: true, written: [], empty: true };
   }
 
   if (check) {

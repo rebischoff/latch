@@ -1,7 +1,11 @@
+import type { RowScope, ScopeId } from "@latch/contracts";
+
 /** List query passed from the DAL kernel to the store. */
 export type ListQuery = {
   principalId: string;
-  rowScope: "own" | "all";
+  rowScope: RowScope;
+  /** From `manifest.scopeIds` when `rowScope === "scope"`. */
+  scopeIds?: ScopeId[];
   status?: string;
   limit: number;
   offset: number;
@@ -26,6 +30,7 @@ export interface StoreAdapter<TRow, TRelated = unknown> {
   isRowVisibleToPrincipal: (
     entityId: string,
     principalId: string,
-    rowScope: "own" | "all" | undefined,
+    rowScope: RowScope | undefined,
+    scopeIds?: ScopeId[],
   ) => boolean;
 }

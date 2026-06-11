@@ -10,15 +10,15 @@ This repo is a **data-governance platform** for Next.js + Postgres business apps
 ## Always read first
 
 1. [`STATUS.md`](../../STATUS.md) ù the "quarterback" file. Current focus, immediate next step, blockers. **Update it when steps complete.**
-2. [`docs/foundations/scope.md`](../../docs/foundations/scope.md) ù what is in v1 and what is explicitly out. Refuse work that's out of scope unless the user explicitly overrides.
-3. [`docs/reference/packages.md`](../../docs/reference/packages.md) ù monorepo layout and import boundaries.
+2. [`docs/foundations/scope.md`](../../packages/docs/foundations/scope.md) ù what is in v1 and what is explicitly out. Refuse work that's out of scope unless the user explicitly overrides.
+3. [`docs/reference/packages.md`](../../packages/docs/reference/packages.md) ù monorepo layout and import boundaries.
 
 ## Working principles
 
 - **Docs-first.** Update the relevant doc *before* writing code that contradicts it. Add a dated **Decision** block (e.g. `### Decision: <topic> (YYYY-MM-DD)`) when locking a choice.
 - **Close phase tasks.** After each `docs/phases/**/tasks/*.md` implementation, mark verify gates `[x]`, add the task **Status** line, and update that phase?s `STATUS.md` ? see [`45-phase-tasks.mdc`](./45-phase-tasks.mdc).
 - **Don't ship features that aren't in v1 scope.** Suggest, don't build. If the user asks for something out of scope, confirm before proceeding.
-- **Product name is Latch** (`@latch/*`, `latch_*` schema prefix) ù see [`docs/foundations/naming.md`](../../docs/foundations/naming.md).
+- **Product name is Latch** (`@latch/*`, `latch_*` schema prefix) ù see [`docs/foundations/naming.md`](../../packages/docs/foundations/naming.md).
 
 ## When the user asks "what's next?"
 

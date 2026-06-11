@@ -79,7 +79,7 @@ describe("generated widget_list schema catalog", () => {
   it("resolves different manifests per role when grants are injected at runtime", async () => {
     const schemaPath = path.join(
       REPO_ROOT,
-      "apps/spike_codegen/modules/widget/generated/widget_list.schema.generated.ts",
+      "apps/spike_business/modules/widget/generated/widget_list.schema.generated.ts",
     );
     const { widgetListSurfacePolicyDef } = await import(schemaPath);
 
@@ -87,13 +87,13 @@ describe("generated widget_list schema catalog", () => {
       widget_list: {
         widget_viewer: {
           rowScope: "own",
-          fields: [{ field: "summary", actions: ["read"] }],
+          fields: [{ field: "label", actions: ["read"] }],
           surfaceActions: ["read"],
         },
         widget_editor: {
           rowScope: "all",
           fields: [
-            { field: "summary", actions: ["read", "write"] },
+            { field: "label", actions: ["read", "write"] },
             { field: "status", actions: ["read", "write"] },
           ],
           surfaceActions: ["read", "write"],
@@ -110,7 +110,7 @@ describe("generated widget_list schema catalog", () => {
       principalWithRoles("user-1", ["widget_viewer"]),
       { surface: "widget_list" },
     );
-    expect(viewer.fields.summary).toEqual(["read"]);
+    expect(viewer.fields.label).toEqual(["read"]);
     expect(viewer.fields.status).toEqual([]);
     expect(viewer.rowScope).toBe("own");
 
@@ -118,7 +118,7 @@ describe("generated widget_list schema catalog", () => {
       principalWithRoles("user-2", ["widget_editor"]),
       { surface: "widget_list" },
     );
-    expect(editor.fields.summary).toEqual(["read", "write"]);
+    expect(editor.fields.label).toEqual(["read", "write"]);
     expect(editor.fields.status).toEqual(["read", "write"]);
     expect(editor.rowScope).toBe("all");
   });

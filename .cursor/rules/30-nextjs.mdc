@@ -17,7 +17,7 @@ This project uses a deliberate **hybrid**:
 - **Route handlers** (`route.ts`) for anything that may ever be called externally (lists, detail reads, exports, bulk ops). Built via `createSurfaceRouteHandlers(surfaceDef)` from `@latch/dal`.
 - **Server Actions** for internal RSC form mutations. Built via `createSurfaceActions(surfaceDef)`. **Do not** use Server Actions for endpoints that need to be openable to non-React clients.
 
-See [`docs/reference/api-style.md`](../../docs/reference/api-style.md).
+See [`docs/reference/api-style.md`](../../packages/docs/reference/api-style.md).
 
 ## Manifest delivery
 

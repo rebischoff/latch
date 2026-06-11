@@ -1,6 +1,6 @@
 # Discussion 01 — User console (bootstrap, create, self-patch)
 
-> **Status:** Closed (2026-06-09) — user create shipped in [task 07](../tasks/07-user-create.md). Spike: [`apps/spike_policy`](../../).
+> **Status:** Closed (2026-06-09) — user create shipped in [task 07](../tasks/07-user-create.md). Spike: [`apps/spike_policy`](../..).
 
 ## Question
 

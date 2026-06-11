@@ -12,7 +12,7 @@ alwaysApply: true
 - **DB schema / table prefix:** `latch_*` (e.g. `latch_audit`)
 - **Env prefix:** `LATCH_*` when needed
 
-See [`docs/foundations/naming.md`](../../docs/foundations/naming.md). Former codename **Modula** is retired.
+See [`docs/foundations/naming.md`](../../packages/docs/foundations/naming.md). Former codename **Modula** is retired.
 
 ## Domain terms (locked)
 

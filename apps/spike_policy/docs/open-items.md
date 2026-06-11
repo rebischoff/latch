@@ -14,7 +14,7 @@ Spike UI tasks 01–04 and **07** (user create) are **complete**. Optional work 
 | [02 — Privileged assignment](./discussions/02-privileged-assignment.md) | `system_iam` vs `system_data` granting rules + proof plan |
 | [03 — IAM ownership](./discussions/03-app-iam-ownership.md) | Platform vs app — who implements user/role CRUD |
 
-> **Repo decision (2026-06-09):** bounded **scope primitive** + **scoped delegation** locked — [discussion 09](../../../docs/discussions/09-role-delegation-and-scope.md#decision-bounded-scope-primitive--scoped-delegation-2026-06-09). Platform build tracked in [`packages/policy` task 05](../../../packages/policy/docs/tasks/05-scope-and-delegation.md); not spike work.
+> **Repo decision (2026-06-09):** bounded **scope primitive** + **scoped delegation** locked — [discussion 09](../../../packages/docs/discussions/09-role-delegation-and-scope.md#decision-bounded-scope-primitive--scoped-delegation-2026-06-09). Platform build tracked in [`packages/policy` task 05](../../../packages/policy/docs/tasks/05-scope-and-delegation.md); not spike work.
 
 **Suggested order:** 08 (scoped delegation, after policy 05 Phase A) → 02 → profile write → Phase 06 cache → widgets demo (task 06).
 
@@ -41,7 +41,7 @@ Spike UI tasks 01–04 and **07** (user create) are **complete**. Optional work 
 Surface vs field actions, create mode, approve/submit, deny semantics — unchanged reference. See:
 
 - [Discussion 03](./discussions/03-app-iam-ownership.md) for policy engine vs app DAL
-- [`docs/reference/access-control.md`](../../../docs/reference/access-control.md)
+- [`docs/reference/access-control.md`](../../../packages/policy/docs/access-control.md)
 - Role editor UI: [`tasks/03-roles-ui.md`](./tasks/03-roles-ui.md)
 
 **Headlines:**

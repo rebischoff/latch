@@ -41,13 +41,13 @@ Audit logging plus **hard delete** semantics. Recovery is from audit, not tombst
 
 **Rationale:** All meaningful deletes are audited; operator undelete and full snapshots apply only where policy grants `restore`.
 
-**Canonical detail:** [`../phases/04-audit-lifecycle/decisions.md`](../phases/04-audit-lifecycle/decisions.md) · Phase 04 task **06**.
+**Canonical detail:** [`../phases/04-audit-lifecycle/decisions.md`](../../docs/phases/04-audit-lifecycle/decisions.md) · Phase 04 task **06**.
 
 ### Decision: Phase 04 vs Phase 05 audit actions (2026-06-02)
 
 **Choice:** Phase 04 proves `insert`, `update`, `delete`, `bulk_summary`, and implements **`restore`**. **`approve`** and **`reject`** are wired in Phase 05 on accept/reject only (types already exist).
 
-**Canonical detail:** [`../phases/04-audit-lifecycle/decisions.md`](../phases/04-audit-lifecycle/decisions.md).
+**Canonical detail:** [`../phases/04-audit-lifecycle/decisions.md`](../../docs/phases/04-audit-lifecycle/decisions.md).
 
 ## Implementation options
 
@@ -72,9 +72,9 @@ Audit logging plus **hard delete** semantics. Recovery is from audit, not tombst
 1. **Trigger** (exists): `BEFORE UPDATE OR DELETE ON latch_audit` → raise.
 2. **Role grants** (Phase 04 task **04**): app role `latch_app` — **`INSERT` only** on `latch_audit`; no `UPDATE`/`DELETE`.
 
-**CI:** Threat **T6** runs as `latch_app`, not superuser. Production `DATABASE_URL` must use the app role; local dev may use superuser (see [`../../apps/crm/docs/DATABASE.md`](../../apps/crm/docs/DATABASE.md)).
+**CI:** Threat **T6** runs as `latch_app`, not superuser. Production `DATABASE_URL` must use the app role; local dev may use superuser (see [`../../apps/crm/docs/DATABASE.md`](../../../apps/crm/docs/DATABASE.md)).
 
-**Canonical detail:** [`../phases/04-audit-lifecycle/decisions.md`](../phases/04-audit-lifecycle/decisions.md).
+**Canonical detail:** [`../phases/04-audit-lifecycle/decisions.md`](../../docs/phases/04-audit-lifecycle/decisions.md).
 
 ## Hard delete (v1 — only delete model)
 
@@ -104,7 +104,7 @@ RLS (when added) treats deleted rows as absent because they no longer exist.
 
 **`jobs.customer_id` → RESTRICT:** Postgres blocks `DELETE` on a `customers` row while any `jobs` row references it. v1 CRM has no customer `delete` Surface; this FK still protects referential integrity if a customer delete is added later.
 
-**Rationale:** Children are not separate policy anchors in v1; per-child DAL delete + audit would duplicate CASCADE and risk audit gaps. Restore replays anchor `before` including embedded children where `restore` is granted ([task **06**](../phases/04-audit-lifecycle/tasks/06-delete-audit-snapshots.md)); the restore operator INSERTs anchor + children from that payload ([task **07**](../phases/04-audit-lifecycle/tasks/07-restore-tool.md)).
+**Rationale:** Children are not separate policy anchors in v1; per-child DAL delete + audit would duplicate CASCADE and risk audit gaps. Restore replays anchor `before` including embedded children where `restore` is granted ([task **06**](../../docs/phases/04-audit-lifecycle/tasks/06-delete-audit-snapshots.md)); the restore operator INSERTs anchor + children from that payload ([task **07**](../../docs/phases/04-audit-lifecycle/tasks/07-restore-tool.md)).
 
 **Pilot Surfaces** (anchor → CASCADE children; audit on anchor only):
 
@@ -116,7 +116,7 @@ RLS (when added) treats deleted rows as absent because they no longer exist.
 
 **Out of scope:** Ordered multi-table DAL deletes without CASCADE; customer or user `delete` Surfaces in v1 CRM.
 
-**Canonical detail:** [`../phases/04-audit-lifecycle/decisions.md`](../phases/04-audit-lifecycle/decisions.md) · [`../../apps/crm/docs/DATABASE.md`](../../apps/crm/docs/DATABASE.md#cascade-on-delete-v1-pilot).
+**Canonical detail:** [`../phases/04-audit-lifecycle/decisions.md`](../../docs/phases/04-audit-lifecycle/decisions.md) · [`../../apps/crm/docs/DATABASE.md`](../../../apps/crm/docs/DATABASE.md#cascade-on-delete-v1-pilot).
 
 ### Decision: restore-from-audit replay (2026-06-02)
 
@@ -132,7 +132,7 @@ RLS (when added) treats deleted rows as absent because they no longer exist.
 
 **Not restore:** `update` / `approve` / `reject` audit rows (Phase 05).
 
-**Canonical detail:** [`../phases/04-audit-lifecycle/decisions.md`](../phases/04-audit-lifecycle/decisions.md) · task **07**.
+**Canonical detail:** [`../phases/04-audit-lifecycle/decisions.md`](../../docs/phases/04-audit-lifecycle/decisions.md) · task **07**.
 
 ## Retention
 
@@ -145,7 +145,7 @@ RLS (when added) treats deleted rows as absent because they no longer exist.
 - **Partitioning:** by month on `occurred_at` (configurable via global options).
 - **GDPR / erasure:** default **off** (`gdprErasureMode: off`). Optional `pseudonymize` mode may redact actor/PII in audit payloads while keeping event skeleton; legal hold blocks erasure. Use only where legal/compliance requires — not default.
 
-See [global-options.md](../foundations/global-options.md).
+See [global-options.md](../../docs/foundations/global-options.md).
 
 ### Decision: retention seam (v1 — Phase 04) (2026-06-02)
 
@@ -165,7 +165,7 @@ Automated retention enforcement is **post–Phase 04** unless a later task prove
 
 ### Partition sketch (monthly on `occurred_at`)
 
-Pilot `latch_audit` is a single table today ([`001_init.sql`](../../apps/crm/migrations/001_init.sql)). When volume warrants partitioning, migrate to a **range-partitioned** parent keyed on `occurred_at` (global option `auditPartitionBy: month`):
+Pilot `latch_audit` is a single table today ([`001_init.sql`](../../../apps/crm/migrations/001_init.sql)). When volume warrants partitioning, migrate to a **range-partitioned** parent keyed on `occurred_at` (global option `auditPartitionBy: month`):
 
 ```sql
 -- Illustrative — not applied in Phase 04 pilot migrations.
@@ -198,20 +198,20 @@ CREATE TABLE latch_audit_y2026m06 PARTITION OF latch_audit
 3. **Drop** detached partitions only after archive is verified — never `DELETE` rows on `latch_audit` (immutability + `latch_app` is INSERT-only).
 4. **Automation deferred** — partition create/attach and scheduled drop are not in Phase 04 CI; operators run DDL on a maintenance window until a later task ships jobs.
 
-See [`apps/crm/docs/DATABASE.md`](../../apps/crm/docs/DATABASE.md#audit-retention-v1-seam).
+See [`apps/crm/docs/DATABASE.md`](../../../apps/crm/docs/DATABASE.md#audit-retention-v1-seam).
 
 ## Bulk operations
 
-Bulk updates and bulk deletes produce **one audit row per successfully changed entity**, plus an **optional batch summary row** linked by `request_id`. See [`bulk-operations.md`](./bulk-operations.md). Bulk delete uses the same **`delete`** audit action per row.
+Bulk updates and bulk deletes produce **one audit row per successfully changed entity**, plus an **optional batch summary row** linked by `request_id`. See [`bulk-operations.md`](../../dal/docs/bulk-operations.md). Bulk delete uses the same **`delete`** audit action per row.
 
-Threat to watch: a bulk implementation that bypasses per-row `writeAudit` will silently lose audit rows. Tests T15 and T16 in [`../foundations/threat-model.md`](../foundations/threat-model.md) cover this.
+Threat to watch: a bulk implementation that bypasses per-row `writeAudit` will silently lose audit rows. Tests T15 and T16 in [`../foundations/threat-model.md`](../../docs/foundations/threat-model.md) cover this.
 
 ## v1 scope note
 
-- **Hard delete only** ([`../foundations/scope.md`](../foundations/scope.md)).
+- **Hard delete only** ([`../foundations/scope.md`](../../docs/foundations/scope.md)).
 - **Restore-from-audit** operator: Phase 04 tasks **06–07** (CLI + `@latch/audit`; no CRM admin UI).
 - **3-year retention default.** Partition automation = config seam + docs in Phase 04; enforcement post-phase unless trivial.
-- **Threat tests in Phase 04 DoD:** **T6** (app role immutability), **T16** (delete audit, no gap). **T17** (denied access audit): design note only — see [`../foundations/open-questions.md`](../foundations/open-questions.md).
+- **Threat tests in Phase 04 DoD:** **T6** (app role immutability), **T16** (delete audit, no gap). **T17** (denied access audit): design note only — see [`../foundations/open-questions.md`](../../docs/foundations/open-questions.md).
 
 ## Relationship to approval
 
@@ -223,4 +223,4 @@ Changes applied via **accept** generate audit with `action = approve` and refere
 
 **Rationale:** Avoid overloading `reject` for a submitter-initiated cancel; pending storage already records who withdrew and when. Reject comments live on the pending row (`comment` column) and in `reject` audit when a reviewer rejects.
 
-**Canonical detail:** Phase 05 task **08** · [`approval-trails.md`](./approval-trails.md).
+**Canonical detail:** Phase 05 task **08** · [`approval-trails.md`](../../approval/docs/approval-trails.md).

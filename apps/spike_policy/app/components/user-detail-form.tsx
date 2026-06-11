@@ -21,6 +21,7 @@ import { patchUserAssignmentsAction } from "@/app/actions/users";
 import { ManifestInspector } from "@/app/components/manifest-inspector";
 import type { RoleListItem } from "@/lib/iam/list-roles";
 import type { ProjectedUserRolesDetail } from "@/lib/iam-user/project";
+import type { ScopeListItem } from "@/lib/iam-user/list-scopes";
 import {
   userDetailToFormValues,
   userFormValuesToPatch,
@@ -29,12 +30,14 @@ import {
 
 const UserFormSchema = z.object({
   display_name: z.string().optional(),
-  role_assignments: z.array(z.string().uuid()),
+  role_ids: z.array(z.string().uuid()),
+  scope_id: z.string().uuid().nullable(),
 });
 
 type UserDetailFormProps = {
   user: ProjectedUserRolesDetail;
   roles: RoleListItem[];
+  scopes: ScopeListItem[];
   manifests: Record<SurfaceId, Manifest>;
   iamSurfaceIds: readonly string[];
   canWrite: boolean;
@@ -44,6 +47,7 @@ type UserDetailFormProps = {
 export const UserDetailForm = ({
   user,
   roles,
+  scopes,
   manifests: initialManifests,
   iamSurfaceIds,
   canWrite,
@@ -55,6 +59,7 @@ export const UserDetailForm = ({
 
   const displayName = user.profile?.display_name ?? user.id;
   const saveDisabled = !canWrite || isSelf;
+  const scopeRequired = scopes.length > 0;
 
   const {
     control,
@@ -68,6 +73,11 @@ export const UserDetailForm = ({
   const roleOptions = roles.map((role) => ({
     value: role.id,
     label: `${role.displayName} (${role.roleClass})`,
+  }));
+
+  const scopeOptions = scopes.map((scope) => ({
+    value: scope.id,
+    label: scope.displayName,
   }));
 
   const onSubmit = handleSubmit(async (values) => {
@@ -104,7 +114,7 @@ export const UserDetailForm = ({
 
           <Form.Item label="Roles" style={{ maxWidth: 640 }}>
             <Controller
-              name="role_assignments"
+              name="role_ids"
               control={control}
               render={({ field }) => (
                 <Select
@@ -120,6 +130,26 @@ export const UserDetailForm = ({
               )}
             />
           </Form.Item>
+
+          {scopeRequired ? (
+            <Form.Item label="Scope" style={{ maxWidth: 480 }}>
+              <Controller
+                name="scope_id"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    disabled={saveDisabled}
+                    options={scopeOptions}
+                    placeholder="Select branch scope for app roles"
+                    style={{ width: "100%" }}
+                    value={field.value ?? undefined}
+                    onChange={(value) => field.onChange(value ?? null)}
+                    allowClear
+                  />
+                )}
+              />
+            </Form.Item>
+          ) : null}
 
           <Typography.Paragraph type="secondary">
             Merged effective access is shown in the inspector below.

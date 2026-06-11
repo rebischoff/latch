@@ -4,6 +4,7 @@
 id: user_roles_detail
 displayName: User roles
 anchorTable: latch_users
+codegen: false
 
 tables:
   - latch_users

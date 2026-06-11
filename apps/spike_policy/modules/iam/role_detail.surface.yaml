@@ -5,6 +5,7 @@
 id: role_detail
 displayName: Role detail
 anchorTable: latch_roles
+codegen: false
 
 tables:
   - latch_roles

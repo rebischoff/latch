@@ -18,7 +18,7 @@ import {
 
 import { createSurfaceDal } from "./create-surface-dal.js";
 import { assertVerificationDirectWrite } from "./pending-routing.js";
-import type { StoreAdapter } from "./store-adapter.js";
+import type { ListQuery, StoreAdapter } from "./store-adapter.js";
 import type { SurfaceDescriptor } from "./surface-descriptor.js";
 
 type WidgetChild = { widgetId: string; tag: string };
@@ -29,12 +29,15 @@ type WidgetRow = {
   notes: string | null;
   secret: string | null;
   status: string;
+  scopeId: string;
 };
 
 const WIDGET_ALPHA = "widget-alpha";
 const WIDGET_BETA = "widget-beta";
 const PRINCIPAL_A = "principal-a";
 const PRINCIPAL_B = "principal-b";
+const SCOPE_A = "scope-a";
+const SCOPE_B = "scope-b";
 
 const WidgetPatchSchema = z.object({
   label: z.object({ text: z.string().optional() }).optional(),
@@ -168,6 +171,7 @@ class WidgetMemoryStore implements StoreAdapter<WidgetRow, WidgetChild[]> {
       notes: "note-a",
       secret: "hidden-a",
       status: "open",
+      scopeId: SCOPE_A,
     });
     this.rows.set(WIDGET_BETA, {
       id: WIDGET_BETA,
@@ -175,6 +179,7 @@ class WidgetMemoryStore implements StoreAdapter<WidgetRow, WidgetChild[]> {
       notes: "note-b",
       secret: "hidden-b",
       status: "closed",
+      scopeId: SCOPE_B,
     });
     this.visibility.set(WIDGET_ALPHA, new Set([PRINCIPAL_A]));
     this.visibility.set(WIDGET_BETA, new Set([PRINCIPAL_B]));
@@ -187,18 +192,18 @@ class WidgetMemoryStore implements StoreAdapter<WidgetRow, WidgetChild[]> {
 
   get = (id: string): WidgetRow | undefined => this.rows.get(id);
 
-  list = (query: {
-    principalId: string;
-    rowScope: "own" | "all";
-    status?: string;
-    limit: number;
-    offset: number;
-  }) => {
+  list = (query: ListQuery) => {
     let rows = [...this.rows.values()];
     if (query.rowScope === "own") {
       rows = rows.filter((row) =>
         this.visibility.get(row.id)?.has(query.principalId),
       );
+    } else if (query.rowScope === "scope") {
+      const scopeIds = query.scopeIds ?? [];
+      rows =
+        scopeIds.length === 0
+          ? []
+          : rows.filter((row) => scopeIds.includes(row.scopeId));
     }
     if (query.status !== undefined) {
       rows = rows.filter((row) => row.status === query.status);
@@ -224,12 +229,20 @@ class WidgetMemoryStore implements StoreAdapter<WidgetRow, WidgetChild[]> {
   isRowVisibleToPrincipal = (
     entityId: string,
     principalId: string,
-    rowScope: "own" | "all" | undefined,
+    rowScope: "own" | "scope" | "all" | undefined,
+    scopeIds?: string[],
   ): boolean => {
-    if (rowScope !== "own") {
-      return true;
+    if (rowScope === "own") {
+      return this.visibility.get(entityId)?.has(principalId) ?? false;
     }
-    return this.visibility.get(entityId)?.has(principalId) ?? false;
+    if (rowScope === "scope") {
+      const row = this.rows.get(entityId);
+      if (!row || !scopeIds?.length) {
+        return false;
+      }
+      return scopeIds.includes(row.scopeId);
+    }
+    return true;
   };
 }
 
@@ -272,6 +285,16 @@ const ownScopeListManifest: Manifest = {
   surface: "alpha_list",
   actions: ["read", "write"],
   rowScope: "own",
+  fields: {
+    label: ["read", "write"],
+  },
+};
+
+const scopedListManifest: Manifest = {
+  surface: "alpha_list",
+  actions: ["read", "write"],
+  rowScope: "scope",
+  scopeIds: [SCOPE_A],
   fields: {
     label: ["read", "write"],
   },
@@ -451,6 +474,87 @@ describe("createSurfaceDal list + bulk (fixture descriptor)", () => {
 
     expect(total).toBe(1);
     expect(rows[0]?.id).toBe(WIDGET_ALPHA);
+  });
+
+  it("list returns only rows in manifest.scopeIds when rowScope is scope", () => {
+    const store = new WidgetMemoryStore();
+    store.seed();
+    const dal = createSurfaceDal(widgetListDescriptor, store);
+
+    const { rows, total } = dal.list!(
+      buildCtx(scopedListManifest, PRINCIPAL_A),
+    );
+
+    expect(total).toBe(1);
+    expect(rows[0]?.id).toBe(WIDGET_ALPHA);
+  });
+
+  it("get on out-of-scope row throws NotFoundError when rowScope is scope", () => {
+    const store = new WidgetMemoryStore();
+    store.seed();
+    const dal = createSurfaceDal(widgetDetailDescriptor, store);
+    const detailManifest: Manifest = {
+      ...readOnlyManifest,
+      rowScope: "scope",
+      scopeIds: [SCOPE_A],
+    };
+
+    expect(() =>
+      dal.get(buildCtx(detailManifest, PRINCIPAL_A), WIDGET_BETA),
+    ).toThrow(NotFoundError);
+  });
+
+  it("own row scope ignores scopeIds on list", () => {
+    const store = new WidgetMemoryStore();
+    store.seed();
+    const dal = createSurfaceDal(widgetListDescriptor, store);
+    const ownWithScopeIds: Manifest = {
+      ...ownScopeListManifest,
+      scopeIds: [SCOPE_B],
+    };
+
+    const { rows, total } = dal.list!(buildCtx(ownWithScopeIds, PRINCIPAL_A));
+
+    expect(total).toBe(1);
+    expect(rows[0]?.id).toBe(WIDGET_ALPHA);
+  });
+
+  it("all row scope ignores scopeIds on list", () => {
+    const store = new WidgetMemoryStore();
+    store.seed();
+    const dal = createSurfaceDal(widgetListDescriptor, store);
+    const allWithScopeIds: Manifest = {
+      ...listWriteManifest,
+      scopeIds: [SCOPE_A],
+    };
+
+    const { rows, total } = dal.list!(buildCtx(allWithScopeIds, PRINCIPAL_A));
+
+    expect(total).toBe(2);
+    expect(rows.map((r) => r.id).sort()).toEqual(
+      [WIDGET_ALPHA, WIDGET_BETA].sort(),
+    );
+  });
+
+  it("bulkUpdate skips out-of-scope rows when rowScope is scope", async () => {
+    setAuditWriter(audit.writer);
+    const store = new WidgetMemoryStore();
+    store.seed();
+    const dal = createSurfaceDal(widgetListDescriptor, store);
+
+    const result = await dal.bulkUpdate!(
+      buildCtx(scopedListManifest, PRINCIPAL_A),
+      [WIDGET_ALPHA, WIDGET_BETA],
+      { label: { text: "Scoped bulk" } },
+      { mode: "partial" },
+    );
+
+    expect(result.succeeded).toEqual([WIDGET_ALPHA]);
+    expect(result.skipped).toEqual([
+      { id: WIDGET_BETA, reason: "not_found" },
+    ]);
+    expect(store.get(WIDGET_ALPHA)?.label).toBe("Scoped bulk");
+    expect(store.get(WIDGET_BETA)?.label).toBe("Beta");
   });
 
   it("bulkUpdate partial success with not_found skips", async () => {

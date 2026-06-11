@@ -22,7 +22,7 @@ isProject: false
 
 # CRM Step B-list — Jobs list pane
 
-## Scope (from [TASKS.md](apps/crm/docs/TASKS.md) § Step B-list)
+## Scope (from [TASKS.md](./apps/crm/docs/TASKS.md) § Step B-list)
 
 **Proves:** Phase 01 `dal.jobs.list`, list projection, `job_list` row scope (tech `own` vs admin `all`).
 
@@ -34,13 +34,13 @@ isProject: false
 
 **Out (explicit):**
 
-- Bulk select + toolbar action — skip unless trivial; platform proof is in [`tests/job-list.e2e.test.ts`](tests/job-list.e2e.test.ts) and web API routes.
+- Bulk select + toolbar action — skip unless trivial; platform proof is in [`tests/job-list.e2e.test.ts`](./tests/job-list.e2e.test.ts) and web API routes.
 - New Surfaces, nav catalog changes, Tailwind, raw `db.*`.
-- Extracting shared `ManifestTable` package — inline in CRM first ([LAYOUT.md](apps/crm/docs/LAYOUT.md)).
+- Extracting shared `ManifestTable` package — inline in CRM first ([LAYOUT.md](./apps/crm/docs/LAYOUT.md)).
 
-**Prerequisite (now satisfied):** Phase 01 complete — `job_list` YAML, policy, DAL `list`, projection, e2e + threat tests merged. Timing rule in [`crm-and-phases.md`](docs/reference/crm-and-phases.md) allows this slice.
+**Prerequisite (now satisfied):** Phase 01 complete — `job_list` YAML, policy, DAL `list`, projection, e2e + threat tests merged. Timing rule in [`crm-and-phases.md`](./docs/reference/crm-and-phases.md) allows this slice.
 
-**Depends on Step B-detail (done):** [`JobsSplitView.tsx`](apps/crm/src/components/jobs/JobsSplitView.tsx) + [`JobDetailPane.tsx`](apps/crm/src/components/jobs/JobDetailPane.tsx) + `?id=` selection already exist; this task only replaces the left placeholder.
+**Depends on Step B-detail (done):** [`JobsSplitView.tsx`](./apps/crm/src/components/jobs/JobsSplitView.tsx) + [`JobDetailPane.tsx`](./apps/crm/src/components/jobs/JobDetailPane.tsx) + `?id=` selection already exist; this task only replaces the left placeholder.
 
 ---
 
@@ -66,8 +66,8 @@ flowchart TB
 
 | Concern | Choice | Rationale |
 |---------|--------|-----------|
-| List fetch | **Server only** — RSC in [`(app)/jobs/page.tsx`](apps/crm/src/app/(app)/jobs/page.tsx) | Invariant: no DAL in client components; mirror [`apps/web/src/app/jobs/page.tsx`](apps/web/src/app/jobs/page.tsx) |
-| Context | `resolveContext({ surfaceId: 'job_list' })` → `PermissionContext` with `surface: 'job_list'`, `mode: 'list'` | DAL `list` asserts `ctx.surface === 'job_list'` ([repository.ts](packages/dal/src/jobs/repository.ts)) |
+| List fetch | **Server only** — RSC in [`(app)/jobs/page.tsx`](./apps/crm/src/app/(app)/jobs/page.tsx) | Invariant: no DAL in client components; mirror [`apps/web/src/app/jobs/page.tsx`](./apps/web/src/app/jobs/page.tsx) |
+| Context | `resolveContext({ surfaceId: 'job_list' })` → `PermissionContext` with `surface: 'job_list'`, `mode: 'list'` | DAL `list` asserts `ctx.surface === 'job_list'` ([repository.ts](./packages/dal/src/jobs/repository.ts)) |
 | Columns | Static column defs + `fieldAllows(manifest, field, 'read')` filter | Same pattern as web list page; UI mirror only — DTO already omits forbidden keys |
 | Row scope | **No client filter** | DAL returns only in-scope rows per manifest `rowScope` |
 | Selection | Preserve **`?id=`** query param | Already used by detail pane; `useRouter().push(\`${pathname}?id=${row.id}\`)` on row click |
@@ -77,7 +77,7 @@ flowchart TB
 
 ## 1. Extend `lib/latch.ts`
 
-Mirror [`apps/web/src/lib/latch.ts`](apps/web/src/lib/latch.ts):
+Mirror [`apps/web/src/lib/latch.ts`](./apps/web/src/lib/latch.ts):
 
 ```ts
 export type ResolveContextInput =
@@ -108,7 +108,7 @@ export const fetchJobList = async () => {
 
 ## 2. Jobs page (RSC)
 
-Update [`apps/crm/src/app/(app)/jobs/page.tsx`](apps/crm/src/app/(app)/jobs/page.tsx):
+Update [`apps/crm/src/app/(app)/jobs/page.tsx`](./apps/crm/src/app/(app)/jobs/page.tsx):
 
 1. **Always** (with or without `id`): `const listCtx = await resolveContext({ surfaceId: 'job_list' }); const { rows, total } = getJobsDal().list(listCtx);`
 2. Pass to `JobsSplitView`: `listRows={rows}`, `listTotal={total}`, `listManifest={listCtx.manifest}`.
@@ -123,11 +123,11 @@ Update [`apps/crm/src/app/(app)/jobs/page.tsx`](apps/crm/src/app/(app)/jobs/page
 
 ## 3. List pane UI (Ant Design)
 
-Replace placeholder block in [`JobsSplitView.tsx`](apps/crm/src/components/jobs/JobsSplitView.tsx) (extract [`JobListPane.tsx`](apps/crm/src/components/jobs/JobListPane.tsx) if the file grows).
+Replace placeholder block in [`JobsSplitView.tsx`](./apps/crm/src/components/jobs/JobsSplitView.tsx) (extract [`JobListPane.tsx`](./apps/crm/src/components/jobs/JobListPane.tsx) if the file grows).
 
 ### Column map (align with web)
 
-Reuse the same logical columns as [`apps/web/src/app/jobs/page.tsx`](apps/web/src/app/jobs/page.tsx) — adapt renders for Ant Design `ColumnsType<ProjectedJobListRow>`:
+Reuse the same logical columns as [`apps/web/src/app/jobs/page.tsx`](./apps/web/src/app/jobs/page.tsx) — adapt renders for Ant Design `ColumnsType<ProjectedJobListRow>`:
 
 | Field id | Header(s) | Render source |
 |----------|-----------|---------------|
@@ -191,9 +191,9 @@ If attempted:
 
 | Doc | Action |
 |-----|--------|
-| [`apps/crm/docs/TASKS.md`](apps/crm/docs/TASKS.md) | Check off Step B-list items + verify gates after manual QA |
-| [`apps/crm/docs/TASKS.md`](apps/crm/docs/TASKS.md) line 5 | Update “list pane waits…” note — no longer blocked |
-| [`apps/crm/README.md`](apps/crm/README.md) | Mention list pane live if status blurb is stale |
+| [`apps/crm/docs/TASKS.md`](./apps/crm/docs/TASKS.md) | Check off Step B-list items + verify gates after manual QA |
+| [`apps/crm/docs/TASKS.md`](./apps/crm/docs/TASKS.md) line 5 | Update “list pane waits…” note — no longer blocked |
+| [`apps/crm/README.md`](./apps/crm/README.md) | Mention list pane live if status blurb is stale |
 
 No new phase task file — CRM consumes existing Phase 01 contract.
 
@@ -216,11 +216,11 @@ No new phase task file — CRM consumes existing Phase 01 contract.
 
 ## File checklist (implementation order)
 
-1. [`apps/crm/src/lib/latch.ts`](apps/crm/src/lib/latch.ts) — `job_list` in `resolveContext`; remove seed list helpers
-2. [`apps/crm/src/app/(app)/jobs/page.tsx`](apps/crm/src/app/(app)/jobs/page.tsx) — list fetch + props
-3. [`apps/crm/src/components/jobs/JobListPane.tsx`](apps/crm/src/components/jobs/JobListPane.tsx) (new) or inline in split view — Table + columns
-4. [`apps/crm/src/components/jobs/JobsSplitView.tsx`](apps/crm/src/components/jobs/JobsSplitView.tsx) — wire list pane; drop placeholder
-5. [`apps/crm/src/app/actions/job-detail.ts`](apps/crm/src/app/actions/job-detail.ts) — if delete leaves list stale, add `revalidatePath('/jobs')` or `router.refresh()` from client after success
+1. [`apps/crm/src/lib/latch.ts`](./apps/crm/src/lib/latch.ts) — `job_list` in `resolveContext`; remove seed list helpers
+2. [`apps/crm/src/app/(app)/jobs/page.tsx`](./apps/crm/src/app/(app)/jobs/page.tsx) — list fetch + props
+3. [`apps/crm/src/components/jobs/JobListPane.tsx`](./apps/crm/src/components/jobs/JobListPane.tsx) (new) or inline in split view — Table + columns
+4. [`apps/crm/src/components/jobs/JobsSplitView.tsx`](./apps/crm/src/components/jobs/JobsSplitView.tsx) — wire list pane; drop placeholder
+5. [`apps/crm/src/app/actions/job-detail.ts`](./apps/crm/src/app/actions/job-detail.ts) — if delete leaves list stale, add `revalidatePath('/jobs')` or `router.refresh()` from client after success
 6. Docs — TASKS checkboxes
 
 ---
@@ -239,8 +239,8 @@ No new phase task file — CRM consumes existing Phase 01 contract.
 
 ## Reference implementations
 
-- Web list RSC + columns: [`apps/web/src/app/jobs/page.tsx`](apps/web/src/app/jobs/page.tsx)
-- Web `resolveContext`: [`apps/web/src/lib/latch.ts`](apps/web/src/lib/latch.ts)
-- DAL list + projection: [`packages/dal/src/jobs/repository.ts`](packages/dal/src/jobs/repository.ts), [`list-project.ts`](packages/dal/src/jobs/list-project.ts)
-- Policy matrix: [`packages/policy/src/surfaces/job-list.ts`](packages/policy/src/surfaces/job-list.ts)
-- Stack e2e: [`tests/job-list.e2e.test.ts`](tests/job-list.e2e.test.ts)
+- Web list RSC + columns: [`apps/web/src/app/jobs/page.tsx`](./apps/web/src/app/jobs/page.tsx)
+- Web `resolveContext`: [`apps/web/src/lib/latch.ts`](./apps/web/src/lib/latch.ts)
+- DAL list + projection: [`packages/dal/src/jobs/repository.ts`](./packages/dal/src/jobs/repository.ts), [`list-project.ts`](./packages/dal/src/jobs/list-project.ts)
+- Policy matrix: [`packages/policy/src/surfaces/job-list.ts`](./packages/policy/src/surfaces/job-list.ts)
+- Stack e2e: [`tests/job-list.e2e.test.ts`](./tests/job-list.e2e.test.ts)

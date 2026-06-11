@@ -1,4 +1,8 @@
-import type { Principal, RoleBinding } from "@latch/contracts";
+import {
+  normalizePrincipalBindings,
+  type Principal,
+  type RoleClass,
+} from "@latch/contracts";
 import { principalRoleIds } from "@latch/contracts";
 import { PolicyService, type PolicyRegistry } from "@latch/policy";
 import type { Pool } from "pg";
@@ -29,19 +33,22 @@ export const loadPrincipalFromDb = async (
   const result = await pool.query<PrincipalRow>(PRINCIPAL_BINDINGS_SQL, [
     userId,
   ]);
-  const bindings: RoleBinding[] = result.rows.map((row) => ({
+  const bindingRows = result.rows.map((row) => ({
     roleId: row.role_id,
     scopeId: row.scope_id,
-  }));
-  const roleClasses: Principal["roleClasses"] = {};
-
-  for (const row of result.rows) {
-    if (
+    roleClass:
       row.role_class === "system_data" ||
       row.role_class === "system_iam" ||
       row.role_class === "app"
-    ) {
-      roleClasses[row.role_id] = row.role_class;
+        ? (row.role_class as RoleClass)
+        : undefined,
+  }));
+  const bindings = normalizePrincipalBindings(bindingRows);
+  const roleClasses: Principal["roleClasses"] = {};
+
+  for (const row of bindingRows) {
+    if (row.roleClass != null) {
+      roleClasses[row.roleId] = row.roleClass;
     }
   }
 

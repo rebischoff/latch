@@ -45,7 +45,7 @@ Open [http://localhost:3002/login](http://localhost:3002/login). Seed users: `te
 
 > The CRM app uses port **3002** by default so it can run alongside other local Next.js apps on 3000.
 
-Database setup (Neon, migrations, audit): [`docs/foundations/development.md`](./docs/foundations/development.md).
+Database setup (Neon, migrations, audit): [`docs/foundations/development.md`](./packages/docs/foundations/development.md).
 
 ## Repository layout
 
@@ -68,18 +68,18 @@ Database setup (Neon, migrations, audit): [`docs/foundations/development.md`](./
 └── .env.example
 ```
 
-See [`docs/reference/packages.md`](./docs/reference/packages.md).
+See [`docs/reference/packages.md`](./packages/docs/reference/packages.md).
 
 ## Documentation index
 
-The full index lives in [`docs/README.md`](./docs/README.md). High-traffic entries:
+The full index lives in [`docs/README.md`](./packages/docs/README.md). High-traffic entries:
 
 - [`STATUS.md`](./STATUS.md) — what's next
-- [`docs/foundations/scope.md`](./docs/foundations/scope.md) — v1 in / out
-- [`docs/foundations/vision.md`](./docs/foundations/vision.md) — why this exists
-- [`docs/foundations/use-cases.md`](./docs/foundations/use-cases.md) — pilot scenarios
-- [`docs/foundations/architecture-overview.md`](./docs/foundations/architecture-overview.md)
-- [`docs/reference/packages.md`](./docs/reference/packages.md)
-- [`docs/reference/api-style.md`](./docs/reference/api-style.md)
-- [`docs/foundations/threat-model.md`](./docs/foundations/threat-model.md)
-- [`docs/roadmap.md`](./docs/roadmap.md)
+- [`docs/foundations/scope.md`](./packages/docs/foundations/scope.md) — v1 in / out
+- [`docs/foundations/vision.md`](./packages/docs/foundations/vision.md) — why this exists
+- [`docs/foundations/use-cases.md`](./packages/docs/foundations/use-cases.md) — pilot scenarios
+- [`docs/foundations/architecture-overview.md`](./packages/docs/foundations/architecture-overview.md)
+- [`docs/reference/packages.md`](./packages/docs/reference/packages.md)
+- [`docs/reference/api-style.md`](./packages/docs/reference/api-style.md)
+- [`docs/foundations/threat-model.md`](./packages/docs/foundations/threat-model.md)
+- [`docs/roadmap.md`](./packages/docs/roadmap.md)

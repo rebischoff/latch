@@ -28,13 +28,13 @@ isProject: false
 
 # test1 — scaffold and planning docs (no code)
 
-**Delivered 2026-06-03.** Docs and task chain live under [`apps/test1/`](../../apps/test1/).
+**Delivered 2026-06-03.** Docs and task chain live under [`apps/test1/`](../../apps/test1).
 
 ## What was created
 
 - [`apps/test1/README.md`](../../apps/test1/README.md) — entry pointer
-- [`apps/test1/docs/`](../../apps/test1/docs/) — PLAN, STATUS, decisions, AUTH, DATABASE, STACK, LAYOUT, CONFIG
-- [`apps/test1/docs/tasks/`](../../apps/test1/docs/tasks/) — 00–05 executable, 10–23 + 90 + 99 stubs
+- [`apps/test1/docs/`](../../apps/test1/docs) — PLAN, STATUS, decisions, AUTH, DATABASE, STACK, LAYOUT, CONFIG
+- [`apps/test1/docs/tasks/`](../../apps/test1/docs/tasks) — 00–05 executable, 10–23 + 90 + 99 stubs
 - Placeholder dirs: `modules/`, `migrations/`, `db/`, `src/` (README only, no TS)
 
 ## Auth boundary

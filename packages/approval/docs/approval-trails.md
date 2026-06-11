@@ -60,7 +60,7 @@ On **accept** (v1 pilot): ordered steps — re-check `approve`, `resolve(accepte
 
 **Immutability (T7):** Terminal rows are not updated via public API; enforced in DAL (v1). Optional DB trigger deferred.
 
-**Canonical detail:** [`../phases/05-verification/decisions.md`](../phases/05-verification/decisions.md).
+**Canonical detail:** [`../phases/05-verification/decisions.md`](../../docs/phases/05-verification/decisions.md).
 
 ### Rejected options (historical)
 
@@ -95,7 +95,7 @@ UI is not a security boundary; DAL projection enforces omission.
 
 ## Bulk + approval interaction
 
-Bulk update on verification-gated Fields creates **per-row pending records** linked by **`batch_id`**. v1 reviewers accept/reject **per row**. See [`bulk-operations.md`](./bulk-operations.md).
+Bulk update on verification-gated Fields creates **per-row pending records** linked by **`batch_id`**. v1 reviewers accept/reject **per row**. See [`bulk-operations.md`](../../dal/docs/bulk-operations.md).
 
 ## Notifications
 
@@ -127,7 +127,7 @@ Proposals are created via normal Surface **PATCH** (or bulk) when gating applies
 | Withdraw | — | Unchanged; pending row `withdrawn` is the trail |
 | Submit | — | Unchanged (pending row is the trail) |
 
-See [`audit-and-lifecycle.md`](./audit-and-lifecycle.md).
+See [`audit-and-lifecycle.md`](../../audit/docs/audit-and-lifecycle.md).
 
 ## Submitter edit and expiry
 

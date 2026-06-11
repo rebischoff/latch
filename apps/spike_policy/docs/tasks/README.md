@@ -2,17 +2,15 @@
 
 > **Quarterback for the UI spike.** Platform lib + migrations (tasks 01–03 under [`packages/policy/docs/tasks`](../../../packages/policy/docs/tasks/README.md)) are **complete**. This folder plans turning the harness into a **visible policy console** that **proves [`@latch/policy`](../../../packages/policy)** — edit users/roles in Postgres, see effective manifests update live.
 >
-> **Updated:** 2026-06-09 (tasks 01–04, **07** complete; next **08 — scoped delegation**).
+> **Updated:** 2026-06-10 (tasks 01–04, **07–08** complete).
 
 ---
 
 ## Right now — do this next
 
-Spike UI tasks 01–04 and **07** are **complete**. Next planned proof work:
+Spike UI tasks 01–04 and **07–08** are **complete**. Scoped **row filtering** consumer proof continues in [Phase 08](../../../../packages/_docs/phases/08-scoped-access/STATUS.md) task 04 (`apps/spike_business`) — this spike proved assignment + delegation only ([two-harness decision](../../../../packages/_docs/phases/08-scoped-access/decisions.md#decision-two-harness-proof-model--repoint-task-04-2026-06-10)).
 
-- **[08 — Scoped delegation](./08-scoped-delegation.md)** — prove non-`system_iam` scoped assignment + delegation. **Blocked** on [`packages/policy` task 05](../../../packages/policy/docs/tasks/05-scope-and-delegation.md) Phase A seam (task 07 is done).
-
-Other optional follow-ups: profile write, `CachingPolicyService` (Phase 06). Discussions: [`../discussions/README.md`](../discussions/README.md) (index: [`../open-items.md`](../open-items.md)).
+Optional spike follow-ups: profile write, wire `CachingPolicyService` (CRM already has it). Discussions: [`../discussions/README.md`](../discussions/README.md).
 
 ---
 
@@ -44,7 +42,7 @@ Dev-only **“Act as”** principal picker (no Auth.js in v1). Real auth graduat
 | — | ~~05 — Manifest inspector~~ | *Folded into [04](./04-users-ui.md)* | superseded |
 | — | ~~06 — Widgets demo~~ | *Deferred — not needed for policy proof* | deferred |
 | 5 | [07 — User create](./07-user-create.md) | Admin sets up other users; `INSERT latch_users` + optional roles; audited | **complete** (2026-06-09) |
-| 6 | [08 — Scoped delegation](./08-scoped-delegation.md) | Prove scoped assignment + delegation (policy half) in the console | **planned** (blocked on policy 05 Phase A) |
+| 6 | [08 — Scoped delegation](./08-scoped-delegation.md) | Prove scoped assignment + delegation (policy half) in the console | **complete** (2026-06-09) |
 
 ### Dependency graph
 

@@ -24,12 +24,18 @@ import {
   SYSTEM_IAM_ID,
 } from "./fixture-ids.js";
 import { MemoryUserStore } from "./memory-user-store.js";
+import { roleAssignmentDto } from "./role-assignment.js";
 import { createUserRolesDetailDal } from "./repository.js";
-import { roleCatalogForHarness, seedPilotUsers } from "./seed.js";
+import {
+  delegationContextForHarness,
+  roleCatalogForHarness,
+  seedPilotUsers,
+} from "./seed.js";
 
 const audit = createMemoryAuditWriter();
 const policy = new PolicyService({ registry: spikePolicyRegistry });
 const catalog = roleCatalogForHarness();
+const delegation = delegationContextForHarness();
 
 afterEach(() => {
   setAuditWriter(null);
@@ -61,7 +67,7 @@ describe("user_roles_detail — createUser", () => {
     setAuditWriter(audit.writer);
     const store = new MemoryUserStore();
     seedPilotUsers(store);
-    const dal = createUserRolesDetailDal(store, { catalog });
+    const dal = createUserRolesDetailDal(store, { catalog, delegation });
     const versionBefore = getMemoryPolicyVersion();
 
     const created = await dal.createUser(buildCtx(systemIamPrincipal()), {
@@ -84,16 +90,16 @@ describe("user_roles_detail — createUser", () => {
     setAuditWriter(audit.writer);
     const store = new MemoryUserStore();
     seedPilotUsers(store);
-    const dal = createUserRolesDetailDal(store, { catalog });
+    const dal = createUserRolesDetailDal(store, { catalog, delegation });
     const versionBefore = getMemoryPolicyVersion();
 
     const created = await dal.createUser(buildCtx(systemIamPrincipal()), {
       id: "tech-new",
       display_name: "Tech New",
-      role_assignments: [FIELD_TECH_ID],
+      role_assignments: [roleAssignmentDto(FIELD_TECH_ID)],
     });
 
-    expect(created.role_assignments).toEqual([FIELD_TECH_ID]);
+    expect(created.role_assignments).toEqual([roleAssignmentDto(FIELD_TECH_ID)]);
     expect(store.listRolesForUser("tech-new")).toEqual([FIELD_TECH_ID]);
     expect(getMemoryPolicyVersion()).toBe(versionBefore + 1);
   });
@@ -102,7 +108,7 @@ describe("user_roles_detail — createUser", () => {
     setAuditWriter(audit.writer);
     const store = new MemoryUserStore();
     seedPilotUsers(store);
-    const dal = createUserRolesDetailDal(store, { catalog });
+    const dal = createUserRolesDetailDal(store, { catalog, delegation });
     const userCountBefore = store.users.size;
 
     await expect(
@@ -120,14 +126,17 @@ describe("user_roles_detail — createUser", () => {
     setAuditWriter(audit.writer);
     const store = new MemoryUserStore();
     seedPilotUsers(store);
-    const dal = createUserRolesDetailDal(store, { catalog });
+    const dal = createUserRolesDetailDal(store, { catalog, delegation });
     const userCountBefore = store.users.size;
 
     await expect(
       dal.createUser(buildCtx(systemIamPrincipal()), {
         id: "bad-combo",
         display_name: "Bad Combo",
-        role_assignments: [SYSTEM_DATA_ID, FIELD_TECH_ID],
+        role_assignments: [
+          roleAssignmentDto(SYSTEM_DATA_ID),
+          roleAssignmentDto(FIELD_TECH_ID),
+        ],
       }),
     ).rejects.toThrow(ValidationError);
 
@@ -140,7 +149,7 @@ describe("user_roles_detail — createUser", () => {
     setAuditWriter(audit.writer);
     const store = new MemoryUserStore();
     seedPilotUsers(store);
-    const dal = createUserRolesDetailDal(store, { catalog });
+    const dal = createUserRolesDetailDal(store, { catalog, delegation });
     const userCountBefore = store.users.size;
 
     await expect(
@@ -158,7 +167,7 @@ describe("user_roles_detail — createUser", () => {
     setAuditWriter(audit.writer);
     const store = new MemoryUserStore();
     seedPilotUsers(store);
-    const dal = createUserRolesDetailDal(store, { catalog });
+    const dal = createUserRolesDetailDal(store, { catalog, delegation });
 
     await expect(
       dal.createUser(buildCtx(systemIamPrincipal()), {

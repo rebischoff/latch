@@ -1,6 +1,6 @@
 # Discussion 02 — Privileged assignment (`system_iam` vs `system_data`)
 
-> **Status:** Open (2026-06-09). Spike: [`apps/spike_policy`](../../).
+> **Status:** Partially resolved in spike (2026-06-09). P4a/P4b + **scoped delegation** proven in [`task 08`](../tasks/08-scoped-delegation.md). IAM-only vs data-only separation still needs an explicit PG integration test.
 
 ## Question
 
@@ -26,7 +26,7 @@ An actor may assign or revoke a **system** catalog row only if they hold the **s
 - Hold `system_iam` → may assign/revoke `system_iam`
 - Hold `system_data` → may assign/revoke `system_data`
 - Hold **both** → may assign **both**
-- App roles — any `system_iam` actor may assign. **Scoped delegated assigners** (non-`system_iam` app roles handing out an allow-listed set, fenced to their scope) are now **decided** ([discussion 09](../../../../docs/discussions/09-role-delegation-and-scope.md#decision-bounded-scope-primitive--scoped-delegation-2026-06-09), 2026-06-09); platform build = [`packages/policy` task 05](../../../../packages/policy/docs/tasks/05-scope-and-delegation.md), not this spike.
+- App roles — any `system_iam` actor may assign. **Scoped delegated assigners** (non-`system_iam` app roles handing out an allow-listed set, fenced to their scope) are **decided** ([discussion 09](../../../../packages/docs/discussions/09-role-delegation-and-scope.md#decision-bounded-scope-primitive--scoped-delegation-2026-06-09), 2026-06-09) and **proven in the spike** ([task 08](../tasks/08-scoped-delegation.md)); platform RLS half = [`packages/policy` task 05](../../../../packages/policy/docs/tasks/05-scope-and-delegation.md) Phase B.
 
 ### Exclusivity
 
@@ -46,15 +46,16 @@ An actor may assign or revoke a **system** catalog row only if they hold the **s
 | `system_iam` only | Yes | **No** (`ForbiddenError`) | Yes |
 | `system_data` only | **No** | Yes | **No** (exclusivity) |
 | Both | Yes | Yes | **No** (exclusivity) |
-| App only | **No** | **No** | Yes* |
+| App only (no delegator grants) | **No** | **No** | **No** |
+| Scoped delegator (`branch_admin @ scope`) | **No** | **No** | Allow-listed app roles **into own scope only** |
 
-\* Future delegated assigners — model decided (scope fence + `delegatable_roles` allow-list, [discussion 09](../../../../docs/discussions/09-role-delegation-and-scope.md#decision-bounded-scope-primitive--scoped-delegation-2026-06-09)); built in [`packages/policy` task 05](../../../../packages/policy/docs/tasks/05-scope-and-delegation.md), not this spike.
+Scoped delegators: see [task 08](../tasks/08-scoped-delegation.md) — `validate-assignments.test.ts` + Maria fixture.
 
 ## What is already tested
 
 | Layer | Coverage |
 |-------|----------|
-| Unit | `validate-assignments.test.ts` — exclusivity, field_tech cannot assign `system_iam`, last-admin, app assignment by `system_iam` actor |
+| Unit | `validate-assignments.test.ts` — exclusivity, last-admin, `system_iam` app assignment, scoped delegation allow/deny matrix (Maria fixture) |
 | DAL / threat | `threat-t8.test.ts` — escalation blocked; `system_iam` positive patch |
 | Policy engine | `policy-service.test.ts` — `system_iam` synthesis; no business-surface access |
 

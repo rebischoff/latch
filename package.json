@@ -7,13 +7,15 @@
   ],
   "scripts": {
     "dev": "npm -w @latch/spike-policy run dev",
+    "dev:business": "npm -w @latch/spike-business run dev",
     "lint": "eslint .",
     "db:docker:up": "docker compose up -d",
     "db:docker:down": "docker compose down",
     "db:docker:logs": "docker compose logs -f postgres",
     "test": "vitest run",
     "codegen": "npm -w @latch/codegen run generate",
-    "codegen:check": "npm -w @latch/codegen run check"
+    "codegen:check": "npm -w @latch/codegen run check",
+    "latch:new": "npm -w @latch/codegen run new --"
   },
   "devDependencies": {
     "eslint": "^9",

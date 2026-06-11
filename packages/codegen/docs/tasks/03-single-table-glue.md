@@ -53,5 +53,5 @@ The DAL kernel consumes a surface **descriptor** plus projection/patch functions
 ## Reference
 
 - `@latch/dal` contracts: [`surface-descriptor.ts`](../../../dal/src/surface-descriptor.ts), [`project.ts`](../../../dal/src/project.ts), [`patch-utils.ts`](../../../dal/src/patch-utils.ts), [`create-surface-dal.ts`](../../../dal/src/create-surface-dal.ts)
-- [`docs/discussions/01-codegen.md`](../../../../docs/discussions/01-codegen.md) — Decision B
+- [`docs/discussions/01-codegen.md`](../../../docs/discussions/01-codegen.md) — Decision B
 - [`00-decisions-needed.md`](./00-decisions-needed.md) — D1 (packaging)

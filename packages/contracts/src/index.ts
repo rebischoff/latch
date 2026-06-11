@@ -24,10 +24,13 @@ export type {
 } from "./types.js";
 
 export {
+  isSystemRoleClass,
+  normalizePrincipalBindings,
   principalHoldsRole,
   principalRoleIds,
   principalWithRoles,
 } from "./principal.js";
+export type { PrincipalBindingRow } from "./principal.js";
 
 export {
   fieldAllows,

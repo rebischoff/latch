@@ -18,7 +18,7 @@ A naive `UPDATE jobs SET assigned_to = $1 WHERE id = ANY($2)` happily updates ro
 
 **Rationale:**
 
-- Partial is what trades-CRM users actually want (S2 in [`../use-cases.md`](../foundations/use-cases.md)): "reassign these 20, tell me which I couldn't."
+- Partial is what trades-CRM users actually want (S2 in [`../use-cases.md`](../../docs/foundations/use-cases.md)): "reassign these 20, tell me which I couldn't."
 - All-or-nothing protects financial / regulated batches where atomicity matters.
 - Per-row audit keeps the audit log queryable by entity; the batch row helps explain bursts.
 
@@ -66,7 +66,7 @@ Same response shape.
 
 ### Bulk delete (Phase 01)
 
-Task: [`11-dal-bulk-delete.md`](../phases/01-data-access/tasks/11-dal-bulk-delete.md). See [`../foundations/scope.md`](../foundations/scope.md).
+Task: [`11-dal-bulk-delete.md`](../../docs/phases/01-data-access/tasks/11-dal-bulk-delete.md). See [`../foundations/scope.md`](../../docs/foundations/scope.md).
 
 ## DAL contract
 
@@ -143,8 +143,8 @@ Reviewer-side UX (accept all / reject all on a batch) is deferred � v1 reviews
 
 ## Related
 
-- [`../scope.md`](../foundations/scope.md)
-- [`../threat-model.md`](../foundations/threat-model.md)
-- [`api-style.md`](./api-style.md)
-- [`audit-and-lifecycle.md`](./audit-and-lifecycle.md)
-- [`approval-trails.md`](./approval-trails.md)
+- [`../scope.md`](../../docs/foundations/scope.md)
+- [`../threat-model.md`](../../docs/foundations/threat-model.md)
+- [`api-style.md`](../../docs/reference/api-style.md)
+- [`audit-and-lifecycle.md`](../../audit/docs/audit-and-lifecycle.md)
+- [`approval-trails.md`](../../approval/docs/approval-trails.md)

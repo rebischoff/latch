@@ -6,7 +6,7 @@
 
 Make codegen **discover surfaces in any app**, and create the disposable `apps/spike_codegen` it will run against. After this task, `npm run codegen` writes generated TS under `apps/spike_codegen/modules/**/generated/` (and any other app's `modules/`), and `npm run codegen:check` passes with no crm dependency.
 
-This task implements **Point 3** (scan all apps) and lands the [discussion decision](../../../../docs/discussions/01-codegen.md#decision-evaluate-via-a-spike-app-retire-crmtest1-2026-06-05) to retire crm/test1.
+This task implements **Point 3** (scan all apps) and lands the [discussion decision](../../../docs/discussions/01-codegen.md#decision-evaluate-via-a-spike-app-retire-crmtest1-2026-06-05) to retire crm/test1.
 
 ## Why this is one task
 
@@ -73,4 +73,4 @@ and `run.ts` throws `"No *.surface.yaml files found under apps/crm/modules/"`. B
 ## Reference
 
 - [`packages/codegen/src/generate.ts`](../../src/generate.ts), [`run.ts`](../../src/run.ts), [`cli.ts`](../../src/cli.ts)
-- [`docs/discussions/01-codegen.md`](../../../../docs/discussions/01-codegen.md)
+- [`docs/discussions/01-codegen.md`](../../../docs/discussions/01-codegen.md)

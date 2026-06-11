@@ -76,4 +76,4 @@ System rows are identified by `role_class` (singleton index), **not** fixed UUID
 
 - [`00-decisions-needed.md`](./00-decisions-needed.md) — P11 (shape), P4 (synthesis), P4a (UUID assignments), P4b (bootstrap UUIDs)
 - [`01-role-tables.md`](./01-role-tables.md) — pre-P11 prototype (complete)
-- [`docs/reference/access-control.md`](../../../../docs/reference/access-control.md) — graduated P11 shape
+- [`docs/reference/access-control.md`](../access-control.md) — graduated P11 shape

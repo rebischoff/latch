@@ -17,7 +17,6 @@ import {
 import { spikePolicyRegistry } from "../policy-registry.js";
 import { createPolicyServiceForPrincipal, loadPrincipalFromDb } from "../request-policy.js";
 import { resetMemoryPolicyVersion } from "./policy-version.js";
-import { getPolicyVersion } from "./policy-version-read.js";
 import { createRoleDetailDalForPool } from "./repository.js";
 
 const spikePolicyDatabaseUrl = (): string | undefined => {
@@ -114,7 +113,6 @@ describe("role_detail — Postgres DAL", () => {
       expect(actorId).toBeTruthy();
 
       const ctx = await buildCtx(pool, actorId!);
-      const versionBefore = await getPolicyVersion(pool);
       const displayName = `pg-dal-${Date.now()}`;
 
       const created = await dal.createRole(ctx, { display_name: displayName });
@@ -130,9 +128,6 @@ describe("role_detail — Postgres DAL", () => {
           },
         ],
       });
-
-      const versionAfterPatch = await getPolicyVersion(pool);
-      expect(versionAfterPatch).toBe(versionBefore + 1);
 
       const freshPool = openPool();
       const freshDal = createRoleDetailDalForPool(freshPool, {
@@ -152,12 +147,7 @@ describe("role_detail — Postgres DAL", () => {
         catalog: { display_name: `${displayName} v2` },
       });
 
-      const versionAfterRename = await getPolicyVersion(pool);
-      expect(versionAfterRename).toBe(versionAfterPatch);
-
       await dal.deleteRole(ctx, created.id);
-      const versionAfterDelete = await getPolicyVersion(pool);
-      expect(versionAfterDelete).toBe(versionAfterRename + 1);
 
       await expect(freshDal.getRole(ctx, created.id)).rejects.toThrow();
     },

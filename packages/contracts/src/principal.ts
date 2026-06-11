@@ -1,4 +1,39 @@
-import type { Principal, RoleBinding, RoleId } from "./types.js";
+import type {
+  Principal,
+  RoleBinding,
+  RoleClass,
+  RoleId,
+  ScopeId,
+} from "./types.js";
+
+/** System catalog classes are always company-wide — never scoped. */
+export const isSystemRoleClass = (roleClass: RoleClass): boolean =>
+  roleClass === "system_data" || roleClass === "system_iam";
+
+/**
+ * One assignment row as returned by `latch_user_roles` ⨝ `latch_roles`.
+ * Loaders pass this into {@link normalizePrincipalBindings}.
+ */
+export type PrincipalBindingRow = {
+  roleId: RoleId;
+  scopeId: ScopeId | null;
+  roleClass?: RoleClass;
+};
+
+/**
+ * Enforce the platform invariant: `system_data` / `system_iam` bindings always
+ * emit `scopeId: null`, even when the DB row is corrupt. App roles pass through.
+ */
+export const normalizePrincipalBindings = (
+  rows: PrincipalBindingRow[],
+): RoleBinding[] =>
+  rows.map((row) => ({
+    roleId: row.roleId,
+    scopeId:
+      row.roleClass != null && isSystemRoleClass(row.roleClass)
+        ? null
+        : row.scopeId,
+  }));
 
 /** Distinct role ids held by the principal (grant lookup / synthesis). */
 export const principalRoleIds = (principal: Principal): RoleId[] => {

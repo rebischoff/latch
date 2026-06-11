@@ -2,7 +2,7 @@
 
 > **Updated:** 2026-06-09. Follow-up questions from reviewing `apps/spike_policy` and `@latch/policy` after tasks 01–04.
 
-Spike UI tasks are **complete**; items here are optional or deferred unless promoted to a task file under [`../tasks/`](../tasks/).
+Spike UI tasks are **complete**; items here are optional or deferred unless promoted to a task file under [`../tasks/`](../tasks).
 
 | # | Discussion | Summary |
 |---|------------|---------|
@@ -27,5 +27,5 @@ Spike UI tasks are **complete**; items here are optional or deferred unless prom
 ## Related
 
 - Task index: [`../tasks/README.md`](../tasks/README.md)
-- Platform identity: [`../../../../docs/discussions/02-identity-and-permissions.md`](../../../../docs/discussions/02-identity-and-permissions.md)
-- Access control: [`../../../../docs/reference/access-control.md`](../../../../docs/reference/access-control.md)
+- Platform identity: [`../../../../docs/discussions/02-identity-and-permissions.md`](../../../../packages/docs/discussions/02-identity-and-permissions.md)
+- Access control: [`../../../../docs/reference/access-control.md`](../../../../packages/policy/docs/access-control.md)

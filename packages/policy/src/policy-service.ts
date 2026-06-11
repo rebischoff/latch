@@ -4,8 +4,10 @@ import type {
   PolicyScope,
   Principal,
   RoleClass,
+  RoleId,
   RoleSurfacePolicy,
   RowScope,
+  ScopeId,
 } from "@latch/contracts";
 import { principalRoleIds } from "@latch/contracts";
 
@@ -43,6 +45,34 @@ const holdsSystemClass = (
   principal.bindings.some(
     (b) => principal.roleClasses?.[b.roleId] === roleClass,
   );
+
+type RolePolicyContribution = {
+  roleId: RoleId;
+  policy: RoleSurfacePolicy;
+};
+
+const scopeContributingRoleIds = (
+  contributions: RolePolicyContribution[],
+): Set<RoleId> =>
+  new Set(
+    contributions
+      .filter((c) => c.policy.rowScope === "scope")
+      .map((c) => c.roleId),
+  );
+
+const resolveScopeIds = (
+  principal: Principal,
+  contributingRoleIds: Set<RoleId>,
+): ScopeId[] =>
+  [
+    ...new Set(
+      principal.bindings
+        .filter(
+          (b) => b.scopeId != null && contributingRoleIds.has(b.roleId),
+        )
+        .map((b) => b.scopeId as ScopeId),
+    ),
+  ].sort();
 
 /** Synthesized grants when principal holds `system_data` on a business surface. */
 export const synthesizeDataMasterBinding = (
@@ -126,6 +156,7 @@ export class PolicyService {
     }
 
     const rolePolicies: RoleSurfacePolicy[] = [];
+    const roleContributions: RolePolicyContribution[] = [];
     const surfaceActionLists: FieldAction[][] = [];
 
     if (
@@ -152,16 +183,20 @@ export class PolicyService {
       surfaceActionLists.push(iamMaster.surfaceActions);
     }
 
-    for (const grant of this.grantProvider.grantsFor(
-      principalRoleIds(principal),
-      scope.surface,
-    )) {
-      rolePolicies.push({
-        rowScope: grant.rowScope,
-        fields: grant.fields,
-      });
-      if (grant.surfaceActions) {
-        surfaceActionLists.push(grant.surfaceActions);
+    for (const roleId of principalRoleIds(principal)) {
+      for (const grant of this.grantProvider.grantsFor(
+        [roleId],
+        scope.surface,
+      )) {
+        const policy: RoleSurfacePolicy = {
+          rowScope: grant.rowScope,
+          fields: grant.fields,
+        };
+        rolePolicies.push(policy);
+        roleContributions.push({ roleId, policy });
+        if (grant.surfaceActions) {
+          surfaceActionLists.push(grant.surfaceActions);
+        }
       }
     }
 
@@ -173,12 +208,21 @@ export class PolicyService {
 
     const fields = ensureFieldKeys(merged.fields, [...surfaceDef.fieldIds]);
 
+    let scopeIds: ScopeId[] | undefined;
+    if (merged.rowScope === "scope") {
+      scopeIds = resolveScopeIds(
+        principal,
+        scopeContributingRoleIds(roleContributions),
+      );
+    }
+
     return {
       surface: scope.surface,
       entityId: scope.entityId,
       actions: unionSurfaceActions(surfaceActionLists),
       fields,
       rowScope: merged.rowScope,
+      ...(scopeIds !== undefined ? { scopeIds } : {}),
     };
   };
 }

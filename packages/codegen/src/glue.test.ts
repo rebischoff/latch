@@ -113,15 +113,15 @@ describe("generated widget_list glue + DAL kernel", () => {
     setAuditWriter(audit.writer);
     const gluePath = path.join(
       REPO_ROOT,
-      "apps/spike_codegen/modules/widget/generated/widget_list.glue.generated.ts",
+      "apps/spike_business/modules/widget/generated/widget_list.glue.generated.ts",
     );
     const { widgetListDescriptor } = await import(gluePath);
 
-    type WidgetRow = { id: string; label: string };
+    type WidgetRow = { id: string; label: string; status: string };
 
     const store = {
       rows: new Map<string, WidgetRow>([
-        ["w-1", { id: "w-1", label: "Alpha" }],
+        ["w-1", { id: "w-1", label: "Alpha", status: "open" }],
       ]),
       get: (id: string) => store.rows.get(id),
       list: () => ({ rows: [...store.rows.values()], total: 1 }),
@@ -141,7 +141,7 @@ describe("generated widget_list glue + DAL kernel", () => {
       actions: ["read", "write"],
       rowScope: "all",
       fields: {
-        summary: ["read", "write"],
+        label: ["read", "write"],
       },
     };
 
@@ -156,13 +156,13 @@ describe("generated widget_list glue + DAL kernel", () => {
     const dto = dal.get(ctx, "w-1");
     expect(dto).toEqual({
       id: "w-1",
-      summary: { id: "w-1", label: "Alpha" },
+      label: { label: "Alpha" },
     });
 
     const patched = await dal.patch(ctx, "w-1", {
-      summary: { label: "Beta" },
+      label: { label: "Beta" },
     });
-    expect(patched.summary).toEqual({ id: "w-1", label: "Beta" });
+    expect(patched.label).toEqual({ label: "Beta" });
     expect(store.get("w-1")?.label).toBe("Beta");
   });
 });

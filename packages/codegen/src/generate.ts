@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { parse } from "yaml";
 
 import { generateGlueFile } from "./glue.js";
+import { findMonorepoRoot } from "./workspace-root.js";
 import {
   COLUMN_TYPES,
   FIELD_ACTIONS,
@@ -22,8 +23,11 @@ const PACKAGE_ROOT = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "..",
 );
+/** Monorepo root relative to this package (used by in-repo fixtures/tests). */
 export const REPO_ROOT = path.resolve(PACKAGE_ROOT, "../..");
-const APPS_ROOT = path.join(REPO_ROOT, "apps");
+
+/** Heavy trees never scanned for `*.surface.yaml`. */
+const EXCLUDED_DIRS = new Set(["node_modules", ".next", ".git", "dist"]);
 
 const columnTypeSet = new Set<string>(COLUMN_TYPES);
 const fieldActionSet = new Set<string>(FIELD_ACTIONS);
@@ -400,6 +404,9 @@ const collectSurfaceYamlPaths = async (dir: string): Promise<string[]> => {
   for (const entry of entries) {
     const fullPath = path.join(dir, entry.name);
     if (entry.isDirectory()) {
+      if (EXCLUDED_DIRS.has(entry.name)) {
+        continue;
+      }
       files.push(...(await collectSurfaceYamlPaths(fullPath)));
       continue;
     }
@@ -412,9 +419,17 @@ const collectSurfaceYamlPaths = async (dir: string): Promise<string[]> => {
 };
 
 const discoverAppModuleRoots = async (): Promise<string[]> => {
+  const monorepoRoot = findMonorepoRoot(process.cwd());
+
+  // Standalone project: cwd is the app; surfaces live anywhere beneath it.
+  if (!monorepoRoot) {
+    return [process.cwd()];
+  }
+
+  const appsRoot = path.join(monorepoRoot, "apps");
   let appNames: string[];
   try {
-    const entries = await readdir(APPS_ROOT, { withFileTypes: true });
+    const entries = await readdir(appsRoot, { withFileTypes: true });
     appNames = entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name);
   } catch {
     return [];
@@ -427,7 +442,7 @@ const discoverAppModuleRoots = async (): Promise<string[]> => {
 
   const moduleRoots: string[] = [];
   for (const appName of appNames) {
-    const modulesDir = path.join(APPS_ROOT, appName, "modules");
+    const modulesDir = path.join(appsRoot, appName, "modules");
     try {
       const modulesStat = await stat(modulesDir);
       if (modulesStat.isDirectory()) {
@@ -454,12 +469,20 @@ export const discoverSurfaceYamls = async (): Promise<string[]> => {
 
 export type GeneratedArtifact = GeneratedSurfaceFile | GeneratedGlueFile;
 
+const isCodegenSkipped = (raw: string): boolean => {
+  const doc = parse(raw) as Record<string, unknown>;
+  return doc.codegen === false;
+};
+
 export const generateAllSurfaces = async (): Promise<GeneratedArtifact[]> => {
   const yamlPaths = await discoverSurfaceYamls();
   const generated: GeneratedArtifact[] = [];
 
   for (const yamlPath of yamlPaths) {
     const raw = await readFile(yamlPath, "utf8");
+    if (isCodegenSkipped(raw)) {
+      continue;
+    }
     const surface = parseSurfaceYaml(raw, yamlPath);
     const moduleDir = path.dirname(yamlPath);
     const schemaOutPath = path.join(

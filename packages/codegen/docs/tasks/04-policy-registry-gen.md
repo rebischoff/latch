@@ -59,5 +59,5 @@ This reverses the grant-generation half of **Decision H**: YAML is no longer the
 ## Reference
 
 - `@latch/policy`: [`registry.ts`](../../../policy/src/registry.ts), [`policy-service.ts`](../../../policy/src/policy-service.ts), [`grant-provider.ts`](../../../policy/src/grant-provider.ts)
-- [`docs/foundations/scope.md`](../../../../docs/foundations/scope.md) — "app-defined roles are runtime data" (2026-06-06)
-- [`docs/discussions/02-identity-and-permissions.md`](../../../../docs/discussions/02-identity-and-permissions.md)
+- [`docs/foundations/scope.md`](../../../docs/foundations/scope.md) — "app-defined roles are runtime data" (2026-06-06)
+- [`docs/discussions/02-identity-and-permissions.md`](../../../docs/discussions/02-identity-and-permissions.md)

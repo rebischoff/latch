@@ -55,8 +55,8 @@ Let app users **create / update / delete roles and their grants** at runtime thr
 
 ## Reference
 
-- [`docs/phases/03-identity-iam/decisions.md`](../../../../docs/phases/03-identity-iam/decisions.md) — `user_roles_detail` pattern, self-patch denial, T8
-- [`docs/foundations/threat-model.md`](../../../../docs/foundations/threat-model.md) — T8 (privilege escalation), T1 (mass assignment)
+- [`docs/phases/03-identity-iam/decisions.md`](../../../docs/phases/03-identity-iam/decisions.md) — `user_roles_detail` pattern, self-patch denial, T8
+- [`docs/foundations/threat-model.md`](../../../docs/foundations/threat-model.md) — T8 (privilege escalation), T1 (mass assignment)
 - [`01-role-tables.md`](./01-role-tables.md) · [`01b-p11-catalog-realignment.md`](./01b-p11-catalog-realignment.md) (tables)
 - [`02-role-grant-provider.md`](./02-role-grant-provider.md) · [`02b-db-role-grant-provider.md`](./02b-db-role-grant-provider.md) (read path)
 - [`.cursor/rules/10-invariants.mdc`](../../../../.cursor/rules/10-invariants.mdc) — invariants 1/2/3/5/6

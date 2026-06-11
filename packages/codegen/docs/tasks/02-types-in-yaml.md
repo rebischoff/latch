@@ -58,5 +58,5 @@ Any column not pre-listed becomes `z.unknown()` — useless for a new app. That 
 ## Reference
 
 - [`packages/codegen/src/generate.ts`](../../src/generate.ts) (lines defining `COLUMN_ZOD` / `zodForColumn`), [`types.ts`](../../src/types.ts)
-- [`docs/discussions/01-codegen.md`](../../../../docs/discussions/01-codegen.md) — Decision A
+- [`docs/discussions/01-codegen.md`](../../../docs/discussions/01-codegen.md) — Decision A
 - [`00-decisions-needed.md`](./00-decisions-needed.md) — D2, D3

@@ -19,10 +19,12 @@ Disposable harness for [policy tasks 01 / 01b](../../packages/policy/docs/tasks/
 | `009_latch_audit.sql` | `latch_audit` + immutability trigger; `latch_app` INSERT-only | Yes |
 | `010_latch_scopes.sql` | `latch_scopes`, `latch_user_roles.scope_id`, `latch_role_delegations` (task 05 Phase A) | Yes |
 | `900_fixture_pilot_roles.sql` | `field_tech` / `office_admin` + fixture vocabulary grants | **Spike only** |
+| `901_fixture_vocabulary.sql` | Union demo roles + refreshed fixture surface grants | **Spike only** |
+| `902_fixture_scoped_delegation.sql` | Branch A/B scopes, `branch_admin` delegator, Maria @ Branch B | **Spike only** |
 
 ## Migrate (Neon — recommended)
 
-Neon is the default Postgres workflow — see [`docs/foundations/development.md`](../../docs/foundations/development.md). Docker is optional.
+Neon is the default Postgres workflow — see [`docs/foundations/development.md`](../../packages/docs/foundations/development.md). Docker is optional.
 
 1. Create or reuse a Neon project; use a **dedicated branch** (e.g. `spike-policy-verify`) so you can reset without touching other work.
 2. Copy the **direct** connection string (not pooler) into `apps/spike_policy/.env.local`:
@@ -205,12 +207,28 @@ const ctx = {
 };
 ```
 
+## Scoped delegation proof (task 08)
+
+Fixture migration `902_fixture_scoped_delegation.sql` seeds:
+
+- `Branch A` / `Branch B` in `latch_scopes`
+- `branch_admin` app role — `read`/`write` on `user_roles_detail`; allow-list = `field_tech`, `office_admin`
+- **Maria** (`maria`) — `branch_admin @ Branch B`
+
+**Demo:** Act as Maria → create user → assign `field_tech @ Branch B` (success). Try Branch A, a non-allow-listed role, or `system_iam` (three distinct `ForbiddenError` messages). Act as `bootstrap-admin` (`system_iam`) → any scope succeeds.
+
+| Module | Role |
+|--------|------|
+| [`lib/iam-user/validate-assignments.ts`](./lib/iam-user/validate-assignments.ts) | Capability + allow-list + scope-fence dials |
+| [`lib/iam-user/assignment-options.ts`](./lib/iam-user/assignment-options.ts) | Server-filtered roles + scopes for the UI |
+| [`lib/iam-user/resolve-all-manifests.ts`](./lib/iam-user/resolve-all-manifests.ts) | Resolves per-surface manifests via `PolicyService.resolve` |
+
 ## Task plans
 
 | Plan | Path |
 |------|------|
 | Platform / runtime roles (01–03 complete) | [`packages/policy/docs/tasks`](../../packages/policy/docs/tasks/README.md) |
-| **Policy console UI** (next: task 01 — shell + antd + policy API page) | [`docs/tasks/README.md`](./docs/tasks/README.md) |
+| **Policy console UI** (tasks 01–08 complete) | [`docs/tasks/README.md`](./docs/tasks/README.md) |
 
 ## Related
 

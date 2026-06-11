@@ -11,6 +11,7 @@ import { z } from "zod";
 import { createUserAction } from "@/app/actions/users";
 import type { RoleListItem } from "@/lib/iam/list-roles";
 import type { UserListItem } from "@/lib/iam-user/list-users-pg";
+import type { ScopeListItem } from "@/lib/iam-user/list-scopes";
 import {
   userCreateFormValuesToInput,
   type UserCreateFormValues,
@@ -19,13 +20,15 @@ import {
 const UserCreateFormSchema = z.object({
   id: z.string().trim().min(1, "User id is required"),
   display_name: z.string().trim().min(1, "Display name is required"),
-  role_assignments: z.array(z.string().uuid()),
+  role_ids: z.array(z.string().uuid()),
+  scope_id: z.string().uuid().nullable(),
 });
 
 type UsersSidebarProps = {
   users: UserListItem[];
   selectedId: string | null;
   roles: RoleListItem[];
+  scopes: ScopeListItem[];
   canCreate: boolean;
 };
 
@@ -33,10 +36,12 @@ export const UsersSidebar = ({
   users,
   selectedId,
   roles,
+  scopes,
   canCreate,
 }: UsersSidebarProps) => {
   const router = useRouter();
   const [createOpen, setCreateOpen] = useState(false);
+  const scopeRequired = scopes.length > 0;
 
   const {
     control,
@@ -48,7 +53,8 @@ export const UsersSidebar = ({
     defaultValues: {
       id: "",
       display_name: "",
-      role_assignments: [],
+      role_ids: [],
+      scope_id: null,
     },
   });
 
@@ -59,6 +65,11 @@ export const UsersSidebar = ({
   const roleOptions = roles.map((role) => ({
     value: role.id,
     label: `${role.displayName} (${role.roleClass})`,
+  }));
+
+  const scopeOptions = scopes.map((scope) => ({
+    value: scope.id,
+    label: scope.displayName,
   }));
 
   const onCreate = handleSubmit(async (values) => {
@@ -197,9 +208,9 @@ export const UsersSidebar = ({
             />
           </Form.Item>
 
-          <Form.Item label="Initial roles" style={{ marginBottom: 0 }}>
+          <Form.Item label="Initial roles" style={{ marginBottom: scopeRequired ? 16 : 0 }}>
             <Controller
-              name="role_assignments"
+              name="role_ids"
               control={control}
               render={({ field }) => (
                 <Select
@@ -214,6 +225,25 @@ export const UsersSidebar = ({
               )}
             />
           </Form.Item>
+
+          {scopeRequired ? (
+            <Form.Item label="Scope" style={{ marginBottom: 0 }}>
+              <Controller
+                name="scope_id"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    options={scopeOptions}
+                    placeholder="Branch scope for app roles"
+                    style={{ width: "100%" }}
+                    value={field.value ?? undefined}
+                    onChange={(value) => field.onChange(value ?? null)}
+                    allowClear
+                  />
+                )}
+              />
+            </Form.Item>
+          ) : null}
         </form>
       </Modal>
     </>

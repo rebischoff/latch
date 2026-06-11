@@ -1,6 +1,6 @@
 # Access control
 
-How Latch thinks about **granular** data access. Combines **Surface** (working name: Module), **Field**, mandatory **DAL**, optional Postgres RLS, and **UI-aligned manifests**. See [permissions-and-ui-sync.md](./permissions-and-ui-sync.md) and [glossary.md](../foundations/glossary.md).
+How Latch thinks about **granular** data access. Combines **Surface** (working name: Module), **Field**, mandatory **DAL**, optional Postgres RLS, and **UI-aligned manifests**. See [permissions-and-ui-sync.md](../../docs/reference/permissions-and-ui-sync.md) and [glossary.md](../../docs/foundations/glossary.md).
 
 ## Resource hierarchy
 
@@ -25,13 +25,13 @@ We **do not** use shared-schema multi-tenancy. Each company has its own database
 - Company ? `DATABASE_URL` routing (TBD)
 - User/role assignment in each company DB (`latch_users`, `latch_user_roles` — see Phase 03 decisions)
 - RLS for row/owner rules **within** a company DB
-- Hosted Postgres on Vercel (e.g. Neon) ? see [development.md](../foundations/development.md)
+- Hosted Postgres on Vercel (e.g. Neon) ? see [development.md](../../docs/foundations/development.md)
 
 Actions (draft): `read`, `write`, `delete`, `restore`, `approve`, `hard_delete`.
 
 ## Decision: app-defined roles are runtime data (2026-06-06)
 
-**Choice:** **Supersedes the "Surface/Field policies per role in repo YAML/JSON" line in the RBAC decision below.** Role definitions — the role catalog and each role's Field/action grants + `rowScope` — are **runtime DB data** (`latch_roles` catalog, `latch_role_surfaces` bindings, `latch_role_grants`), created/updated/deleted by app users through a permission-gated IAM Surface, audited. Codegen still owns the per-Surface **Field/action vocabulary**; the role editor validates each grant against it. The two system classes (`system_data`, `system_iam`) stay template-seeded and synthesized in `PolicyService`. Canonical detail: [`../foundations/scope.md`](../foundations/scope.md), [`../discussions/02-identity-and-permissions.md`](../discussions/02-identity-and-permissions.md). Runtime tasks: [`../../packages/policy/docs/tasks/README.md`](../../packages/policy/docs/tasks/README.md).
+**Choice:** **Supersedes the "Surface/Field policies per role in repo YAML/JSON" line in the RBAC decision below.** Role definitions — the role catalog and each role's Field/action grants + `rowScope` — are **runtime DB data** (`latch_roles` catalog, `latch_role_surfaces` bindings, `latch_role_grants`), created/updated/deleted by app users through a permission-gated IAM Surface, audited. Codegen still owns the per-Surface **Field/action vocabulary**; the role editor validates each grant against it. The two system classes (`system_data`, `system_iam`) stay template-seeded and synthesized in `PolicyService`. Canonical detail: [`../foundations/scope.md`](../../docs/foundations/scope.md), [`../discussions/02-identity-and-permissions.md`](../../docs/discussions/02-identity-and-permissions.md). Runtime tasks: [`../../packages/policy/docs/tasks/README.md`](./tasks/README.md).
 
 **Rationale:** Assignments were already runtime (`latch_user_roles`); leaving definitions at build time forced a dev redeploy for every permission tweak. Splitting **vocabulary (codegen, build time) from grants (DB, runtime)** preserves the safety property — a runtime grant can never reference a Field the Surface doesn't define, because the role editor and the resolver both read the codegen catalog — while letting business admins own the policy.
 
@@ -41,7 +41,7 @@ Actions (draft): `read`, `write`, `delete`, `restore`, `approve`, `hard_delete`.
 
 | Table | Purpose |
 |-------|---------|
-| `latch_roles` | Role catalog (`id` UUID, `role_class`, `display_name`) — [P11](../../packages/policy/docs/tasks/00-decisions-needed.md#p11--role-catalog-shape-uuid--role_class-2026-06-08) |
+| `latch_roles` | Role catalog (`id` UUID, `role_class`, `display_name`) — [P11](./tasks/00-decisions-needed.md#p11--role-catalog-shape-uuid--role_class-2026-06-08) |
 | `latch_role_surfaces` | One row per **(role, surface)** — authoritative `row_scope` (`own` \| `all`) |
 | `latch_role_grants` | Sparse allow-rows: one per **(role, surface, field, action)**; no `row_scope` |
 | `latch_user_roles` | Assignments (unchanged); `role_id` FK → `latch_roles.id` |
@@ -54,7 +54,7 @@ Actions (draft): `read`, `write`, `delete`, `restore`, `approve`, `hard_delete`.
 | `latch_role_grants.role_id` | `latch_roles.id` | **CASCADE** |
 | `latch_role_surfaces.role_id` | `latch_roles.id` | **CASCADE** |
 
-**System roles:** Template seeds exactly one `system_data` and one `system_iam` catalog row (**DB-generated UUIDs**, identified by `role_class` via the singleton index; non-deletable via the role editor). Grants for **both** are **synthesized in `PolicyService`** from `role_class` (`system_data` → Surface `kind: business`; `system_iam` → Surface `kind: iam`), not stored as grant rows. Storage, exclusivity, and bootstrap: P4 / P4a / P4b / P11 in [`../../packages/policy/docs/tasks/00-decisions-needed.md`](../../packages/policy/docs/tasks/00-decisions-needed.md).
+**System roles:** Template seeds exactly one `system_data` and one `system_iam` catalog row (**DB-generated UUIDs**, identified by `role_class` via the singleton index; non-deletable via the role editor). Grants for **both** are **synthesized in `PolicyService`** from `role_class` (`system_data` → Surface `kind: business`; `system_iam` → Surface `kind: iam`), not stored as grant rows. Storage, exclusivity, and bootstrap: P4 / P4a / P4b / P11 in [`../../packages/policy/docs/tasks/00-decisions-needed.md`](./tasks/00-decisions-needed.md).
 
 **Sparse grants:** New roles need **no** grant rows until configured; missing grants → default deny. Only surfaces the editor touches get `latch_role_surfaces` rows.
 
@@ -62,7 +62,7 @@ Actions (draft): `read`, `write`, `delete`, `restore`, `approve`, `hard_delete`.
 
 **Rationale:** RESTRICT on assignments preserves an explicit, auditable revoke path. CASCADE on definition children avoids orphan grant/binding rows. Template provisioning seeds built-in catalog rows only; pilot app roles are created at runtime (or in `apps/spike_policy` fixture seeds for tests).
 
-Canonical parking-lot detail: [`../../packages/policy/docs/tasks/00-decisions-needed.md`](../../packages/policy/docs/tasks/00-decisions-needed.md) (P1, P2, P2a, P3, P4, P4a, P4b).
+Canonical parking-lot detail: [`../../packages/policy/docs/tasks/00-decisions-needed.md`](./tasks/00-decisions-needed.md) (P1, P2, P2a, P3, P4, P4a, P4b).
 
 ### Decision: built-in roles — synthesis, storage, exclusivity, bootstrap (2026-06-06)
 
@@ -75,7 +75,7 @@ Canonical parking-lot detail: [`../../packages/policy/docs/tasks/00-decisions-ne
 - **Privileged assignment (2026-06-08).** Assign `system_iam` only if actor holds `system_iam`; assign `system_data` only if actor holds `system_data`; hold both → assign both.
 - **Bootstrap.** Provisioning seeds one initial super admin (both system UUIDs); the assignment DAL refuses to remove the **last** `system_iam` holder; env break-glass (`LATCH_BOOTSTRAP_ADMIN_EMAIL`) assigns `system_iam` when zero holders exist.
 
-**Rationale:** One assignment table keeps a single source of truth and a uniform resolver; `role_class` encodes plane + deletability ([P11](../../packages/policy/docs/tasks/00-decisions-needed.md#p11--role-catalog-shape-uuid--role_class-2026-06-08)). Synthesizing both removes the bootstrap lockout risk; separation of duties + per-class assignment stop cross-plane escalation. Scoped delegation for non-`system_iam` assigners is deferred to [discussion 09](../discussions/09-role-delegation-and-scope.md).
+**Rationale:** One assignment table keeps a single source of truth and a uniform resolver; `role_class` encodes plane + deletability ([P11](./tasks/00-decisions-needed.md#p11--role-catalog-shape-uuid--role_class-2026-06-08)). Synthesizing both removes the bootstrap lockout risk; separation of duties + per-class assignment stop cross-plane escalation. Scoped delegation for non-`system_iam` assigners is deferred to [discussion 09](../../docs/discussions/09-role-delegation-and-scope.md).
 
 ## Decision: RBAC with built-in roles (2026-05)
 
@@ -87,7 +87,7 @@ Canonical parking-lot detail: [`../../packages/policy/docs/tasks/00-decisions-ne
 
 ### Decision: role catalog — system classes + app roles (2026-06-02; shape 2026-06-08)
 
-**Choice:** Catalog rows use **UUID** PK + `role_class` ([P11](../../packages/policy/docs/tasks/00-decisions-needed.md#p11--role-catalog-shape-uuid--role_class-2026-06-08)):
+**Choice:** Catalog rows use **UUID** PK + `role_class` ([P11](./tasks/00-decisions-needed.md#p11--role-catalog-shape-uuid--role_class-2026-06-08)):
 
 | `role_class` | Template seed | Purpose |
 |--------------|---------------|---------|
@@ -99,9 +99,9 @@ Canonical parking-lot detail: [`../../packages/policy/docs/tasks/00-decisions-ne
 
 **Rationale:** Separates pilot personas from platform administration; system classes satisfy Phase 03 sub-goals with a proper catalog table.
 
-> **Updated (2026-06-08):** only `system_data` / `system_iam` are template-seeded. Pilot personas are **runtime** `app` rows (role editor or `apps/spike_policy` fixture only) — [P3](../../packages/policy/docs/tasks/00-decisions-needed.md#p3--seed-pilot-app-roles-or-start-the-catalog-empty).
+> **Updated (2026-06-08):** only `system_data` / `system_iam` are template-seeded. Pilot personas are **runtime** `app` rows (role editor or `apps/spike_policy` fixture only) — [P3](./tasks/00-decisions-needed.md#p3--seed-pilot-app-roles-or-start-the-catalog-empty).
 
-Canonical detail: [`../phases/03-identity-iam/decisions.md`](../phases/03-identity-iam/decisions.md).
+Canonical detail: [`../phases/03-identity-iam/decisions.md`](../../docs/phases/03-identity-iam/decisions.md).
 
 ### Decision: data_master wildcard (2026-06-02)
 
@@ -109,7 +109,7 @@ Canonical detail: [`../phases/03-identity-iam/decisions.md`](../phases/03-identi
 
 **Rationale:** New business Surfaces gain `data_master` access when registered + app-role policies are added — no hand-edited `data_master` YAML. Regression-tested in Phase 03 task **21**.
 
-Implementation: `PolicyService.resolve` synthesizes `read`/`write` on all `fieldIds` (+ surface `read`/`write` actions) when the principal holds a role of `role_class = 'system_data'` (via `Principal.roleClasses`) and the registry entry has `kind: "business"`. IAM entries use `kind: "iam"` (e.g. `user_roles_detail`). `synthesizeDataMasterBinding` in `@latch/policy` (keyed on `role_class` since [01b](../../packages/policy/docs/tasks/01b-p11-catalog-realignment.md); no fixed role-id constant).
+Implementation: `PolicyService.resolve` synthesizes `read`/`write` on all `fieldIds` (+ surface `read`/`write` actions) when the principal holds a role of `role_class = 'system_data'` (via `Principal.roleClasses`) and the registry entry has `kind: "business"`. IAM entries use `kind: "iam"` (e.g. `user_roles_detail`). `synthesizeDataMasterBinding` in `@latch/policy` (keyed on `role_class` since [01b](./tasks/01b-p11-catalog-realignment.md); no fixed role-id constant).
 
 ### Decision: iam_master wildcard (2026-06-08)
 
@@ -117,11 +117,11 @@ Implementation: `PolicyService.resolve` synthesizes `read`/`write` on all `field
 
 **Rationale:** New IAM Surfaces (role editor, user assignments, etc.) gain `iam_master` access when registered — no grant rows in `latch_role_grants`. Synthesis removes bootstrap lockout risk when the grant table is empty or broken.
 
-Implementation: `PolicyService.resolve` synthesizes `read`/`write` on all `fieldIds` (+ surface `read`/`write` actions) when the principal holds a role of `role_class = 'system_iam'` (via `Principal.roleClasses`) and the registry entry has `kind: "iam"`. `synthesizeIamMasterBinding` in `@latch/policy` (keyed on `role_class` since [01b](../../packages/policy/docs/tasks/01b-p11-catalog-realignment.md); no fixed role-id constant).
+Implementation: `PolicyService.resolve` synthesizes `read`/`write` on all `fieldIds` (+ surface `read`/`write` actions) when the principal holds a role of `role_class = 'system_iam'` (via `Principal.roleClasses`) and the registry entry has `kind: "iam"`. `synthesizeIamMasterBinding` in `@latch/policy` (keyed on `role_class` since [01b](./tasks/01b-p11-catalog-realignment.md); no fixed role-id constant).
 
 ### Decision: multiple roles ? `multiRoleCombine` (2026-05-27, revised)
 
-**Choice (v1):** When a user has multiple roles, effective permissions are merged using global option **`multiRoleCombine`**. **v1 implements `union_grants` only.** The other three modes are designed as pluggable strategies but not built or tested in v1 ([`scope.md`](../foundations/scope.md)).
+**Choice (v1):** When a user has multiple roles, effective permissions are merged using global option **`multiRoleCombine`**. **v1 implements `union_grants` only.** The other three modes are designed as pluggable strategies but not built or tested in v1 ([`scope.md`](../../docs/foundations/scope.md)).
 
 | Mode | Status | Semantics |
 |---|---|---|
@@ -134,18 +134,18 @@ Implementation: `PolicyService.resolve` synthesizes `read`/`write` on all `field
 
 **v1 deliverable:** `PolicyService` unit tests for `union_grants` ? `denyWins` matrix. Engine ships with a `RoleMergeStrategy` seam so other modes can be added without refactor.
 
-See [global-options.md](../foundations/global-options.md).
+See [global-options.md](../../docs/foundations/global-options.md).
 
 ### Decision: Step 3 pilot Surface (2026-05-28)
 
-**Choice:** The v1 pilot Surface id is **`job_detail`**. It covers use cases **S1**, **S3**, and **S4** in [`use-cases.md`](../foundations/use-cases.md) (field tech read, PM approval, cross-tech denial).
+**Choice:** The v1 pilot Surface id is **`job_detail`**. It covers use cases **S1**, **S3**, and **S4** in [`use-cases.md`](../../docs/foundations/use-cases.md) (field tech read, PM approval, cross-tech denial).
 
 **Rationale:** One multi-table Surface exercises Field-level permissions (financials hidden from field tech), row-level rules (own jobs), approval (change orders), audit, and hard delete without building the full trades-CRM surface set.
 
 **Locked with this decision (task 00):**
 
 - **D4:** v1 implements **`union_grants` only** with global **`denyWins: true`** (see **Decision: multiple roles ? `multiRoleCombine`** above).
-- **D5:** **RLS deferred**; v1 enforcement is DAL-only ([`scope.md`](../foundations/scope.md)).
+- **D5:** **RLS deferred**; v1 enforcement is DAL-only ([`scope.md`](../../docs/foundations/scope.md)).
 
 ## Surface as policy boundary
 
@@ -173,7 +173,7 @@ manifest.fields = union_grants(base, overlay) with denyWins; overlay cannot add 
 
 `PolicyScope.mode` exists in `@latch/contracts`; wire in `packages/policy` when merging split ids.
 
-See [`../foundations/glossary.md`](../foundations/glossary.md).
+See [`../foundations/glossary.md`](../../docs/foundations/glossary.md).
 
 ## Field-level permissions
 
@@ -210,13 +210,13 @@ Optional global setting: **404** instead of **403** for sensitive Fields.
 
 Set **once per (role, surface)** on `latch_role_surfaces`; applies to list, detail, and bulk alike. When a user holds multiple roles, `mergeRowScope` takes the most permissive (`all` beats `own`).
 
-**Deferred (post-v1):** richer scopes (team/colleagues, manager subtree, site-scoped, etc.) via additional `row_scope` enum values and/or Surface row-rule metadata; ABAC/ReBAC remains out of v1 ([`scope.md`](../foundations/scope.md)). Keep `row_scope` as a string column so new values do not require a breaking DDL change.
+**Deferred (post-v1):** richer scopes (team/colleagues, manager subtree, site-scoped, etc.) via additional `row_scope` enum values and/or Surface row-rule metadata; ABAC/ReBAC remains out of v1 ([`scope.md`](../../docs/foundations/scope.md)). Keep `row_scope` as a string column so new values do not require a breaking DDL change.
 
 **Rationale:** Covers the pilot personas without committing to a full row-rule language. Policy passes `own`/`all`; the store owns *how* “own” is evaluated.
 
 ### Decision: bounded scope primitive — `row_scope: scope` + scoped delegation (2026-06-09)
 
-**Choice (seam locked; full build is a dedicated phase):** Add a third `row_scope` value **`scope`** plus a bounded **scope primitive** for branch/site/crew isolation and local role delegation. This is *namespaced RBAC*, not ABAC/ReBAC. Canonical model + rationale: [`../discussions/09-role-delegation-and-scope.md`](../discussions/09-role-delegation-and-scope.md#decision-bounded-scope-primitive--scoped-delegation-2026-06-09).
+**Choice (seam locked; full build is a dedicated phase):** Add a third `row_scope` value **`scope`** plus a bounded **scope primitive** for branch/site/crew isolation and local role delegation. This is *namespaced RBAC*, not ABAC/ReBAC. Canonical model + rationale: [`../discussions/09-role-delegation-and-scope.md`](../../docs/discussions/09-role-delegation-and-scope.md#decision-bounded-scope-primitive--scoped-delegation-2026-06-09).
 
 **Seam edits this flags (additive, no breaking DDL):**
 
@@ -259,16 +259,16 @@ The DAL:
 
 ## Postgres integration (safety net)
 
-See [postgres-rls-and-security.md](../discovery/postgres-rls-and-security.md).
+See [postgres-rls-and-security.md](../../docs/discovery/postgres-rls-and-security.md).
 
 **Hybrid:** DAL + manifest for Field-level and UI sync; RLS for row rules where discovery confirms value.
 
 ## Bulk operations
 
-Bulk update/delete is part of v1. The per-row evaluation model is documented in [`bulk-operations.md`](./bulk-operations.md). Key invariant: bulk paths use the same `PolicyService` + `PermissionContext` as single-record paths ? *no parallel enforcement*.
+Bulk update/delete is part of v1. The per-row evaluation model is documented in [`bulk-operations.md`](../../dal/docs/bulk-operations.md). Key invariant: bulk paths use the same `PolicyService` + `PermissionContext` as single-record paths ? *no parallel enforcement*.
 
 ## Open points
 
-Deny policy YAML syntax, break-glass audit, per-Surface override of `multiRoleCombine`. Multi-company DB routing is deferred ([`../scope.md`](../foundations/scope.md)).
+Deny policy YAML syntax, break-glass audit, per-Surface override of `multiRoleCombine`. Multi-company DB routing is deferred ([`../scope.md`](../../docs/foundations/scope.md)).
 
-Identity storage, D2 auth provider (Auth.js), and built-in catalog are locked in [`../phases/03-identity-iam/decisions.md`](../phases/03-identity-iam/decisions.md).
+Identity storage, D2 auth provider (Auth.js), and built-in catalog are locked in [`../phases/03-identity-iam/decisions.md`](../../docs/phases/03-identity-iam/decisions.md).

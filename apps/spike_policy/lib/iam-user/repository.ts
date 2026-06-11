@@ -16,6 +16,8 @@ import {
   createUserRolesDetailDescriptor,
   userRowAuditSnapshot,
 } from "./descriptors.js";
+import { loadDelegationContextFromPg } from "./delegation-context.js";
+import type { DelegationContext } from "./delegation-context.js";
 import type { MemoryUserStore, MemoryUserRecord } from "./memory-user-store.js";
 import {
   hydrateMemoryUserStoreFromPg,
@@ -24,6 +26,8 @@ import {
 } from "./pg-hydrate.js";
 import type { ProjectedUserRolesDetail } from "./project.js";
 import { loadRoleCatalogFromPg } from "./role-catalog.js";
+import type { RoleAssignmentDto, UserRoleBinding } from "./role-assignment.js";
+import { dtosToBindings } from "./role-assignment.js";
 import type { RoleCatalogEntry } from "./validate-assignments.js";
 import { UserCreateSchema } from "./user-form.js";
 import { validateRoleAssignmentsPatch } from "./validate-assignments.js";
@@ -31,7 +35,7 @@ import { validateRoleAssignmentsPatch } from "./validate-assignments.js";
 export type UserCreateBody = {
   id: string;
   display_name: string;
-  role_assignments?: string[];
+  role_assignments?: RoleAssignmentDto[];
 };
 
 export type UserRolesDetailDal = {
@@ -96,22 +100,29 @@ const assertNotSelfRolePatch = (
 
 const createUserStoreAdapter = (
   store: MemoryUserStore,
-): StoreAdapter<MemoryUserRecord, string[]> => ({
+): StoreAdapter<MemoryUserRecord, UserRoleBinding[]> => ({
   get: (id) => store.getUser(id),
   list: () => ({ rows: [], total: 0 }),
   upsert: (row) => store.upsertUser(row),
   delete: (id) => {
     store.users.delete(id);
-    store.rolesByUser.delete(id);
+    store.bindingsByUser.delete(id);
   },
-  getRelated: (entityId) => store.listRolesForUser(entityId),
-  replaceRelated: (entityId, roleIds) => store.setUserRoles(entityId, roleIds),
+  getRelated: (entityId) => store.listBindingsForUser(entityId),
+  replaceRelated: (entityId, bindings) =>
+    store.setUserBindings(entityId, bindings),
+  // IAM `latch_users` rows have no `scope_id` — scoped row RLS is deferred (task 08).
+  // Delegation fence lives in validate-assignments; scope-rung grants still need get/patch access.
   isRowVisibleToPrincipal: (_entityId, _principalId, rowScope) =>
-    rowScope === "all" || rowScope === undefined,
+    rowScope === "all" ||
+    rowScope === "scope" ||
+    rowScope === "own" ||
+    rowScope === undefined,
 });
 
 export type UserRolesDetailDalDeps = {
   catalog: Map<string, RoleCatalogEntry>;
+  delegation: DelegationContext;
   pool?: Pool;
 };
 
@@ -148,22 +159,25 @@ export const createUserRolesDetailDal = (
         validateRoleAssignmentsPatch({
           actor: ctx.principal,
           targetUserId: id,
-          nextRoleIds: role_assignments,
+          nextBindings: role_assignments,
           catalog: deps.catalog,
+          delegation: deps.delegation,
           listUsersWithRole: (roleId) => store.listUsersWithRole(roleId),
         });
       }
 
       store.upsertUser({ id, displayName: display_name });
       if (role_assignments !== undefined && role_assignments.length > 0) {
-        store.setUserRoles(id, role_assignments);
+        store.setUserBindings(id, dtosToBindings(role_assignments));
       }
 
       const row = store.getUser(id)!;
-      const roleIds = store.listRolesForUser(id);
-      const snapshot = userRowAuditSnapshot(row, roleIds);
+      const bindings = store.listBindingsForUser(id);
+      const snapshot = userRowAuditSnapshot(row, bindings);
       const fieldIds =
-        roleIds.length > 0 ? (["profile", "role_assignments"] as const) : (["profile"] as const);
+        bindings.length > 0
+          ? (["profile", "role_assignments"] as const)
+          : (["profile"] as const);
 
       await writeAudit({
         actorId: ctx.principal.id,
@@ -175,7 +189,7 @@ export const createUserRolesDetailDal = (
         after: snapshot,
       });
 
-      if (roleIds.length > 0) {
+      if (bindings.length > 0) {
         await bumpPolicyVersion(ctx.principal.id, deps.pool);
       }
 
@@ -189,8 +203,9 @@ export const createUserRolesDetailDal = (
         validateRoleAssignmentsPatch({
           actor: ctx.principal,
           targetUserId: id,
-          nextRoleIds: patch.role_assignments,
+          nextBindings: patch.role_assignments,
           catalog: deps.catalog,
+          delegation: deps.delegation,
           listUsersWithRole: (roleId) => store.listUsersWithRole(roleId),
         });
       }
@@ -222,7 +237,8 @@ export const createUserRolesDetailDalForPool = (
     withPermissionDb(pool, principalId, async (client) => {
       const store = await hydrateMemoryUserStoreFromPg(client);
       const catalog = await loadRoleCatalogFromPg(client);
-      const dal = createUserRolesDetailDal(store, { catalog, pool });
+      const delegation = await loadDelegationContextFromPg(client);
+      const dal = createUserRolesDetailDal(store, { catalog, delegation, pool });
       const txn: PgUserTxn = {
         store,
         dal,

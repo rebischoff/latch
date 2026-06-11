@@ -8,8 +8,8 @@ Add the platform tables that make role definitions runtime data: `latch_roles` (
 
 ## Background
 
-- Phase 03 deliberately shipped **no** `roles` table (assignments only, in `latch_user_roles`). This task reverses that under the "[roles are runtime data](../../../../docs/discussions/02-identity-and-permissions.md)" decision.
-- Drizzle owns DDL (codegen never generates migrations — [`codegen-scope.md`](../../../../docs/reference/codegen-scope.md)). These are hand-written migrations + Drizzle schema, like `latch_user_roles`.
+- Phase 03 deliberately shipped **no** `roles` table (assignments only, in `latch_user_roles`). This task reverses that under the "[roles are runtime data](../../../docs/discussions/02-identity-and-permissions.md)" decision.
+- Drizzle owns DDL (codegen never generates migrations — [`codegen-scope.md`](../../../codegen/docs/reference/codegen-scope.md)). These are hand-written migrations + Drizzle schema, like `latch_user_roles`.
 - Platform tables → eventually templatized (compartment 6).
 - **`row_scope` per `(role, surface)`** is locked ([P1](./00-decisions-needed.md#p1--row_scope-granularity-per-grant-row-or-per-role-surface) Decision, 2026-06-06) — lives on `latch_role_surfaces`, not on grant rows.
 - **Pilot personas** (`field_tech`, `office_admin`, …) are **not** template seeds. Optional fixture seeds for tests live in [`apps/spike_policy`](../../../../apps/spike_policy) only (vocabulary from [`apps/spike_codegen`](../../../../apps/spike_codegen)).
@@ -65,8 +65,8 @@ Stop gate for **table structure and P1–P4b semantics** on the pre-P11 sketch. 
 ## Reference
 
 - [`00-decisions-needed.md`](./00-decisions-needed.md) — P1 (`row_scope`), P2 (FK), P3 (system rows only), P4 (synthesize), P4a (storage + exclusivity), P4b (bootstrap), P11 (catalog shape)
-- [`docs/phases/03-identity-iam/decisions.md`](../../../../docs/phases/03-identity-iam/decisions.md) — identity storage (superseded in part)
-- [`docs/reference/compartments.md`](../../../../docs/reference/compartments.md) — platform tables
+- [`docs/phases/03-identity-iam/decisions.md`](../../../docs/phases/03-identity-iam/decisions.md) — identity storage (superseded in part)
+- [`docs/reference/compartments.md`](../../../docs/reference/compartments.md) — platform tables
 - [`01b-p11-catalog-realignment.md`](./01b-p11-catalog-realignment.md) — P11 catalog shape (next)
 - [`02-role-grant-provider.md`](./02-role-grant-provider.md) · [`02b-db-role-grant-provider.md`](./02b-db-role-grant-provider.md) — read path
 - [`apps/spike_policy`](../../../../apps/spike_policy) · [`apps/spike_codegen`](../../../../apps/spike_codegen) — disposable harness + vocabulary fixture

@@ -1,6 +1,6 @@
 # Discussion 03 — IAM ownership (platform vs business app)
 
-> **Status:** Open (2026-06-09). Spike: [`apps/spike_policy`](../../).
+> **Status:** Open (2026-06-09). Spike: [`apps/spike_policy`](../..).
 
 ## Question
 
@@ -23,7 +23,7 @@ There is **no `@latch/iam` package in v1** (Phase 03 decision; extract in Phase 
 | Audit transactions | `@latch/audit` |
 | Field/action **vocabulary** | App codegen from `*.surface.yaml` |
 
-Canonical split: [`docs/discussions/02-identity-and-permissions.md`](../../../../docs/discussions/02-identity-and-permissions.md).
+Canonical split: [`docs/discussions/02-identity-and-permissions.md`](../../../../packages/docs/discussions/02-identity-and-permissions.md).
 
 ## What each business app provides
 
@@ -128,5 +128,5 @@ Live map: **`/dev/policy-api`** in the spike. Summary:
 
 - [01 — User console](./01-user-console.md)
 - [02 — Privileged assignment](./02-privileged-assignment.md)
-- Compartments map: [`docs/reference/compartments.md`](../../../../docs/reference/compartments.md#2-identity--permissions)
-- Phase 03 package layout: [`docs/phases/03-identity-iam/decisions.md`](../../../../docs/phases/03-identity-iam/decisions.md)
+- Compartments map: [`docs/reference/compartments.md`](../../../../packages/docs/reference/compartments.md#2-identity--permissions)
+- Phase 03 package layout: [`docs/phases/03-identity-iam/decisions.md`](../../../../packages/docs/phases/03-identity-iam/decisions.md)

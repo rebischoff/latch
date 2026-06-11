@@ -7,6 +7,7 @@ import { UserDetailForm } from "@/app/components/user-detail-form";
 import { UsersSidebar } from "@/app/components/users-sidebar";
 import type { RoleListItem } from "@/lib/iam/list-roles";
 import type { UserListItem } from "@/lib/iam-user/list-users-pg";
+import type { ScopeListItem } from "@/lib/iam-user/list-scopes";
 import type { ProjectedUserRolesDetail } from "@/lib/iam-user/project";
 
 type UsersWorkspaceProps = {
@@ -14,6 +15,7 @@ type UsersWorkspaceProps = {
   selectedId: string | null;
   user: ProjectedUserRolesDetail | null;
   roles: RoleListItem[];
+  scopes: ScopeListItem[];
   manifests: Record<SurfaceId, Manifest> | null;
   iamSurfaceIds: readonly string[];
   canCreate: boolean;
@@ -26,6 +28,7 @@ export const UsersWorkspace = ({
   selectedId,
   user,
   roles,
+  scopes,
   manifests,
   iamSurfaceIds,
   canCreate,
@@ -52,6 +55,7 @@ export const UsersWorkspace = ({
         users={users}
         selectedId={selectedId}
         roles={roles}
+        scopes={scopes}
         canCreate={canCreate}
       />
     </aside>
@@ -70,6 +74,7 @@ export const UsersWorkspace = ({
           key={user.id}
           user={user}
           roles={roles}
+          scopes={scopes}
           manifests={manifests}
           iamSurfaceIds={iamSurfaceIds}
           canWrite={canWrite}

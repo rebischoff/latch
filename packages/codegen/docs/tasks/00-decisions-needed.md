@@ -1,10 +1,10 @@
 # 00 — Decisions needed (parking lot)
 
-> **Status:** Open (2026-06-05). Not a task — a list of choices that **block** deferred codegen work or shape how the executable tasks are packaged. Resolve here (dated **Decision** block), then graduate into [`docs/discussions/01-codegen.md`](../../../../docs/discussions/01-codegen.md) and spawn a task if needed.
+> **Status:** Open (2026-06-05). Not a task — a list of choices that **block** deferred codegen work or shape how the executable tasks are packaged. Resolve here (dated **Decision** block), then graduate into [`docs/discussions/01-codegen.md`](../../../docs/discussions/01-codegen.md) and spawn a task if needed.
 
 These are the *un-decided* items extracted from the discussion. Executable tasks (01–04) do **not** wait on these except where noted.
 
-> **Boundary reference:** the scope these items sit inside is fixed by [`docs/reference/codegen-scope.md`](../../../../docs/reference/codegen-scope.md) — codegen **owns** the logical-surface layer (types/validation/permissions/glue), **verifies** the physical layer (`--check` vs Drizzle), and **does not own** DDL/migrations or page JSX. D2/D5 below are *how/whether* questions **inside** that boundary, not invitations to move it.
+> **Boundary reference:** the scope these items sit inside is fixed by [`codegen/docs/reference/codegen-scope.md`](../reference/codegen-scope.md) — codegen **owns** the logical-surface layer (types/validation/permissions/glue), **verifies** the physical layer (`--check` vs Drizzle), and **does not own** DDL/migrations or page JSX. D2/D5 below are *how/whether* questions **inside** that boundary, not invitations to move it.
 
 ---
 
@@ -16,7 +16,7 @@ These are the *un-decided* items extracted from the discussion. Executable tasks
 
 **Affects:** packaging of 03/04 (not their logic). Pick before finalizing their CLI surface.
 
-**Scope:** all modes named here (`structure` / `glue` / `registry`) live **inside** the [codegen boundary](../../../../docs/reference/codegen-scope.md); a `ddl` mode would cross it (see D5).
+**Scope:** all modes named here (`structure` / `glue` / `registry`) live **inside** the [codegen boundary](../reference/codegen-scope.md); a `ddl` mode would cross it (see D5).
 
 **Status:** Undecided.
 
@@ -32,7 +32,7 @@ These are the *un-decided* items extracted from the discussion. Executable tasks
 
 **Why it matters:** Determines whether task [02](./02-types-in-yaml.md) ships the cross-check in one pass or splits it out. The *YAML-declared types + drop `COLUMN_ZOD`* half of task 02 is executable regardless.
 
-**Scope:** this is the **verify** verb in [`codegen-scope.md`](../../../../docs/reference/codegen-scope.md) — codegen reads Drizzle to confirm YAML types match; it never writes Drizzle. Picking import-vs-parse does **not** move the boundary.
+**Scope:** this is the **verify** verb in [`codegen-scope.md`](../reference/codegen-scope.md) — codegen reads Drizzle to confirm YAML types match; it never writes Drizzle. Picking import-vs-parse does **not** move the boundary.
 
 **Status:** **Deferred** (2026-06-06) — task 02 shipped YAML-declared types; Drizzle reconciliation is a follow-up once the import-vs-parse approach is picked.
 
@@ -62,11 +62,11 @@ These are the *un-decided* items extracted from the discussion. Executable tasks
 
 **Question:** Should codegen "scaffold a starter page once" (Point 5)? If so, what is the "scaffold once, never own/overwrite" mechanism?
 
-**Why it matters:** Overlaps **template delivery** (decision G, [discussion 07](../../../../docs/discussions/07-template-scaffold.md)). No task until both this and the template approach are settled.
+**Why it matters:** Overlaps **template delivery** (decision G, [discussion 07](../../../docs/discussions/07-template-scaffold.md)). No task until both this and the template approach are settled.
 
-**Scope:** [`codegen-scope.md`](../../../../docs/reference/codegen-scope.md) boundary 3 — codegen **does not own** page components/JSX. Any starter-page work must be one-time scaffold (not the idempotent `sync` generator) and must not overwrite app-owned files.
+**Scope:** [`codegen-scope.md`](../reference/codegen-scope.md) boundary 3 — codegen **does not own** page components/JSX. Any starter-page work must be one-time scaffold (not the idempotent `sync` generator) and must not overwrite app-owned files.
 
-**Status:** Deferred — no task.
+**Status:** Deferred — use [task 05](./05-scaffold-cli.md) (`latch new`), not sync codegen.
 
 ---
 
@@ -76,7 +76,7 @@ These are the *un-decided* items extracted from the discussion. Executable tasks
 
 **Why it matters:** Large surface; intersects the Drizzle-as-source-of-truth question (D2). Out of scope for the spike.
 
-**Scope:** generating DDL would **move** the [`codegen-scope.md`](../../../../docs/reference/codegen-scope.md) boundary — it overturns "Drizzle owns the physical schema; codegen only verifies it." The current decision is **stay DB-first**; revisiting this is a deliberate scope change (planning gate), not a follow-up task.
+**Scope:** generating DDL would **move** the [`codegen-scope.md`](../reference/codegen-scope.md) boundary — it overturns "Drizzle owns the physical schema; codegen only verifies it." The current decision is **stay DB-first**; revisiting this is a deliberate scope change (planning gate), not a follow-up task.
 
 **Status:** Deferred — no task.
 
@@ -84,6 +84,6 @@ These are the *un-decided* items extracted from the discussion. Executable tasks
 
 ## Related
 
-- [`docs/reference/codegen-scope.md`](../../../../docs/reference/codegen-scope.md) — **the boundary these decisions sit inside** (owns / verifies / must-not-own).
-- [`01-codegen.md`](../../../../docs/discussions/01-codegen.md) — decisions A / B / H and the open questions these expand on.
-- [`docs/reference/metadata-and-codegen.md`](../../../../docs/reference/metadata-and-codegen.md).
+- [`codegen/docs/reference/codegen-scope.md`](../reference/codegen-scope.md) — **the boundary these decisions sit inside** (owns / verifies / must-not-own).
+- [`01-codegen.md`](../../../docs/discussions/01-codegen.md) — decisions A / B / H and the open questions these expand on.
+- [`docs/reference/metadata-and-codegen.md`](../reference/metadata-and-codegen.md).

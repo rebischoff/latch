@@ -22,6 +22,10 @@ const main = async (): Promise<void> => {
   for (const file of result.written ?? []) {
     console.log(`codegen: wrote ${file}`);
   }
+
+  if (result.empty) {
+    console.log("codegen: no *.surface.yaml files found — nothing to generate");
+  }
 };
 
 main().catch((error: unknown) => {

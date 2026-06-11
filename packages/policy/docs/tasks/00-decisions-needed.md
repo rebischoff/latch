@@ -1,10 +1,10 @@
 # 00 — Decisions needed (parking lot)
 
-> **Status:** Resolved (2026-06-08). P1–P10 locked (P7 deferred). Runtime-roles parking lot complete; UI spike: [`apps/spike_policy/docs/tasks`](../../../../apps/spike_policy/docs/tasks/README.md). **Scoped role delegation** split to [discussion 09](../../../../docs/discussions/09-role-delegation-and-scope.md). Not a task — a parking lot for forks that **block** or **shape** runtime-roles work.
+> **Status:** Resolved (2026-06-08). P1–P10 locked (P7 deferred). Runtime-roles parking lot complete; UI spike: [`apps/spike_policy/docs/tasks`](../../../../apps/spike_policy/docs/tasks/README.md). **Scoped role delegation** split to [discussion 09](../../../docs/discussions/09-role-delegation-and-scope.md). Not a task — a parking lot for forks that **block** or **shape** runtime-roles work.
 
 The big architectural choice is already locked — **"roles are runtime data"** (2026-06-06, see the discussion). These are the *fine-tune forks* that the locked decision deferred. Tasks are gated as noted; nothing here re-opens the runtime-data decision itself.
 
-> **Boundary reference:** vocabulary (Surfaces/Fields/actions that *exist*) is codegen, build time; grants (who gets what) are DB, runtime. Neither of those moves. These items are *how* the runtime grant layer is shaped — see [`docs/reference/codegen-scope.md`](../../../../docs/reference/codegen-scope.md) and [`access-control.md`](../../../../docs/reference/access-control.md).
+> **Boundary reference:** vocabulary (Surfaces/Fields/actions that *exist*) is codegen, build time; grants (who gets what) are DB, runtime. Neither of those moves. These items are *how* the runtime grant layer is shaped — see [`codegen/docs/reference/codegen-scope.md`](../../../codegen/docs/reference/codegen-scope.md) and [`access-control.md`](../access-control.md).
 
 ---
 
@@ -23,13 +23,13 @@ The big architectural choice is already locked — **"roles are runtime data"** 
 
 **Choice:** Store `row_scope` **once per `(role, surface)`** — on a `latch_role_surfaces` binding row (or an equivalent single authoritative column per role×surface), **not** duplicated on every field×action grant row. `latch_role_grants` rows carry no `row_scope`.
 
-**Rationale:** The "[roles are runtime data](../../../../docs/discussions/02-identity-and-permissions.md)" reversal means an **app user** edits grants through the IAM Surface matrix, not a developer in YAML. The editor exposes **one** "row scope: own / all" control per role×surface; per-row storage would force the write path to fan that single value across every grant row and the read path to collapse it via `mergeRowScope`, creating an inconsistency hazard a human editor can trip (e.g. half a role's rows say `own`, half say `all`). One authoritative value per `(role, surface)` maps 1:1 to the control and removes the hazard. `PolicyService` is **unchanged** — it already reduces to one `rowScope` per role×surface before the cross-role merge; only the `DbRoleGrantProvider` fold reads the binding row instead of a grant-row column. Cross-**role** merge still uses `mergeRowScope` (`all` beats `own`).
+**Rationale:** The "[roles are runtime data](../../../docs/discussions/02-identity-and-permissions.md)" reversal means an **app user** edits grants through the IAM Surface matrix, not a developer in YAML. The editor exposes **one** "row scope: own / all" control per role×surface; per-row storage would force the write path to fan that single value across every grant row and the read path to collapse it via `mergeRowScope`, creating an inconsistency hazard a human editor can trip (e.g. half a role's rows say `own`, half say `all`). One authoritative value per `(role, surface)` maps 1:1 to the control and removes the hazard. `PolicyService` is **unchanged** — it already reduces to one `rowScope` per role×surface before the cross-role merge; only the `DbRoleGrantProvider` fold reads the binding row instead of a grant-row column. Cross-**role** merge still uses `mergeRowScope` (`all` beats `own`).
 
 **Status:** Locked (per `(role, surface)`). Task 01 ([`01-role-tables.md`](./01-role-tables.md)) DDL aligned: `latch_role_surfaces(role_id, surface_id, row_scope, …)` binding table; **no `row_scope` on `latch_role_grants`**.
 
 ### Decision: `row_scope` values v1 — `own` | `all`; expansion deferred (2026-06-06)
 
-**Choice:** v1 stores only **`own`** and **`all`** on `latch_role_surfaces.row_scope` (and `RowScope` in `@latch/contracts`). **`own`** means “rows visible to this principal per the Surface store” (pilot: assignment join on jobs). **`all`** means no row filter. Cross-role merge: `all` beats `own` (`mergeRowScope`). Richer patterns (team, colleagues, manager subtree, site-scoped, etc.) are **deferred** — see [`access-control.md`](../../../../docs/reference/access-control.md#decision-row-scope-v1--expansion-deferred-2026-06-06).
+**Choice:** v1 stores only **`own`** and **`all`** on `latch_role_surfaces.row_scope` (and `RowScope` in `@latch/contracts`). **`own`** means “rows visible to this principal per the Surface store” (pilot: assignment join on jobs). **`all`** means no row filter. Cross-role merge: `all` beats `own` (`mergeRowScope`). Richer patterns (team, colleagues, manager subtree, site-scoped, etc.) are **deferred** — see [`access-control.md`](../access-control.md#decision-row-scope-v1--expansion-deferred-2026-06-06).
 
 **Rationale:** Two values cover the pilot (`field_tech` / `office_admin`) without committing to ABAC/ReBAC. Keep `row_scope` as a string column so new enum values can land without a breaking DDL change.
 
@@ -54,7 +54,7 @@ The big architectural choice is already locked — **"roles are runtime data"** 
 
 **Rationale:** RESTRICT on assignments forces an explicit revoke path (audited via `user_roles_detail`) instead of silently stripping roles from users when a catalog row disappears. CASCADE on grants/bindings avoids orphan definition rows and matches the Phase 04 “DAL deletes anchor; DB cascades structural children” pattern — here the anchor is `latch_roles`. The FK on assignments also blocks typo/unknown `role_id` strings at insert time.
 
-**Status:** Locked. Task 01 DDL aligned. Graduated to [`access-control.md`](../../../../docs/reference/access-control.md) and [`02-identity-and-permissions.md`](../../../../docs/discussions/02-identity-and-permissions.md).
+**Status:** Locked. Task 01 DDL aligned. Graduated to [`access-control.md`](../access-control.md) and [`02-identity-and-permissions.md`](../../../docs/discussions/02-identity-and-permissions.md).
 
 ---
 
@@ -88,7 +88,7 @@ The big architectural choice is already locked — **"roles are runtime data"** 
 
 **Rationale:** Matches Phase 03 default-deny semantics and keeps the grant table small. A role with no grants is valid (inert until configured).
 
-**Status:** Locked. Graduated to [`access-control.md`](../../../../docs/reference/access-control.md).
+**Status:** Locked. Graduated to [`access-control.md`](../access-control.md).
 
 ---
 
@@ -112,7 +112,7 @@ Catalog rows for both stay template-seeded with fixed UUIDs and `role_class` `sy
 
 **Rationale:** Symmetry (one mental model: business plane ↔ control plane), and it removes the bootstrap chicken-and-egg — an empty or broken `latch_role_grants` table can never strip IAM access, because `iam_master` grants come from code + registry, not data. Synthesis reads `surfaceDef.fieldIds` from the codegen vocabulary, so a built-in can never reference a Field its Surface doesn't define. `data_master` still gets **no** IAM synthesis (separation of duties — see P4a).
 
-**Status:** Locked (synthesize both). Graduated to [`02-identity-and-permissions.md`](../../../../docs/discussions/02-identity-and-permissions.md) and [`access-control.md`](../../../../docs/reference/access-control.md). Task 01 seeds catalog rows only; `synthesizeIamMasterBinding` is implemented in `@latch/policy`. [Task 02b](./02b-db-role-grant-provider.md) loads **app-role** grants only; system classes synthesize in code ([01b](./01b-p11-catalog-realignment.md) aligns synthesis with `role_class`).
+**Status:** Locked (synthesize both). Graduated to [`02-identity-and-permissions.md`](../../../docs/discussions/02-identity-and-permissions.md) and [`access-control.md`](../access-control.md). Task 01 seeds catalog rows only; `synthesizeIamMasterBinding` is implemented in `@latch/policy`. [Task 02b](./02b-db-role-grant-provider.md) loads **app-role** grants only; system classes synthesize in code ([01b](./01b-p11-catalog-realignment.md) aligns synthesis with `role_class`).
 
 ---
 
@@ -129,7 +129,7 @@ Catalog rows for both stay template-seeded with fixed UUIDs and `role_class` `sy
 - **Exclusivity (validation, not storage).** The assignment DAL rejects role sets where:
   - a user holds `system_data` **and** any `app` role (synthesis already grants full business access; app roles are redundant and create audit confusion). `system_data` may still stack with `system_iam`.
   - `system_iam` may be assigned alone or alongside `system_data`; `app` roles are allowed only when `system_data` is absent.
-- **Privileged assignment (amended 2026-06-08).** An actor may assign/revoke a system catalog row only if they hold a row with the **same** `role_class` (`system_iam` → `system_iam`, `system_data` → `system_data`). Hold both → may assign both. Delegated assigners remain `app`-roles-only — see [discussion 09](../../../../docs/discussions/09-role-delegation-and-scope.md).
+- **Privileged assignment (amended 2026-06-08).** An actor may assign/revoke a system catalog row only if they hold a row with the **same** `role_class` (`system_iam` → `system_iam`, `system_data` → `system_data`). Hold both → may assign both. Delegated assigners remain `app`-roles-only — see [discussion 09](../../../docs/discussions/09-role-delegation-and-scope.md).
 
 **Rationale:** Uniform storage keeps one source of truth for "what roles does a user have" and avoids special-casing the resolver. `role_class` encodes plane + deletability without a separate `is_builtin` flag. Per-class assignment authority preserves separation of duties (IAM admins cannot mint data superusers and vice versa). Exclusivity is enforced at write time.
 
@@ -245,7 +245,7 @@ Catalog rows for both stay template-seeded with fixed UUIDs and `role_class` `sy
 
 **Question:** When an `iam_master` edits grants that would widen *their own* effective permissions — deny, or allow with extra audit?
 
-**Recommendation:** **Deny self-affecting grant edits** by default, mirroring `user_roles_detail` self-patch denial (Phase 03 decisions). Operators use a second `iam_master` principal. Document if relaxed. (Scoped **assignment** delegation for non-`iam_master` users is a separate fork — see [discussion 09](../../../../docs/discussions/09-role-delegation-and-scope.md).)
+**Recommendation:** **Deny self-affecting grant edits** by default, mirroring `user_roles_detail` self-patch denial (Phase 03 decisions). Operators use a second `iam_master` principal. Document if relaxed. (Scoped **assignment** delegation for non-`iam_master` users is a separate fork — see [discussion 09](../../../docs/discussions/09-role-delegation-and-scope.md).)
 
 ### Decision: deny self grant/binding edits (2026-06-08)
 
@@ -281,7 +281,7 @@ Catalog rows for both stay template-seeded with fixed UUIDs and `role_class` `sy
 |-------|--------|
 | **Fixture** | `apps/spike_policy` — platform migrations `001`–`008`, `spikePolicyRegistry`, `spike_codegen` vocabulary |
 | **Package unit tests** | Pure `PolicyService` / validate-grant tests stay in `packages/policy/src/*.test.ts` |
-| **Integration / threat** | **Option A** — IAM/threat tests under `apps/spike_policy/**/*.test.ts` (vitest already scans `apps/**`); root `tests/` left orphaned until [discussion 07](../../../../docs/discussions/07-template-scaffold.md) |
+| **Integration / threat** | **Option A** — IAM/threat tests under `apps/spike_policy/**/*.test.ts` (vitest already scans `apps/**`); root `tests/` left orphaned until [discussion 07](../../../docs/discussions/07-template-scaffold.md) |
 | **HTTP T8** | **DAL-level** in spike for P10 (`lib/iam-user/threat-t8.test.ts`); HTTP routes when UI shell lands |
 | **Template** | Full CRM-parity e2e graduates with discussion 07 — out of scope for task 04 |
 
@@ -293,8 +293,8 @@ Catalog rows for both stay template-seeded with fixed UUIDs and `role_class` `sy
 
 ## Related
 
-- [`docs/discussions/02-identity-and-permissions.md`](../../../../docs/discussions/02-identity-and-permissions.md) — "roles are runtime data" Decision (the locked parent)
-- [`docs/foundations/scope.md`](../../../../docs/foundations/scope.md) — v1 scope change
-- [`docs/reference/access-control.md`](../../../../docs/reference/access-control.md) · [`compartments.md`](../../../../docs/reference/compartments.md)
+- [`docs/discussions/02-identity-and-permissions.md`](../../../docs/discussions/02-identity-and-permissions.md) — "roles are runtime data" Decision (the locked parent)
+- [`docs/foundations/scope.md`](../../../docs/foundations/scope.md) — v1 scope change
+- [`docs/reference/access-control.md`](../access-control.md) · [`compartments.md`](../../../docs/reference/compartments.md)
 - Tasks: [`README.md`](./README.md) (execution sequence) · [`01-role-tables.md`](./01-role-tables.md) · [`01b-p11-catalog-realignment.md`](./01b-p11-catalog-realignment.md) · [`02-role-grant-provider.md`](./02-role-grant-provider.md) · [`02b-db-role-grant-provider.md`](./02b-db-role-grant-provider.md) · [`03-role-editor-surface.md`](./03-role-editor-surface.md)
 - Engine: [`policy-service.ts`](../../src/policy-service.ts) · [`grant-provider.ts`](../../src/grant-provider.ts) · [`registry.ts`](../../src/registry.ts)

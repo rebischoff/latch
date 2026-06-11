@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { principalWithRoles, type Principal } from "@latch/contracts";
+import {
+  principalWithRoles,
+  type Principal,
+  type RoleBinding,
+} from "@latch/contracts";
 
 import { createMemoryRoleGrantProvider } from "./grant-provider.js";
 import { unionGrants, mergeRowScope } from "./merge.js";
@@ -325,5 +329,200 @@ describe("PolicyService — system_iam synthesis", () => {
     expect(manifest.fields.bar).toEqual([]);
     expect(manifest.actions).toEqual([]);
     expect(manifest.rowScope).toBeUndefined();
+  });
+});
+
+const ROLE_SCOPE = "role_scope_mgr";
+const ROLE_SCOPE_B = "role_scope_b";
+const ROLE_OWN = "role_own";
+const ROLE_ALL = "role_all";
+const SCOPE_S1 = "scope-s1";
+const SCOPE_S2 = "scope-s2";
+
+const principalWithBindings = (
+  bindings: RoleBinding[],
+  extras?: Pick<Principal, "roleClasses">,
+): Principal => ({
+  id: "user-1",
+  bindings,
+  ...extras,
+});
+
+const scopedWidgetSurface = defineSurfacePolicy({
+  surface: "scoped_widget",
+  fieldIds: ["widget_name"],
+  fieldActions: ["read", "write"],
+  surfaceActions: ["read"],
+  kind: "business",
+});
+
+const scopedIamSurface = defineSurfacePolicy({
+  surface: "scoped_iam",
+  fieldIds: ["assignments"],
+  fieldActions: ["read", "write"],
+  surfaceActions: ["read", "write"],
+  kind: "iam",
+});
+
+const scopedGrantProvider = createMemoryRoleGrantProvider({
+  scoped_widget: {
+    [ROLE_SCOPE]: {
+      rowScope: "scope",
+      fields: [{ field: "widget_name", actions: ["read", "write"] }],
+      surfaceActions: ["read"],
+    },
+    [ROLE_SCOPE_B]: {
+      rowScope: "scope",
+      fields: [{ field: "widget_name", actions: ["read"] }],
+      surfaceActions: ["read"],
+    },
+    [ROLE_OWN]: {
+      rowScope: "own",
+      fields: [{ field: "widget_name", actions: ["read"] }],
+      surfaceActions: ["read"],
+    },
+    [ROLE_ALL]: {
+      rowScope: "all",
+      fields: [{ field: "widget_name", actions: ["read", "write"] }],
+      surfaceActions: ["read"],
+    },
+  },
+});
+
+const scopedRegistry = definePolicyRegistry(
+  scopedWidgetSurface,
+  scopedIamSurface,
+);
+
+describe("scopeIds resolve", () => {
+  const policy = new PolicyService({
+    registry: scopedRegistry,
+    grantProvider: scopedGrantProvider,
+  });
+
+  it("6a: single scoped binding → one scopeId", () => {
+    const manifest = policy.resolve(
+      principalWithBindings([
+        { roleId: ROLE_SCOPE, scopeId: SCOPE_S1 },
+      ]),
+      { surface: "scoped_widget" },
+    );
+
+    expect(manifest.rowScope).toBe("scope");
+    expect(manifest.scopeIds).toEqual([SCOPE_S1]);
+  });
+
+  it("6b: two bindings same role → union of scope ids", () => {
+    const manifest = policy.resolve(
+      principalWithBindings([
+        { roleId: ROLE_SCOPE, scopeId: SCOPE_S1 },
+        { roleId: ROLE_SCOPE, scopeId: SCOPE_S2 },
+      ]),
+      { surface: "scoped_widget" },
+    );
+
+    expect(manifest.rowScope).toBe("scope");
+    expect(manifest.scopeIds).toEqual([SCOPE_S1, SCOPE_S2]);
+  });
+
+  it("6c: scope + all roles → all wins, scopeIds omitted", () => {
+    const manifest = policy.resolve(
+      principalWithBindings([
+        { roleId: ROLE_SCOPE, scopeId: SCOPE_S1 },
+        { roleId: ROLE_ALL, scopeId: null },
+      ]),
+      { surface: "scoped_widget" },
+    );
+
+    expect(manifest.rowScope).toBe("all");
+    expect(manifest.scopeIds).toBeUndefined();
+  });
+
+  it("6d: scope + own roles → scope wins, scopeIds from scope role only", () => {
+    const manifest = policy.resolve(
+      principalWithBindings([
+        { roleId: ROLE_SCOPE, scopeId: SCOPE_S1 },
+        { roleId: ROLE_OWN, scopeId: SCOPE_S2 },
+      ]),
+      { surface: "scoped_widget" },
+    );
+
+    expect(manifest.rowScope).toBe("scope");
+    expect(manifest.scopeIds).toEqual([SCOPE_S1]);
+  });
+
+  it("6e: scope grant with null scopeId binding → empty scopeIds", () => {
+    const manifest = policy.resolve(
+      principalWithBindings([{ roleId: ROLE_SCOPE, scopeId: null }]),
+      { surface: "scoped_widget" },
+    );
+
+    expect(manifest.rowScope).toBe("scope");
+    expect(manifest.scopeIds).toEqual([]);
+  });
+
+  it("6f: system_data on business surface → all, scopeIds omitted", () => {
+    const manifest = policy.resolve(
+      principalWithBindings(
+        [{ roleId: SYSTEM_DATA_ID, scopeId: SCOPE_S1 }],
+        { roleClasses: { [SYSTEM_DATA_ID]: "system_data" } },
+      ),
+      { surface: "scoped_widget" },
+    );
+
+    expect(manifest.rowScope).toBe("all");
+    expect(manifest.scopeIds).toBeUndefined();
+  });
+
+  it("6g: system_iam on IAM surface → all, scopeIds omitted", () => {
+    const manifest = policy.resolve(
+      principalWithBindings(
+        [{ roleId: SYSTEM_IAM_ID, scopeId: null }],
+        { roleClasses: { [SYSTEM_IAM_ID]: "system_iam" } },
+      ),
+      { surface: "scoped_iam" },
+    );
+
+    expect(manifest.rowScope).toBe("all");
+    expect(manifest.scopeIds).toBeUndefined();
+  });
+
+  it("6h: two scope-rung roles → union across roles", () => {
+    const manifest = policy.resolve(
+      principalWithBindings([
+        { roleId: ROLE_SCOPE, scopeId: SCOPE_S1 },
+        { roleId: ROLE_SCOPE_B, scopeId: SCOPE_S2 },
+      ]),
+      { surface: "scoped_widget" },
+    );
+
+    expect(manifest.rowScope).toBe("scope");
+    expect(manifest.scopeIds).toEqual([SCOPE_S1, SCOPE_S2]);
+  });
+
+  it("6i: system_data + scope role → all wins, scopeIds omitted", () => {
+    const manifest = policy.resolve(
+      principalWithBindings(
+        [
+          { roleId: SYSTEM_DATA_ID, scopeId: null },
+          { roleId: ROLE_SCOPE, scopeId: SCOPE_S1 },
+        ],
+        { roleClasses: { [SYSTEM_DATA_ID]: "system_data" } },
+      ),
+      { surface: "scoped_widget" },
+    );
+
+    expect(manifest.rowScope).toBe("all");
+    expect(manifest.scopeIds).toBeUndefined();
+  });
+
+  it("6j: own-only role binding with scopeId → own, scopeIds omitted", () => {
+    const manifest = policy.resolve(
+      principalWithBindings([{ roleId: ROLE_OWN, scopeId: SCOPE_S1 }]),
+      { surface: "scoped_widget" },
+    );
+
+    expect(manifest.rowScope).toBe("own");
+    expect(manifest.scopeIds).toBeUndefined();
   });
 });

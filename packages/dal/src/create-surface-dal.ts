@@ -90,7 +90,12 @@ const rowVisible = <TRow, TRelated>(
   ctx: PermissionContext,
   id: string,
 ): boolean =>
-  store.isRowVisibleToPrincipal(id, ctx.principal.id, ctx.manifest.rowScope);
+  store.isRowVisibleToPrincipal(
+    id,
+    ctx.principal.id,
+    ctx.manifest.rowScope,
+    ctx.manifest.scopeIds,
+  );
 
 const projectEntity = <TRow, TRelated>(
   descriptor: SurfaceDescriptor<TRow, TRelated>,
@@ -411,6 +416,7 @@ export const createSurfaceDal = <TRow extends { id: string }, TRelated>(
           const { rows, total } = store.list({
             principalId: ctx.principal.id,
             rowScope: ctx.manifest.rowScope ?? "all",
+            scopeIds: ctx.manifest.scopeIds,
             status: query.status,
             limit: query.limit,
             offset: query.offset,

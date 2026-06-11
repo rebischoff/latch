@@ -15,15 +15,26 @@ type InspectorRow = {
   surface: string;
   isIam: boolean;
   rowScope: string;
+  scopeIds: string;
   fieldActions: string;
   surfaceActions: string;
 };
 
 const formatRowScope = (rowScope: Manifest["rowScope"]): string => {
-  if (rowScope === "own" || rowScope === "all") {
+  if (rowScope === "own" || rowScope === "all" || rowScope === "scope") {
     return rowScope;
   }
   return "—";
+};
+
+const formatScopeIds = (manifest: Manifest): string => {
+  if (manifest.rowScope !== "scope") {
+    return "—";
+  }
+  if (!manifest.scopeIds || manifest.scopeIds.length === 0) {
+    return "(none)";
+  }
+  return manifest.scopeIds.join(", ");
 };
 
 const formatFieldActions = (manifest: Manifest): string => {
@@ -49,6 +60,7 @@ const manifestsToRows = (
       surface: manifest.surface,
       isIam: iamSurfaceIds.includes(manifest.surface),
       rowScope: formatRowScope(manifest.rowScope),
+      scopeIds: formatScopeIds(manifest),
       fieldActions: formatFieldActions(manifest),
       surfaceActions: formatSurfaceActions(manifest.actions),
     }));
@@ -98,6 +110,19 @@ export const ManifestInspector = ({
               width: 96,
               render: (value: string) => (
                 <Typography.Text type={value === "—" ? "secondary" : undefined}>
+                  {value}
+                </Typography.Text>
+              ),
+            },
+            {
+              title: "scopeIds",
+              dataIndex: "scopeIds",
+              width: 160,
+              render: (value: string) => (
+                <Typography.Text
+                  style={{ fontFamily: "monospace", fontSize: 12 }}
+                  type={value === "—" ? "secondary" : undefined}
+                >
                   {value}
                 </Typography.Text>
               ),

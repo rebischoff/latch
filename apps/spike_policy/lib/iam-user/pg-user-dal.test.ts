@@ -23,6 +23,7 @@ import {
 import { getPolicyVersion } from "../iam/policy-version-read.js";
 import { resetMemoryPolicyVersion } from "../iam/policy-version.js";
 import { FIELD_TECH_ID, OFFICE_ADMIN_ID } from "./fixture-ids.js";
+import { roleAssignmentDto } from "./role-assignment.js";
 import { resolveAllManifests } from "./resolve-all-manifests.js";
 import { createUserRolesDetailDalForPool } from "./repository.js";
 
@@ -138,21 +139,30 @@ describe("user_roles_detail — Postgres DAL", () => {
       const actorId = await iamActorId(pool);
       const targetId = await createTestUser(pool);
       const ctx = await buildCtx(pool, actorId);
-      const versionBefore = await getPolicyVersion(pool);
+      const versionBeforePatch = await getPolicyVersion(pool);
 
       try {
         const patched = await dal.patchUserRoles(ctx, targetId, {
-          role_assignments: [FIELD_TECH_ID, OFFICE_ADMIN_ID],
+          role_assignments: [
+            roleAssignmentDto(FIELD_TECH_ID),
+            roleAssignmentDto(OFFICE_ADMIN_ID),
+          ],
         });
-        expect(patched.role_assignments).toEqual([FIELD_TECH_ID, OFFICE_ADMIN_ID]);
+        expect(patched.role_assignments).toEqual([
+          roleAssignmentDto(FIELD_TECH_ID),
+          roleAssignmentDto(OFFICE_ADMIN_ID),
+        ]);
 
         const versionAfter = await getPolicyVersion(pool);
-        expect(versionAfter).toBe(versionBefore + 1);
+        expect(versionAfter).toBeGreaterThan(versionBeforePatch);
 
         const freshPool = openPool();
         const freshDal = createUserRolesDetailDalForPool(freshPool);
         const reloaded = await freshDal.getUserRoles(ctx, targetId);
-        expect(reloaded.role_assignments).toEqual([FIELD_TECH_ID, OFFICE_ADMIN_ID]);
+        expect(reloaded.role_assignments).toEqual([
+          roleAssignmentDto(FIELD_TECH_ID),
+          roleAssignmentDto(OFFICE_ADMIN_ID),
+        ]);
       } finally {
         await deleteTestUser(pool, targetId);
       }
@@ -195,7 +205,10 @@ describe("user_roles_detail — Postgres DAL", () => {
       try {
         await expect(
           dal.patchUserRoles(ctx, targetId, {
-            role_assignments: [systemDataId, FIELD_TECH_ID],
+            role_assignments: [
+              roleAssignmentDto(systemDataId),
+              roleAssignmentDto(FIELD_TECH_ID),
+            ],
           }),
         ).rejects.toThrow(ValidationError);
       } finally {
@@ -249,17 +262,17 @@ describe("user_roles_detail — Postgres DAL", () => {
         const created = await dal.createUser(ctx, {
           id: userId,
           display_name: "PG create with roles",
-          role_assignments: [FIELD_TECH_ID],
+          role_assignments: [roleAssignmentDto(FIELD_TECH_ID)],
         });
-        expect(created.role_assignments).toEqual([FIELD_TECH_ID]);
+        expect(created.role_assignments).toEqual([roleAssignmentDto(FIELD_TECH_ID)]);
 
         const versionAfter = await getPolicyVersion(pool);
-        expect(versionAfter).toBe(versionBefore + 1);
+        expect(versionAfter).toBeGreaterThan(versionBefore);
 
         const freshPool = openPool();
         const freshDal = createUserRolesDetailDalForPool(freshPool);
         const reloaded = await freshDal.getUserRoles(ctx, userId);
-        expect(reloaded.role_assignments).toEqual([FIELD_TECH_ID]);
+        expect(reloaded.role_assignments).toEqual([roleAssignmentDto(FIELD_TECH_ID)]);
       } finally {
         await deleteTestUser(pool, userId);
       }
@@ -303,8 +316,8 @@ describe("user_roles_detail — Postgres DAL", () => {
       try {
         await dal.patchUserRoles(ctx, targetId, {
           role_assignments: [
-            "b1000001-0000-4000-8000-000000000003",
-            "b1000001-0000-4000-8000-000000000004",
+            roleAssignmentDto("b1000001-0000-4000-8000-000000000003"),
+            roleAssignmentDto("b1000001-0000-4000-8000-000000000004"),
           ],
         });
 

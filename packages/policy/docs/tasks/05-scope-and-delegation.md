@@ -1,6 +1,6 @@
 # 05 — Bounded scope primitive + scoped delegation
 
-> **Status:** Phase A complete (2026-06-09). Next: Phase B (scoped RLS in resolve + DAL). Source decision: [discussion 09 — role delegation & scope](../../../../docs/discussions/09-role-delegation-and-scope.md#decision-bounded-scope-primitive--scoped-delegation-2026-06-09). Part of the [runtime roles plan](./README.md).
+> **Status:** Complete (2026-06-10). Next: [README](./README.md) (runtime roles chain done). Phase orchestration: [Phase 08](../../../docs/phases/08-scoped-access/STATUS.md). Source decision: [discussion 09 — role delegation & scope](../../../docs/discussions/09-role-delegation-and-scope.md#decision-bounded-scope-primitive--scoped-delegation-2026-06-09). Part of the [runtime roles plan](./README.md).
 
 ## Goal
 
@@ -29,6 +29,15 @@ This is *namespaced RBAC* (role binding at a scope node), **not** ABAC/ReBAC. Fi
 
 ## Phase B — scoped RLS (resolve + DAL)
 
+Executable tasks:
+
+| Step | Doc | Package |
+|------|-----|---------|
+| B1 | [05b — resolve `scopeIds`](./05b-scoped-rls-resolve.md) | `@latch/policy` |
+| B2 | [dal 01 — scoped row filter](../../../dal/docs/tasks/01-scoped-row-filter.md) | `@latch/dal` |
+| B3 | [Phase 08 task 04 — business proof](../../../docs/phases/08-scoped-access/tasks/04-crm-scoped-proof.md) | `apps/spike_business` |
+| B4 | [05c — policy closeout](./05c-policy-closeout.md) | `@latch/policy` |
+
 1. `PolicyService.resolve` — for a `scope`-rung role, set `manifest.rowScope = "scope"` and `manifest.scopeIds = union(actor's scopes for that role)`.
 2. Store / DAL list + get — when `rowScope === "scope"`, filter `WHERE scope_id IN (manifest.scopeIds)`. `own` ignores scope (assignment join already crosses boundaries); `all` ignores it.
 3. Bulk paths reuse the same per-row evaluation.
@@ -47,21 +56,21 @@ Existing guards unchanged: exclusivity, last-`system_iam`, self-patch denied. `s
 ## Verify (stop gate)
 
 - [x] **Phase A:** `RowScope` includes `scope`; `Principal` carries scoped bindings; `latch_scopes`, `latch_user_roles.scope_id`, `latch_role_delegations` migrated; `getPrincipal` populates scopes
-- [ ] **Phase B:** `scope`-rung role → `manifest.scopeIds` set; DAL list/get/bulk filter `WHERE scope_id IN (...)`; `own`/`all` unaffected; `mergeRowScope` keeps most-permissive across scoped + unscoped bindings
-- [ ] **Phase C:** delegated assigner can grant allow-listed app role into its own scope; blocked on out-of-scope target, non-allow-listed role, and any system class; `system_iam` still unscoped/any-app-role
-- [ ] System classes remain unscoped (`scope_id = NULL`) end-to-end
-- [ ] Tests: scoped list visibility (sales-manager-style), scoped delegation fence, system-class-unscoped regression
+- [x] **Phase B:** `scope`-rung role → `manifest.scopeIds` set; DAL list/get/bulk filter `WHERE scope_id IN (...)`; `own`/`all` unaffected; `mergeRowScope` keeps most-permissive across scoped + unscoped bindings
+- [x] **Phase C:** delegated assigner can grant allow-listed app role into its own scope; blocked on out-of-scope target, non-allow-listed role, and any system class; `system_iam` still unscoped/any-app-role (spike task 08, 2026-06-09)
+- [x] System classes remain unscoped (`scope_id = NULL`) end-to-end
+- [x] Tests: scoped list visibility (sales-manager-style), scoped delegation fence, system-class-unscoped regression
 
 ## Out of scope
 
-- Per-scope differential field grants (deferred — [`scope.md`](../../../../docs/foundations/scope.md)).
+- Per-scope differential field grants (deferred — [`scope.md`](../../../docs/foundations/scope.md)).
 - Org-chart / region / manager-subtree templating; scope hierarchy traversal beyond one `parent_id`.
 - ABAC / ReBAC / OPA-style DSL.
 
 ## Reference
 
-- [`docs/discussions/09-role-delegation-and-scope.md`](../../../../docs/discussions/09-role-delegation-and-scope.md) — canonical model
-- [`docs/reference/access-control.md`](../../../../docs/reference/access-control.md#row-level-rules) — row-scope rungs + seam table
-- [`docs/foundations/scope.md`](../../../../docs/foundations/scope.md) — in/out lines
+- [`docs/discussions/09-role-delegation-and-scope.md`](../../../docs/discussions/09-role-delegation-and-scope.md) — canonical model
+- [`docs/reference/access-control.md`](../access-control.md#row-level-rules) — row-scope rungs + seam table
+- [`docs/foundations/scope.md`](../../../docs/foundations/scope.md) — in/out lines
 - [`00-decisions-needed.md`](./00-decisions-needed.md) — P1 (row scope), P4a/P4b (assignment guards)
 - [`.cursor/rules/10-invariants.mdc`](../../../../.cursor/rules/10-invariants.mdc) — invariants 1/2/4

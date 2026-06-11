@@ -19,7 +19,7 @@ Then in **Verify (stop gate)**, change **every** `- [ ]` to `- [x]`. Do not leav
 
 ## 2. Phase `STATUS.md`
 
-Update the phase folder’s [`STATUS.md`](../../docs/phases/README.md) in the same change set:
+Update the phase folder’s [`STATUS.md`](../../packages/docs/phases/README.md) in the same change set:
 
 | Section | Action |
 |---------|--------|
@@ -27,7 +27,7 @@ Update the phase folder’s [`STATUS.md`](../../docs/phases/README.md) in the sa
 | **Recently completed** | Prepend a bullet for the task just finished (task id, short deliverable, date). |
 | **Updated:** line | Set to today’s date. |
 
-Follow [`01-task-index.md`](../../docs/phases/02-ui-sync/tasks/01-task-index.md#status-discipline) when present in the active phase.
+Follow [`01-task-index.md`](../../packages/docs/phases/02-ui-sync/tasks/01-task-index.md#status-discipline) when present in the active phase.
 
 ## 3. Root `STATUS.md`
 

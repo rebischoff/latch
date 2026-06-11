@@ -4,7 +4,7 @@
 
 ## Goal
 
-**Lock P10** and restore a runnable threat/e2e harness for IAM + policy assertions after `apps/crm` was removed — without blocking on the full business-app template ([discussion 07](../../../../docs/discussions/07-template-scaffold.md)).
+**Lock P10** and restore a runnable threat/e2e harness for IAM + policy assertions after `apps/crm` was removed — without blocking on the full business-app template ([discussion 07](../../../docs/discussions/07-template-scaffold.md)).
 
 ## Locked choice (P10 — 2026-06-08)
 
@@ -20,7 +20,7 @@
 
 - `user_roles_detail` surface vocabulary + `userRolesDetailSurfacePolicyDef` in spike registry
 - `lib/iam-user/` — assignment DAL (P4a/P4b validation), memory fixture, [`threat-t8.test.ts`](../../../../apps/spike_policy/lib/iam-user/threat-t8.test.ts)
-- Root [`tests/`](../../../../tests/) documented as orphaned (CRM-coupled); not in `npm test`
+- Root [`tests/`](../../../../tests) documented as orphaned (CRM-coupled); not in `npm test`
 
 ## Verify (stop gate)
 
@@ -33,6 +33,6 @@
 ## Reference
 
 - [P10 parking lot](./00-decisions-needed.md#p10--test-harness-after-appscrm-deletion)
-- Phase 03 T8: [`docs/phases/03-identity-iam/tasks/21-threat-t8-phase-dod.md`](../../../../docs/phases/03-identity-iam/tasks/21-threat-t8-phase-dod.md)
+- Phase 03 T8: [`docs/phases/03-identity-iam/tasks/21-threat-t8-phase-dod.md`](../../../docs/phases/03-identity-iam/tasks/21-threat-t8-phase-dod.md)
 - Spike fixture: [`apps/spike_policy/README.md`](../../../../apps/spike_policy/README.md)
 - UI follow-on: [`apps/spike_policy/docs/tasks/README.md`](../../../../apps/spike_policy/docs/tasks/README.md)

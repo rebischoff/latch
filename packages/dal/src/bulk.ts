@@ -61,6 +61,7 @@ const classifyUpdateRow = async <TRow, TRelated>(
       id,
       ctx.principal.id,
       ctx.manifest.rowScope,
+      ctx.manifest.scopeIds,
     )
   ) {
     return { kind: "skip", entry: { id, reason: "not_found" } };
@@ -271,6 +272,7 @@ const classifyDeleteRow = <TRow, TRelated>(
       id,
       ctx.principal.id,
       ctx.manifest.rowScope,
+      ctx.manifest.scopeIds,
     )
   ) {
     return { kind: "skip", entry: { id, reason: "not_found" } };

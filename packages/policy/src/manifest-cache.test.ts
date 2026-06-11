@@ -234,6 +234,59 @@ describe("CachingPolicyService", () => {
     expect(spy).toHaveBeenCalledTimes(2);
   });
 
+  it("scoped manifest: cache key unchanged; hits cache per policyVersion", () => {
+    const scopeGrantProvider = createMemoryRoleGrantProvider({
+      widgets: {
+        branch_sales: {
+          rowScope: "scope",
+          fields: [{ field: "name", actions: ["read", "write"] }],
+          surfaceActions: ["read"],
+        },
+      },
+    });
+    const scopedInner = new PolicyService({
+      registry: miniRegistry,
+      grantProvider: scopeGrantProvider,
+    });
+    const scopedPrincipal = {
+      id: "u-scope",
+      policyVersion: 3,
+      bindings: [{ roleId: "branch_sales", scopeId: "scope-a" }],
+      roleClasses: { branch_sales: "app" as const },
+    };
+    const editorPrincipal = principal(["editor"], {
+      id: "u-scope",
+      policyVersion: 3,
+    });
+
+    const scopedKey = manifestCacheKey(scopedPrincipal, scope);
+    const editorKey = manifestCacheKey(editorPrincipal, scope);
+    expect(scopedKey).toBe(editorKey);
+    expect(scopedKey).not.toContain("scope-a");
+    expect(parseManifestCacheKey(scopedKey).policyVersion).toBe(3);
+
+    const map = new Map<string, import("@latch/contracts").Manifest>();
+    const wrapped = createCachingPolicyService(
+      scopedInner,
+      { mode: "request" },
+      createMapManifestCacheStore(map),
+    );
+    const spy = vi.spyOn(scopedInner, "resolve");
+
+    const first = wrapped.resolve(scopedPrincipal, scope);
+    const second = wrapped.resolve(scopedPrincipal, scope);
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(second).toBe(first);
+    expect(first.rowScope).toBe("scope");
+    expect(first.scopeIds).toEqual(["scope-a"]);
+
+    wrapped.resolve(
+      { ...scopedPrincipal, policyVersion: 4 },
+      scope,
+    );
+    expect(spy).toHaveBeenCalledTimes(2);
+  });
+
   it("rejects stale cached manifest when principal policyVersion no longer matches", () => {
     const map = new Map<string, import("@latch/contracts").Manifest>();
     const wrapped = createCachingPolicyService(

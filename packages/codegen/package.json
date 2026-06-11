@@ -10,8 +10,13 @@
   "types": "./src/index.ts",
   "scripts": {
     "generate": "tsx src/cli.ts",
-    "check": "tsx src/cli.ts --check"
+    "check": "tsx src/cli.ts --check",
+    "new": "tsx src/scaffold-cli.ts"
   },
+  "files": [
+    "src",
+    "template"
+  ],
   "dependencies": {
     "yaml": "^2.7.0"
   },

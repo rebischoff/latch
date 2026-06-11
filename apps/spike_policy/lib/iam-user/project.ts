@@ -1,6 +1,11 @@
 import { fieldAllows, type Manifest } from "@latch/contracts";
 
 import type { MemoryUserRecord } from "./memory-user-store.js";
+import {
+  bindingsToDtos,
+  type RoleAssignmentDto,
+  type UserRoleBinding,
+} from "./role-assignment.js";
 
 /** Read DTO for `user_roles_detail` — keys omitted when manifest denies `read`. */
 export type ProjectedUserRolesDetail = {
@@ -9,13 +14,13 @@ export type ProjectedUserRolesDetail = {
     id: string;
     display_name: string;
   };
-  role_assignments?: string[];
+  role_assignments?: RoleAssignmentDto[];
 };
 
 export const projectUserRolesRow = (
   row: MemoryUserRecord,
   manifest: Manifest,
-  roleIds: string[],
+  bindings: UserRoleBinding[],
 ): ProjectedUserRolesDetail => {
   const dto: ProjectedUserRolesDetail = { id: row.id };
 
@@ -27,7 +32,7 @@ export const projectUserRolesRow = (
   }
 
   if (fieldAllows(manifest, "role_assignments", "read")) {
-    dto.role_assignments = [...roleIds];
+    dto.role_assignments = bindingsToDtos(bindings);
   }
 
   return dto;

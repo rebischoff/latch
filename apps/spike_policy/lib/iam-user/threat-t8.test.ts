@@ -23,12 +23,18 @@ import {
   SYSTEM_IAM_ID,
 } from "./fixture-ids.js";
 import { MemoryUserStore } from "./memory-user-store.js";
+import { roleAssignmentDto } from "./role-assignment.js";
 import { createUserRolesDetailDal } from "./repository.js";
-import { roleCatalogForHarness, seedPilotUsers } from "./seed.js";
+import {
+  delegationContextForHarness,
+  roleCatalogForHarness,
+  seedPilotUsers,
+} from "./seed.js";
 
 const audit = createMemoryAuditWriter();
 const policy = new PolicyService({ registry: spikePolicyRegistry });
 const catalog = roleCatalogForHarness();
+const delegation = delegationContextForHarness();
 
 afterEach(() => {
   setAuditWriter(null);
@@ -60,14 +66,19 @@ describe("threat model — T8 privilege escalation via role assignment (DAL)", (
     setAuditWriter(audit.writer);
     const store = new MemoryUserStore();
     seedPilotUsers(store);
-    const dal = createUserRolesDetailDal(store, { catalog });
+    const dal = createUserRolesDetailDal(store, { catalog, delegation });
     const before = store.listRolesForUser(SEED_TECH_USER_ID);
 
     await expect(
       dal.patchUserRoles(
         buildCtx(fieldTechPrincipal()),
         SEED_TECH_USER_ID,
-        { role_assignments: [FIELD_TECH_ID, SYSTEM_IAM_ID] },
+        {
+          role_assignments: [
+            roleAssignmentDto(FIELD_TECH_ID),
+            roleAssignmentDto(SYSTEM_IAM_ID),
+          ],
+        },
       ),
     ).rejects.toThrow(NotFoundError);
 
@@ -80,33 +91,42 @@ describe("threat model — T8 privilege escalation via role assignment (DAL)", (
     setAuditWriter(audit.writer);
     const store = new MemoryUserStore();
     seedPilotUsers(store);
-    const dal = createUserRolesDetailDal(store, { catalog });
+    const dal = createUserRolesDetailDal(store, { catalog, delegation });
     const ctx = buildCtx(systemIamPrincipal());
 
     const patched = await dal.patchUserRoles(ctx, SEED_TECH_USER_ID, {
-      role_assignments: [FIELD_TECH_ID, OFFICE_ADMIN_ID],
+      role_assignments: [
+        roleAssignmentDto(FIELD_TECH_ID),
+        roleAssignmentDto(OFFICE_ADMIN_ID),
+      ],
     });
 
-    expect(patched.role_assignments).toEqual([FIELD_TECH_ID, OFFICE_ADMIN_ID]);
+    expect(patched.role_assignments).toEqual([
+      roleAssignmentDto(FIELD_TECH_ID),
+      roleAssignmentDto(OFFICE_ADMIN_ID),
+    ]);
     expect(store.listRolesForUser(SEED_TECH_USER_ID)).toEqual([
       FIELD_TECH_ID,
       OFFICE_ADMIN_ID,
     ]);
 
     const readBack = dal.getUserRoles(ctx, SEED_TECH_USER_ID);
-    expect(readBack.role_assignments).toEqual([FIELD_TECH_ID, OFFICE_ADMIN_ID]);
+    expect(readBack.role_assignments).toEqual([
+      roleAssignmentDto(FIELD_TECH_ID),
+      roleAssignmentDto(OFFICE_ADMIN_ID),
+    ]);
   });
 
   it("self-patch throws ForbiddenError", async () => {
     setAuditWriter(audit.writer);
     const store = new MemoryUserStore();
     seedPilotUsers(store);
-    const dal = createUserRolesDetailDal(store, { catalog });
+    const dal = createUserRolesDetailDal(store, { catalog, delegation });
     const before = store.listRolesForUser(SEED_IAM_USER_ID);
 
     await expect(
       dal.patchUserRoles(buildCtx(systemIamPrincipal()), SEED_IAM_USER_ID, {
-        role_assignments: [SYSTEM_IAM_ID],
+        role_assignments: [roleAssignmentDto(SYSTEM_IAM_ID)],
       }),
     ).rejects.toThrow(ForbiddenError);
 

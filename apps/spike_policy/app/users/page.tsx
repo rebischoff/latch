@@ -3,6 +3,7 @@ import { fieldAllows, surfaceAllows } from "@latch/contracts";
 import { AccessDeniedPanel } from "@/app/components/access-denied-panel";
 import { UsersWorkspace } from "@/app/components/users-workspace";
 import { getPool } from "@/lib/db";
+import { resolveAssignmentOptions } from "@/lib/iam-user/assignment-options";
 import { listRolesFromPg } from "@/lib/iam/list-roles";
 import { listUsersFromPg } from "@/lib/iam-user/list-users-pg";
 import { resolveAllManifests } from "@/lib/iam-user/resolve-all-manifests";
@@ -41,13 +42,19 @@ const UsersPage = async ({ searchParams }: UsersPageProps) => {
   const canCreate = surfaceAllows(ctx.manifest, "write");
   const canWrite = fieldAllows(ctx.manifest, "role_assignments", "write");
 
-  const [user, roles, manifests] = selectedId
+  const allRoles = await listRolesFromPg(pool);
+  const assignmentOptions = await resolveAssignmentOptions(
+    pool,
+    principal,
+    allRoles,
+  );
+
+  const [user, manifests] = selectedId
     ? await Promise.all([
         dal.getUserRoles(ctx, selectedId),
-        listRolesFromPg(pool),
         resolveAllManifests(pool, selectedId, spikePolicyRegistry),
       ])
-    : [null, await listRolesFromPg(pool), null];
+    : [null, null];
 
   const isSelf = selectedId !== null && principal.id === selectedId;
 
@@ -56,7 +63,8 @@ const UsersPage = async ({ searchParams }: UsersPageProps) => {
       users={users}
       selectedId={selectedId}
       user={user}
-      roles={roles}
+      roles={assignmentOptions.roles}
+      scopes={assignmentOptions.scopes}
       manifests={manifests}
       iamSurfaceIds={iamSurfaceIds}
       canCreate={canCreate}

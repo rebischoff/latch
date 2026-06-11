@@ -4,36 +4,56 @@
  * Loads DATABASE_URL from apps/<app>/.env.local first, then the shell env.
  *
  * Usage:
- *   node scripts/db-migrate.mjs              # CRM (default)
- *   node scripts/db-migrate.mjs --app=test1
- *   node scripts/db-migrate.mjs --app=spike_policy
- *   node scripts/db-migrate.mjs --app=crm --check
+ *   node scripts/db-migrate.mjs                    # spike_policy (default)
+ *   node scripts/db-migrate.mjs --app=spike_business
+ *   node scripts/db-migrate.mjs --app=widgets
+ *   node scripts/db-migrate.mjs --app=spike_policy --check
  */
 import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-const APPS = {
-  crm: {
-    envLocalPath: resolve("apps/crm/.env.local"),
-    migrationsDir: resolve("apps/crm/migrations"),
-  },
-  test1: {
-    envLocalPath: resolve("apps/test1/.env.local"),
-    migrationsDir: resolve("apps/test1/migrations"),
-  },
-  spike_policy: {
-    envLocalPath: resolve("apps/spike_policy/.env.local"),
-    migrationsDir: resolve("apps/spike_policy/migrations"),
-  },
+const APPS_ROOT = resolve("apps");
+const DEFAULT_APP = "spike_policy";
+
+/** Discover apps with a migrations/ folder. */
+const discoverApps = () => {
+  const apps = {};
+
+  if (!existsSync(APPS_ROOT)) {
+    return apps;
+  }
+
+  for (const entry of readdirSync(APPS_ROOT, { withFileTypes: true })) {
+    if (!entry.isDirectory()) {
+      continue;
+    }
+
+    const appName = entry.name;
+    const migrationsDir = resolve(APPS_ROOT, appName, "migrations");
+    if (!existsSync(migrationsDir)) {
+      continue;
+    }
+
+    apps[appName] = {
+      envLocalPath: resolve(APPS_ROOT, appName, ".env.local"),
+      migrationsDir,
+    };
+  }
+
+  return apps;
 };
 
-const appArg = process.argv.find((a) => a.startsWith("--app="))?.slice("--app=".length) ?? "crm";
+const APPS = discoverApps();
+
+const appArg =
+  process.argv.find((a) => a.startsWith("--app="))?.slice("--app=".length) ??
+  DEFAULT_APP;
 const appConfig = APPS[appArg];
 
 if (!appConfig) {
   console.error(
-    `Unknown --app=${appArg}. Supported: ${Object.keys(APPS).join(", ")}`,
+    `Unknown --app=${appArg}. Supported: ${Object.keys(APPS).sort().join(", ")}`,
   );
   process.exit(1);
 }

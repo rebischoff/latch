@@ -16,6 +16,13 @@ export const userRolesDetailColumnMap = {
   role_assignments: [],
 } as const satisfies Record<UserRolesDetailFieldId, readonly string[]>;
 
+const RoleAssignmentSchema = z
+  .object({
+    role_id: z.string().uuid(),
+    scope_id: z.string().uuid().nullable(),
+  })
+  .strict();
+
 /** Full read DTO keyed by Field id (narrow with manifest for read). */
 export const UserRolesDetailSchema = z.object({
   id: z.string(),
@@ -25,13 +32,13 @@ export const UserRolesDetailSchema = z.object({
       display_name: z.string(),
     })
     .optional(),
-  role_assignments: z.array(z.string().uuid()).optional(),
+  role_assignments: z.array(RoleAssignmentSchema).optional(),
 });
 
 /** PATCH body keyed by Field id (strict — unknown keys rejected by DAL). */
 export const UserRolesDetailPatchSchema = z
   .object({
-    role_assignments: z.array(z.string().uuid()).optional(),
+    role_assignments: z.array(RoleAssignmentSchema).optional(),
   })
   .strict();
 

@@ -11,6 +11,7 @@ import {
   createUserRolesDetailDalForPool,
 } from "@/lib/iam-user/repository";
 import type { ProjectedUserRolesDetail } from "@/lib/iam-user/project";
+import type { RoleAssignmentDto } from "@/lib/iam-user/role-assignment";
 import { buildUserRolesDetailContext } from "@/lib/iam-user/user-detail-context";
 import type { UserCreateInput } from "@/lib/iam-user/user-form";
 import { spikePolicyRegistry } from "@/lib/policy-registry";
@@ -69,7 +70,7 @@ export const createUserAction = async (
 
 export const patchUserAssignmentsAction = async (
   userId: string,
-  roleAssignments: string[],
+  roleAssignments: RoleAssignmentDto[],
 ): Promise<UserActionResult<PatchUserAssignmentsResult>> => {
   try {
     ensureAuditWriter();

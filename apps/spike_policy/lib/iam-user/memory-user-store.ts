@@ -1,3 +1,6 @@
+import type { UserRoleBinding } from "./role-assignment.js";
+import { unscopedRoleIds } from "./role-assignment.js";
+
 export type MemoryUserRecord = {
   id: string;
   displayName: string;
@@ -8,12 +11,12 @@ export type MemoryUserRecord = {
  */
 export class MemoryUserStore {
   readonly users = new Map<string, MemoryUserRecord>();
-  /** user id → assigned role UUIDs */
-  readonly rolesByUser = new Map<string, string[]>();
+  /** user id → scoped role bindings */
+  readonly bindingsByUser = new Map<string, UserRoleBinding[]>();
 
   clear = (): void => {
     this.users.clear();
-    this.rolesByUser.clear();
+    this.bindingsByUser.clear();
   };
 
   upsertUser = (user: MemoryUserRecord): void => {
@@ -22,21 +25,42 @@ export class MemoryUserStore {
 
   getUser = (id: string): MemoryUserRecord | undefined => this.users.get(id);
 
-  listRolesForUser = (userId: string): string[] =>
-    [...(this.rolesByUser.get(userId) ?? [])].sort();
+  listBindingsForUser = (userId: string): UserRoleBinding[] =>
+    [...(this.bindingsByUser.get(userId) ?? [])].sort((a, b) =>
+      a.roleId.localeCompare(b.roleId),
+    );
 
-  setUserRoles = (userId: string, roleIds: string[]): void => {
-    const unique = [...new Set(roleIds)].sort();
-    if (unique.length === 0) {
-      this.rolesByUser.delete(userId);
+  /** Unique role ids held by the user (any scope). */
+  listRolesForUser = (userId: string): string[] =>
+    unscopedRoleIds(this.listBindingsForUser(userId));
+
+  setUserBindings = (userId: string, bindings: UserRoleBinding[]): void => {
+    const unique = new Map<string, UserRoleBinding>();
+    for (const binding of bindings) {
+      const key = `${binding.roleId}\0${binding.scopeId ?? ""}`;
+      unique.set(key, binding);
+    }
+    const sorted = [...unique.values()].sort((a, b) =>
+      a.roleId.localeCompare(b.roleId),
+    );
+    if (sorted.length === 0) {
+      this.bindingsByUser.delete(userId);
       return;
     }
-    this.rolesByUser.set(userId, unique);
+    this.bindingsByUser.set(userId, sorted);
+  };
+
+  /** Convenience for unscoped harness seeds. */
+  setUserRoles = (userId: string, roleIds: string[]): void => {
+    this.setUserBindings(
+      userId,
+      roleIds.map((roleId) => ({ roleId, scopeId: null })),
+    );
   };
 
   listUsersWithRole = (roleId: string): string[] =>
-    [...this.rolesByUser.entries()]
-      .filter(([, roles]) => roles.includes(roleId))
+    [...this.bindingsByUser.entries()]
+      .filter(([, bindings]) => bindings.some((b) => b.roleId === roleId))
       .map(([userId]) => userId)
       .sort();
 }
