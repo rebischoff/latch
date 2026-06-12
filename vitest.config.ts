@@ -14,14 +14,23 @@ export default defineConfig({
       "@latch/contracts": latchAlias("contracts"),
       "@latch/policy": latchAlias("policy"),
       "@latch/dal": latchAlias("dal"),
+      "@latch/adapter-better-auth": latchAlias("adapter-better-auth"),
+      "@latch/adapter-neon": latchAlias("adapter-neon"),
+      "@latch/adapter-pg-audit": latchAlias("adapter-pg-audit"),
       "@latch/audit": latchAlias("audit"),
+      "@latch/pg-session": latchAlias("pg-session"),
       "@latch/approval": latchAlias("approval"),
       "@latch/react": latchAlias("react"),
       "@latch/codegen": latchAlias("codegen"),
+      "@latch/app-kit": latchAlias("app-kit"),
+      "@latch/adapter-pg-store": latchAlias("adapter-pg-store"),
     },
   },
   test: {
-    include: ["packages/**/*.test.ts", "apps/**/*.test.ts"],
+    include: [
+      "packages/**/*.test.ts",
+      "fixtures/**/*.test.ts",
+    ],
     /** Tests that spy on `PolicyService.resolve` expect no cache unless opted in. */
     env: {
       LATCH_MANIFEST_CACHE_MODE: "none",

@@ -48,7 +48,7 @@ How the codebase is partitioned. The repo is a **monorepo from day one** so pack
 ??? packages/
     ??? contracts/                 # Manifest schema, Field IDs, base Zod (client-safe)
     ??? policy/                    # PolicyService + metadata-driven registry loader (server)
-    ??? dal/                       # Generic DAL kernel (createSurfaceDal), narrowing, Drizzle helpers (server)
+    ??? dal/                       # Generic DAL kernel (createSurfaceDal, async StoreAdapter), narrowing (server; ORM-free, SQL-first 2026-06-11)
     ??? audit/                     # Audit table, triggers, retention helpers (server)
     ??? approval/                  # Pending store + state machine (server)
     ??? react/                     # CapabilitiesProvider, <Can>, <FieldControl> (client)

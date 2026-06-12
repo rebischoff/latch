@@ -14,6 +14,7 @@ import {
   createMemoryAuditWriter,
   setAuditWriter,
 } from "./audit-service.js";
+import type { AuditJson } from "./types.js";
 import { restoreFromAuditEntry, type StoredAuditEntry } from "./restore.js";
 
 const WIDGET_ID = "widget-alpha";
@@ -84,15 +85,16 @@ describe("restoreFromAuditEntry", () => {
     }: {
       tableName: string;
       recordId: string;
-      before: WidgetBefore;
+      before: AuditJson;
     }) => {
+      const snapshot = before as WidgetBefore;
       const anchor = {
-        label: before.label,
-        status: before.status,
+        label: snapshot.label,
+        status: snapshot.status,
       };
       liveRows.set(recordId, {
         ...anchor,
-        children: before.children ?? [],
+        children: snapshot.children ?? [],
       });
       return anchor;
     },

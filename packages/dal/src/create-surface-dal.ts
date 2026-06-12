@@ -28,11 +28,14 @@ export type SurfaceDalDeps = {
 };
 
 export type SurfaceDal = {
-  get: (ctx: PermissionContext, id: string) => Record<string, unknown>;
+  get: (
+    ctx: PermissionContext,
+    id: string,
+  ) => Promise<Record<string, unknown>>;
   list?: (
     ctx: PermissionContext,
     opts?: Record<string, unknown>,
-  ) => { rows: Record<string, unknown>[]; total: number };
+  ) => Promise<{ rows: Record<string, unknown>[]; total: number }>;
   patch: (
     ctx: PermissionContext,
     id: string,
@@ -85,11 +88,11 @@ const assertSurface = <TRow, TRelated>(
   }
 };
 
-const rowVisible = <TRow, TRelated>(
+const rowVisible = async <TRow, TRelated>(
   store: StoreAdapter<TRow, TRelated>,
   ctx: PermissionContext,
   id: string,
-): boolean =>
+): Promise<boolean> =>
   store.isRowVisibleToPrincipal(
     id,
     ctx.principal.id,
@@ -97,14 +100,14 @@ const rowVisible = <TRow, TRelated>(
     ctx.manifest.scopeIds,
   );
 
-const projectEntity = <TRow, TRelated>(
+const projectEntity = async <TRow, TRelated>(
   descriptor: SurfaceDescriptor<TRow, TRelated>,
   store: StoreAdapter<TRow, TRelated>,
   row: TRow,
   manifest: PermissionContext["manifest"],
   listJoins?: Record<string, unknown>,
-): Record<string, unknown> => {
-  const related = store.getRelated((row as { id: string }).id);
+): Promise<Record<string, unknown>> => {
+  const related = await store.getRelated((row as { id: string }).id);
   return projectRow(descriptor, row, manifest, related, listJoins);
 };
 
@@ -125,11 +128,14 @@ export const createSurfaceDal = <TRow extends { id: string }, TRelated>(
   const { pendingStore } = deps;
   const defaultPageSize = descriptor.listDefaultPageSize ?? 50;
 
-  const get = (ctx: PermissionContext, id: string): Record<string, unknown> => {
+  const get = async (
+    ctx: PermissionContext,
+    id: string,
+  ): Promise<Record<string, unknown>> => {
     assertSurface(descriptor, ctx);
 
-    const row = store.get(id);
-    if (!row || !rowVisible(store, ctx, id)) {
+    const row = await store.get(id);
+    if (!row || !(await rowVisible(store, ctx, id))) {
       throw new NotFoundError();
     }
 
@@ -143,8 +149,8 @@ export const createSurfaceDal = <TRow extends { id: string }, TRelated>(
   ): Promise<Record<string, unknown>> => {
     assertSurface(descriptor, ctx);
 
-    const row = store.get(id);
-    if (!row || !rowVisible(store, ctx, id)) {
+    const row = await store.get(id);
+    if (!row || !(await rowVisible(store, ctx, id))) {
       throw new NotFoundError();
     }
 
@@ -196,11 +202,11 @@ export const createSurfaceDal = <TRow extends { id: string }, TRelated>(
 
     const beforeSnapshot = descriptor.auditSnapshot(row);
     const updated = descriptor.applyPatch(row, directPatch);
-    store.upsert(updated);
+    await store.upsert(updated);
 
     const relatedPatch = descriptor.applyRelatedPatch?.(id, directPatch);
     if (relatedPatch !== undefined) {
-      store.replaceRelated(id, relatedPatch);
+      await store.replaceRelated(id, relatedPatch);
     }
 
     const afterSnapshot = descriptor.auditSnapshot(updated);
@@ -249,13 +255,13 @@ export const createSurfaceDal = <TRow extends { id: string }, TRelated>(
     }
   };
 
-  const assertEntityVisibleForPending = (
+  const assertEntityVisibleForPending = async (
     store: StoreAdapter<TRow, TRelated>,
     ctx: PermissionContext,
     entityId: string,
-  ): TRow => {
-    const row = store.get(entityId);
-    if (!row || !rowVisible(store, ctx, entityId)) {
+  ): Promise<TRow> => {
+    const row = await store.get(entityId);
+    if (!row || !(await rowVisible(store, ctx, entityId))) {
       throw new NotFoundError();
     }
     return row;
@@ -284,7 +290,7 @@ export const createSurfaceDal = <TRow extends { id: string }, TRelated>(
         assertReviewerApprove(ctx, pending);
 
         const id = pending.entityId;
-        const row = assertEntityVisibleForPending(store, ctx, id);
+        const row = await assertEntityVisibleForPending(store, ctx, id);
 
         const patchBody = pending.patch as Record<string, unknown>;
         const fieldIds = patchedFieldIds(patchBody);
@@ -304,11 +310,11 @@ export const createSurfaceDal = <TRow extends { id: string }, TRelated>(
         });
 
         const updated = descriptor.applyPatch(row, patchBody);
-        store.upsert(updated);
+        await store.upsert(updated);
 
         const relatedPatch = descriptor.applyRelatedPatch?.(id, patchBody);
         if (relatedPatch !== undefined) {
-          store.replaceRelated(id, relatedPatch);
+          await store.replaceRelated(id, relatedPatch);
         }
 
         const afterSnapshot = descriptor.auditSnapshot(updated);
@@ -340,7 +346,7 @@ export const createSurfaceDal = <TRow extends { id: string }, TRelated>(
         assertReviewerApprove(ctx, pending);
 
         const id = pending.entityId;
-        assertEntityVisibleForPending(store, ctx, id);
+        await assertEntityVisibleForPending(store, ctx, id);
 
         const patchBody = pending.patch as Record<string, unknown>;
         const fieldIds = patchedFieldIds(patchBody);
@@ -368,7 +374,7 @@ export const createSurfaceDal = <TRow extends { id: string }, TRelated>(
     ? async (ctx: PermissionContext, pendingId: string): Promise<void> => {
         const pending = await loadSubmittedPending(ctx, pendingId);
         assertSubmitterMayWithdraw(ctx, pending);
-        assertEntityVisibleForPending(store, ctx, pending.entityId);
+        await assertEntityVisibleForPending(store, ctx, pending.entityId);
 
         await pendingStore.resolve(pendingId, {
           status: "withdrawn",
@@ -387,8 +393,8 @@ export const createSurfaceDal = <TRow extends { id: string }, TRelated>(
       throw new ForbiddenError();
     }
 
-    const row = store.get(id);
-    if (!row || !rowVisible(store, ctx, id)) {
+    const row = await store.get(id);
+    if (!row || !(await rowVisible(store, ctx, id))) {
       throw new NotFoundError();
     }
 
@@ -398,7 +404,10 @@ export const createSurfaceDal = <TRow extends { id: string }, TRelated>(
   const list =
     descriptor.capabilities.includes("list") &&
     descriptor.listQuerySchema !== undefined
-      ? (ctx: PermissionContext, rawOpts?: Record<string, unknown>) => {
+      ? async (
+          ctx: PermissionContext,
+          rawOpts?: Record<string, unknown>,
+        ): Promise<{ rows: Record<string, unknown>[]; total: number }> => {
           assertSurface(descriptor, ctx);
 
           const parsed = descriptor.listQuerySchema!.safeParse(rawOpts ?? {});
@@ -413,7 +422,7 @@ export const createSurfaceDal = <TRow extends { id: string }, TRelated>(
             parsed.data as Record<string, unknown>,
             defaultPageSize,
           );
-          const { rows, total } = store.list({
+          const { rows, total } = await store.list({
             principalId: ctx.principal.id,
             rowScope: ctx.manifest.rowScope ?? "all",
             scopeIds: ctx.manifest.scopeIds,
@@ -423,13 +432,15 @@ export const createSurfaceDal = <TRow extends { id: string }, TRelated>(
           });
 
           return {
-            rows: rows.map((row) =>
-              projectEntity(
-                descriptor,
-                store,
-                row,
-                ctx.manifest,
-                descriptor.listJoins?.(row),
+            rows: await Promise.all(
+              rows.map((row) =>
+                projectEntity(
+                  descriptor,
+                  store,
+                  row,
+                  ctx.manifest,
+                  descriptor.listJoins?.(row),
+                ),
               ),
             ),
             total,

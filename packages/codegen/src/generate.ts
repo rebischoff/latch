@@ -5,12 +5,15 @@ import { fileURLToPath } from "node:url";
 import { parse } from "yaml";
 
 import { generateGlueFile } from "./glue.js";
+import { crossCheckYamlColumnTypes } from "./migration-ddl.js";
+import { generateStoreFile } from "./store.js";
 import { findMonorepoRoot } from "./workspace-root.js";
 import {
   COLUMN_TYPES,
   FIELD_ACTIONS,
   type ColumnType,
   type GeneratedGlueFile,
+  type GeneratedStoreFile,
   type GeneratedSurfaceFile,
   type PolicyFieldAction,
   type SurfaceColumnDef,
@@ -89,17 +92,18 @@ const parseModesList = (
   return modes;
 };
 
-/** Optional comma-separated app dir names under `apps/` (e.g. `spike_codegen,crm`). */
-const codegenAppAllowList = (): string[] | undefined => {
-  const raw = process.env.LATCH_CODEGEN_APPS?.trim();
+/** Optional comma-separated scan roots (absolute or cwd-relative). */
+const codegenScanRoots = (): string[] | undefined => {
+  const raw = process.env.LATCH_CODEGEN_ROOTS?.trim();
   if (!raw) {
     return undefined;
   }
-  const names = raw
+  const roots = raw
     .split(",")
     .map((name) => name.trim())
-    .filter(Boolean);
-  return names.length > 0 ? names : undefined;
+    .filter(Boolean)
+    .map((name) => path.resolve(name));
+  return roots.length > 0 ? roots : undefined;
 };
 
 const toPascalCase = (snake: string): string =>
@@ -419,41 +423,29 @@ const collectSurfaceYamlPaths = async (dir: string): Promise<string[]> => {
 };
 
 const discoverAppModuleRoots = async (): Promise<string[]> => {
-  const monorepoRoot = findMonorepoRoot(process.cwd());
-
-  // Standalone project: cwd is the app; surfaces live anywhere beneath it.
-  if (!monorepoRoot) {
-    return [process.cwd()];
+  const explicitRoots = codegenScanRoots();
+  if (explicitRoots) {
+    return explicitRoots;
   }
 
-  const appsRoot = path.join(monorepoRoot, "apps");
-  let appNames: string[];
+  const cwd = process.cwd();
+  const cwdModules = path.join(cwd, "modules");
   try {
-    const entries = await readdir(appsRoot, { withFileTypes: true });
-    appNames = entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name);
+    const modulesStat = await stat(cwdModules);
+    if (modulesStat.isDirectory()) {
+      return [cwdModules];
+    }
   } catch {
+    // cwd has no modules/ — fall through.
+  }
+
+  const monorepoRoot = findMonorepoRoot(cwd);
+  if (!monorepoRoot) {
     return [];
   }
 
-  const allowList = codegenAppAllowList();
-  if (allowList) {
-    appNames = appNames.filter((name) => allowList.includes(name));
-  }
-
-  const moduleRoots: string[] = [];
-  for (const appName of appNames) {
-    const modulesDir = path.join(appsRoot, appName, "modules");
-    try {
-      const modulesStat = await stat(modulesDir);
-      if (modulesStat.isDirectory()) {
-        moduleRoots.push(modulesDir);
-      }
-    } catch {
-      // App has no modules/ — skip gracefully.
-    }
-  }
-
-  return moduleRoots;
+  // In-repo with no explicit roots and no cwd modules/: nothing to scan.
+  return [];
 };
 
 export const discoverSurfaceYamls = async (): Promise<string[]> => {
@@ -467,11 +459,71 @@ export const discoverSurfaceYamls = async (): Promise<string[]> => {
   return yamlPaths.sort();
 };
 
-export type GeneratedArtifact = GeneratedSurfaceFile | GeneratedGlueFile;
+export type GeneratedArtifact =
+  | GeneratedSurfaceFile
+  | GeneratedGlueFile
+  | GeneratedStoreFile;
 
 const isCodegenSkipped = (raw: string): boolean => {
   const doc = parse(raw) as Record<string, unknown>;
   return doc.codegen === false;
+};
+
+const resolveAppRoot = async (yamlPath: string): Promise<string | undefined> => {
+  let dir = path.dirname(yamlPath);
+  for (let depth = 0; depth < 6; depth += 1) {
+    const migrationsDir = path.join(dir, "migrations");
+    try {
+      const migrationsStat = await stat(migrationsDir);
+      if (migrationsStat.isDirectory()) {
+        return dir;
+      }
+    } catch {
+      // keep walking up
+    }
+    const parent = path.dirname(dir);
+    if (parent === dir) {
+      break;
+    }
+    dir = parent;
+  }
+  return undefined;
+};
+
+const readMigrationSql = async (appRoot: string): Promise<string> => {
+  const migrationsDir = path.join(appRoot, "migrations");
+  const entries = await readdir(migrationsDir);
+  const sqlFiles = entries.filter((name) => name.endsWith(".sql")).sort();
+  const chunks: string[] = [];
+  for (const file of sqlFiles) {
+    chunks.push(await readFile(path.join(migrationsDir, file), "utf8"));
+  }
+  return chunks.join("\n");
+};
+
+const validateSurfaceAgainstMigrations = async (
+  surface: SurfaceDef,
+  yamlPath: string,
+): Promise<void> => {
+  const appRoot = await resolveAppRoot(yamlPath);
+  if (!appRoot) {
+    return;
+  }
+
+  const migrationSql = await readMigrationSql(appRoot);
+  const yamlColumns = surface.fields.flatMap((field) =>
+    field.columns.map((col) => ({ column: col.column, type: col.type })),
+  );
+  const errors = crossCheckYamlColumnTypes(
+    surface.anchorTable,
+    yamlColumns,
+    migrationSql,
+  );
+  if (errors.length > 0) {
+    throw new Error(
+      `Migration DDL cross-check failed for ${surface.id}:\n${errors.map((e) => `- ${e}`).join("\n")}`,
+    );
+  }
 };
 
 export const generateAllSurfaces = async (): Promise<GeneratedArtifact[]> => {
@@ -484,6 +536,7 @@ export const generateAllSurfaces = async (): Promise<GeneratedArtifact[]> => {
       continue;
     }
     const surface = parseSurfaceYaml(raw, yamlPath);
+    await validateSurfaceAgainstMigrations(surface, yamlPath);
     const moduleDir = path.dirname(yamlPath);
     const schemaOutPath = path.join(
       moduleDir,
@@ -495,9 +548,18 @@ export const generateAllSurfaces = async (): Promise<GeneratedArtifact[]> => {
       "generated",
       `${surface.id}.glue.generated.ts`,
     );
+    const storeOutPath = path.join(
+      moduleDir,
+      "generated",
+      `${surface.id}.store.generated.ts`,
+    );
 
     generated.push(generateSurfaceFile(surface, yamlPath, schemaOutPath));
     generated.push(generateGlueFile(surface, yamlPath, glueOutPath));
+    const storeFile = generateStoreFile(surface, yamlPath, storeOutPath);
+    if (storeFile) {
+      generated.push(storeFile);
+    }
   }
 
   return generated;

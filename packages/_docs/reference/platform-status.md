@@ -8,10 +8,11 @@
 |-------|-------|
 | **Phases 00–06** | Complete — three-Surface CRM proof, IAM, audit, verification, manifest cache |
 | **Phase 08** | **Complete** (2026-06-10) — scoped row filter (`scopeIds` → DAL) + `apps/spike_business` proof |
+| **Phase 09** | **Active (planned 2026-06-11)** — extract reference adapters into `@latch/*`; template zero-glue; fresh-start + scaffold proof |
 | **Phase 07** | Deferred — multi-company, native RLS, package publish |
 | **Spike policy console** | UI tasks complete; delegation proven in browser |
 
-**Next executable step:** None scheduled. Pull [Phase 07](../phases/07-scale-out/STATUS.md) when a real driver appears.
+**Next executable step:** [Phase 09 task 00 — clean slate](../phases/09-platform-packaging/tasks/00-clean-slate.md) (after locking its gated decisions).
 
 ---
 
@@ -63,7 +64,7 @@ From [`scope.md`](../foundations/scope.md) and Phase 07:
 - Native Postgres RLS (DAL scoped filter is Phase 08; RLS is Phase 07)
 - `@latch/*` npm publish + external SDK consumer
 - Per-scope differential field grants, ABAC/ReBAC
-- Codegen: migration DDL gen, starter pages, Drizzle `--check` cross-validation
+- Codegen: migration DDL gen, starter pages, `--check` cross-validation vs **migration DDL** (SQL-first, 2026-06-11; was Drizzle)
 
 ---
 

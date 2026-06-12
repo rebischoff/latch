@@ -79,7 +79,7 @@ describe("generated widget_list schema catalog", () => {
   it("resolves different manifests per role when grants are injected at runtime", async () => {
     const schemaPath = path.join(
       REPO_ROOT,
-      "apps/spike_business/modules/widget/generated/widget_list.schema.generated.ts",
+      "fixtures/codegen-fixtures/widget/generated/widget_list.schema.generated.ts",
     );
     const { widgetListSurfacePolicyDef } = await import(schemaPath);
 

@@ -3,7 +3,6 @@
   "vitest.rootConfig": "vitest.config.ts",
   "debug.javascript.autoAttachFilter": "disabled",
   "eslint.workingDirectories": [
-    { "pattern": "apps/*" },
     { "pattern": "packages/*" }
   ]
 }

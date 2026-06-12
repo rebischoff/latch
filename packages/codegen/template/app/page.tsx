@@ -4,7 +4,7 @@ const HomePage = () => (
     <p>
       Scaffolded Latch business app. Platform migrations are applied; add Surface
       YAML under <code>modules/</code>, run <code>npm run codegen</code>, then
-      wire routes per <code>apps/docs/bootstrap</code>.
+      wire routes per the bootstrap docs.
     </p>
     <p>
       Dev server defaults to port <code>__APP_PORT__</code>.

@@ -49,7 +49,7 @@ fields:
 
 **Choice:** Each entry in `fields[].columns` is an object `{ column, type, nullable? }`. The generator maps a **closed vocabulary** of `type` values to Zod fragments (`string`, `number`, `boolean`, `timestamp`). The hardcoded `COLUMN_ZOD` map in `@latch/codegen` is removed — new apps need no in-package type table.
 
-**Rationale:** Column types feed Zod validation (spine). Declaring them in YAML keeps codegen app-agnostic; a closed vocabulary keeps emission total and enables a future Drizzle cross-check in `--check` (mechanism TBD — see [`00-decisions-needed.md`](../tasks/00-decisions-needed.md#d2--how-does---check-cross-check-types-against-drizzle)).
+**Rationale:** Column types feed Zod validation (spine). Declaring them in YAML keeps codegen app-agnostic; a closed vocabulary keeps emission total and enables a `--check` cross-check against the **parsed migration DDL** (**SQL-first, 2026-06-11**; was "Drizzle cross-check" — mechanism in [task 08](../../../docs/phases/09-platform-packaging/tasks/08-adapter-drizzle.md), tracked in [`00-decisions-needed.md`](../tasks/00-decisions-needed.md#d2--how-does---check-cross-check-types-against-drizzle)).
 
 | YAML `type` | Zod emitted | Notes |
 |-------------|-------------|-------|

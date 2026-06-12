@@ -2,11 +2,11 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 /**
- * A Latch monorepo root is a `package.json` that declares an `apps/*`
- * workspace. This is the signal that scaffolding and codegen should operate
- * across `apps/`, rather than treating the current directory as a single app.
+ * A Latch monorepo root is a `package.json` that declares a `packages/*`
+ * workspace. Codegen and scaffold use this to distinguish in-repo tooling
+ * from a standalone consumer app.
  */
-const declaresAppsWorkspace = (pkgPath: string): boolean => {
+const declaresPackagesWorkspace = (pkgPath: string): boolean => {
   try {
     const pkg = JSON.parse(readFileSync(pkgPath, "utf8")) as {
       workspaces?: string[] | { packages?: string[] };
@@ -15,7 +15,7 @@ const declaresAppsWorkspace = (pkgPath: string): boolean => {
       ? pkg.workspaces
       : (pkg.workspaces?.packages ?? []);
     return patterns.some(
-      (pattern) => pattern === "apps/*" || pattern === "apps/**",
+      (pattern) => pattern === "packages/*" || pattern === "packages/**",
     );
   } catch {
     return false;
@@ -31,7 +31,7 @@ export const findMonorepoRoot = (startDir: string): string | null => {
 
   for (;;) {
     const pkgPath = join(dir, "package.json");
-    if (existsSync(pkgPath) && declaresAppsWorkspace(pkgPath)) {
+    if (existsSync(pkgPath) && declaresPackagesWorkspace(pkgPath)) {
       return dir;
     }
 

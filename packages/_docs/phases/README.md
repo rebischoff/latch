@@ -38,7 +38,8 @@ This is cheaper than building on an imagined contract and reworking. CRM slices 
 | [`04-audit-lifecycle`](./04-audit-lifecycle/README.md) | `audit` | Full audit, hard delete + recovery | complete |
 | [`05-verification`](./05-verification/README.md) | `approval` | Accept/reject, field/surface verification gates | complete |
 | [`06-performance-safety`](./06-performance-safety/README.md) | `policy` / `dal` | Manifest cache modes, T5/T12 connection safety | complete |
-| [`08-scoped-access`](./08-scoped-access/README.md) | `policy` / `dal` / `crm` | `scopeIds` resolve, DAL row filter, CRM proof | **active** |
+| [`08-scoped-access`](./08-scoped-access/README.md) | `policy` / `dal` / `crm` | `scopeIds` resolve, DAL row filter, CRM proof | complete |
+| [`09-platform-packaging`](./09-platform-packaging/README.md) | new `@latch/adapter-*` / `app-kit` / `pg-session` | Extract reference adapters; template zero-glue; scaffold proof | **active (planned)** |
 | [`07-scale-out`](./07-scale-out/README.md) | cross-cutting | Multi-company routing, native RLS, Postgres job store, publish | **deferred** |
 
 ## Phase folder layout

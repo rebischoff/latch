@@ -49,6 +49,24 @@ Audit logging plus **hard delete** semantics. Recovery is from audit, not tombst
 
 **Canonical detail:** [`../phases/04-audit-lifecycle/decisions.md`](../../docs/phases/04-audit-lifecycle/decisions.md).
 
+### Decision: audit mode at scaffold (2026-06-10, implemented 2026-06-11)
+
+**Choice:** Three **runtime-immutable** modes, chosen at **`latch new --audit-mode=…`** (default **`full`**), stored in **`latch_app_config.audit_mode`** (single-row platform table). The DAL gates payloads in `writeAudit` via `shapeAuditEntryForMode`:
+
+| Mode | Create (`insert`) | Update (`update`) | Delete (`delete`) |
+|------|-------------------|-------------------|-------------------|
+| **`full`** | `after` | before/after + patch | `before` |
+| **`standard`** | metadata only (no `after` body) | before/after + patch | `before` |
+| **`recovery`** | none (no row) | none (no row) | `before` only |
+
+`approve`, `reject`, `restore`, and `bulk_summary` follow the same class rules as their underlying mutation (`update`, `update`, `insert`, and `update`/`delete` respectively). The `latch_audit` table ships for every app; mode controls **what the DAL writes**, not whether the table exists.
+
+**Change policy:** **Upgrade-only** via operator SQL migration or future CLI (`recovery` → `standard` → `full`). **No** runtime UI toggle. **Downgrade** only via explicit break-glass operator script (documented, out of band). Mode changes do not backfill or purge historical rows — the trail may be discontinuous.
+
+**Bootstrap:** `ensureAuditMode()` reads `latch_app_config` once per process and calls `setAuditMode()` before mutations run.
+
+**Canonical detail:** [`../../docs/discussions/12-audit-opinionation.md`](../../docs/discussions/12-audit-opinionation.md) · Phase 09 task **05**.
+
 ## Implementation options
 
 | Approach | Pros | Cons |

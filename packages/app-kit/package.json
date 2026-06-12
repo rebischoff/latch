@@ -1,0 +1,28 @@
+{
+  "name": "@latch/app-kit",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "types": "./src/index.ts",
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@latch/adapter-pg-audit": "0.0.0",
+    "@latch/audit": "0.0.0",
+    "@latch/contracts": "0.0.0",
+    "@latch/dal": "0.0.0",
+    "@latch/pg-session": "0.0.0",
+    "@latch/policy": "0.0.0",
+    "react": "19.2.4"
+  },
+  "devDependencies": {
+    "@types/react": "^19",
+    "typescript": "^5",
+    "vitest": "^3.0.5"
+  }
+}

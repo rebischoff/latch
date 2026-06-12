@@ -1,0 +1,2 @@
+export { columnBindingsFromMap, createPgStoreAdapter, type CreatePgStoreAdapterOptions, type PgColumnBinding, type PgColumnMap, } from "./create-pg-store-adapter.js";
+//# sourceMappingURL=index.d.ts.map

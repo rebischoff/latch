@@ -75,3 +75,10 @@ export interface GeneratedGlueFile {
   content: string;
   glueMode: SurfaceGlueMode;
 }
+
+export interface GeneratedStoreFile {
+  surfaceId: string;
+  sourcePath: string;
+  outPath: string;
+  content: string;
+}

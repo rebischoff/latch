@@ -1,0 +1,1 @@
+{"version":3,"file":"manifest-request-scope.d.ts","sourceRoot":"","sources":["../src/manifest-request-scope.ts"],"names":[],"mappings":"AAIA,OAAO,EAEL,KAAK,kBAAkB,EACxB,MAAM,eAAe,CAAC;AASvB;;;GAGG;AACH,eAAO,MAAM,4BAA4B,QAAO,kBAM/C,CAAC;AAEF,8FAA8F;AAC9F,eAAO,MAAM,2BAA2B,GAAI,CAAC,EAC3C,IAAI,MAAM,CAAC,GAAG,OAAO,CAAC,CAAC,CAAC,KACvB,CAAC,GAAG,OAAO,CAAC,CAAC,CAA+C,CAAC"}

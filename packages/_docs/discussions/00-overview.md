@@ -142,7 +142,7 @@ So AI substrate is **validation + schema + apply gates** on the toolchain side (
 
 | # | Decision | Bucket | Home doc |
 |---|---|---|---|
-| A | Column types | Opinionated — declare in YAML, cross-check Drizzle (drop `COLUMN_ZOD`) | [01-codegen](./01-codegen.md) |
+| A | Column types | Opinionated — declare in YAML, cross-check **migration DDL** (drop `COLUMN_ZOD`; SQL-first 2026-06-11) | [01-codegen](./01-codegen.md) |
 | B | Surface glue | Opinionated for single-table; hand-written escape hatch for multi-table | [01-codegen](./01-codegen.md) |
 | C | Forms | Opinionated alignment via manifest-driven `<SurfaceForm>`; flexible widgets | [06-ui-sync](./06-ui-sync.md) |
 | D | UI kit | Flexible — not tied to any library | [06-ui-sync](./06-ui-sync.md) |

@@ -1,6 +1,6 @@
 # Discussion 10 — Platform opinionation roadmap
 
-> **Status:** Active (2026-06-10). **Do this track one session at a time** — mark each step complete before starting the next.
+> **Status:** Opinionation track **complete** (2026-06-10). **Implementation graduated to [Phase 09 — platform packaging](../phases/09-platform-packaging/README.md)** (2026-06-11). Start at [task 00 — clean slate](../phases/09-platform-packaging/tasks/00-clean-slate.md); slices 9.1–9.8 map to phase tasks 02–09.
 >
 > **Charter:** [`00-overview.md`](./00-overview.md) (living, not exhaustive). **Taxonomy:** [`11-spine-adapters-skin.md`](./11-spine-adapters-skin.md).
 
@@ -34,11 +34,11 @@ Mark **Status** when the session’s **Outcome** is recorded (Decision block in 
 | 4 | Spine lock list | `[x]` | [`11-spine-adapters-skin.md` § Spine lock list](./11-spine-adapters-skin.md#spine-lock-list-draft) | Confirmed vs contested spine items listed |
 | 5 | Adapter catalog | `[x]` | [`11-spine-adapters-skin.md` § Adapter catalog](./11-spine-adapters-skin.md#adapter-catalog-draft) | Default adapter per port + formal port vs template convention (TanStack Query deferred) |
 | 6 | Audit compartment | `[x]` | [`12-audit-opinionation.md`](./12-audit-opinionation.md) | Spine vs adapter split for `@latch/audit`; IAM + business audit table decision |
-| 7 | Template / scaffold delivery | `[ ]` | [`07-template-scaffold.md`](./07-template-scaffold.md) | How spine + reference adapters ship; zero copy-paste audit writer |
-| 8 | Skin patterns | `[ ]` | [`08-ai-authored-surfaces.md`](./08-ai-authored-surfaces.md), per-app `modules/` | What app authors own; when to fork adapter vs skin |
-| 9 | Extraction roadmap | `[ ]` | This file § [Extraction sequence](#extraction-sequence-draft) | Ordered implementation slices (no big-bang) |
+| 7 | Template / scaffold delivery | `[x]` | [`07-template-scaffold.md`](./07-template-scaffold.md) | How spine + reference adapters ship; zero copy-paste audit writer |
+| 8 | AI authoring substrate | `[x]` | [`08-ai-authored-surfaces.md`](./08-ai-authored-surfaces.md) | Declarative-only AI path, tiered gate, developer-assist v1; `contact_list` proof in spike_codegen |
+| 9 | Extraction roadmap | `[x]` | This file § [Extraction sequence](#extraction-sequence) | Eight ordered slices + optional kernel merge locked (9.1–9.8) |
 
-**Right now — do this next:** Session **7** (template delivery in [`07-template-scaffold.md`](./07-template-scaffold.md)).
+**Right now — do this next:** **Implementation** — extraction slice **1** (`@latch/adapter-pg-audit`). Parallel toolchain: session 8 JSON Schema + migration linter + `contact_list` proof ([`08-ai-authored-surfaces.md`](./08-ai-authored-surfaces.md)).
 
 ---
 
@@ -91,7 +91,7 @@ Debate each port: formal `@latch/adapter-*` package vs `packages/codegen/templat
 | Port | Likely default | Spine constraint |
 |------|----------------|------------------|
 | Session → `Principal` | Better Auth (update from Auth.js in older docs) | Subject → `latch_users.id`; no second user table |
-| Persistence | `pg` + Drizzle migrations | SQL only behind `StoreAdapter` |
+| Persistence | **raw `pg` + SQL migrations** (Drizzle retired 2026-06-11) | SQL only behind async `StoreAdapter`; single-table SQL codegen'd |
 | Audit write | Postgres INSERT → `latch_audit` | Append-only; `latch_app` INSERT-only |
 | HTTP reads / writes | REST factory + Server Actions helper | Re-resolve manifest per request |
 | Client cache | TanStack Query (convention?) | UI not security boundary |
@@ -110,33 +110,104 @@ Extend [`07-template-scaffold.md`](./07-template-scaffold.md) with spine + adapt
 
 **Test:** scaffolded app runs migrations + audit bootstrap with zero custom audit glue.
 
-### 8 — Skin patterns
+### 8 — AI authoring substrate ✅
 
-**Goal:** What codegen / app authors still own.
+**Goal:** How AI-assisted surface authoring fits the existing architecture (not a new runtime).
 
-- Surface YAML, business tables, descriptors, multi-table escape hatch
-- Domain validation (delegation, last-admin)
-- Restore `replay()` — domain-specific
+Locked in [`08-ai-authored-surfaces.md`](./08-ai-authored-surfaces.md) (8.1–8.8). **Deferred** to extraction / per-app docs: multi-table glue, `replay()`, domain validation (original “skin patterns” bullets — see [`06-ui-sync`](./06-ui-sync.md)).
 
-### 9 — Extraction roadmap
+### 9 — Extraction roadmap ✅
 
 **Goal:** Sequence implementation without boiling the ocean.
 
-See [Extraction sequence](#extraction-sequence-draft) below; adjust after sessions 2–7.
+Locked in [Extraction sequence](#extraction-sequence) (decisions 9.1–9.8).
 
 ---
 
-## Extraction sequence (draft)
+## Extraction sequence
 
-Ordered slices — **not** committed until session 9.
+Ordered implementation slices — lock one per session 9 decision. **Today:** per-app `audit-db-writer.ts` is copy-paste; each slice replaces copies with `@latch/*` imports.
 
-1. `@latch/adapter-pg-audit`; drop per-app `audit-db-writer.ts` copy-paste
-2. `@latch/pg-session` — extract `withPermissionDb` from `@latch/audit`
-3. `latch_app_config.audit_mode` migration + DAL mode gate (`full` \| `standard` \| `recovery`)
-4. Reference auth adapter — `@latch/adapter-better-auth` in template
-5. `@latch/app-kit` bootstrap (`resolveContext`, manifest cache, `ensureAuditWriter`, REST/Action factories)
-6. `@latch/adapter-drizzle` `StoreAdapter` helper
-7. *(Optional)* Merge server kernel — compartment tests unchanged
+### Decision: slice 1 — `@latch/adapter-pg-audit` first (2026-06-10)
+
+**Choice:** **A — pg-audit before pg-session.** Create `packages/adapter-pg-audit/` (`@latch/adapter-pg-audit`) with `createPostgresAuditWriter`. **Stop gate:** template + `apps/widgets` + `apps/spike_policy` import the package and **delete** `lib/audit-db-writer.ts`; package tests cover INSERT behavior. May import `withPermissionDb` from `@latch/audit` until slice 2. **Out of scope:** `ensureAuditWriter` (slice 6), audit mode gate (slice 4), Neon (slice 3).
+
+**Rationale:** Removes the most visible copy-paste debt first ([`12-audit-opinionation`](./12-audit-opinionation.md) 6.5); temporary `@latch/audit` dependency is acceptable for one slice.
+
+### Decision: slice 2 — `@latch/pg-session` extract + re-export (2026-06-10)
+
+**Choice:** **A — extract with deprecation re-export.** Move `permission-db.ts` from `@latch/audit` to `packages/pg-session/` (`@latch/pg-session`). `@latch/audit` re-exports `withPermissionDb` during deprecation; `@latch/adapter-pg-audit` and other consumers switch to `@latch/pg-session`. **Stop gate:** T12 / permission-db tests pass from new package; no `withPermissionDb` implementation left in `@latch/audit` (re-export only).
+
+**Rationale:** Fixes spine leakage ([`11-spine-adapters-skin`](./11-spine-adapters-skin.md)); re-export avoids a big-bang import churn in one PR.
+
+1. ✅ **`@latch/adapter-pg-audit`** — drop per-app `audit-db-writer.ts` copy-paste (locked 9.1)
+2. ✅ **`@latch/pg-session`** — extract `withPermissionDb` from `@latch/audit` (locked 9.2)
+
+### Decision: slice 3 — `@latch/adapter-neon` before app-kit (2026-06-10)
+
+**Choice:** **A — Neon package now, thin port.** Ship `@latch/adapter-neon` with `createDatabaseConnections()` (reads `DATABASE_URL`, `DATABASE_URL_DIRECT`, `LATCH_APP_ROLE_PASSWORD`); shared `DatabaseConnections` type in `@latch/contracts` or `@latch/pg-session`. Template `.env.example` updated; apps wire manually until slice 6 (`@latch/app-kit`). **No** Neon imports in spine or app-kit. **Stop gate:** package + env docs; pooled vs direct pools verified in one spike app.
+
+**Rationale:** Session 7.5 — hosting is adapter, not spine; don't block on full bootstrap ([`07-template-scaffold`](./07-template-scaffold.md)).
+
+3. ✅ **`@latch/adapter-neon`** — dual URL; thin `DatabaseConnections` port (locked 9.3)
+
+### Decision: slice 4 — audit mode end-to-end (2026-06-10)
+
+**Choice:** **A — full slice.** Ship `latch_app_config` migration (or equivalent) + DAL mode gate (`full` \| `standard` \| `recovery`) + `latch new --audit-mode` seed in one slice. **Stop gate:** three modes match session 6 payload table; compartment/threat tests; upgrade-only change policy documented (no runtime toggle). `011_latch_pending_changes` may land same PR as platform migrations bundle but is **not** required for mode gate.
+
+**Rationale:** Migration without DAL gate leaves dead config ([`12-audit-opinionation`](./12-audit-opinionation.md) 6.6–6.7); scaffold flag without persistence is incomplete ([`07-template-scaffold`](./07-template-scaffold.md) 7.3).
+
+4. ✅ **`latch_app_config.audit_mode`** + DAL mode gate + `--audit-mode` (locked 9.4)
+
+### Decision: slice 5 — `@latch/adapter-better-auth` + template (2026-06-10)
+
+**Choice:** **A — package + template.** Ship `@latch/adapter-better-auth` with Better Auth → `getPrincipal()` binding (`subject` → `latch_users.id`; roles from DB, not cookie). Template `lib/latch.ts` wires the adapter. **Stop gate:** package tests mapping contract; template `getPrincipal` returns DB-backed `Principal`; no second user table ([`02-identity`](./02-identity-and-permissions.md) F). Spike apps may migrate in same PR or follow-on.
+
+**Rationale:** Matches slices 1–3 (package first, template imports); auth must work on `latch new` before app-kit orchestration (slice 6).
+
+5. ✅ **`@latch/adapter-better-auth`** in template (locked 9.5)
+
+### Decision: slice 6 — full `@latch/app-kit` (2026-06-10)
+
+**Choice:** **A — full bootstrap slice.** One `@latch/app-kit` package: `resolveContext`, manifest cache, `ensureAuditWriter`, `DatabaseConnections` injection (from `@latch/adapter-neon`), REST route factory, optional Server Action helpers. Template `lib/latch.ts` = thin registry + adapter injection only; delete duplicated `audit-bootstrap.ts` / request wiring. **Stop gate:** scaffolded app runs migrations + audit bootstrap with zero custom audit glue ([`07-template-scaffold`](./07-template-scaffold.md)); REST read works for one surface in a spike app.
+
+**Rationale:** Session 4 bootstrap **C** + 4.11 REST contract; slices 1–3 and 5 are orphaned without orchestration. Single package avoids `@latch/next-kit` sprawl for v1.
+
+6. ✅ **`@latch/app-kit`** — full bootstrap + REST/Actions (locked 9.6)
+
+### Decision: slice 7 — `@latch/adapter-drizzle` helper (2026-06-10) — **SUPERSEDED (2026-06-11)**
+
+**Choice:** **A — helper package.** `@latch/adapter-drizzle` implements `StoreAdapter` for single-table Drizzle schemas (`createDrizzleStoreAdapter` or equivalent); template + one spike surface demonstrate usage. Memory/in-memory stores remain valid for tests. Multi-table glue stays hand-written ([`01-codegen`](./01-codegen.md) B).
+
+**Rationale:** Session 5.2 locked Drizzle as default business store; adapter stays out of `@latch/dal` kernel. Completes the adapter catalog before optional kernel merge.
+
+> **Superseded by SQL-first (2026-06-11):** Drizzle is retired as the runtime engine. Slice 7 becomes **`@latch/adapter-pg-store`** — an **async** `StoreAdapter` over raw `pg` plus codegen-emitted single-table store SQL (`store.generated.ts`). Memory stores are demoted to kernel-unit-test doubles only. See [`11-spine-adapters-skin.md`](./11-spine-adapters-skin.md#decision-sql-first-persistence--retire-drizzle-as-the-runtime-orm-2026-06-11) and [`../phases/09-platform-packaging/tasks/08-adapter-drizzle.md`](../phases/09-platform-packaging/tasks/08-adapter-drizzle.md).
+
+7. ✅ **`@latch/adapter-drizzle`** `StoreAdapter` helper (locked 9.7) — **re-scoped to `@latch/adapter-pg-store` (SQL-first, 2026-06-11)**
+
+### Decision: slice 8 — merge server kernel after adapters (2026-06-10)
+
+**Choice:** **A — merge after slice 7.** Once a scaffold app runs end-to-end on extracted adapters, merge `@latch/policy` + `@latch/dal` + `@latch/audit` + `@latch/approval` → one server package (name TBD: `@latch/core` or `@latch/server`). Keep `@latch/contracts` and `@latch/react` separate; adapters stay out. **Stop gate:** compartment + threat tests unchanged; strict internal module boundaries.
+
+**Rationale:** [`00-overview`](./00-overview.md) working lean — merge is ergonomics after adapters prove the ports, not a prerequisite.
+
+8. ✅ **Merge server kernel** (optional slice, locked 9.8)
+
+### Parallel track — AI / codegen toolchain (session 8)
+
+Not numbered in the adapter sequence; may run alongside slices 1–4:
+
+- JSON Schema for surface/policies YAML
+- CI migration linter (destructive DDL marker)
+- `contact_list` proof in `apps/spike_codegen`
+
+See [`08-ai-authored-surfaces.md`](./08-ai-authored-surfaces.md).
+
+## Verify (session 9 stop gate)
+
+- [x] Slices 1–8 ordered and locked with stop gates (9.1–9.8)
+- [x] Parallel toolchain track noted (session 8)
+- [ ] Slice 1 implemented — **start here**
 
 ---
 

@@ -1,4 +1,16 @@
 export {
+  AUDIT_MODES,
+  auditMutationClass,
+  getAuditMode,
+  isAuditModeUpgrade,
+  parseAuditMode,
+  resetAuditMode,
+  setAuditMode,
+  shapeAuditEntryForMode,
+  type AuditMode,
+  type AuditMutationClass,
+} from "./audit-mode.js";
+export {
   DEFAULT_AUDIT_CONFIG,
   DEFAULT_AUDIT_RETENTION_YEARS,
   getAuditConfig,

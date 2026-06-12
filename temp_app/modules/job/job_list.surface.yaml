@@ -1,0 +1,50 @@
+id: job_list
+displayName: Job list
+anchorTable: jobs
+kind: business
+
+fieldActions:
+  - read
+  - write
+  - submit
+  - approve
+
+surfaceActions:
+  - read
+  - write
+  - delete
+
+tables:
+  - jobs
+  - customers
+  - sites
+  - assignments
+
+fields:
+  - id: summary
+    columns:
+      - column: jobs.id
+        type: string
+      - column: jobs.title
+        type: string
+      - column: jobs.status
+        type: string
+      - column: jobs.scheduled_at
+        type: timestamp
+        nullable: true
+
+  - id: customer_site
+    columns:
+      - column: customers.name
+        type: string
+      - column: sites.label
+        type: string
+
+  - id: financial_terms
+    sensitivity: high
+    columns:
+      - column: jobs.contract_amount
+        type: string
+
+  - id: assignments
+    columns: []

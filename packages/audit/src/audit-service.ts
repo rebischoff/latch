@@ -1,3 +1,4 @@
+import { getAuditMode, shapeAuditEntryForMode } from "./audit-mode.js";
 import type { AuditEntryInput } from "./types.js";
 
 export type AuditWriter = (entry: AuditEntryInput) => void | Promise<void>;
@@ -14,7 +15,11 @@ export const writeAudit = async (entry: AuditEntryInput): Promise<void> => {
       "Audit writer not configured — call setAuditWriter() before writeAudit()",
     );
   }
-  await auditWriter(entry);
+  const shaped = shapeAuditEntryForMode(entry, getAuditMode());
+  if (shaped === null) {
+    return;
+  }
+  await auditWriter(shaped);
 };
 
 export interface MemoryAuditWriter {

@@ -3,7 +3,7 @@
 #
 # Usage:
 #   npm run db:docker:up
-#   DATABASE_URL=postgresql://latch:latch@localhost:5432/latch  # in apps/crm/.env.local
+#   DATABASE_URL=postgresql://latch:latch@localhost:5432/latch  # in scaffolded app .env.local
 #   npm run db:migrate
 
 services:

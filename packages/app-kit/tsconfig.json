@@ -1,0 +1,21 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "rootDir": "src",
+    "declaration": true,
+    "declarationMap": true,
+    "noEmit": false,
+    "emitDeclarationOnly": true,
+    "outDir": "dist"
+  },
+  "include": ["src"],
+  "references": [
+    { "path": "../adapter-pg-audit" },
+    { "path": "../audit" },
+    { "path": "../contracts" },
+    { "path": "../dal" },
+    { "path": "../pg-session" },
+    { "path": "../policy" }
+  ]
+}

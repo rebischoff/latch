@@ -2,24 +2,29 @@
   "name": "latch-monorepo",
   "private": true,
   "workspaces": [
-    "apps/*",
-    "packages/*"
+    "packages/*",
+    "temp_app"
   ],
   "scripts": {
-    "dev": "npm -w @latch/spike-policy run dev",
-    "dev:business": "npm -w @latch/spike-business run dev",
+    "build": "tsc --noEmit -p tsconfig.build.json",
     "lint": "eslint .",
     "db:docker:up": "docker compose up -d",
     "db:docker:down": "docker compose down",
     "db:docker:logs": "docker compose logs -f postgres",
+    "db:migrate": "node scripts/db-migrate.mjs",
+    "db:check": "node scripts/db-migrate.mjs --check",
     "test": "vitest run",
     "codegen": "npm -w @latch/codegen run generate",
     "codegen:check": "npm -w @latch/codegen run check",
     "latch:new": "npm -w @latch/codegen run new --"
   },
   "devDependencies": {
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
+    "next": "16.2.6",
+    "react-dom": "19.2.4",
     "typescript": "^5",
     "tsx": "^4.19.3",
     "vitest": "^3.0.5"

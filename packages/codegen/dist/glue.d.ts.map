@@ -1,0 +1,1 @@
+{"version":3,"file":"glue.d.ts","sourceRoot":"","sources":["../src/glue.ts"],"names":[],"mappings":"AAEA,OAAO,KAAK,EAEV,iBAAiB,EAEjB,UAAU,EACV,mBAAmB,EAEpB,MAAM,YAAY,CAAC;AAiDpB,wFAAwF;AACxF,eAAO,MAAM,kBAAkB,GAAI,SAAS,UAAU,KAAG,mBA2BxD,CAAC;AA0KF,eAAO,MAAM,gBAAgB,GAC3B,SAAS,UAAU,EACnB,YAAY,MAAM,EAClB,SAAS,MAAM,KACd,iBAgBF,CAAC"}

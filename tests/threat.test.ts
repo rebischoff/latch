@@ -573,7 +573,7 @@ describe("threat model — T12 session var leak across requests", () => {
       const { withPermissionDb } = await import("@latch/audit");
       const { createPostgresPendingStore } = await import("@latch/approval");
       const { createPostgresAuditWriter } = await import(
-        "../apps/crm/src/lib/audit-db-writer.js"
+        "@latch/adapter-pg-audit"
       );
 
       const url = latchAppDatabaseUrl()!;

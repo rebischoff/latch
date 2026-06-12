@@ -1,0 +1,41 @@
+{
+  "name": "@latch/temp-app",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev --webpack --port 3003",
+    "build": "next build --webpack",
+    "start": "next start --port 3003",
+    "db:migrate": "node ../scripts/db-migrate.mjs --dir=.",
+    "codegen": "LATCH_CODEGEN_ROOTS=. tsx ../packages/codegen/src/cli.ts",
+    "codegen:check": "LATCH_CODEGEN_ROOTS=. tsx ../packages/codegen/src/cli.ts --check"
+  },
+  "dependencies": {
+    "@latch/adapter-better-auth": "0.0.0",
+    "@latch/adapter-neon": "0.0.0",
+    "@latch/adapter-pg-audit": "0.0.0",
+    "@latch/app-kit": "0.0.0",
+    "@latch/pg-session": "0.0.0",
+    "@latch/audit": "0.0.0",
+    "@latch/contracts": "0.0.0",
+    "@latch/dal": "0.0.0",
+    "@latch/policy": "0.0.0",
+    "better-auth": "^1.6.14",
+    "next": "16.2.6",
+    "pg": "^8.16.0",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/pg": "^8.15.4",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "babel-plugin-react-compiler": "1.0.0",
+    "eslint-config-next": "16.2.6",
+    "tsx": "^4.19.3",
+    "typescript": "^5"
+  }
+}

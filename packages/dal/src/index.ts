@@ -19,4 +19,4 @@ export {
   bindPermissionSession,
   LATCH_DEFAULT_COMPANY_ID,
   withPermissionDb,
-} from "@latch/audit";
+} from "@latch/pg-session";

@@ -1,7 +1,7 @@
 # STATUS — per-package board
 
 > Per-package quarterback. The **global** quarterback (active phase) is the root [`STATUS.md`](../../STATUS.md). Detailed matrix: [`reference/platform-status.md`](./reference/platform-status.md).
-> Updated: 2026-06-10.
+> Updated: 2026-06-11.
 
 ## At a glance
 
@@ -17,12 +17,10 @@
 
 ## Right now — do this next
 
-**Phase 08 Scoped access** ([phase STATUS](./phases/08-scoped-access/STATUS.md)) is the active cross-package work:
+**Phase 09 Platform packaging** ([phase STATUS](./phases/09-platform-packaging/STATUS.md)) — planned, ready to implement:
 
-1. **`@latch/policy`** → [05b — resolve `scopeIds`](../policy/docs/tasks/05b-scoped-rls-resolve.md)
-2. **`@latch/dal`** → [01 — scoped row filter](../dal/docs/tasks/01-scoped-row-filter.md)
-3. **`apps/crm`** → [scoped proof](./phases/08-scoped-access/tasks/04-crm-scoped-proof.md)
-4. **`@latch/policy`** → [05c — closeout](../policy/docs/tasks/05c-policy-closeout.md)
+1. Lock [decisions](./phases/09-platform-packaging/decisions.md) open items for task 00
+2. [00 — clean slate](./phases/09-platform-packaging/tasks/00-clean-slate.md) (remove `apps/`, repoint tooling to template)
 
 ## Deferred (Phase 07, no active task)
 

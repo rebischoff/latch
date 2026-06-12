@@ -36,6 +36,42 @@ The single most important document for keeping v1 shippable solo. **If a feature
 
 **Stays out (see Deferred):** per-scope *differential field grants*, scope-hierarchy traversal beyond one `parent_id`, ABAC/ReBAC/OPA-style DSL, and org-chart (region/manager-edge) templating.
 
+### Decision: platform packaging is in-v1 hardening (2026-06-11)
+
+**Choice:** The opinionation track ([`../discussions/10-opinionation-roadmap.md`](../discussions/10-opinionation-roadmap.md), sessions 1–9) graduates into **[Phase 09 — platform packaging](../phases/09-platform-packaging/README.md)** as **in-v1 platform hardening** (refactor + packaging, not new runtime capability). The eight extraction slices (9.1–9.8) extract reference adapters into `@latch/*` packages so the template/scaffold ships zero copy-paste glue. This is the in-monorepo `workspace:*` continuation of [Phase 02b](../phases/02b-platform-extraction/README.md); **npm publish stays deferred to Phase 07**.
+
+**Rationale:** Owner confirmed (2026-06-11) the packaging churn is wanted now. The work hardens the template/`latch new` story that v1 already depends on; it adds no out-of-scope feature.
+
+### Decision: fresh-start consumer — remove apps/, scaffold proof from template (2026-06-11)
+
+**Choice:** **All current `apps/` are disposable and will be removed** in Phase 09 task 00 (`apps/crm`, `apps/widgets`, `apps/spike_policy`, `apps/spike_business`, `apps/spike_codegen`). The canonical consumer becomes a **freshly scaffolded app from `packages/codegen/template/` via `latch new`**, importing only `@latch/*` with **no copied `lib/` glue**. The trades-CRM proof is **re-established on the extracted packages** as the Phase 09 end-to-end gate. **Supersedes** the 2026-06-01 "sole consumer `apps/crm`" decision below and the `apps/crm` sample-app wording in this doc.
+
+**Rationale:** Owner chose a clean baseline (2026-06-11). Existing apps accumulated copy-paste adapter drift (three `audit-db-writer.ts` copies, bespoke bootstrap); a scaffold-from-template proof is the real acceptance test for "zero custom glue" and removes migration churn from every extraction slice.
+
+### Decision: audit modes are in-v1 (2026-06-11)
+
+**Choice:** Three scaffold-time, runtime-immutable audit modes — **`full` / `standard` / `recovery`** — selected by `latch new --audit-mode=…` (default `full`), persisted in a platform `latch_app_config` row, gated in the DAL. Upgrade-only change path (operator migration/CLI); no runtime UI toggle. Canonical detail: [`../discussions/12-audit-opinionation.md`](../discussions/12-audit-opinionation.md). The `latch_audit` table ships for **every** app regardless of mode; mode controls **what the DAL writes**.
+
+**Rationale:** Lets apps trade audit payload volume vs. forensic depth at scaffold time without forking the table. Extends the tiered delete snapshots already proven in Phase 04.
+
+### Decision: Neon hosting adapter — standard pg, dual URL (2026-06-11)
+
+**Choice:** `@latch/adapter-neon` is the **default hosting adapter** (not spine): dual connection URLs (`DATABASE_URL` pooled runtime / `DATABASE_URL_DIRECT` migrate-psql) over the **standard `pg` driver**, plus `LATCH_APP_ROLE_PASSWORD`. **Explicitly NOT in this adapter:** `@neondatabase/serverless` and Neon branch-provisioning API — both remain **deferred to Phase 07** (see Deferred list). `@latch/app-kit` takes injected `DatabaseConnections`; no Neon imports in kernel/app-kit.
+
+**Rationale:** v1 already targets Vercel + Neon. Dual-URL connection discipline is plain Postgres connection config — compatible with the standing "use standard pg driver until proven needed" deferral, which only governs the serverless driver and branch automation.
+
+### Decision: `@latch/pg-session` extraction trigger met (2026-06-11)
+
+**Choice:** The [2026-06-04 deferral](../reference/packages.md#decision-extract-latchpg-session-when-postgres-surface-grows-2026-06-04) of `@latch/pg-session` is **now triggered** — extracted in Phase 09 slice 2. Trigger basis: a documented home is needed for `SET LOCAL` session binding shared by the new `@latch/adapter-pg-audit`, IAM, and business stores once adapters are packaged. `@latch/audit` re-exports `withPermissionDb` during a deprecation window.
+
+**Rationale:** Packaging the audit writer (slice 1) makes the audit-resident `permission-db.ts` a cross-package leak; extracting it satisfies the "spine leakage" anti-pattern fix from the taxonomy track.
+
+### Decision: SQL-first persistence — retire Drizzle as runtime ORM (2026-06-11)
+
+**Choice:** The business-persistence engine is **raw `pg` + SQL**, not an ORM. **Supersedes** the 2026-05-27 `orm: drizzle` default and Phase 09 slice 9.7's `@latch/adapter-drizzle`. Single-table Surfaces get **codegen-emitted parameterized `pg` SQL** from the YAML `columnMap`; multi-table Surfaces keep **hand-written SQL** in `repository.ts`. Schema source of truth is **SQL migration files** (gated by the destructive-migration linter + PR); `codegen --check` cross-checks YAML types against **parsed migration DDL** (not a Drizzle schema). `StoreAdapter` becomes **async**; memory stores are a **kernel-unit-test double only** (not shipped, not a prod fallback), with a **Postgres integration test tier** covering generated + hand-written SQL. Audit/session/pending stay raw `pg` on one shared pool. Canonical decision + rationale: [`../discussions/11-spine-adapters-skin.md`](../discussions/11-spine-adapters-skin.md#decision-sql-first-persistence--retire-drizzle-as-the-runtime-orm-2026-06-11).
+
+**Rationale:** Latch's safety is manifest → Zod → kernel enforcement with codegen owning Field→column mapping; an ORM adds a second schema-of-record that competes with YAML + migrations — the exact drift the platform removes. The AI-authoring north star ([`../discussions/08-ai-authored-surfaces.md`](../discussions/08-ai-authored-surfaces.md)) emits declarative YAML + SQL DDL, not ORM models. Postgres is a welded spine bet (triggers, `SET LOCAL`, JSONB audit, future RLS), so ORM dialect-portability buys nothing.
+
 ---
 
 ## In v1
@@ -103,8 +139,9 @@ The single most important document for keeping v1 shippable solo. **If a feature
 - Tests for T1, T2, T3, T11, T13 at minimum.
 
 ### Sample app
-- Trades CRM in **`apps/crm`** — sole consumer; uses only `@latch/*` packages.
-- Login (auth provider TBD), job list, job detail, customer detail.
+> **Superseded for the consumer vehicle (2026-06-11):** see [fresh-start decision](#decision-fresh-start-consumer--remove-apps-scaffold-proof-from-template-2026-06-11). The trades-CRM proof is rebuilt by scaffolding from the template after Phase 09 extraction; `apps/crm` is removed with the other apps.
+- Trades CRM (scaffolded from `packages/codegen/template/` via `latch new`) — uses only `@latch/*` packages, zero copied `lib/` glue.
+- Login (Better Auth via `@latch/adapter-better-auth`), job list, job detail, customer detail.
 - Two seed users in two roles (e.g. `field_tech`, `office_admin`).
 
 ---

@@ -17,12 +17,12 @@ export const deleteRowWithAudit = async <TRow, TRelated>(
   opts?: { requestId?: string },
 ): Promise<void> => {
   const id = row.id;
-  const related = store.getRelated(id);
+  const related = await store.getRelated(id);
   const beforeSnapshot =
     surfaceAllows(ctx.manifest, "restore") && descriptor.deleteAuditSnapshot
       ? descriptor.deleteAuditSnapshot(row, related)
       : descriptor.auditSnapshot(row);
-  store.delete(id);
+  await store.delete(id);
 
   await writeAudit({
     actorId: ctx.principal.id,

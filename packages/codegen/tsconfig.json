@@ -9,5 +9,12 @@
     "emitDeclarationOnly": true,
     "outDir": "dist"
   },
-  "include": ["src"]
+  "include": ["src"],
+  "references": [
+    { "path": "../adapter-pg-store" },
+    { "path": "../audit" },
+    { "path": "../contracts" },
+    { "path": "../dal" },
+    { "path": "../policy" }
+  ]
 }

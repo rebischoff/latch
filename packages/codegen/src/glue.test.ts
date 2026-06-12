@@ -113,7 +113,7 @@ describe("generated widget_list glue + DAL kernel", () => {
     setAuditWriter(audit.writer);
     const gluePath = path.join(
       REPO_ROOT,
-      "apps/spike_business/modules/widget/generated/widget_list.glue.generated.ts",
+      "fixtures/codegen-fixtures/widget/generated/widget_list.glue.generated.ts",
     );
     const { widgetListDescriptor } = await import(gluePath);
 
@@ -123,17 +123,17 @@ describe("generated widget_list glue + DAL kernel", () => {
       rows: new Map<string, WidgetRow>([
         ["w-1", { id: "w-1", label: "Alpha", status: "open" }],
       ]),
-      get: (id: string) => store.rows.get(id),
-      list: () => ({ rows: [...store.rows.values()], total: 1 }),
-      upsert: (row: WidgetRow) => {
+      get: async (id: string) => store.rows.get(id),
+      list: async () => ({ rows: [...store.rows.values()], total: 1 }),
+      upsert: async (row: WidgetRow) => {
         store.rows.set(row.id, row);
       },
-      delete: (id: string) => {
+      delete: async (id: string) => {
         store.rows.delete(id);
       },
-      getRelated: () => [],
-      replaceRelated: () => {},
-      isRowVisibleToPrincipal: () => true,
+      getRelated: async () => [],
+      replaceRelated: async () => {},
+      isRowVisibleToPrincipal: async () => true,
     };
 
     const manifest: Manifest = {
@@ -153,7 +153,7 @@ describe("generated widget_list glue + DAL kernel", () => {
 
     const dal = createSurfaceDal(widgetListDescriptor, store);
 
-    const dto = dal.get(ctx, "w-1");
+    const dto = await dal.get(ctx, "w-1");
     expect(dto).toEqual({
       id: "w-1",
       label: { label: "Alpha" },
@@ -163,6 +163,6 @@ describe("generated widget_list glue + DAL kernel", () => {
       label: { label: "Beta" },
     });
     expect(patched.label).toEqual({ label: "Beta" });
-    expect(store.get("w-1")?.label).toBe("Beta");
+    expect((await store.get("w-1"))?.label).toBe("Beta");
   });
 });

@@ -18,19 +18,19 @@ export type ListResult<TRow> = {
 
 /**
  * Storage port for `createSurfaceDal`.
- * In-memory and Postgres adapters implement the same contract.
+ * In-memory test doubles and Postgres adapters implement the same async contract.
  */
 export interface StoreAdapter<TRow, TRelated = unknown> {
-  get: (id: string) => TRow | undefined;
-  list: (query: ListQuery) => ListResult<TRow>;
-  upsert: (row: TRow) => void;
-  delete: (id: string) => void;
-  getRelated: (entityId: string) => TRelated;
-  replaceRelated: (entityId: string, related: TRelated) => void;
+  get: (id: string) => Promise<TRow | undefined>;
+  list: (query: ListQuery) => Promise<ListResult<TRow>>;
+  upsert: (row: TRow) => Promise<void>;
+  delete: (id: string) => Promise<void>;
+  getRelated: (entityId: string) => Promise<TRelated>;
+  replaceRelated: (entityId: string, related: TRelated) => Promise<void>;
   isRowVisibleToPrincipal: (
     entityId: string,
     principalId: string,
     rowScope: RowScope | undefined,
     scopeIds?: ScopeId[],
-  ) => boolean;
+  ) => Promise<boolean>;
 }

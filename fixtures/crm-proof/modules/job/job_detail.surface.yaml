@@ -1,0 +1,37 @@
+# job_detail — pilot Surface (Step 3)
+# @see docs/archive/tasks/job_detail/06-surface-yaml.md
+
+id: job_detail
+displayName: Job detail
+anchorTable: jobs
+
+tables:
+  - jobs
+  - customers
+  - sites
+  - assignments
+
+fields:
+  - id: summary
+    columns:
+      - jobs.title
+      - jobs.status
+      - jobs.scheduled_at
+
+  - id: scope
+    columns:
+      - jobs.description
+
+  - id: financial_terms
+    sensitivity: high
+    requires_verification: true
+    columns:
+      - jobs.contract_amount
+
+  - id: customer_ref
+    columns:
+      - customers.id
+      - customers.name
+
+  - id: assignments
+    columns: []

@@ -15,6 +15,7 @@
     "@latch/approval": "0.0.0",
     "@latch/audit": "0.0.0",
     "@latch/contracts": "0.0.0",
+    "@latch/pg-session": "0.0.0",
     "zod": "^3.24.2"
   },
   "devDependencies": {

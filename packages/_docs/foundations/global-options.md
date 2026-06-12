@@ -113,9 +113,9 @@ Cache key: `(principalId, policyVersion, surfaceId, mode, entityId?)` — `mode`
 
 | Option | Default | v1? | Notes |
 |---|---|---|---|
-| `orm` | `drizzle` | (v1) | Migrations and DAL; raw SQL for triggers. |
+| `orm` | `none (sql-first)` | (v1) | **SQL-first (2026-06-11).** No runtime ORM. Single-table stores = codegen-emitted parameterized `pg` SQL; multi-table = hand-written `repository.ts`. Schema = SQL migration files. Drizzle retired as runtime engine (optional dev-only migration sketching). See [`scope.md`](./scope.md#decision-sql-first-persistence--retire-drizzle-as-runtime-orm-2026-06-11). |
 | `rlsEnabled` | `false` | Deferred | RLS post-v1. v1 uses DAL-only enforcement. |
-| `dbDriver` | `pg` | (v1) | Standard `pg`. Move to `@neondatabase/serverless` only if pooling problems arise. |
+| `dbDriver` | `pg` | (v1) | Standard `pg` — the sole runtime DB engine. Move to `@neondatabase/serverless` only if pooling problems arise. |
 
 ## Metadata
 

@@ -54,15 +54,15 @@ const classifyUpdateRow = async <TRow, TRelated>(
   directFieldIds: string[],
   pendingFieldIds: string[],
 ): Promise<RowPlan<TRow>> => {
-  const row = store.get(id);
+  const row = await store.get(id);
   if (
     !row ||
-    !store.isRowVisibleToPrincipal(
+    !(await store.isRowVisibleToPrincipal(
       id,
       ctx.principal.id,
       ctx.manifest.rowScope,
       ctx.manifest.scopeIds,
-    )
+    ))
   ) {
     return { kind: "skip", entry: { id, reason: "not_found" } };
   }
@@ -94,19 +94,19 @@ const classifyUpdateRow = async <TRow, TRelated>(
   return { kind: "apply", id, row: row as TRow & { id: string } };
 };
 
-const applyRowUpdate = <TRow, TRelated>(
+const applyRowUpdate = async <TRow, TRelated>(
   descriptor: SurfaceDescriptor<TRow, TRelated>,
   store: StoreAdapter<TRow, TRelated>,
   id: string,
   row: TRow,
   patch: Record<string, unknown>,
-): TRow => {
+): Promise<TRow> => {
   const updated = descriptor.applyPatch(row, patch);
-  store.upsert(updated);
+  await store.upsert(updated);
 
   const relatedPatch = descriptor.applyRelatedPatch?.(id, patch);
   if (relatedPatch !== undefined) {
-    store.replaceRelated(id, relatedPatch);
+    await store.replaceRelated(id, relatedPatch);
   }
 
   return updated;
@@ -202,7 +202,7 @@ export const bulkUpdate = async <TRow, TRelated>(
       );
 
       const beforeSnapshot = descriptor.auditSnapshot(row);
-      const updated = applyRowUpdate(descriptor, store, id, row, directPatch);
+      const updated = await applyRowUpdate(descriptor, store, id, row, directPatch);
       const afterSnapshot = descriptor.auditSnapshot(updated);
 
       await writeAudit({
@@ -260,20 +260,20 @@ export const bulkUpdate = async <TRow, TRelated>(
   return { succeeded, skipped, failed: [] };
 };
 
-const classifyDeleteRow = <TRow, TRelated>(
+const classifyDeleteRow = async <TRow, TRelated>(
   store: StoreAdapter<TRow, TRelated>,
   ctx: PermissionContext,
   id: string,
-): RowPlan<TRow> => {
-  const row = store.get(id);
+): Promise<RowPlan<TRow>> => {
+  const row = await store.get(id);
   if (
     !row ||
-    !store.isRowVisibleToPrincipal(
+    !(await store.isRowVisibleToPrincipal(
       id,
       ctx.principal.id,
       ctx.manifest.rowScope,
       ctx.manifest.scopeIds,
-    )
+    ))
   ) {
     return { kind: "skip", entry: { id, reason: "not_found" } };
   }
@@ -304,7 +304,9 @@ export const bulkDelete = async <TRow, TRelated>(
   const mode = opts?.mode ?? "partial";
   const requestId = opts?.requestId;
 
-  const plans = ids.map((id) => classifyDeleteRow(store, ctx, id));
+  const plans = await Promise.all(
+    ids.map((id) => classifyDeleteRow(store, ctx, id)),
+  );
 
   const skipped = plans
     .filter(

@@ -2,7 +2,7 @@
 
 > **Purpose:** align on the **overall picture** and each **major point** before any planning or implementation. These are comprehension + agreement documents, not specs and not task lists.
 >
-> **Status:** Open (2026-06-10). Read [`00-overview.md`](./00-overview.md) first. Opinionation track: sessions **1–6** complete; **do session 7 next** — [`10-opinionation-roadmap.md`](./10-opinionation-roadmap.md).
+> **Status:** Open (2026-06-10). Read [`00-overview.md`](./00-overview.md) first. **Opinionation track complete** (sessions 1–9). **Implementation next:** extraction slice 1 — [`10-opinionation-roadmap.md`](./10-opinionation-roadmap.md).
 
 Each discussion follows the same shape:
 

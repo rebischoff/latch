@@ -2,7 +2,7 @@
 
 > **The "quarterback" file.** When in doubt, start here. Always read this first.
 > This is the **global pointer**: it names the **active phase**. Detailed, per-phase status lives in each phase's own `STATUS.md`.
-> Updated: 2026-06-10 (Phase 08 complete; no scheduled active phase).
+> Updated: 2026-06-11 (Phase 09 complete; **Phase 07 — scale-out** remains deferred until a real driver).
 
 ---
 
@@ -18,9 +18,15 @@
 
 ## Active phase
 
-**None scheduled.** Phases 00–06 and **Phase 08** are complete for the current v1 scope slice.
+**No active implementation phase** — v1 platform packaging slice is complete (Phase 09 closed 2026-06-11). Consumer apps: scaffold via `npm run latch:new -- <name>`; trades-CRM domain fixtures in [`fixtures/crm-proof/`](./fixtures/crm-proof/). Pull **[Phase 07 — Scale-out](./packages/_docs/phases/07-scale-out/README.md)** when a second company, second app, or external `@latch/*` consumer appears.
 
-Pull work from the deferred queue when a real driver appears — see [Phase 07](#phase-07--scale-out--deferred) below.
+| | |
+|---|---|
+| **Last completed** | [Phase 09 — Platform packaging](./packages/_docs/phases/09-platform-packaging/README.md) ([STATUS](./packages/_docs/phases/09-platform-packaging/STATUS.md)) |
+| **Deliverable** | `@latch/*` adapters + `app-kit`; template zero glue; scaffold proof (domain in `fixtures/crm-proof/`) |
+| **Deferred next** | [Phase 07 — Scale-out](./packages/_docs/phases/07-scale-out/README.md) — publish, multi-company, native RLS |
+
+Phases 00–06, 08, and 09 are complete for the current v1 scope slice.
 
 > **Planning gate:** when any implementation task hits an unplanned fork, stop and plan before coding — see [`docs/phases/README.md`](./packages/docs/phases/README.md#planning-gate-stop-and-plan-rule).
 
@@ -41,16 +47,17 @@ Pull work from the deferred queue when a real driver appears — see [Phase 07](
 
 | Phase | Capability | State |
 |-------|-----------|-------|
-| [00 Foundation](./packages/docs/phases/00-foundation/STATUS.md) | contracts, policy, codegen, single-record DAL | complete (policy task 05 closed 2026-06-10) |
-| [01 Data access](./packages/docs/phases/01-data-access/STATUS.md) | list, projection, bulk (`job_list`) | complete |
-| [02b Platform extraction](./packages/docs/phases/02b-platform-extraction/STATUS.md) | genericize `@latch/*`; retire `apps/web` | complete |
-| [02 UI sync](./packages/docs/phases/02-ui-sync/STATUS.md) | `<Can>`/`<FieldControl>`, `customer_detail` | complete |
-| [03 Identity & IAM](./packages/docs/phases/03-identity-iam/STATUS.md) | users/roles in DB, IAM + Data master, auth | complete |
-| [04 Audit & lifecycle](./packages/docs/phases/04-audit-lifecycle/STATUS.md) | full audit, hard delete + recovery | complete |
-| [05 Verification](./packages/docs/phases/05-verification/STATUS.md) | accept/reject, verification gates | complete |
-| [06 Performance & safety](./packages/docs/phases/06-performance-safety/STATUS.md) | manifest cache, T5/T12 connection safety | complete |
-| [08 Scoped access](./packages/docs/phases/08-scoped-access/STATUS.md) | `scopeIds` resolve + DAL filter + business harness proof | complete (2026-06-10) |
-| [07 Scale-out](./packages/docs/phases/07-scale-out/STATUS.md) | multi-company, native RLS, Postgres job store, publish | **deferred** |
+| [00 Foundation](./packages/_docs/phases/00-foundation/STATUS.md) | contracts, policy, codegen, single-record DAL | complete (policy task 05 closed 2026-06-10) |
+| [01 Data access](./packages/_docs/phases/01-data-access/STATUS.md) | list, projection, bulk (`job_list`) | complete |
+| [02b Platform extraction](./packages/_docs/phases/02b-platform-extraction/STATUS.md) | genericize `@latch/*`; retire `apps/web` | complete |
+| [02 UI sync](./packages/_docs/phases/02-ui-sync/STATUS.md) | `<Can>`/`<FieldControl>`, `customer_detail` | complete |
+| [03 Identity & IAM](./packages/_docs/phases/03-identity-iam/STATUS.md) | users/roles in DB, IAM + Data master, auth | complete |
+| [04 Audit & lifecycle](./packages/_docs/phases/04-audit-lifecycle/STATUS.md) | full audit, hard delete + recovery | complete |
+| [05 Verification](./packages/_docs/phases/05-verification/STATUS.md) | accept/reject, verification gates | complete |
+| [06 Performance & safety](./packages/_docs/phases/06-performance-safety/STATUS.md) | manifest cache, T5/T12 connection safety | complete |
+| [08 Scoped access](./packages/_docs/phases/08-scoped-access/STATUS.md) | `scopeIds` resolve + DAL filter + business harness proof | complete (2026-06-10) |
+| [09 Platform packaging](./packages/_docs/phases/09-platform-packaging/STATUS.md) | extract reference adapters; template zero-glue; scaffold proof | complete (2026-06-11) |
+| [07 Scale-out](./packages/_docs/phases/07-scale-out/STATUS.md) | multi-company, native RLS, Postgres job store, publish | **deferred** |
 
 ---
 
@@ -59,7 +66,7 @@ Pull work from the deferred queue when a real driver appears — see [Phase 07](
 | Area | State |
 |---|---|
 | Docs | Phase 08 closed; platform-status updated (2026-06-10) |
-| Code | Scoped RLS complete — `resolve` → `scopeIds`, DAL filter, `apps/spike_business` proof |
+| Code | Phase 09 complete; packages + template; consumer apps via `latch new` |
 | Tests | `npm run test` — contracts, policy, dal, audit, e2e, threat, performance-safety, scoped visibility |
 | CI | GitHub Actions on `main` PRs |
 

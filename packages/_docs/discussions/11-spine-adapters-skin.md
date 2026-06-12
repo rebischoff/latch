@@ -23,8 +23,8 @@ The 2026-06-05 **spine vs skin** rule remains valid. This discussion adds **adap
 | `PolicyService.resolve`, manifest shape | Spine | — | Kernel |
 | `PermissionContext`, `Manifest`, `Principal` types | Spine | — | `@latch/contracts` |
 | `createSurfaceDal`, narrow/project, strict patch | Spine | — | Kernel |
-| `StoreAdapter` interface | Spine | `StoreAdapter` | Contract only — no ORM in `@latch/dal` |
-| Drizzle / memory `StoreAdapter` impl | Adapter | `StoreAdapter` | Business tables only; separate from audit |
+| `StoreAdapter` interface (**async**, 2026-06-11) | Spine | `StoreAdapter` | Contract only — no ORM in `@latch/dal` |
+| `pg` SQL / memory `StoreAdapter` impl | Adapter | `StoreAdapter` | Business tables only; separate from audit. **Drizzle retired as runtime engine (2026-06-11)** |
 | `SurfaceDescriptor` (`projectRow`, `applyPatch`, …) | Spine | — | Port shape; per-surface **values** are glue |
 | Codegen single-table glue (generated) | Spine (toolchain) | — | Opinionated 80% path from YAML |
 | Multi-table hand glue | Skin | — | Escape hatch (e.g. `job_detail`) |
@@ -139,9 +139,10 @@ Session **5** — lock default adapter per port and whether it is a package or t
 | Port | Spine contract | Default adapter (proposal) | Package vs template | Status |
 |------|----------------|----------------------------|---------------------|--------|
 | Identity | `getPrincipal()` → `Principal` | Better Auth | `@latch/adapter-better-auth` | `[x]` session 5.1–5.1b (2026-06-10) |
-| Business persistence | `StoreAdapter` | Drizzle + `pg` | `@latch/adapter-drizzle` | `[x]` session 5.2 (2026-06-10) |
+| Business persistence | `StoreAdapter` (async) | **raw `pg` + codegen-emitted SQL** (Drizzle retired) | `@latch/adapter-pg-store` | `[x]` session 5.2 (2026-06-10); **superseded 2026-06-11 → SQL-first** (see below) |
 | Audit persistence | `writeAudit` → `latch_audit` | Postgres pool writer | `@latch/adapter-pg-audit` | `[x]` session 5.3 (2026-06-10) |
 | DB session | `withPermissionDb` / `SET LOCAL` | `pg` Pool | `@latch/pg-session` | `[x]` session 5.4 (2026-06-10) |
+| Postgres hosting | `DatabaseConnections` port | Neon (dual URL) | `@latch/adapter-neon` | `[x]` session 7.5 (2026-06-10) |
 | HTTP read | manifest + DAL | REST route factory | `@latch/app-kit` | `[x]` session 5.5 (2026-06-10) |
 | HTTP write | manifest + DAL | Server Action helper (optional) | `@latch/app-kit` | `[x]` session 5.6 (2026-06-10) |
 | Client reads | manifest props | RSC default; TanStack Query **deferred** until a app needs it | — | `[~]` hold — session 5.7 |
@@ -157,6 +158,22 @@ Session **5** — lock default adapter per port and whether it is a package or t
 **Choice:** Default adapters and package homes locked (table above). **TanStack Query deferred** — no package or convention until a real app uses it; until then RSC props + REST JSON suffice. **`@latch/app-kit`:** bootstrap orchestration (session 4 **C**) plus REST route factory + optional Server Action helpers (not a vendor `adapter-*` package).
 
 **Rationale:** Separate packages per port (Option 2 layout) keep deps isolated. Vendor bindings use `@latch/adapter-*`; first-party Postgres uses `@latch/pg-*`. HTTP factories belong in `app-kit` as Next.js platform wiring, distinct from DAL kernel. Client cache library is presentation-tier — premature to standardize without a consumer.
+
+### Decision: SQL-first persistence — retire Drizzle as the runtime ORM (2026-06-11)
+
+**Choice:** **The business-persistence engine is raw `pg` + SQL, not an ORM.** This **supersedes** the session 5.2 / slice 9.7 choice of Drizzle as the default `StoreAdapter` implementation.
+
+- **Runtime DB engine is `pg` only.** No ORM is imported by any `@latch/*` runtime package. Drizzle is **removed from the adapter roadmap**; it may live as optional dev-only migration/schema sketching, never as a runtime dependency.
+- **Single-table Surfaces:** `codegen` emits parameterized `pg` SQL (`store.generated.ts`) from the YAML `columnMap` — the same deterministic templating that already emits Zod + glue. The LLM/human authors **YAML + SQL migrations**, never the query SQL.
+- **Multi-table Surfaces:** persistence stays **hand-written SQL** in a per-surface `repository.ts` (the existing escape hatch, [Decision B](./01-codegen.md)). ~80% of surfaces are codegen'd; the multi-table remainder is human-owned.
+- **Schema source of truth:** SQL **migration files** (AI/human authored, gated by the destructive-migration linter + PR review). `codegen --check` cross-checks YAML columns/types against the **parsed migration DDL** — replacing the previously planned "cross-check against Drizzle schema."
+- **`StoreAdapter` becomes async.** The sync contract was a memory-store convenience; real `pg` reads/writes are awaited, which also unlocks a single transaction wrapping business write + audit + pending.
+- **Memory stores are a test double only** — kept for `@latch/dal` / `@latch/policy` kernel unit tests, **not** shipped in the scaffolded app and **not** a production fallback. Generated and hand-written SQL is covered by a **Postgres integration test tier** (Docker / Neon branch, transactional rollback per test).
+- **Audit, session binding, and pending stay raw `pg`** on the **one shared pool** injected by `@latch/app-kit` (`@latch/adapter-pg-audit`, `@latch/pg-session`, approval pg store). The "too many packages / two engines" concern is resolved by consolidating **pool + wiring**, not by collapsing ports.
+
+**Rationale:** Latch's safety derives from manifest → Zod → kernel enforcement with codegen owning Field→column mapping; an ORM adds a *second* schema-of-record competing with YAML + migrations — exactly the drift the platform exists to remove. The north-star authoring pipeline ([`08-ai-authored-surfaces.md`](./08-ai-authored-surfaces.md)) already emits declarative YAML + SQL DDL, not ORM models, so an ORM sits in the middle of a flow that never collects its benefit. Postgres is a welded spine bet (triggers, `SET LOCAL`, JSONB audit, future RLS), so Drizzle's dialect-portability buys nothing — Latch's portability axis is *ports* (auth, hosting, session), not ORM-to-ORM. Keeping the enforcement kernel ORM-free preserves the fast, DB-free compartment tests that have proven the security model since Phase 00.
+
+**Consequences:** Phase 09 slice **9.7** is re-scoped from `@latch/adapter-drizzle` to `@latch/adapter-pg-store` + codegen store-SQL emission, with an **async `StoreAdapter`** prerequisite ([`../phases/09-platform-packaging/tasks/08-adapter-drizzle.md`](../phases/09-platform-packaging/tasks/08-adapter-drizzle.md)). `global-options.md` `orm` default changes from `drizzle` to `none (sql-first)`. Codegen `--check` D5/D2 reconciled to DDL-parse. No change to `@latch/adapter-pg-audit` (slice 9.1) or `@latch/pg-session` (slice 9.2) — append-only/session ports were already raw `pg`.
 
 ---
 

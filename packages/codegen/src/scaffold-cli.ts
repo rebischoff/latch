@@ -1,4 +1,5 @@
 import {
+  parseAuditMode,
   resolveScaffoldTarget,
   scaffoldApp,
   toPackageName,
@@ -8,29 +9,39 @@ const slugFromArgv = (): string => {
   const positional = process.argv.slice(2).filter((arg) => !arg.startsWith("-"));
   const slug = positional[0]?.trim();
   if (!slug) {
-    console.error("Usage: latch new <name>");
-    console.error("  In a Latch monorepo  → creates apps/<name>");
+    console.error("Usage: latch new <name> [--audit-mode=full|standard|recovery]");
+    console.error("  In a Latch monorepo  → creates ./<name> at the repo root");
     console.error("  Standalone           → creates ./<name> (or '.' in place)");
     process.exit(1);
   }
   return slug;
 };
 
-const printMonorepoNextSteps = (slug: string, port: string): void => {
+const auditModeFromArgv = (): ReturnType<typeof parseAuditMode> => {
+  const flag = process.argv.find((arg) => arg.startsWith("--audit-mode="));
+  const raw = flag?.slice("--audit-mode=".length) ?? "full";
+  try {
+    return parseAuditMode(raw);
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exit(1);
+  }
+};
+
+const printMonorepoNextSteps = (label: string, slug: string, port: string): void => {
   const pkg = toPackageName(slug);
-  console.log(`Created apps/${slug} (${pkg})`);
+  console.log(`Created ${label} (${pkg})`);
   console.log("");
   console.log("Next steps:");
-  console.log(`  1. cp apps/${slug}/.env.example apps/${slug}/.env.local`);
+  console.log("  1. npm install   (repo root — links the new workspace)");
+  console.log(`  2. cp ${label}/.env.example ${label}/.env.local`);
   console.log(
     "     Set DATABASE_URL, AUTH_SECRET, LATCH_APP_ROLE_PASSWORD (Neon requires a non-default password).",
   );
-  console.log(`  2. node scripts/db-migrate.mjs --app=${slug}`);
-  console.log(
-    `  3. Add *.surface.yaml under apps/${slug}/modules/ (Phase 1 — see apps/docs/phase-01-first-app.md)`,
-  );
-  console.log("  4. npm run codegen");
-  console.log(`  5. npm run dev -w ${pkg}  (port ${port})`);
+  console.log(`  3. node scripts/db-migrate.mjs --dir=${label}`);
+  console.log(`  4. Add *.surface.yaml under ${label}/modules/`);
+  console.log(`  5. cd ${label} && LATCH_CODEGEN_ROOTS=. npm run -w @latch/codegen generate`);
+  console.log(`  6. npm run dev -w ${pkg}  (port ${port})`);
 };
 
 const printStandaloneNextSteps = (
@@ -73,7 +84,7 @@ const main = (): void => {
 
   let port: string;
   try {
-    ({ port } = scaffoldApp(target));
+    ({ port } = scaffoldApp(target, { auditMode: auditModeFromArgv() }));
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     process.exit(1);
@@ -81,7 +92,7 @@ const main = (): void => {
 
   console.log("");
   if (target.isMonorepo) {
-    printMonorepoNextSteps(target.slug, port);
+    printMonorepoNextSteps(target.label, target.slug, port);
   } else {
     printStandaloneNextSteps(target.label, target.slug, port);
   }

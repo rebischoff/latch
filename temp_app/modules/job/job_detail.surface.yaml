@@ -1,0 +1,54 @@
+id: job_detail
+displayName: Job detail
+anchorTable: jobs
+kind: business
+
+fieldActions:
+  - read
+  - write
+  - submit
+  - approve
+
+surfaceActions:
+  - read
+  - write
+  - delete
+
+tables:
+  - jobs
+  - customers
+  - sites
+  - assignments
+
+fields:
+  - id: summary
+    columns:
+      - column: jobs.title
+        type: string
+      - column: jobs.status
+        type: string
+      - column: jobs.scheduled_at
+        type: timestamp
+        nullable: true
+
+  - id: scope
+    columns:
+      - column: jobs.description
+        type: string
+
+  - id: financial_terms
+    sensitivity: high
+    requires_verification: true
+    columns:
+      - column: jobs.contract_amount
+        type: string
+
+  - id: customer_ref
+    columns:
+      - column: customers.id
+        type: string
+      - column: customers.name
+        type: string
+
+  - id: assignments
+    columns: []

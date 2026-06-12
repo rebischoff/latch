@@ -66,7 +66,7 @@ Opinionated **spine** only ([spine-vs-skin](../../../docs/discussions/00-overvie
 | **lib/** | Stubs: `db.ts`, `audit-bootstrap.ts`, `policy-registry.ts` (empty business registry) | `getPrincipal`, `resolveContext`, store adapters |
 | **modules/** | `README.md` only | `*.surface.yaml`, `generated/` |
 
-`latch_pending_changes` migration is **optional in v1 scaffold** — first temp apps skip approval wiring ([bootstrap f](../../../../apps/docs/bootstrap/f-explicitly-out-of-scope.md)).
+`latch_pending_changes` ships in the platform migration chain (session 3 / discussion 07, 2026-06-10); approval remains **opt-in per field** in Surface YAML. `latch_app_config` (audit mode) — add when extraction slice 3 lands ([`12-audit-opinionation.md`](../../../docs/discussions/12-audit-opinionation.md)).
 
 ---
 

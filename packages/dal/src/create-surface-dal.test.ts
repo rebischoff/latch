@@ -190,9 +190,9 @@ class WidgetMemoryStore implements StoreAdapter<WidgetRow, WidgetChild[]> {
     this.childrenByWidget.set(WIDGET_BETA, []);
   };
 
-  get = (id: string): WidgetRow | undefined => this.rows.get(id);
+  get = async (id: string): Promise<WidgetRow | undefined> => this.rows.get(id);
 
-  list = (query: ListQuery) => {
+  list = async (query: ListQuery): Promise<{ rows: WidgetRow[]; total: number }> => {
     let rows = [...this.rows.values()];
     if (query.rowScope === "own") {
       rows = rows.filter((row) =>
@@ -212,26 +212,26 @@ class WidgetMemoryStore implements StoreAdapter<WidgetRow, WidgetChild[]> {
     return { rows: rows.slice(query.offset, query.offset + query.limit), total };
   };
 
-  upsert = (row: WidgetRow): void => {
+  upsert = async (row: WidgetRow): Promise<void> => {
     this.rows.set(row.id, row);
   };
 
-  delete = (id: string): void => {
+  delete = async (id: string): Promise<void> => {
     this.rows.delete(id);
     this.visibility.delete(id);
   };
 
-  getRelated = (entityId: string): WidgetChild[] =>
+  getRelated = async (entityId: string): Promise<WidgetChild[]> =>
     this.childrenByWidget.get(entityId) ?? [];
 
-  replaceRelated = (): void => {};
+  replaceRelated = async (): Promise<void> => {};
 
-  isRowVisibleToPrincipal = (
+  isRowVisibleToPrincipal = async (
     entityId: string,
     principalId: string,
     rowScope: "own" | "scope" | "all" | undefined,
     scopeIds?: string[],
-  ): boolean => {
+  ): Promise<boolean> => {
     if (rowScope === "own") {
       return this.visibility.get(entityId)?.has(principalId) ?? false;
     }
@@ -317,12 +317,12 @@ afterEach(() => {
 });
 
 describe("createSurfaceDal (fixture descriptor)", () => {
-  it("omits forbidden fields from projection", () => {
+  it("omits forbidden fields from projection", async () => {
     const store = new WidgetMemoryStore();
     store.seed();
     const dal = createSurfaceDal(widgetDetailDescriptor, store);
 
-    const dto = dal.get(buildCtx(readLabelOnlyManifest, PRINCIPAL_A), WIDGET_ALPHA);
+    const dto = await dal.get(buildCtx(readLabelOnlyManifest, PRINCIPAL_A), WIDGET_ALPHA);
 
     expect(dto.label).toEqual({ text: "Alpha" });
     expect(dto).not.toHaveProperty("meta");
@@ -345,7 +345,7 @@ describe("createSurfaceDal (fixture descriptor)", () => {
     expect(audit.entries).toHaveLength(0);
   });
 
-  it("cross-principal read throws NotFoundError under own row scope", () => {
+  it("cross-principal read throws NotFoundError under own row scope", async () => {
     const store = new WidgetMemoryStore();
     store.seed();
     const dal = createSurfaceDal(widgetDetailDescriptor, store);
@@ -354,9 +354,9 @@ describe("createSurfaceDal (fixture descriptor)", () => {
       rowScope: "own",
     };
 
-    expect(() =>
+    await expect(
       dal.get(buildCtx(ownManifest, PRINCIPAL_A), WIDGET_BETA),
-    ).toThrow(NotFoundError);
+    ).rejects.toThrow(NotFoundError);
   });
 
   it("patch updates row and records audit", async () => {
@@ -371,7 +371,7 @@ describe("createSurfaceDal (fixture descriptor)", () => {
     });
 
     expect(dto.label).toEqual({ text: "Alpha updated" });
-    expect(store.get(WIDGET_ALPHA)?.label).toBe("Alpha updated");
+    expect((await store.get(WIDGET_ALPHA))?.label).toBe("Alpha updated");
     expect(audit.entries).toHaveLength(1);
     expect(audit.entries[0]).toMatchObject({
       action: "update",
@@ -395,7 +395,7 @@ describe("createSurfaceDal (fixture descriptor)", () => {
 
     await detailDal.delete(ctx, WIDGET_ALPHA);
 
-    expect(store.get(WIDGET_ALPHA)).toBeUndefined();
+    expect(await store.get(WIDGET_ALPHA)).toBeUndefined();
     expect(audit.entries).toHaveLength(1);
     expect(audit.entries[0]).toMatchObject({
       action: "delete",
@@ -416,7 +416,7 @@ describe("createSurfaceDal (fixture descriptor)", () => {
       actions: ["read", "write", "delete", "restore"],
     };
     const ctx = buildCtx(restoreDeleteManifest, PRINCIPAL_A);
-    const expectedChildren = store.getRelated(WIDGET_ALPHA);
+    const expectedChildren = await store.getRelated(WIDGET_ALPHA);
 
     await detailDal.delete(ctx, WIDGET_ALPHA);
 
@@ -440,7 +440,7 @@ describe("createSurfaceDal (fixture descriptor)", () => {
       dal.delete(buildCtx(writeManifest, PRINCIPAL_A), WIDGET_ALPHA),
     ).rejects.toThrow(ForbiddenError);
 
-    expect(store.get(WIDGET_ALPHA)).toBeDefined();
+    expect(await store.get(WIDGET_ALPHA)).toBeDefined();
     expect(audit.entries).toHaveLength(0);
   });
 
@@ -463,12 +463,12 @@ describe("createSurfaceDal (fixture descriptor)", () => {
 });
 
 describe("createSurfaceDal list + bulk (fixture descriptor)", () => {
-  it("list respects own row scope", () => {
+  it("list respects own row scope", async () => {
     const store = new WidgetMemoryStore();
     store.seed();
     const dal = createSurfaceDal(widgetListDescriptor, store);
 
-    const { rows, total } = dal.list!(
+    const { rows, total } = await dal.list!(
       buildCtx(ownScopeListManifest, PRINCIPAL_A),
     );
 
@@ -476,12 +476,12 @@ describe("createSurfaceDal list + bulk (fixture descriptor)", () => {
     expect(rows[0]?.id).toBe(WIDGET_ALPHA);
   });
 
-  it("list returns only rows in manifest.scopeIds when rowScope is scope", () => {
+  it("list returns only rows in manifest.scopeIds when rowScope is scope", async () => {
     const store = new WidgetMemoryStore();
     store.seed();
     const dal = createSurfaceDal(widgetListDescriptor, store);
 
-    const { rows, total } = dal.list!(
+    const { rows, total } = await dal.list!(
       buildCtx(scopedListManifest, PRINCIPAL_A),
     );
 
@@ -489,7 +489,7 @@ describe("createSurfaceDal list + bulk (fixture descriptor)", () => {
     expect(rows[0]?.id).toBe(WIDGET_ALPHA);
   });
 
-  it("get on out-of-scope row throws NotFoundError when rowScope is scope", () => {
+  it("get on out-of-scope row throws NotFoundError when rowScope is scope", async () => {
     const store = new WidgetMemoryStore();
     store.seed();
     const dal = createSurfaceDal(widgetDetailDescriptor, store);
@@ -499,12 +499,12 @@ describe("createSurfaceDal list + bulk (fixture descriptor)", () => {
       scopeIds: [SCOPE_A],
     };
 
-    expect(() =>
+    await expect(
       dal.get(buildCtx(detailManifest, PRINCIPAL_A), WIDGET_BETA),
-    ).toThrow(NotFoundError);
+    ).rejects.toThrow(NotFoundError);
   });
 
-  it("own row scope ignores scopeIds on list", () => {
+  it("own row scope ignores scopeIds on list", async () => {
     const store = new WidgetMemoryStore();
     store.seed();
     const dal = createSurfaceDal(widgetListDescriptor, store);
@@ -513,13 +513,13 @@ describe("createSurfaceDal list + bulk (fixture descriptor)", () => {
       scopeIds: [SCOPE_B],
     };
 
-    const { rows, total } = dal.list!(buildCtx(ownWithScopeIds, PRINCIPAL_A));
+    const { rows, total } = await dal.list!(buildCtx(ownWithScopeIds, PRINCIPAL_A));
 
     expect(total).toBe(1);
     expect(rows[0]?.id).toBe(WIDGET_ALPHA);
   });
 
-  it("all row scope ignores scopeIds on list", () => {
+  it("all row scope ignores scopeIds on list", async () => {
     const store = new WidgetMemoryStore();
     store.seed();
     const dal = createSurfaceDal(widgetListDescriptor, store);
@@ -528,7 +528,7 @@ describe("createSurfaceDal list + bulk (fixture descriptor)", () => {
       scopeIds: [SCOPE_A],
     };
 
-    const { rows, total } = dal.list!(buildCtx(allWithScopeIds, PRINCIPAL_A));
+    const { rows, total } = await dal.list!(buildCtx(allWithScopeIds, PRINCIPAL_A));
 
     expect(total).toBe(2);
     expect(rows.map((r) => r.id).sort()).toEqual(
@@ -553,8 +553,8 @@ describe("createSurfaceDal list + bulk (fixture descriptor)", () => {
     expect(result.skipped).toEqual([
       { id: WIDGET_BETA, reason: "not_found" },
     ]);
-    expect(store.get(WIDGET_ALPHA)?.label).toBe("Scoped bulk");
-    expect(store.get(WIDGET_BETA)?.label).toBe("Beta");
+    expect((await store.get(WIDGET_ALPHA))?.label).toBe("Scoped bulk");
+    expect((await store.get(WIDGET_BETA))?.label).toBe("Beta");
   });
 
   it("bulkUpdate partial success with not_found skips", async () => {
@@ -572,7 +572,7 @@ describe("createSurfaceDal list + bulk (fixture descriptor)", () => {
 
     expect(result.succeeded).toEqual([WIDGET_ALPHA]);
     expect(result.skipped).toEqual([{ id: "missing-1", reason: "not_found" }]);
-    expect(store.get(WIDGET_ALPHA)?.label).toBe("Bulk alpha");
+    expect((await store.get(WIDGET_ALPHA))?.label).toBe("Bulk alpha");
     expect(audit.entries.filter((e) => e.action === "update")).toHaveLength(1);
   });
 
@@ -590,8 +590,8 @@ describe("createSurfaceDal list + bulk (fixture descriptor)", () => {
     );
 
     expect(result.succeeded).toEqual(ids);
-    expect(store.get(WIDGET_ALPHA)).toBeUndefined();
-    expect(store.get(WIDGET_BETA)).toBeUndefined();
+    expect(await store.get(WIDGET_ALPHA)).toBeUndefined();
+    expect(await store.get(WIDGET_BETA)).toBeUndefined();
 
     const deleteEntries = audit.entries.filter((e) => e.action === "delete");
     expect(deleteEntries).toHaveLength(2);
@@ -645,7 +645,7 @@ describe("createSurfaceDal list + bulk (fixture descriptor)", () => {
       dal.bulkDelete!(buildCtx(readOnlyList, PRINCIPAL_A), [WIDGET_ALPHA]),
     ).rejects.toThrow(ForbiddenError);
 
-    expect(store.get(WIDGET_ALPHA)).toBeDefined();
+    expect(await store.get(WIDGET_ALPHA)).toBeDefined();
     expect(audit.entries).toHaveLength(0);
   });
 });
@@ -692,7 +692,7 @@ describe("createSurfaceDal verification pending routing", () => {
       { meta: { notes: "proposed" } },
     );
 
-    expect(store.get(WIDGET_ALPHA)?.notes).toBe("note-a");
+    expect((await store.get(WIDGET_ALPHA))?.notes).toBe("note-a");
     expect(dto.meta).toEqual({ notes: "note-a" });
 
     const pending = await pendingStore.getPendingForEntity(WIDGET_ALPHA, {
@@ -733,8 +733,8 @@ describe("createSurfaceDal verification pending routing", () => {
       meta: { notes: "pending only" },
     });
 
-    expect(store.get(WIDGET_ALPHA)?.label).toBe("Alpha live");
-    expect(store.get(WIDGET_ALPHA)?.notes).toBe("note-a");
+    expect((await store.get(WIDGET_ALPHA))?.label).toBe("Alpha live");
+    expect((await store.get(WIDGET_ALPHA))?.notes).toBe("note-a");
     expect(audit.entries).toHaveLength(1);
     expect(audit.entries[0]?.fieldIds).toEqual(["label"]);
   });
@@ -761,7 +761,7 @@ describe("createSurfaceDal verification pending routing", () => {
     );
 
     expect(dto.meta).toEqual({ notes: "approved notes" });
-    expect(store.get(WIDGET_ALPHA)?.notes).toBe("approved notes");
+    expect((await store.get(WIDGET_ALPHA))?.notes).toBe("approved notes");
     expect(audit.entries[0]?.action).toBe("approve");
   });
 
@@ -787,7 +787,7 @@ describe("createSurfaceDal verification pending routing", () => {
       pending[0]!.id,
     );
 
-    expect(store.get(WIDGET_ALPHA)?.notes).toBe("note-a");
+    expect((await store.get(WIDGET_ALPHA))?.notes).toBe("note-a");
     expect((await pendingStore.getById(pending[0]!.id))?.status).toBe("rejected");
     expect(audit.entries).toHaveLength(1);
     expect(audit.entries[0]?.action).toBe("reject");

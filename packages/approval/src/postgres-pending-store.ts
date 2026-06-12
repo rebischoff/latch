@@ -1,4 +1,4 @@
-import { withPermissionDb } from "@latch/audit";
+import { withPermissionDb } from "@latch/pg-session";
 import { Pool, type PoolClient } from "pg";
 
 import type {

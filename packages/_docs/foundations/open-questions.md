@@ -48,7 +48,7 @@ _None — D2 resolved 2026-06-02 (Phase 03 task **00**)._
 | 2026-05-27 | Policy metadata | Repo YAML/JSON | [`architecture/metadata-and-codegen.md`](../../codegen/docs/reference/metadata-and-codegen.md) |
 | 2026-05-27 | Manifest delivery | RSC props when possible | [`architecture/permissions-and-ui-sync.md`](../reference/permissions-and-ui-sync.md) |
 | 2026-05-27 | Approval v1 | All-or-nothing pending; internal reviewers only | [`architecture/approval-trails.md`](../../approval/docs/approval-trails.md) |
-| 2026-05-27 | ORM | Drizzle | [`architecture/global-options.md`](./global-options.md) |
+| 2026-05-27 | ORM | ~~Drizzle~~ → **SQL-first, no runtime ORM** (superseded 2026-06-11) | [`global-options.md`](./global-options.md), [`scope.md`](./scope.md#decision-sql-first-persistence--retire-drizzle-as-runtime-orm-2026-06-11), [`../discussions/11-spine-adapters-skin.md`](../discussions/11-spine-adapters-skin.md#decision-sql-first-persistence--retire-drizzle-as-the-runtime-orm-2026-06-11) |
 | 2026-05-27 | Audit | Immutable default; 3-year retention | [`architecture/audit-and-lifecycle.md`](../../audit/docs/audit-and-lifecycle.md) |
 | 2026-05-27 | Multi-role merge (v1) | **Single mode `union_grants`** with `denyWins`; other modes deferred | [`architecture/access-control.md`](../../policy/docs/access-control.md), [`scope.md`](./scope.md) |
 | 2026-05-27 | Surface vs Module | Lock **Surface** as the term; rename in Phase-0 naming pass | [`glossary.md`](./glossary.md), [`naming.md`](./naming.md) |

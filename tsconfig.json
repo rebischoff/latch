@@ -1,14 +1,19 @@
 {
   "files": [],
   "references": [
-    { "path": "apps/spike_codegen" },
-    { "path": "apps/spike_policy" },
+    { "path": "fixtures/crm-proof" },
     { "path": "packages/contracts" },
+    { "path": "packages/pg-session" },
     { "path": "packages/policy" },
-    { "path": "packages/dal" },
-    { "path": "packages/audit" },
     { "path": "packages/approval" },
+    { "path": "packages/audit" },
+    { "path": "packages/dal" },
     { "path": "packages/react" },
+    { "path": "packages/adapter-better-auth" },
+    { "path": "packages/adapter-neon" },
+    { "path": "packages/adapter-pg-audit" },
+    { "path": "packages/adapter-pg-store" },
+    { "path": "packages/app-kit" },
     { "path": "packages/codegen" }
   ]
 }

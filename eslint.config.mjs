@@ -3,7 +3,7 @@ import tseslint from "typescript-eslint";
 
 const tsFiles = [
   "packages/**/*.{ts,tsx}",
-  "apps/**/*.{ts,tsx}",
+  "fixtures/**/*.{ts,tsx}",
   "*.{ts,mjs}",
   "scripts/**/*.{ts,mjs}",
 ];

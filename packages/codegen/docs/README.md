@@ -7,9 +7,9 @@
 | Tool | Command | Doc home |
 |------|---------|----------|
 | **Sync codegen** | `npm run codegen` / `codegen:check` | [reference/](./reference/) + [tasks 01–04](./tasks/README.md) |
-| **Scaffold CLI** | `npm run latch:new` | [tasks/05-scaffold-cli.md](./tasks/05-scaffold-cli.md) |
+| **Scaffold CLI** | `npm run latch:new` | [tasks/05-scaffold-cli.md](./tasks/05-scaffold-cli.md) · [scaffold-runbook.md](./scaffold-runbook.md) |
 
-Sync = idempotent `YAML → TS` on every build. Scaffold = one-time copy of `packages/codegen/template/` → `apps/<slug>/` (monorepo) or `./<slug>/` (standalone).
+Sync = idempotent `YAML → TS` on every build. Scaffold = one-time copy of `packages/codegen/template/` → `./<slug>/` at repo root (monorepo) or `./<slug>/` (standalone).
 
 ---
 

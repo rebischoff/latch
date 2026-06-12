@@ -59,7 +59,8 @@ apps/<app>/docs/              app/spike docs — independent of packages
 | [`phases/04-audit-lifecycle/`](./phases/04-audit-lifecycle/README.md) | full audit, hard delete + recovery |
 | [`phases/05-verification/`](./phases/05-verification/README.md) | accept/reject, verification gates |
 | [`phases/06-performance-safety/`](./phases/06-performance-safety/README.md) | manifest cache, T5/T12 |
-| [`phases/08-scoped-access/`](./phases/08-scoped-access/README.md) | scoped row filter — **active** |
+| [`phases/08-scoped-access/`](./phases/08-scoped-access/README.md) | scoped row filter | complete |
+| [`phases/09-platform-packaging/`](./phases/09-platform-packaging/README.md) | extract reference adapters; template zero-glue; scaffold proof | **active (planned)** |
 | [`phases/07-scale-out/`](./phases/07-scale-out/README.md) | multi-company, native RLS, publish (deferred) |
 
 ## Reference — cross-cutting deep-dives

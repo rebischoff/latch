@@ -1,67 +1,35 @@
 #!/usr/bin/env node
 /**
- * Apply apps/<app>/migrations/*.sql in lexical order (matches CI).
- * Loads DATABASE_URL from apps/<app>/.env.local first, then the shell env.
+ * Apply migrations/*.sql in lexical order (matches CI).
+ * Loads DATABASE_URL from <target>/.env.local first, then the shell env.
  *
  * Usage:
- *   node scripts/db-migrate.mjs                    # spike_policy (default)
- *   node scripts/db-migrate.mjs --app=spike_business
- *   node scripts/db-migrate.mjs --app=widgets
- *   node scripts/db-migrate.mjs --app=spike_policy --check
+ *   node scripts/db-migrate.mjs                              # template (default)
+ *   node scripts/db-migrate.mjs --dir=packages/codegen/template
+ *   node scripts/db-migrate.mjs --dir=./my-scaffolded-app
+ *   node scripts/db-migrate.mjs --check
  */
 import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-const APPS_ROOT = resolve("apps");
-const DEFAULT_APP = "spike_policy";
+const DEFAULT_TARGET = "packages/codegen/template";
 
-/** Discover apps with a migrations/ folder. */
-const discoverApps = () => {
-  const apps = {};
-
-  if (!existsSync(APPS_ROOT)) {
-    return apps;
-  }
-
-  for (const entry of readdirSync(APPS_ROOT, { withFileTypes: true })) {
-    if (!entry.isDirectory()) {
-      continue;
-    }
-
-    const appName = entry.name;
-    const migrationsDir = resolve(APPS_ROOT, appName, "migrations");
-    if (!existsSync(migrationsDir)) {
-      continue;
-    }
-
-    apps[appName] = {
-      envLocalPath: resolve(APPS_ROOT, appName, ".env.local"),
-      migrationsDir,
-    };
-  }
-
-  return apps;
-};
-
-const APPS = discoverApps();
-
-const appArg =
-  process.argv.find((a) => a.startsWith("--app="))?.slice("--app=".length) ??
-  DEFAULT_APP;
-const appConfig = APPS[appArg];
-
-if (!appConfig) {
-  console.error(
-    `Unknown --app=${appArg}. Supported: ${Object.keys(APPS).sort().join(", ")}`,
-  );
-  process.exit(1);
-}
-
-const { envLocalPath, migrationsDir } = appConfig;
+const dirArg = process.argv.find((a) => a.startsWith("--dir="))?.slice("--dir=".length);
+const targetDir = resolve(dirArg ?? DEFAULT_TARGET);
+const migrationsDir = resolve(targetDir, "migrations");
+const envLocalPath = resolve(targetDir, ".env.local");
 const checkOnly = process.argv.includes("--check");
 const onlyArg = process.argv.find((a) => a.startsWith("--only="));
 const onlyFile = onlyArg?.slice("--only=".length);
+
+if (!existsSync(migrationsDir)) {
+  console.error(
+    `No migrations/ directory at ${targetDir}.\n` +
+      "  Pass --dir=<app-root> (scaffolded app or packages/codegen/template).",
+  );
+  process.exit(1);
+}
 
 const parseEnvValue = (raw) => {
   let value = raw.trim();
@@ -155,7 +123,7 @@ if (host.includes("-pooler")) {
 }
 
 if (checkOnly) {
-  console.log(`OK  app=${appArg}  source=${source}  host=${host}`);
+  console.log(`OK  dir=${targetDir}  source=${source}  host=${host}`);
   process.exit(0);
 }
 

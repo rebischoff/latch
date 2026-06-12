@@ -144,7 +144,7 @@ The single enforcement path. Platform kernel + per-app store/glue. SQL lives **o
 | Connection safety (T5/T12) | [`packages/audit/src/permission-db.ts`](../../audit/src/permission-db.ts) (`withPermissionDb`); `latch_app` role — crm `005`, test1 `002` |
 | Doc | [`permissions-and-ui-sync.md`](./permissions-and-ui-sync.md), [`api-style.md`](./api-style.md) |
 
-**Proposed:** `@latch/store-drizzle` (`createDrizzleStore(table, columnMap)`) and a route/action factory + `registerSurface()` bootstrap so per-app glue shrinks to ~3 files.
+**Proposed:** `@latch/adapter-pg-store` (`createPgStoreAdapter(table, columnMap)`, raw `pg` — SQL-first, 2026-06-11; was `@latch/store-drizzle`) and a route/action factory + `registerSurface()` bootstrap so per-app glue shrinks to ~3 files.
 
 **In-memory test:** the whole engine runs against `memory-store.ts` — full enforcement coverage, no database.
 
@@ -183,7 +183,7 @@ Packages the **platform** tables + wiring so a new business app starts with audi
 |---|---|
 | Migration runner (exists) | [`scripts/db-migrate.mjs`](../../../scripts/db-migrate.mjs) |
 | Platform tables to templatize | `latch_users`, `latch_user_roles`, `latch_policy_version`, `latch_audit` (+trigger), `latch_pending_changes`, `latch_app` role |
-| Proposed packages | `@latch/app-kit` (`registerSurface`, `resolveContext`, route/action factories), `@latch/store-drizzle`, `create-latch-app` CLI |
+| Proposed packages | `@latch/app-kit` (`registerSurface`, `resolveContext`, route/action factories), `@latch/adapter-pg-store` (raw `pg`, SQL-first), `create-latch-app` CLI |
 | Optional add-on | Neon-API branch provisioning (keep opt-in; core stays cloud-agnostic) |
 
 **Roadmap note:** this compartment is the substrate for **AI-authored surfaces** — AI emits constrained YAML + a migration, the validation gate (`codegen --check` + Zod + migration review) guards it, and the kernel enforces invariants regardless of what was authored.
