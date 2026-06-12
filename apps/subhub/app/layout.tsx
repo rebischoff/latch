@@ -4,8 +4,8 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Temp App",
-  description: "Latch business app (temp_app)",
+  title: "SubHub",
+  description: "Latch business app (SubHub)",
 };
 
 type RootLayoutProps = {

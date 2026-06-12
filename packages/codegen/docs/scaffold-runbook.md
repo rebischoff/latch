@@ -7,17 +7,17 @@
 
 | Step | Action |
 |------|--------|
-| Copy | `packages/codegen/template/` → `./<slug>/` at repo root |
-| Tokens | `__APP_SLUG__`, `__APP_PACKAGE__`, `__APP_PORT__`, `__APP_REGISTRY__` |
-| Workspace | Appends `"<slug>"` to root `package.json` `workspaces` |
+| Copy | `packages/codegen/template/` → `./apps/<slug>/` |
+| Tokens | `__APP_SLUG__`, `__APP_PACKAGE__`, `__APP_PORT__`, `__APP_REGISTRY__`, `__MONOREPO_REL__` |
+| Workspace | Ensures `"apps/*"` is in root `package.json` `workspaces` |
 | Port | First free port from **3003** (scans sibling `package.json` `--port` values) |
 | Grants | `lib/latch.ts` preloads `latch_role_grants` per request via `@latch/app-kit` |
 
 ## Manual steps (today)
 
 1. **`npm install`** (repo root) — links the new workspace to `@latch/*`
-2. **`cp <slug>/.env.example <slug>/.env.local`** — see env table below
-3. **`node scripts/db-migrate.mjs --dir=<slug>`** — platform `001`–`012`; optional dev seeds `013`+ when present
+2. **`cp apps/<slug>/.env.example apps/<slug>/.env.local`** — see env table below
+3. **`node scripts/db-migrate.mjs --dir=apps/<slug>`** — platform `001`–`012`; optional dev seeds `013`+ when present
 4. **Surfaces** — add `modules/**/*.surface.yaml` only (**not** `*.policies.yaml`), then `npm run codegen -w @latch/<slug>`
 5. Wire `policy-registry.ts` with generated `*SurfacePolicyDef` imports
 6. **`npm run dev -w @latch/<slug>`**
@@ -104,7 +104,7 @@ psql "$DATABASE_URL_DIRECT" -c \
 | **Postgres job store** | Phase 07 |
 | **Hide migration 006 password in psql output** | Dev ergonomics |
 
-## Pitfalls (2026-06-11, `temp_app`)
+## Pitfalls (2026-06-11, scaffolded apps)
 
 1. **Workspace not linked** — CLI patches `workspaces`; still run `npm install`
 2. **`BETTER_AUTH_URL` wrong port** — use scaffolded port

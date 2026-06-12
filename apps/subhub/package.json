@@ -1,5 +1,5 @@
 {
-  "name": "@latch/temp-app",
+  "name": "@latch/subhub",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -7,9 +7,9 @@
     "dev": "next dev --webpack --port 3003",
     "build": "next build --webpack",
     "start": "next start --port 3003",
-    "db:migrate": "node ../scripts/db-migrate.mjs --dir=.",
-    "codegen": "LATCH_CODEGEN_ROOTS=. tsx ../packages/codegen/src/cli.ts",
-    "codegen:check": "LATCH_CODEGEN_ROOTS=. tsx ../packages/codegen/src/cli.ts --check"
+    "db:migrate": "node ../../scripts/db-migrate.mjs --dir=.",
+    "codegen": "LATCH_CODEGEN_ROOTS=. tsx ../../packages/codegen/src/cli.ts",
+    "codegen:check": "LATCH_CODEGEN_ROOTS=. tsx ../../packages/codegen/src/cli.ts --check"
   },
   "dependencies": {
     "@latch/adapter-better-auth": "0.0.0",

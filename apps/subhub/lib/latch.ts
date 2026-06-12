@@ -14,7 +14,7 @@ import { PolicyService } from "@latch/policy";
 import { headers } from "next/headers";
 
 import { getConnections, getPool } from "./db.js";
-import { tempAppRegistry } from "./policy-registry.js";
+import { subhubRegistry } from "./policy-registry.js";
 
 let authInstance: ReturnType<typeof createBetterAuth> | undefined;
 
@@ -41,7 +41,7 @@ export const getPrincipal = createGetPrincipal({
   pool: getPool,
 });
 
-const registry = tempAppRegistry;
+const registry = subhubRegistry;
 
 const policyService = new PolicyService({ registry });
 

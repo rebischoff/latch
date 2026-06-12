@@ -49,7 +49,7 @@ describe("scaffoldApp — monorepo workspace", () => {
     }
   });
 
-  it("registers the new app in root package.json workspaces", () => {
+  it("scaffolds under apps/<slug> in a monorepo", () => {
     tempRoot = mkdtempSync(join(tmpdir(), "latch-scaffold-"));
     writeFileSync(
       join(tempRoot, "package.json"),
@@ -68,15 +68,15 @@ describe("scaffoldApp — monorepo workspace", () => {
 
     const target = resolveScaffoldTarget("my_app", tempRoot);
     expect(target.isMonorepo).toBe(true);
+    expect(target.targetDir).toBe(join(tempRoot, "apps", "my_app"));
     scaffoldApp(target);
 
-    const rootPkg = JSON.parse(
-      readFileSync(join(tempRoot, "package.json"), "utf8"),
-    ) as { workspaces: string[] };
-    expect(rootPkg.workspaces).toEqual(["packages/*", "my_app"]);
+    expect(
+      readFileSync(join(target.targetDir, "package.json"), "utf8"),
+    ).toContain('"db:migrate": "node ../../scripts/db-migrate.mjs --dir=."');
   });
 
-  it("does not duplicate an existing workspace entry", () => {
+  it("registers apps/* in root package.json workspaces", () => {
     tempRoot = mkdtempSync(join(tmpdir(), "latch-scaffold-"));
     writeFileSync(
       join(tempRoot, "package.json"),
@@ -84,7 +84,7 @@ describe("scaffoldApp — monorepo workspace", () => {
         {
           name: "fake-monorepo",
           private: true,
-          workspaces: ["packages/*", "my_app"],
+          workspaces: ["packages/*"],
         },
         null,
         2,
@@ -99,6 +99,32 @@ describe("scaffoldApp — monorepo workspace", () => {
     const rootPkg = JSON.parse(
       readFileSync(join(tempRoot, "package.json"), "utf8"),
     ) as { workspaces: string[] };
-    expect(rootPkg.workspaces).toEqual(["packages/*", "my_app"]);
+    expect(rootPkg.workspaces).toEqual(["packages/*", "apps/*"]);
+  });
+
+  it("does not duplicate an existing apps/* workspace entry", () => {
+    tempRoot = mkdtempSync(join(tmpdir(), "latch-scaffold-"));
+    writeFileSync(
+      join(tempRoot, "package.json"),
+      `${JSON.stringify(
+        {
+          name: "fake-monorepo",
+          private: true,
+          workspaces: ["packages/*", "apps/*"],
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+    mkdirSync(join(tempRoot, "packages", "codegen"), { recursive: true });
+
+    const target = resolveScaffoldTarget("my_app", tempRoot);
+    scaffoldApp(target);
+
+    const rootPkg = JSON.parse(
+      readFileSync(join(tempRoot, "package.json"), "utf8"),
+    ) as { workspaces: string[] };
+    expect(rootPkg.workspaces).toEqual(["packages/*", "apps/*"]);
   });
 });

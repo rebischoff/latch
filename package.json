@@ -3,7 +3,7 @@
   "private": true,
   "workspaces": [
     "packages/*",
-    "temp_app"
+    "apps/*"
   ],
   "scripts": {
     "build": "tsc --noEmit -p tsconfig.build.json",

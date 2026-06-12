@@ -10,7 +10,7 @@ const slugFromArgv = (): string => {
   const slug = positional[0]?.trim();
   if (!slug) {
     console.error("Usage: latch new <name> [--audit-mode=full|standard|recovery]");
-    console.error("  In a Latch monorepo  → creates ./<name> at the repo root");
+    console.error("  In a Latch monorepo  → creates ./apps/<name>");
     console.error("  Standalone           → creates ./<name> (or '.' in place)");
     process.exit(1);
   }

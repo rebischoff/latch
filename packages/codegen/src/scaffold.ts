@@ -157,7 +157,7 @@ const walkAndSubstitute = (
 /**
  * Resolve where a new app named `rawSlug` should be scaffolded.
  *
- * - Inside a Latch monorepo  → `<root>/<slug>` (sibling to `packages/`).
+ * - Inside a Latch monorepo  → `<root>/apps/<slug>`.
  * - Standalone (no monorepo) → `<cwd>/<slug>`, or `<cwd>` in place when the
  *   slug is `.` (slug then derived from the directory name).
  */
@@ -176,11 +176,11 @@ export const resolveScaffoldTarget = (
   }
 
   if (monorepoRoot) {
-    const targetDir = join(monorepoRoot, slug);
+    const targetDir = join(monorepoRoot, "apps", slug);
     return {
       slug,
       targetDir,
-      label: `./${slug}`,
+      label: `./apps/${slug}`,
       isMonorepo: true,
       monorepoRoot,
     };
@@ -219,21 +219,20 @@ const workspacePatterns = (pkg: RootPackageJson): string[] => {
   return pkg.workspaces?.packages ?? [];
 };
 
-const workspaceEntryForSlug = (slug: string): string => slug;
+const APPS_WORKSPACE = "apps/*";
 
-const isSlugRegistered = (patterns: string[], slug: string): boolean =>
+const hasAppsWorkspace = (patterns: string[]): boolean =>
   patterns.some(
     (pattern) =>
-      pattern === slug ||
-      pattern === `./${slug}` ||
-      pattern === `${slug}/*` ||
-      pattern === `./${slug}/*`,
+      pattern === APPS_WORKSPACE ||
+      pattern === `./${APPS_WORKSPACE}` ||
+      pattern === "apps/**",
   );
 
-/** Append a consumer app folder to the monorepo root `workspaces` list. */
+/** Ensure `apps/*` is listed in the monorepo root `workspaces`. */
 export const registerMonorepoWorkspace = (
   monorepoRoot: string,
-  slug: string,
+  _slug: string,
 ): boolean => {
   const rootPackagePath = join(monorepoRoot, "package.json");
   if (!existsSync(rootPackagePath)) {
@@ -242,12 +241,11 @@ export const registerMonorepoWorkspace = (
 
   const pkg = JSON.parse(readFileSync(rootPackagePath, "utf8")) as RootPackageJson;
   const patterns = workspacePatterns(pkg);
-  if (isSlugRegistered(patterns, slug)) {
+  if (hasAppsWorkspace(patterns)) {
     return false;
   }
 
-  const entry = workspaceEntryForSlug(slug);
-  const nextPatterns = [...patterns, entry];
+  const nextPatterns = [...patterns, APPS_WORKSPACE];
 
   if (Array.isArray(pkg.workspaces)) {
     pkg.workspaces = nextPatterns;
@@ -275,8 +273,8 @@ const patchAppConfigSeed = (targetDir: string, auditMode: AuditMode): void => {
   }
   const sql = readFileSync(migrationPath, "utf8");
   const patched = sql.replace(
-    /INSERT INTO latch_app_config \(id, audit_mode\) VALUES \(1, 'full'\);/,
-    `INSERT INTO latch_app_config (id, audit_mode) VALUES (1, '${auditMode}');`,
+    /INSERT INTO latch_app_config \(id, audit_mode\) VALUES \(1, 'full'\)(\s+ON CONFLICT \(id\) DO NOTHING)?;/,
+    `INSERT INTO latch_app_config (id, audit_mode) VALUES (1, '${auditMode}') ON CONFLICT (id) DO NOTHING;`,
   );
   if (patched === sql) {
     throw new Error(
@@ -296,9 +294,14 @@ export const scaffoldApp = (
   }
   assertWritable(target);
 
-  const portSearchDir = target.monorepoRoot ?? dirname(target.targetDir);
+  const portSearchDir = target.isMonorepo
+    ? join(target.monorepoRoot ?? dirname(target.targetDir), "apps")
+    : dirname(target.targetDir);
   const port = String(nextDevPort(portSearchDir));
 
+  if (target.isMonorepo) {
+    mkdirSync(join(target.monorepoRoot!, "apps"), { recursive: true });
+  }
   mkdirSync(target.targetDir, { recursive: true });
   cpSync(TEMPLATE_DIR, target.targetDir, { recursive: true });
 
@@ -308,6 +311,7 @@ export const scaffoldApp = (
     __APP_TITLE__: toTitle(target.slug),
     __APP_PORT__: port,
     __APP_REGISTRY__: `${toCamelCase(target.slug)}Registry`,
+    __MONOREPO_REL__: target.isMonorepo ? "../.." : "..",
   });
 
   patchAppConfigSeed(target.targetDir, options.auditMode ?? "full");

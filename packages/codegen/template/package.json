@@ -7,9 +7,9 @@
     "dev": "next dev --webpack --port __APP_PORT__",
     "build": "next build --webpack",
     "start": "next start --port __APP_PORT__",
-    "db:migrate": "node ../scripts/db-migrate.mjs --dir=.",
-    "codegen": "LATCH_CODEGEN_ROOTS=. tsx ../packages/codegen/src/cli.ts",
-    "codegen:check": "LATCH_CODEGEN_ROOTS=. tsx ../packages/codegen/src/cli.ts --check"
+    "db:migrate": "node __MONOREPO_REL__/scripts/db-migrate.mjs --dir=.",
+    "codegen": "LATCH_CODEGEN_ROOTS=. tsx __MONOREPO_REL__/packages/codegen/src/cli.ts",
+    "codegen:check": "LATCH_CODEGEN_ROOTS=. tsx __MONOREPO_REL__/packages/codegen/src/cli.ts --check"
   },
   "dependencies": {
     "@latch/adapter-better-auth": "0.0.0",

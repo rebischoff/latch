@@ -1,20 +1,20 @@
 {
-  "extends": "../tsconfig.base.json",
+  "extends": "__MONOREPO_REL__/tsconfig.base.json",
   "compilerOptions": {
     "baseUrl": ".",
     "plugins": [{ "name": "next" }],
     "paths": {
       "@/*": ["./*"],
-      "@latch/adapter-better-auth": ["../packages/adapter-better-auth/src/index.ts"],
-      "@latch/adapter-neon": ["../packages/adapter-neon/src/index.ts"],
-      "@latch/adapter-pg-audit": ["../packages/adapter-pg-audit/src/index.ts"],
-      "@latch/app-kit": ["../packages/app-kit/src/index.ts"],
-      "@latch/approval": ["../packages/approval/src/index.ts"],
-      "@latch/audit": ["../packages/audit/src/index.ts"],
-      "@latch/contracts": ["../packages/contracts/src/index.ts"],
-      "@latch/dal": ["../packages/dal/src/index.ts"],
-      "@latch/pg-session": ["../packages/pg-session/src/index.ts"],
-      "@latch/policy": ["../packages/policy/src/index.ts"]
+      "@latch/adapter-better-auth": ["__MONOREPO_REL__/packages/adapter-better-auth/src/index.ts"],
+      "@latch/adapter-neon": ["__MONOREPO_REL__/packages/adapter-neon/src/index.ts"],
+      "@latch/adapter-pg-audit": ["__MONOREPO_REL__/packages/adapter-pg-audit/src/index.ts"],
+      "@latch/app-kit": ["__MONOREPO_REL__/packages/app-kit/src/index.ts"],
+      "@latch/approval": ["__MONOREPO_REL__/packages/approval/src/index.ts"],
+      "@latch/audit": ["__MONOREPO_REL__/packages/audit/src/index.ts"],
+      "@latch/contracts": ["__MONOREPO_REL__/packages/contracts/src/index.ts"],
+      "@latch/dal": ["__MONOREPO_REL__/packages/dal/src/index.ts"],
+      "@latch/pg-session": ["__MONOREPO_REL__/packages/pg-session/src/index.ts"],
+      "@latch/policy": ["__MONOREPO_REL__/packages/policy/src/index.ts"]
     },
     "jsx": "preserve"
   },
