@@ -8,6 +8,6 @@ npm run latch:new -- <slug>
 
 Current apps:
 
-| App | Package | Dev port |
-|-----|---------|----------|
-| [SubHub](./subhub/) | `@latch/subhub` | 3003 |
+| App | Package | Dev port | Status |
+|-----|---------|----------|--------|
+| [SubHub](./subhub/) | `@latch/subhub` | 3003 | [`subhub/STATUS.md`](./subhub/STATUS.md) |

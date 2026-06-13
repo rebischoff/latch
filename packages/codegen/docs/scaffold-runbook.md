@@ -17,7 +17,7 @@
 
 1. **`npm install`** (repo root) — links the new workspace to `@latch/*`
 2. **`cp apps/<slug>/.env.example apps/<slug>/.env.local`** — see env table below
-3. **`node scripts/db-migrate.mjs --dir=apps/<slug>`** — platform `001`–`012`; optional dev seeds `013`+ when present
+3. **`node scripts/db-migrate.mjs --dir=apps/<slug>`** — platform `001`–`012` only
 4. **Surfaces** — add `modules/**/*.surface.yaml` only (**not** `*.policies.yaml`), then `npm run codegen -w @latch/<slug>`
 5. Wire `policy-registry.ts` with generated `*SurfacePolicyDef` imports
 6. **`npm run dev -w @latch/<slug>`**
@@ -45,10 +45,11 @@ Template `lib/latch.ts` calls `preloadRoleGrantsFromDb(getPool(), principalRoleI
 | `AUTH_SECRET` / `BETTER_AUTH_SECRET` | `npx auth secret` |
 | `BETTER_AUTH_URL` | `http://localhost:<port>` — must match scaffolded dev port (`__APP_PORT__` in `.env.example`) |
 
-Dev stub (after migration `013_pilot_roles_seed.sql`):
+Optional dev stub (no seed migration in template — add users/roles in app-specific SQL or via IAM):
 
 ```
-LATCH_STUB_USER=seed-field-tech
+LATCH_STUB_USER=<your-user-id>
+LATCH_STUB_ROLE=<single-role-fallback>
 ```
 
 When `LATCH_STUB_USER` matches a `latch_users.id` row, `getPrincipal` loads roles from `latch_user_roles` (DB-backed UUIDs). `LATCH_STUB_ROLE` is only a fallback when the user row is absent.
@@ -57,9 +58,8 @@ When `LATCH_STUB_USER` matches a `latch_users.id` row, `getPrincipal` loads role
 
 | Range | Content |
 |-------|---------|
-| `001`–`012` | Platform (always) |
-| `013_pilot_roles_seed.sql` | Optional dev seed: `field_tech` / `office_admin` UUID roles + grants + seed users |
-| `014_business_schema.sql` | Placeholder in template; replace when adding domain tables |
+| `001`–`012` | Platform (scaffold ships only these) |
+| `013+` | **App-specific** — add business DDL, dev seeds, fixtures under `migrations/` when needed |
 
 After a DB wipe:
 
@@ -90,9 +90,9 @@ psql "$DATABASE_URL_DIRECT" -c \
 ## Adding business domain (trades-CRM example)
 
 1. Copy `modules/job/*.surface.yaml` from `fixtures/crm-proof/` (typed `column` + `type` format)
-2. Add `migrations/014_*.sql` business DDL (codegen cross-checks columns)
+2. Add `migrations/013_*.sql` (or higher) business DDL (codegen cross-checks columns)
 3. `npm run codegen -w @latch/<slug>` → wire `policy-registry.ts`
-4. Run migrate (includes `013` seed if using pilot roles)
+4. Run migrate; seed `latch_roles` / `latch_role_grants` / users as needed for your domain
 5. Add DAL/routes when ready (`lib/jobs/`, `app/api/jobs/`) — jobs store may stay in-memory until Phase 07
 
 ## Improvements backlog
@@ -110,7 +110,7 @@ psql "$DATABASE_URL_DIRECT" -c \
 2. **`BETTER_AUTH_URL` wrong port** — use scaffolded port
 3. **Auth 500** — use `createAuthRouteHandlers(getAuth)` (fixed in template)
 4. **Copied `*.policies.yaml`** — delete; grants are DB-only
-5. **Empty manifests for app roles** — run `013` seed or insert `latch_role_grants`; template preloads from DB
+5. **Empty manifests for app roles** — insert `latch_role_grants` (IAM editor or app-specific seed SQL); template preloads from DB
 6. **Surface YAML old format** — columns need `{ column, type }` objects
 
 ## Related

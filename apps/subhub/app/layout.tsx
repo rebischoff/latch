@@ -1,3 +1,4 @@
+import { AntdRegistry } from "@ant-design/nextjs-registry";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
@@ -14,7 +15,9 @@ type RootLayoutProps = {
 
 const RootLayout = ({ children }: RootLayoutProps) => (
   <html lang="en">
-    <body>{children}</body>
+    <body>
+      <AntdRegistry>{children}</AntdRegistry>
+    </body>
   </html>
 );
 

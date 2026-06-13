@@ -1,6 +1,10 @@
 # SubHub
 
-Latch business app (`subhub`). Platform migrations only — add Surface YAML under `modules/`, then run codegen.
+Latch business app (`subhub`) — service-trades / AV integration CRM on real Postgres.
+
+**Start here:** [`STATUS.md`](./STATUS.md) · **Plan:** [`docs/README.md`](./docs/README.md) · **Tasks:** [`docs/tasks/01-task-index.md`](./docs/tasks/01-task-index.md)
+
+Platform migrations `001`–`012` ship with the template; business DDL from `013+`.
 
 ## Bootstrap
 
