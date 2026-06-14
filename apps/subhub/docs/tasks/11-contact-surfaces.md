@@ -1,5 +1,7 @@
 # 11 — Contact surfaces
 
+> **Status:** Complete (2026-06-13). Next: [12-contact-dal-api.md](./12-contact-dal-api.md).
+
 ## Goal
 
 Surface YAML for contacts and subset lists; codegen + registry.
@@ -26,13 +28,14 @@ Surface YAML for contacts and subset lists; codegen + registry.
 1. `anchorTable: party` for contact surfaces; `employee` for employee detail.
 2. Logical collection fields: `columns: []` with comment pointing to [child-collections.md](../child-collections.md).
 3. Run codegen; fix any migration cross-check mismatches.
-4. Log **L1/L2** in latch-feedback if glue stubs missing.
+4. Omit `created_at` / `updated_at` / `created_by` from Surface Fields unless product requires manifest-gated display ([decisions.md](../decisions.md#decision-row-timestamps-vs-audit--ddl-vs-surface-fields-2026-06-13)).
+5. Log **L1/L2** in latch-feedback if glue stubs missing.
 
 ## Verify (stop gate)
 
-- [ ] `npm run codegen:check -w @latch/subhub` passes
-- [ ] All contact/employee defs in registry
-- [ ] [`../../STATUS.md`](../../STATUS.md) → [12-contact-dal-api.md](./12-contact-dal-api.md)
+- [x] `npm run codegen:check -w @latch/subhub` passes
+- [x] All contact/employee defs in registry
+- [x] [`../../STATUS.md`](../../STATUS.md) → [12-contact-dal-api.md](./12-contact-dal-api.md)
 
 ## Out of scope
 

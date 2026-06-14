@@ -1,5 +1,7 @@
 # 12 — Contact DAL and API
 
+> **Status:** Complete (2026-06-13). Next: [13-contact-ui.md](./13-contact-ui.md).
+
 ## Goal
 
 Hand-written repository for multi-table contacts; explicit `/api/contacts` routes.
@@ -31,11 +33,11 @@ Hand-written repository for multi-table contacts; explicit `/api/contacts` route
 
 ## Verify (stop gate)
 
-- [ ] `GET /api/contacts` returns rows + manifest for granted role
-- [ ] `GET /api/contacts/[id]` 404 when no grant
-- [ ] `GET /api/customers` returns only `customer`-tagged parties
-- [ ] Contract test: forbidden field omission
-- [ ] [`../../STATUS.md`](../../STATUS.md) → [13-contact-ui.md](./13-contact-ui.md)
+- [x] `GET /api/contacts` returns rows + manifest for granted role
+- [x] `GET /api/contacts/[id]` 404 when no grant
+- [x] `GET /api/customers` returns only `customer`-tagged parties
+- [x] Contract test: forbidden field omission
+- [x] [`../../STATUS.md`](../../STATUS.md) → [13-contact-ui.md](./13-contact-ui.md)
 
 ## Out of scope
 

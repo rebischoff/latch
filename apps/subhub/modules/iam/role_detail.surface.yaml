@@ -1,0 +1,49 @@
+# IAM — role catalog + surface bindings + sparse grants (role editor)
+# @see packages/policy/docs/tasks/03-role-editor-surface.md
+id: role_detail
+displayName: Role detail
+anchorTable: latch_roles
+kind: iam
+
+fieldActions:
+  - read
+  - write
+
+surfaceActions:
+  - read
+  - write
+  - delete
+
+tables:
+  - latch_roles
+  - latch_role_surfaces
+  - latch_role_grants
+
+fields:
+  - id: catalog
+    columns:
+      - column: latch_roles.id
+        type: string
+      - column: latch_roles.role_class
+        type: string
+      - column: latch_roles.display_name
+        type: string
+  - id: surface_bindings
+    columns:
+      - column: latch_role_surfaces.surface_id
+        type: string
+      - column: latch_role_surfaces.row_scope
+        type: string
+        nullable: true
+  - id: grants
+    columns:
+      - column: latch_role_grants.surface_id
+        type: string
+      - column: latch_role_grants.field_id
+        type: string
+        nullable: true
+      - column: latch_role_grants.action
+        type: string
+      - column: latch_role_grants.mode
+        type: string
+        nullable: true

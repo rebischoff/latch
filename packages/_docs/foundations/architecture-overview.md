@@ -93,6 +93,14 @@ Module **structure** is also declared in repo (YAML/JSON) and drives **codegen**
 
 Business tables remain normal Postgres tables with standard columns (`created_at`, `updated_at`) — **no** `deleted_at` in v1.
 
+### Decision: row timestamps vs audit (2026-06-13)
+
+**Choice:** `latch_audit` is authoritative for mutation history (who / when / what changed). Row `created_at` / `updated_at` on **business** tables are optional **DDL convenience** for list sort and freshness — not a substitute for audit (and unreliable as the only source in non-`full` audit modes). Platform **IAM catalog** rows (`latch_roles`, sparse grants/bindings) omit row timestamps ([P11](../../policy/docs/tasks/00-decisions-needed.md#p11--role-catalog-shape-uuid--role_class-2026-06-08)). **`created_by`** is deferred until row-scope (`own`) or owner UI needs it.
+
+**Surface YAML:** map timestamp/actor columns to Fields only when the UI/API needs manifest-gated read/write; default is omit (avoids accidental PATCH of metadata).
+
+**Rationale:** Separates audit trail from denormalized read optimization; keeps IAM surfaces aligned with Phase 03 sketches and P11.
+
 ## Global options (platform config)
 
 Central defaults (database-per-company, RBAC union, Drizzle, audit retention, manifest via RSC, etc.): [global-options.md](./global-options.md).

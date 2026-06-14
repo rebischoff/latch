@@ -1,5 +1,7 @@
 # 14 — Contact child collections
 
+> **Status:** Complete (2026-06-13). Next: Slice 2 — create [15-site-migration.md](./15-site-migration.md) when starting sites.
+
 ## Goal
 
 Phones and emails as logical Fields on `contact_detail` — DAL replace semantics + RHF `useFieldArray`.
@@ -28,11 +30,11 @@ Phones and emails as logical Fields on `contact_detail` — DAL replace semantic
 
 ## Verify (stop gate)
 
-- [ ] Add/edit/remove phone; save; reload shows persisted state
-- [ ] Read-only role sees phones as static text, no add button
-- [ ] Field omitted entirely when no `read` on `phones`
-- [ ] Slice 1 exit: customer list + contact detail with collections works
-- [ ] [`../../STATUS.md`](../../STATUS.md) → Slice 2 task **15** (create `15-site-migration.md` when starting sites)
+- [x] Add/edit/remove phone; save; reload shows persisted state
+- [x] Read-only role sees phones as static text, no add button
+- [x] Field omitted entirely when no `read` on `phones`
+- [x] Slice 1 exit: customer list + contact detail with collections works
+- [x] [`../../STATUS.md`](../../STATUS.md) → Slice 2 task **15** (create `15-site-migration.md` when starting sites)
 
 ## Out of scope
 

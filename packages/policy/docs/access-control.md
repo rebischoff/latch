@@ -54,7 +54,7 @@ Actions (draft): `read`, `write`, `delete`, `restore`, `approve`, `hard_delete`.
 | `latch_role_grants.role_id` | `latch_roles.id` | **CASCADE** |
 | `latch_role_surfaces.role_id` | `latch_roles.id` | **CASCADE** |
 
-**System roles:** Template seeds exactly one `system_data` and one `system_iam` catalog row (**DB-generated UUIDs**, identified by `role_class` via the singleton index; non-deletable via the role editor). Grants for **both** are **synthesized in `PolicyService`** from `role_class` (`system_data` → Surface `kind: business`; `system_iam` → Surface `kind: iam`), not stored as grant rows. Storage, exclusivity, and bootstrap: P4 / P4a / P4b / P11 in [`../../packages/policy/docs/tasks/00-decisions-needed.md`](./tasks/00-decisions-needed.md).
+**System roles:** Template seeds exactly one `system_data` and one `system_iam` catalog row (**DB-generated UUIDs**, identified by `role_class` via the singleton index; **immutable `role_class`**, not deletable — DB triggers + role editor). Grants for **both** are **synthesized in `PolicyService`** from `role_class` (`system_data` → Surface `kind: business`; `system_iam` → Surface `kind: iam`), not stored as grant rows. Storage, exclusivity, and bootstrap: P4 / P4a / P4b / P11 in [`../../packages/policy/docs/tasks/00-decisions-needed.md`](./tasks/00-decisions-needed.md).
 
 **Sparse grants:** New roles need **no** grant rows until configured; missing grants → default deny. Only surfaces the editor touches get `latch_role_surfaces` rows.
 
@@ -62,7 +62,7 @@ Actions (draft): `read`, `write`, `delete`, `restore`, `approve`, `hard_delete`.
 
 **Rationale:** RESTRICT on assignments preserves an explicit, auditable revoke path. CASCADE on definition children avoids orphan grant/binding rows. Template provisioning seeds built-in catalog rows only; pilot app roles are created at runtime (or in `apps/spike_policy` fixture seeds for tests).
 
-Canonical parking-lot detail: [`../../packages/policy/docs/tasks/00-decisions-needed.md`](./tasks/00-decisions-needed.md) (P1, P2, P2a, P3, P4, P4a, P4b).
+Canonical parking-lot detail: [`../../packages/policy/docs/tasks/00-decisions-needed.md`](./tasks/00-decisions-needed.md) (P1, P2, P2a, P3, P4, P4a, P4b, P4c).
 
 ### Decision: built-in roles — synthesis, storage, exclusivity, bootstrap (2026-06-06)
 
@@ -73,7 +73,8 @@ Canonical parking-lot detail: [`../../packages/policy/docs/tasks/00-decisions-ne
 - **Separation of duties.** `system_data` (data plane) ≠ `system_iam` (control plane). Composable on one user; `system_data` alone cannot widen IAM access.
 - **Exclusivity (write-time validation).** `system_data` may not combine with `app` roles (may combine with `system_iam`); `app` roles only when `system_data` absent.
 - **Privileged assignment (2026-06-08).** Assign `system_iam` only if actor holds `system_iam`; assign `system_data` only if actor holds `system_data`; hold both → assign both.
-- **Bootstrap.** Provisioning seeds one initial super admin (both system UUIDs); the assignment DAL refuses to remove the **last** `system_iam` holder; env break-glass (`LATCH_BOOTSTRAP_ADMIN_EMAIL`) assigns `system_iam` when zero holders exist.
+- **Bootstrap.** First admin via app `/setup` wizard (`LATCH_SETUP_KEY` + `login_name` + password) when `latch_users` is empty — not SQL seed ([P4b amendment](./tasks/00-decisions-needed.md#amendment-first-run-setup--db-identity-guards-2026-06-13)). Assignment DAL + DB triggers refuse removing the **last** `system_iam` or `system_data` holder. `role_class` is immutable at the DB.
+- **Identity.** `login_name` is the setup-time login identifier; `login_email` nullable until linked from `party_email`. Login resolves `login_name` or `login_email`.
 
 **Rationale:** One assignment table keeps a single source of truth and a uniform resolver; `role_class` encodes plane + deletability ([P11](./tasks/00-decisions-needed.md#p11--role-catalog-shape-uuid--role_class-2026-06-08)). Synthesizing both removes the bootstrap lockout risk; separation of duties + per-class assignment stop cross-plane escalation. Scoped delegation for non-`system_iam` assigners is deferred to [discussion 09](../../docs/discussions/09-role-delegation-and-scope.md).
 

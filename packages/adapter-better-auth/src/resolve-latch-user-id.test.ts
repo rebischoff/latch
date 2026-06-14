@@ -46,13 +46,51 @@ describe("resolveLatchUserId", () => {
     ).resolves.toBe("seed-admin");
     expect(mockQuery).toHaveBeenNthCalledWith(
       2,
-      expect.stringContaining("login_email = $1"),
+      expect.stringContaining("login_name = $1 OR login_email = $1"),
       ["admin@demo.local"],
+    );
+  });
+
+  it("maps login_name to latch_users.id when subject differs", async () => {
+    mockQuery
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ id: "seed-admin" }] });
+
+    await expect(
+      resolveLatchUserId(pool, {
+        subject: "better-auth-uuid",
+        email: "master",
+      }),
+    ).resolves.toBe("seed-admin");
+    expect(mockQuery).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining("login_name = $1 OR login_email = $1"),
+      ["master"],
+    );
+  });
+
+  it("maps @latch.local credential email back to login_name", async () => {
+    mockQuery
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ id: "seed-admin" }] });
+
+    await expect(
+      resolveLatchUserId(pool, {
+        subject: "better-auth-uuid",
+        email: "master@latch.local",
+      }),
+    ).resolves.toBe("seed-admin");
+    expect(mockQuery).toHaveBeenNthCalledWith(
+      3,
+      expect.stringContaining("login_name = $1 OR login_email = $1"),
+      ["master"],
     );
   });
 
   it("falls back to provider subject when no latch row matches", async () => {
     mockQuery
+      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] });
 

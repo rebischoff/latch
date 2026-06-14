@@ -86,10 +86,10 @@ Phase 02 CRM used `?id=` query params; SubHub uses **path segments** for shareab
 
 | Practice | SubHub usage |
 |----------|----------------|
-| **RSC default** | Shell layout, initial manifest + principal check, redirect unauthenticated users from `(app)` group |
+| **RSC default** | Shell layout, `requireAuth` on private pages, manifest + principal check before DAL |
 | **`'use client'` boundary** | Master-detail interactive shell, forms, React Query provider, Ant Design tree |
 | **`@ant-design/nextjs-registry`** | Wrap root layout — required for Ant Design SSR/hydration |
-| **Route groups** | `(public)` vs `(app)` — home stays public; business routes gated |
+| **Route groups** | `(public)` vs `(private)` — both share root shell; `(private)` gates unauthenticated access |
 | **No catch-all pages** | See above |
 | **Request dedup** | `createResolveContext` already uses React `cache()` — call `resolveContext` once per RSC tree branch |
 | **Server Actions** | Optional for mutations; **prefer REST + React Query** for consistent `{ data, manifest }` responses and cache invalidation |
@@ -97,9 +97,119 @@ Phase 02 CRM used `?id=` query params; SubHub uses **path segments** for shareab
 
 ### Auth gating
 
-- `(app)/layout.tsx`: server checks session; redirect to `/login` or render shell with login modal trigger
-- Public: `(public)/page.tsx`, auth API routes
-- Per-page: still resolve manifest — 404 when Surface not granted (existence hide where appropriate)
+Next.js 16 deprecates `middleware.ts` → **`proxy.ts`**. Proxy is a network boundary (rewrites, redirects, header injection) — **not** SubHub's auth firewall. Do **not** add `proxy.ts` / `middleware.ts` for session checks. Authoritative gating lives in Server Components and the DAL.
+
+| Concern | Where | Mechanism |
+|---------|-------|-----------|
+| Nav chrome (logged in vs out) | Root `layout.tsx` | `isAuthenticated()` → `RootShell`; `router.refresh()` after login/logout |
+| Voluntary login | `UserMenu` (client) | `usePathname()` → `/login?callbackUrl=…` |
+| Session gate (authentication) | Each `(private)` page | `await requireAuth('/explicit/path')` at top of RSC |
+| Authorization (403/404) | Page + DAL | `resolveContext` / manifest — separate from login |
+| Sign-in UI | `(public)/login/page.tsx` | RHF + Better Auth client; not behind private gate |
+
+**Single login entry:** `/login` inline form inside shell — no modal.
+
+**`callbackUrl` sources:**
+
+- **Voluntary:** client builds path from `usePathname()` + query string.
+- **Gate:** server passes explicit href to `requireAuth` (layouts cannot read URL — [Next.js `usePathname`](https://nextjs.org/docs/app/api-reference/functions/use-pathname)).
+- **Sanitize:** `sanitizeCallbackUrl` — same-origin relative paths only (`/…`, not `//…` or absolute URLs). Default when missing: `/`.
+
+**Partial rendering caveat:** root layout session for nav may be stale across client navigations until `router.refresh()`. Data paths still re-check via `requireAuth` / `resolveContext` on each RSC render.
+
+**Optional proxy (out of scope v1):** optimistic cookie-only redirect before render — still requires authoritative check in page/DAL. SubHub defers unless measured need.
+
+```ts
+// lib/require-auth.ts — pattern (illustrative)
+export const requireAuth = async (callbackPath: string) => {
+  if (!(await isAuthenticated())) {
+    redirect(loginHref(callbackPath));
+  }
+};
+
+// app/(private)/settings/page.tsx
+const SettingsPage = async () => {
+  await requireAuth("/settings");
+  return (/* ... */);
+};
+```
+
+Public routes: `(public)/page.tsx`, `(public)/login/page.tsx`, auth API routes.
+
+### Sidebar navigation
+
+Nav merges **public** routes (always), **session** items (authenticated, not Surfaces), and **manifest-filtered** Surface catalog entries — see [task 05](./tasks/05-nav-manifest.md) and [decisions](./decisions.md).
+
+| Practice | Detail |
+|----------|--------|
+| **Grouping** | Chrome (Home, Settings) = top-level `Menu` items. Surface catalog = `type: 'group'` (IAM, Contacts, …). Optional divider between chrome and groups |
+| **Route prefetch** | Sidebar labels use `next/link` (default prefetch on). Avoid `Menu` `onClick` → `router.push` for primary nav — no RSC flight prefetch |
+| **Selection** | `usePathname()` drives Ant Design `Menu` `selectedKeys`; longest-prefix match for nested routes |
+| **Server filter** | `getNavItems(principal)` in RSC root layout; pass serializable props to client `SideNav` |
+| **Data prefetch** | Optional `queryClient.prefetchQuery` on list row hover — separate from route prefetch; add only if lists feel slow |
+
+```tsx
+// SideNav — pattern (illustrative)
+import Link from "next/link";
+
+const items = [
+  { key: "/", icon: <HomeOutlined />, label: <Link href="/">Home</Link> },
+  ...(authenticated
+    ? [{ key: "/settings", icon: <SettingOutlined />, label: <Link href="/settings">Settings</Link> }]
+    : []),
+  { type: "divider" },
+  {
+    type: "group",
+    label: "IAM",
+    children: navSurfaces.iam.map((item) => ({
+      key: item.href,
+      icon: item.icon,
+      label: <Link href={item.href}>{item.label}</Link>,
+    })),
+  },
+];
+```
+
+Master-detail **list rows** may use `<Link href={/contacts/${id}}>` or `router.push` — prefer Link when the target route is static enough to prefetch.
+
+### App header
+
+Global chrome in root `Layout.Header` — **not** a horizontal `Menu`.
+
+| Slot | Component | Notes |
+|------|-----------|-------|
+| Title | `Typography.Title` | App name |
+| Global search | `Input.Search` | Optional v1 stub; flex width adapts |
+| Account / settings | `Dropdown` | Extends `UserMenu`: login, sign out; optional link to `/settings`; theme later |
+
+Session auth lives here. Do not manifest-gate dropdown entries except where a future feature needs it.
+
+### Surface toolbar
+
+Per-route action row at the top of the working area (inside route `layout.tsx` or page). Implemented by **`SurfaceToolbar`** (task **08**). **Not** `Menu mode="horizontal"`.
+
+| Practice | Detail |
+|----------|--------|
+| **Layout** | `Flex` / `Space` + `Button`; optional page-local `Input.Search` on the left |
+| **Gating** | Each action wrapped in `<Can>` — hidden actions omitted from bar **and** overflow menu |
+| **Overflow (Pattern A)** | Actions declare `priority: 'primary' \| 'secondary'`. Primary stays in the bar; secondary moves to a **More** (`⋯`) `Dropdown` when compact or width is tight |
+| **Compact** | Optional `Grid.useBreakpoint()` — icon + `Tooltip` instead of text label on narrow desktop widths |
+| **Scope** | Desktop-only — handle half-screen / narrow windows, not mobile breakpoints |
+
+```tsx
+// SurfaceToolbar — action shape (illustrative)
+type ToolbarAction = {
+  key: string;
+  label: string;
+  icon?: ReactNode;
+  priority: "primary" | "secondary";
+  action: "write" | "delete" /* manifest action for <Can> */;
+  danger?: boolean;
+  onClick: () => void;
+};
+```
+
+First consumer: IAM UI (task **08**). Contacts and later Surfaces reuse the same component.
 
 ---
 
@@ -112,9 +222,10 @@ Phase 02 CRM used `?id=` query params; SubHub uses **path segments** for shareab
 | **`ConfigProvider`** | Theme token overrides once in shell — avoid per-form providers |
 | **Forms** | **Do not** use antd `Form` as the source of truth — use **RHF** + antd inputs as controlled children |
 | **Read-only Fields** | Per Latch alignment: readable ∧ ¬writable → `Typography.Text`, `Descriptions.Item`, or `Input` with `readOnly` + plain styling — **not** `disabled` (disabled grays out and implies non-data) |
-| **Tables** | `Table` for list panes; row click → navigate to `[id]` |
+| **Tables** | `Table` for list panes; row click → `<Link>` to `[id]` (or `router.push` when prefetch is undesirable) |
 | **Responsive** | `readOnly` display can use `Descriptions` column={{ xs:1, lg:2 }}` for multi-column labels on wide viewports |
 | **Icons** | `@ant-design/icons` for nav and toolbar |
+| **Toolbar overflow** | Priority + `Dropdown` (More menu) — not horizontal `Menu`; see [Surface toolbar](#surface-toolbar) |
 
 ---
 
@@ -161,7 +272,7 @@ Each hook knows the **explicit API path** for that surface (not a dynamic URL bu
 | Export | Use |
 |--------|-----|
 | `CapabilitiesProvider` | Wrap detail pane with server-provided manifest |
-| `<Can field action>` | Toolbar buttons, section visibility |
+| `<Can field action>` | Toolbar buttons (`SurfaceToolbar`), section visibility |
 | `<FieldControl>` | Server-safe omission; client sections |
 
 `<SurfaceForm>` is **not shipped yet** — SubHub builds Ant Design + RHF wrappers; consider upstreaming patterns to `@latch/ui-antd` later ([latch-feedback.md](./latch-feedback.md)).

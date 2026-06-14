@@ -1,0 +1,40 @@
+# Contact profile + child collections (phones, emails)
+id: contact_detail
+displayName: Contact detail
+anchorTable: party
+
+fieldActions:
+  - read
+  - write
+
+surfaceActions:
+  - read
+  - write
+  - delete
+
+tables:
+  - party
+  - party_phone
+  - party_email
+
+fields:
+  - id: profile
+    columns:
+      - column: party.id
+        type: string
+      - column: party.kind
+        type: string
+      - column: party.display_name
+        type: string
+      - column: party.legal_name
+        type: string
+        nullable: true
+      - column: party.notes
+        type: string
+        nullable: true
+  - id: phones
+    # logical — DAL maps to party_phone; see docs/child-collections.md
+    columns: []
+  - id: emails
+    # logical — DAL maps to party_email; see docs/child-collections.md
+    columns: []

@@ -3,6 +3,23 @@ export {
   type AuthRouteInput,
 } from "./auth-route.js";
 export {
+  authCredentialLookupKeys,
+  LATCH_AUTH_EMAIL_SUFFIX,
+  toAuthCredentialEmail,
+} from "./latch-credential-keys.js";
+export {
+  hashLatchPassword,
+  verifyLatchPassword,
+} from "./latch-password.js";
+export {
+  signInWithLatchCredentials,
+  type LatchSignInInput,
+} from "./latch-sign-in.js";
+export {
+  latchCredentialsPlugin,
+  type LatchUserCredentialRow,
+} from "./latch-credentials-plugin.js";
+export {
   createBetterAuth,
   type BetterAuthInstance,
   type CreateBetterAuthOptions,

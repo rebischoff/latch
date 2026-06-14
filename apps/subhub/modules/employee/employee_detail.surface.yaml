@@ -1,0 +1,38 @@
+# Employee — party profile + optional latch_users link
+id: employee_detail
+displayName: Employee detail
+anchorTable: employee
+
+fieldActions:
+  - read
+  - write
+
+surfaceActions:
+  - read
+  - write
+  - delete
+
+tables:
+  - employee
+  - party
+
+fields:
+  - id: profile
+    columns:
+      - column: party.id
+        type: string
+      - column: party.kind
+        type: string
+      - column: party.display_name
+        type: string
+      - column: party.legal_name
+        type: string
+        nullable: true
+      - column: party.notes
+        type: string
+        nullable: true
+  - id: account_link
+    columns:
+      - column: employee.latch_user_id
+        type: string
+        nullable: true

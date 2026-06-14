@@ -61,7 +61,7 @@ Opinionated **spine** only ([spine-vs-skin](../../../docs/discussions/00-overvie
 
 | Area | Included | Not included |
 |------|----------|--------------|
-| **Migrations** | Platform chain: `latch_users`, `latch_user_roles`, `latch_roles` (+ `system_data` / `system_iam` seeds), `latch_role_*`, `latch_policy_version`, `latch_scopes`, `latch_audit` + immutability trigger, `latch_app` role, bootstrap super-admin (`system_iam` + `system_data`) | Business tables, fixture data |
+| **Migrations** | Platform chain `001`–`013`: identity, roles, audit, scopes, `latch_app` role, **`013_latch_identity_guards`** (`login_name`, DB triggers, no user seed). `007` no-op. First admin via app `/setup` ([P4b amendment](../../policy/docs/tasks/00-decisions-needed.md#amendment-first-run-setup--db-identity-guards-2026-06-13)). Business DDL from `014+`. | Business tables, app-role persona rosters, fixture data |
 | **Next.js** | Minimal `app/layout.tsx`, `app/page.tsx`, `next.config.ts` (webpack `@latch/*` aliases) | Sidebar, login, domain routes |
 | **lib/** | Stubs: `db.ts`, `audit-bootstrap.ts`, `policy-registry.ts` (empty business registry) | `getPrincipal`, `resolveContext`, store adapters |
 | **modules/** | `README.md` only | `*.surface.yaml`, `generated/` |

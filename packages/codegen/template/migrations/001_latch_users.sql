@@ -5,7 +5,7 @@ BEGIN;
 
 CREATE TABLE IF NOT EXISTS latch_users (
   id           TEXT PRIMARY KEY,
-  display_name TEXT NOT NULL,
+  login_name   TEXT UNIQUE,
   login_email  TEXT UNIQUE,
   created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );

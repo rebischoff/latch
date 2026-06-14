@@ -1,0 +1,28 @@
+# IAM — user profile (editable metadata)
+id: user_detail
+displayName: User detail
+anchorTable: latch_users
+kind: iam
+
+fieldActions:
+  - read
+  - write
+
+surfaceActions:
+  - read
+  - write
+
+tables:
+  - latch_users
+
+fields:
+  - id: profile
+    columns:
+      - column: latch_users.id
+        type: string
+      - column: latch_users.login_name
+        type: string
+        nullable: true
+      - column: latch_users.login_email
+        type: string
+        nullable: true

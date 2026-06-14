@@ -1,0 +1,34 @@
+# IAM — role assignment (Phase 03 / threat T8)
+# @see packages/_docs/phases/03-identity-iam/decisions.md
+id: user_roles_detail
+displayName: User roles
+anchorTable: latch_users
+kind: iam
+
+fieldActions:
+  - read
+  - write
+
+surfaceActions:
+  - read
+  - write
+
+tables:
+  - latch_users
+  - latch_user_roles
+
+fields:
+  - id: profile
+    columns:
+      - column: latch_users.id
+        type: string
+      - column: latch_users.login_name
+        type: string
+        nullable: true
+      - column: latch_users.login_email
+        type: string
+        nullable: true
+  - id: role_assignments
+    columns:
+      - column: latch_user_roles.role_id
+        type: string

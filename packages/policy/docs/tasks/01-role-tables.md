@@ -44,7 +44,7 @@ Add the platform tables that make role definitions runtime data: `latch_roles` (
 
 1. Write DDL + Drizzle schema for all three tables; enforce grant tuple uniqueness and `(role_id, surface_id)` uniqueness on `latch_role_surfaces`.
 2. Seed system catalog rows (`system_data`, `system_iam`); confirm they can't be deleted via the editor (task 03 enforces).
-3. Seed **one initial super-admin** user with both built-ins assigned in `latch_user_roles` (P4b bootstrap); document the `LATCH_BOOTSTRAP_ADMIN_EMAIL` break-glass alongside.
+3. Platform `007` is a no-op (no user seed). Consumer apps implement `/setup` per [P4b amendment](./00-decisions-needed.md#amendment-first-run-setup--db-identity-guards-2026-06-13). Legacy spike fixtures may still seed users for tests.
 4. Confirm `latch_app` (T5) can read grants and bindings; writes go through the audited IAM path only.
 5. *(Fixture, not template)* Update `apps/spike_policy` migration if needed so local harness can optionally seed pilot personas + grants against `spike_codegen` vocabulary.
 

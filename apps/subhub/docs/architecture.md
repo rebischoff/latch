@@ -74,7 +74,9 @@ Every gated request: `getPrincipal` → `resolveContext({ surfaceId, entityId? }
 | `invoice`, `invoice_line`, `schedule_of_value`, `sov_line` | Billing + progress milestones |
 | `purchase_order`, `po_line` | Procurement from job |
 
-Physical DDL lands in numbered migrations (`013+`). Detail ER and column lists evolve in migration task files.
+Physical DDL lands in numbered migrations (`014+` for business tables; `013` = platform identity guards). Detail ER and column lists evolve in migration task files.
+
+**Timestamps:** Business anchors get `created_at` / `updated_at` in DDL for list sort and freshness; IAM catalog tables follow platform P11 (audit only, no row timestamps). Neither belongs in Surface YAML unless manifest-gated UI requires it — see [decisions.md](./decisions.md#decision-row-timestamps-vs-audit--ddl-vs-surface-fields-2026-06-13).
 
 ## Surface catalog
 
@@ -93,14 +95,44 @@ Convention: `{entity}_list` + `{entity}_detail` where both exist. IAM uses platf
 
 Filtered lists (`customer_list`, etc.) share `party` anchor; DAL applies `party_role` filter from list query or surface id.
 
+## Navigation
+
+Three **shell chrome layers** ([decision](./decisions.md)):
+
+```text
+┌──────────┬──────────────────────────────────────────────┐
+│ SideNav  │ App header — title, search, settings ▼       │
+│ (inline  ├──────────────────────────────────────────────┤
+│  Menu)   │ SurfaceToolbar — New | Save | ⋯ More         │
+│          ├──────────────────────────────────────────────┤
+│          │ Page content                                 │
+└──────────┴──────────────────────────────────────────────┘
+```
+
+**Sidebar** merges three sources:
+
+| Source | Gating | Menu shape | Examples |
+|--------|--------|------------|----------|
+| Public | Always | Top-level item | Home `/` |
+| Session chrome | Authenticated | Top-level item | Settings `/settings` |
+| Surface catalog | `resolveContext` per `surfaceId` | `type: 'group'` | IAM → Users, Roles; Contacts → `/contacts` |
+
+**App chrome** (public + session) is not a Latch Surface. **IAM / Contacts groups** are Surfaces — manifest-filtered; omit empty groups server-side.
+
+Static catalog in `lib/nav.ts`; server filter in `lib/nav-server.ts`. Sidebar labels use `next/link` ([routing-and-libraries.md](./routing-and-libraries.md)). Per-page actions use `SurfaceToolbar` with priority + overflow menu (task **08**).
+
 ## App directory shape (target)
 
 ```
 apps/subhub/
   app/
-    (public)/page.tsx
-    (app)/
-      layout.tsx                 # shell: nav, header, auth
+    layout.tsx                   # root shell; isAuthenticated → nav
+    (public)/
+      page.tsx                   # home
+      login/page.tsx             # sign-in (not gated)
+    (private)/
+      layout.tsx                 # passthrough (no pathname redirect)
+      settings/page.tsx          # requireAuth('/settings')
       contacts/
         layout.tsx               # master-detail: list sider + {children}
         page.tsx                 # empty state
@@ -115,16 +147,37 @@ apps/subhub/
     shell/
     form/                        # RHF + Ant Design wrappers
   lib/
+    auth-session.ts              # readBetterAuthSession wrappers
+    auth-utils.ts                # sanitizeCallbackUrl, loginHref
+    require-auth.ts              # requireAuth(callbackPath)
     contacts/                    # descriptor, repository, dal factory
   modules/
     contact/*.surface.yaml
     */generated/
   migrations/
-    001-012                      # platform (shipped)
-    013+                         # business
+    001-013                      # platform (shipped; 013 = identity guards)
+    014+                           # business
 ```
 
-## Dev roles (seed)
+## First-run setup (Slice 0)
+
+Platform migration `013_latch_identity_guards.sql` ships DB guards. Task **09** implements `/setup`:
+
+| Piece | Shape |
+|-------|--------|
+| Gate | No `latch_users` rows and `setup_complete = false` → `/setup` |
+| Form | `LATCH_SETUP_KEY` + **login_name** + password |
+| `latch_users` | `id = gen_random_uuid()::text`; `login_name` unique; `login_email` null until party link |
+| Role assignments | `system_data` + `system_iam` via `role_class` lookup |
+| IAM grants | **None** — `PolicyService` synthesizes for `system_iam` |
+
+**Login:** username or linked `login_email` (`resolveLatchUserId`). **Party link (task 10+):** `employee.latch_user_id` → `party`; user may promote a `party_email` to `login_email` (unique guard).
+
+Platform rule: [P4b amendment](../../../packages/policy/docs/tasks/00-decisions-needed.md#amendment-first-run-setup--db-identity-guards-2026-06-13).
+
+## App roles (future catalog)
+
+Business slices will introduce `role_class = 'app'` rows with sparse grants. Planned names (not seeded in task **09**):
 
 | Role | Typical surfaces |
 |------|------------------|

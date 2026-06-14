@@ -68,6 +68,12 @@ fields:
 
 Codegen today: multi-table glue is **hand-written**; `phones` / `emails` stubs in descriptor + repository.
 
+### Decision: SubHub `contact_detail` implementation (2026-06-13)
+
+**Choice:** Hand-written `contactDetailDescriptor`, `ContactDetailPatchSchema`, and `projectContactDetailRow` live in [`lib/contacts/descriptors.ts`](../lib/contacts/descriptors.ts) (not generated glue). Repository replace helpers: `loadPartyPhones` / `loadPartyEmails`, `replacePartyPhones` / `replacePartyEmails` in [`lib/contacts/repository.ts`](../lib/contacts/repository.ts).
+
+**Rationale:** Codegen emits placeholder `user_id` array elements for empty-column logical Fields (L2). IAM pattern (`user_roles_detail`, `role_detail`) already overrides generated glue in app descriptors; same approach for child collections until collection Field codegen ships.
+
 ### DTO shape (projected)
 
 ```json

@@ -1,5 +1,7 @@
 # 13 — Contact UI
 
+> **Status:** Complete (2026-06-13). Next: [14-contact-child-collections.md](./14-contact-child-collections.md).
+
 ## Goal
 
 `/contacts` master-detail: list in layout, detail at `/contacts/[id]`.
@@ -17,23 +19,23 @@
 | `app/(app)/contacts/[id]/page.tsx` | **Create** |
 | `components/contacts/ContactList.tsx` | **Create** |
 | `components/contacts/ContactDetailForm.tsx` | **Create** — profile fields first |
-| `components/shell/SurfaceToolbar.tsx` | **Create** — reusable toolbar |
+| `components/shell/SurfaceToolbar.tsx` | **Reuse** — from task **08**; add surface-specific actions |
 
 ## Steps
 
 1. **No parallel routes** — list lives in `layout.tsx` ([decisions.md](../decisions.md)).
 2. Row click → `router.push(/contacts/${id})`.
 3. React Query: `useSurfaceList('contact_list')`, `useSurfaceDetail('contact_detail', id)`.
-4. Toolbar: New / Delete / Save from manifest actions.
+4. **`SurfaceToolbar`:** New / Delete / Save from manifest; reuse component from task **08** ([routing-and-libraries.md](../routing-and-libraries.md#surface-toolbar)).
 5. Form grid: multi-column on `lg` breakpoints via Ant `Row`/`Col` or CSS grid.
 6. Optional: `/customers` reuses list component with different query hook + surface id.
 
 ## Verify (stop gate)
 
-- [ ] List loads; clicking row shows detail without full page remount of list
-- [ ] Save PATCH updates profile; manifest returned on response
-- [ ] User without grant gets 404 / `notFound()`
-- [ ] [`../../STATUS.md`](../../STATUS.md) → [14-contact-child-collections.md](./14-contact-child-collections.md)
+- [x] List loads; clicking row shows detail without full page remount of list
+- [x] Save PATCH updates profile; manifest returned on response
+- [x] User without grant gets 404 / `notFound()`
+- [x] [`../../STATUS.md`](../../STATUS.md) → [14-contact-child-collections.md](./14-contact-child-collections.md)
 
 ## Out of scope
 

@@ -19,7 +19,7 @@ import { __APP_REGISTRY__ } from "./policy-registry.js";
 let authInstance: ReturnType<typeof createBetterAuth> | undefined;
 
 export const getAuth = (): ReturnType<typeof createBetterAuth> => {
-  authInstance ??= createBetterAuth();
+  authInstance ??= createBetterAuth({ pool: getPool });
   return authInstance;
 };
 

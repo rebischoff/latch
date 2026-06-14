@@ -1,0 +1,25 @@
+# Customers — party subset filtered by party_role.customer (DAL)
+id: customer_list
+displayName: Customer list
+anchorTable: party
+
+fieldActions:
+  - read
+  - write
+
+surfaceActions:
+  - read
+
+tables:
+  - party
+  - party_role
+
+fields:
+  - id: summary
+    columns:
+      - column: party.id
+        type: string
+      - column: party.display_name
+        type: string
+      - column: party.kind
+        type: string

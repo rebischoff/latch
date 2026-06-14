@@ -4,17 +4,18 @@ Latch business app (`subhub`) — service-trades / AV integration CRM on real Po
 
 **Start here:** [`STATUS.md`](./STATUS.md) · **Plan:** [`docs/README.md`](./docs/README.md) · **Tasks:** [`docs/tasks/01-task-index.md`](./docs/tasks/01-task-index.md)
 
-Platform migrations `001`–`012` ship with the template; business DDL from `013+`.
+Platform migrations `001`–`013` ship with the template (`013` = identity DB guards); business DDL from `014+`.
 
 ## Bootstrap
 
 1. `npm install` (repo root — links this workspace)
-2. `cp .env.example .env.local` — set `DATABASE_URL`, `AUTH_SECRET`, `LATCH_APP_ROLE_PASSWORD` (required on Neon); `BETTER_AUTH_URL` must match port **3003**
+2. `cp .env.example .env.local` — set `DATABASE_URL`, `AUTH_SECRET`, `LATCH_APP_ROLE_PASSWORD` (required on Neon), `LATCH_SETUP_KEY`; `BETTER_AUTH_URL` must match port **3003**
 3. `npm run db:migrate -w @latch/subhub` (or `node scripts/db-migrate.mjs --dir=apps/subhub` from repo root)
 4. Add `*.surface.yaml` under `modules/`, then `npm run codegen -w @latch/subhub`
 5. `npm run dev -w @latch/subhub` (port **3003**)
+6. Open `/setup` — install token + **login_name** + password (task **09**)
 
-See [scaffold runbook](../../packages/codegen/docs/scaffold-runbook.md) for DB reset, verify steps, and lifting domain from `fixtures/crm-proof/`.
+See [09-dev-roles-seed.md](./docs/tasks/09-dev-roles-seed.md) and [scaffold runbook](../../packages/codegen/docs/scaffold-runbook.md#first-run-setup).
 
 ## GitHub
 

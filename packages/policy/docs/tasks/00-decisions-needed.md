@@ -145,13 +145,36 @@ Catalog rows for both stay template-seeded with fixed UUIDs and `role_class` `sy
 
 **Choice:**
 
-1. **Provision seed.** Each per-company DB is provisioned from the migration template; that step seeds **exactly one** user assigned **both** system catalog rows (`system_data` + `system_iam` UUIDs from [P11](#p11--role-catalog-shape-uuid--role_class-2026-06-08)) — the initial super admin. Deterministic, audited, no race.
-2. **Last-admin protection.** The assignment DAL refuses any revoke/replace that would leave **zero** users with an assigned `system_iam` row. This is the primary anti-lockout rule.
-3. **Break-glass (defense in depth).** An env-gated bootstrap (`LATCH_BOOTSTRAP_ADMIN_EMAIL`) assigns the `system_iam` catalog UUID on login **only when the DB currently has zero `system_iam` holders**. Because `system_iam` is synthesized (P4), the promoted user is immediately functional with no grant rows. Avoid "first user to sign up becomes admin" outside local/dev (race + internet-facing footgun).
+1. **Provision seed (legacy spike / operator).** Per-company DBs provisioned before the setup-wizard template may still seed one super-admin in SQL. **Scaffolded business apps (2026-06-13+):** zero users after migrate; first admin via `/setup` — see [amendment](#amendment-first-run-setup--db-identity-guards-2026-06-13).
+2. **Last-admin protection.** The assignment DAL and DB triggers refuse any revoke/delete that would leave **zero** holders of `system_iam` or `system_data`.
+3. **Break-glass (optional).** Env-gated `LATCH_BOOTSTRAP_ADMIN_EMAIL` — optional operator recovery; not the primary path for new apps.
 
 **Rationale:** Provisioning is the natural, auditable place to mint the first admin; the last-admin invariant prevents the most common self-inflicted lockout; break-glass guarantees recovery even if the seed is skipped, leaning on built-in synthesis so recovery needs no data repair.
 
 **Status:** Locked. Task 01 seeds the super-admin; assignment DAL adds the last-`system_iam` guard; break-glass env documented with the seed.
+
+#### Amendment: first-run setup + DB identity guards (2026-06-13)
+
+**Choice:** **Supersedes P4b provision seed + P4c SQL dev user for scaffolded business apps.**
+
+| Layer | What ships |
+|-------|------------|
+| Platform `001`–`012` | System catalog (`system_data`, `system_iam` in `003`); **no users** (`007` no-op) |
+| Platform `013_latch_identity_guards` | `login_name` on `latch_users`; `setup_complete` on `latch_app_config`; DB triggers: immutable `role_class`, system catalog rows not deletable, last `system_data` / `system_iam` holder not revocable |
+| Consumer app (e.g. SubHub task **09**) | `/setup` wizard: `LATCH_SETUP_KEY` + `login_name` + password → first user + both system role assignments |
+| App `014+` | Business DDL only |
+
+**Identity:** `login_name` is the primary login identifier at setup. `login_email` stays nullable until linked from `party_email` (1:1 `employee.latch_user_id` → party). Login accepts **username or linked email** (`resolveLatchUserId`).
+
+**Lockout:** DB triggers + DAL `assertNotLastSystemRoleHolder` mirror each other. `LATCH_BOOTSTRAP_ADMIN_EMAIL` is **not** the primary bootstrap for new apps — optional operator recovery only.
+
+**Do not:** SQL seed of users; persona rosters; sparse IAM grant seeds in migrate.
+
+**Status:** Locked. Runbook: [`scaffold-runbook.md`](../../../codegen/docs/scaffold-runbook.md#first-run-setup). Reference app: [`apps/subhub`](../../../../apps/subhub/).
+
+#### Amendment: app dev seed — single master user, no persona roster (2026-06-13) — **superseded**
+
+**Superseded by** [first-run setup amendment](#amendment-first-run-setup--db-identity-guards-2026-06-13) (2026-06-13). Do not add `013_*_dev_master.sql` SQL user seeds in new apps.
 
 ---
 
@@ -172,7 +195,7 @@ Catalog rows for both stay template-seeded with fixed UUIDs and `role_class` `sy
 - **No `slug` column** — uniqueness is the UUID; the role editor does not mint string keys.
 - **No `created_at` on catalog rows** — mutation times live in `latch_audit` (and related IAM audit), not duplicated on the catalog.
 - **Singleton system rows:** at most one row per `role_class IN ('system_data', 'system_iam')` (partial unique index).
-- **Deletability:** `role_class = 'app'` only, and only when no assignments remain (`RESTRICT`). System rows are not deletable via the role editor.
+- **Deletability:** `role_class = 'app'` only, and only when no assignments remain (`RESTRICT`). System rows are not deletable (`BEFORE DELETE` trigger + role editor). **`role_class` is immutable** (`BEFORE UPDATE` trigger).
 - **Synthesis:** `PolicyService` keys off assigned catalog `role_class` (join or preload), not string role constants in the DB — `system_data` → business-surface wildcard; `system_iam` → IAM-surface wildcard.
 - **FKs:** `latch_user_roles.role_id`, `latch_role_grants.role_id`, `latch_role_surfaces.role_id` → `latch_roles.id` (`UUID`).
 

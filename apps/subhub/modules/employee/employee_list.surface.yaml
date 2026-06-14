@@ -1,0 +1,27 @@
+# Employees — party subset with latch user link
+id: employee_list
+displayName: Employee list
+anchorTable: party
+
+fieldActions:
+  - read
+  - write
+
+surfaceActions:
+  - read
+
+tables:
+  - party
+  - employee
+  - party_role
+
+fields:
+  - id: summary
+    columns:
+      - column: party.id
+        type: string
+      - column: party.display_name
+        type: string
+      - column: employee.latch_user_id
+        type: string
+        nullable: true

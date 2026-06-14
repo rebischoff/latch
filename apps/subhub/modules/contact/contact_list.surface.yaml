@@ -1,0 +1,24 @@
+# Contacts — all parties (nav gate + table projection)
+id: contact_list
+displayName: Contact list
+anchorTable: party
+
+fieldActions:
+  - read
+  - write
+
+surfaceActions:
+  - read
+
+tables:
+  - party
+
+fields:
+  - id: summary
+    columns:
+      - column: party.id
+        type: string
+      - column: party.display_name
+        type: string
+      - column: party.kind
+        type: string

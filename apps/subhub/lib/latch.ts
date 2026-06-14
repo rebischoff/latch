@@ -13,13 +13,14 @@ import { principalRoleIds, type PolicyScope, type SurfaceId } from "@latch/contr
 import { PolicyService } from "@latch/policy";
 import { headers } from "next/headers";
 
+import { minPasswordLength } from "./auth-password.js";
 import { getConnections, getPool } from "./db.js";
 import { subhubRegistry } from "./policy-registry.js";
 
 let authInstance: ReturnType<typeof createBetterAuth> | undefined;
 
 export const getAuth = (): ReturnType<typeof createBetterAuth> => {
-  authInstance ??= createBetterAuth();
+  authInstance ??= createBetterAuth({ minPasswordLength, pool: getPool });
   return authInstance;
 };
 

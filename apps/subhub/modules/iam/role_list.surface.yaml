@@ -1,0 +1,25 @@
+# IAM — role catalog list (nav gate + table projection)
+id: role_list
+displayName: Role list
+anchorTable: latch_roles
+kind: iam
+
+fieldActions:
+  - read
+  - write
+
+surfaceActions:
+  - read
+
+tables:
+  - latch_roles
+
+fields:
+  - id: summary
+    columns:
+      - column: latch_roles.id
+        type: string
+      - column: latch_roles.role_class
+        type: string
+      - column: latch_roles.display_name
+        type: string

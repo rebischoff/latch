@@ -60,6 +60,10 @@ fields:
 
 When `nullable: true`, the generator appends `.nullable()` (e.g. `z.string().nullable()`). Omitted or false → non-nullable in the base schema.
 
+### Decision: audit-metadata columns — DDL vs Surface Fields (2026-06-13)
+
+**Choice:** A column may exist in migration DDL without appearing in `*.surface.yaml`. **`latch_audit`** is authoritative for mutation history. Row `created_at` / `updated_at` on business anchors are DDL convenience for list sort; platform IAM catalog omits row timestamps ([P11](../../../policy/docs/tasks/00-decisions-needed.md#p11--role-catalog-shape-uuid--role_class-2026-06-08)). Default: **do not** map `created_at`, `updated_at`, or `created_by` to Fields unless manifest-gated UI requires it — avoids writable PATCH metadata. Canonical: [architecture-overview](../../../docs/foundations/architecture-overview.md#decision-row-timestamps-vs-audit-2026-06-13).
+
 ### Decision: `requires_verification` on Field (2026-06-03)
 
 **Choice:** Optional `requires_verification: true` on a Field in `*.surface.yaml`. Codegen emits `${SurfacePascal}VerificationFieldIds` (tuple of Field ids) and `${SurfacePascal}VerificationFieldId` in `generated/<surface>.schema.generated.ts`. Omitted or false → Field is not listed in the constant.

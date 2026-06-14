@@ -1,0 +1,27 @@
+# IAM — user list (nav gate + table projection)
+id: user_list
+displayName: User list
+anchorTable: latch_users
+kind: iam
+
+fieldActions:
+  - read
+  - write
+
+surfaceActions:
+  - read
+
+tables:
+  - latch_users
+
+fields:
+  - id: summary
+    columns:
+      - column: latch_users.id
+        type: string
+      - column: latch_users.login_name
+        type: string
+        nullable: true
+      - column: latch_users.login_email
+        type: string
+        nullable: true

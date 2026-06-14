@@ -34,7 +34,7 @@ flowchart TD
   d05 --> d06[06 IAM surfaces]
   d06 --> d07[07 IAM DAL API]
   d07 --> d08[08 IAM UI]
-  d08 --> d09[09 dev roles seed]
+  d08 --> d09[09 first-run setup]
   d09 --> d10[10 party migration]
   d10 --> d11[11 contact surfaces]
   d11 --> d12[12 contact DAL API]
@@ -46,18 +46,18 @@ flowchart TD
 
 ## Slice 00 — App shell
 
-**Exit criteria:** Log in, nav shows only permitted surfaces, IAM users/roles CRUD for admin.
+**Exit criteria:** Complete `/setup`; log in with `login_name`; nav shows permitted Surfaces; IAM users/roles CRUD for master (`system_iam`).
 
 | # | Task | Delivers |
 |---|------|----------|
 | 02 | [02-ui-dependencies.md](./02-ui-dependencies.md) | antd, RHF, React Query, registry |
 | 03 | [03-app-shell-layout.md](./03-app-shell-layout.md) | `(public)` / `(app)` groups, sidebar shell |
-| 04 | [04-auth-entry.md](./04-auth-entry.md) | Login modal + `/login` inline |
-| 05 | [05-nav-manifest.md](./05-nav-manifest.md) | Manifest-driven nav config |
+| 04 | [04-auth-entry.md](./04-auth-entry.md) | `/login` (public); `requireAuth(path)` gate; `callbackUrl`; no proxy |
+| 05 | [05-nav-manifest.md](./05-nav-manifest.md) | Sidebar: chrome flat + Surface groups; `next/link`; app header / page toolbar documented |
 | 06 | [06-iam-surfaces.md](./06-iam-surfaces.md) | IAM `*.surface.yaml` |
 | 07 | [07-iam-dal-api.md](./07-iam-dal-api.md) | IAM DAL + explicit API routes |
-| 08 | [08-iam-ui.md](./08-iam-ui.md) | Users + roles master-detail pages |
-| 09 | [09-dev-roles-seed.md](./09-dev-roles-seed.md) | `013_dev_roles.sql` + test users |
+| 08 | [08-iam-ui.md](./08-iam-ui.md) | Users + roles master-detail; `SurfaceToolbar` (priority + overflow) |
+| 09 | [09-dev-roles-seed.md](./09-dev-roles-seed.md) | `/setup` wizard — `login_name` + token; platform `013` identity guards |
 
 ---
 

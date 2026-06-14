@@ -1,5 +1,7 @@
 # 07 — IAM DAL and API
 
+> **Status:** Complete (2026-06-13). Next: [08-iam-ui.md](./08-iam-ui.md).
+
 ## Goal
 
 DAL get/list/patch for IAM surfaces; explicit API routes under `api/iam/`.
@@ -30,11 +32,11 @@ DAL get/list/patch for IAM surfaces; explicit API routes under `api/iam/`.
 
 ## Verify (stop gate)
 
-- [ ] Admin `GET /api/iam/users` returns rows + manifest
-- [ ] Non-admin `GET` returns 404
-- [ ] `PATCH` role grants persists to `latch_role_grants`
-- [ ] No raw `db` imports in `app/api/**`
-- [ ] [`../../STATUS.md`](../../STATUS.md) → [08-iam-ui.md](./08-iam-ui.md)
+- [x] Admin `GET /api/iam/users` returns rows + manifest
+- [x] Non-admin `GET` returns 404
+- [x] `PATCH` role grants persists to `latch_role_grants`
+- [x] No raw `db` imports in `app/api/**`
+- [x] [`../../STATUS.md`](../../STATUS.md) → [08-iam-ui.md](./08-iam-ui.md)
 
 ## Out of scope
 

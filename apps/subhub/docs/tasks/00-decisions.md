@@ -29,7 +29,7 @@ Planning session complete (2026-06-12).
 5. Ant Design + RHF + TanStack Query; desktop-only.
 6. Child collections as logical Fields with array PATCH (replace semantics).
 7. Line-item snapshots on estimate → job → invoice.
-8. SQL-first persistence; migrations `013+` for business DDL.
+8. SQL-first persistence; migrations `014+` for business DDL (`013` = platform identity guards).
 
 ## Verify (stop gate)
 
