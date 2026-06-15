@@ -9,14 +9,14 @@ import { z } from "zod";
 
 import { RhfInput } from "@/components/form/RhfInput";
 import { RhfPassword } from "@/components/form/RhfPassword";
-import { passwordFieldSchema } from "@/lib/auth-password";
+import { loginPasswordFieldSchema } from "@/lib/auth-password";
 import {
   sanitizeCallbackUrl,
 } from "@/lib/auth-utils";
 
 const loginSchema = z.object({
   identifier: z.string().min(1, "Enter your login name or email"),
-  password: passwordFieldSchema(),
+  password: loginPasswordFieldSchema(),
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;

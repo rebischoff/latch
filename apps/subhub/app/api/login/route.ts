@@ -3,12 +3,12 @@ import { z } from "zod";
 
 import { signInWithLatchCredentials } from "@latch/adapter-better-auth";
 
-import { passwordFieldSchema } from "@/lib/auth-password";
+import { loginPasswordFieldSchema } from "@/lib/auth-password";
 import { getAuth, getPool } from "@/lib/latch";
 
 const loginBodySchema = z.object({
   identifier: z.string().min(1, "Enter your login name or email"),
-  password: passwordFieldSchema(),
+  password: loginPasswordFieldSchema(),
   rememberMe: z.boolean().optional(),
 });
 
