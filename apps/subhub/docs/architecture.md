@@ -44,17 +44,23 @@ Every gated request: `getPrincipal` → `resolveContext({ surfaceId, entityId? }
 | Table | Purpose |
 |-------|---------|
 | `party` | Person or organization — anchor for contacts |
-| `party_role` | Tags: `customer`, `vendor`, `manufacturer`, `employee` |
+| `party_role` | Master tags: `customer`, `vendor`, `manufacturer`, `employee`, `property_owner`, `other` |
 | `party_phone`, `party_email` | Child collections |
-| `employee` | `party_id` + optional `latch_user_id` |
+| `party_location` | `party_id` + `location_id` + `purpose` (billing, hq, …) |
+| `employee` | `party_id` + optional `latch_user_id` *(generalized → `party_user` in a future slice)* |
 
-### Sites
+### Sites and locations
 
 | Table | Purpose |
 |-------|---------|
-| `site` | Location / address |
-| `site_system` | Systems at site |
-| `site_contact` | `site_id` + `party_id` + relation |
+| `site` | Logical place; optional `parent_site_id` hierarchy |
+| `location` | Normalized address (manual entry v1; verification deferred) |
+| `site_location` | `site_id` + `location_id` + `purpose` |
+| `party_location` | `party_id` + `location_id` + `purpose` |
+| `site_contact_relation` | Catalog of standing-contact roles at a site |
+| `site_contact` | `site_id` + `party_id` + `relation_id` |
+
+`job_location` (*job slice*) attaches a `location` to a specific job work area. Installed systems at a site (*catalog slice*) — tied to items/parts, not `site_system` in Slice 2.
 
 ### Catalog
 
@@ -69,7 +75,8 @@ Every gated request: `getPrincipal` → `resolveContext({ surfaceId, entityId? }
 | Table | Purpose |
 |-------|---------|
 | `estimate`, `estimate_line` | Quote with snapshot lines |
-| `job`, `job_line`, `job_line_progress` | Exploded BOM from estimate; per-line progress |
+| `job`, `job_party`, `job_location` | Work at a `site`; per-job stakeholders; work-area address |
+| `job_line`, `job_line_progress` | Exploded BOM from estimate; per-line progress |
 | `change_order`, `change_order_line` | Job deltas |
 | `invoice`, `invoice_line`, `schedule_of_value`, `sov_line` | Billing + progress milestones |
 | `purchase_order`, `po_line` | Procurement from job |
@@ -77,6 +84,12 @@ Every gated request: `getPrincipal` → `resolveContext({ surfaceId, entityId? }
 Physical DDL lands in numbered migrations (`014+` for business tables; `013` = platform identity guards). Detail ER and column lists evolve in migration task files.
 
 **Timestamps:** Business anchors get `created_at` / `updated_at` in DDL for list sort and freshness; IAM catalog tables follow platform P11 (audit only, no row timestamps). Neither belongs in Surface YAML unless manifest-gated UI requires it — see [decisions.md](./decisions.md#decision-row-timestamps-vs-audit--ddl-vs-surface-fields-2026-06-13).
+
+## Entity flow
+
+How business entities **link** across slices (relationship map — not a duplicate of the table list above). **Solid** = implemented (Slice 1) or created in task **17** migration; **dashed** = deferred (later slices or [decisions.md](./decisions.md)).
+
+> **In progress (task 15):** diagram and task-17 vs later-slices table follow in steps 2–5. Step 1 locked in [15-entity-flow.md](./tasks/15-entity-flow.md#step-1--section-placement-2026-06-15-).
 
 ## Surface catalog
 

@@ -1,7 +1,7 @@
 # STATUS — SubHub
 
 > App-local quarterback. Platform pointer: [`../../STATUS.md`](../../STATUS.md).
-> Updated: 2026-06-13.
+> Updated: 2026-06-15.
 
 - **Package:** `@latch/subhub` · **Port:** 3003
 - **Docs:** [`docs/README.md`](./docs/README.md) · **Tasks:** [`docs/tasks/01-task-index.md`](./docs/tasks/01-task-index.md)
@@ -9,7 +9,7 @@
 
 ## Right now — do this next
 
-**Slice 2 — Sites** — create [`15-site-migration.md`](./docs/tasks/15-site-migration.md) and implement `site`, `site_system`, `site_contact` DDL (see [01-task-index.md](./docs/tasks/01-task-index.md#slice-02--sites)).
+**Slice 2 — task 15** — entity flow sketch per [`15-entity-flow.md`](./docs/tasks/15-entity-flow.md) (docs only; then **16** planning gate, then **17** migration).
 
 ## Blockers
 
@@ -21,7 +21,7 @@ None.
 |-------|--------|-------|
 | [00 — App shell](./docs/tasks/01-task-index.md#slice-00--app-shell) | Layout, nav, auth, IAM surfaces | complete (tasks 04–09) |
 | [01 — Party / contacts](./docs/tasks/01-task-index.md#slice-01--party--contacts) | `party` model, phones/emails, subsets | **complete** (tasks 10–14) |
-| [02 — Sites](./docs/tasks/01-task-index.md#slice-02--sites) | Locations, systems, site contacts | **next** (task 15+) |
+| [02 — Sites](./docs/tasks/01-task-index.md#slice-02--sites) | Sites, locations, site contacts | **next** (tasks [15](./docs/tasks/15-entity-flow.md) → [16](./docs/tasks/16-slice2-planning-gate.md) → [17](./docs/tasks/17-site-migration.md)) |
 | [03 — Catalog](./docs/tasks/01-task-index.md#slice-03--catalog) | Parts, items, vendor pricing | planned |
 | [04 — Estimates](./docs/tasks/01-task-index.md#slice-04--estimates) | Sales quotes + line items | planned |
 | [05 — Jobs](./docs/tasks/01-task-index.md#slice-05--jobs--change-orders) | BOM explosion, progress, COs | planned |

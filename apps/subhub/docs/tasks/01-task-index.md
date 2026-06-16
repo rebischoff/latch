@@ -20,6 +20,7 @@ Orient the SubHub delivery slices and task chain. Global status: [`../../STATUS.
   → 06-iam-surfaces → 07-iam-dal-api → 08-iam-ui → 09-dev-roles-seed
   → 10-party-migration → 11-contact-surfaces → 12-contact-dal-api
   → 13-contact-ui → 14-contact-child-collections
+  → 15-entity-flow → 16-slice2-planning-gate → 17-site-migration
   → (slice 2+ — see below)
 ```
 
@@ -77,13 +78,27 @@ flowchart TD
 
 ## Slice 02 — Sites
 
-**Exit criteria:** Sites with systems and linked contacts.
+**Exit criteria:** Sites with locations (site + party attachments) and linked contacts (relation catalog).
 
 | # | Task | Delivers |
 |---|------|----------|
-| 15 | *TBD* `15-site-migration.md` | `site`, `site_system`, `site_contact` |
-| 16 | *TBD* `16-site-surfaces.md` | `site_list`, `site_detail` |
-| 17 | *TBD* `17-site-dal-api-ui.md` | DAL, API, `/sites` UI |
+| 15 | [15-entity-flow.md](./15-entity-flow.md) | Cross-slice entity flow in `architecture.md` (docs only) |
+| 16 | [16-slice2-planning-gate.md](./16-slice2-planning-gate.md) | Lock Slice 2 open choices; align task 17 before DDL |
+| 17 | [17-site-migration.md](./17-site-migration.md) | `location`, `site`, junctions, `site_contact_relation`, `site_contact`; `party_role` expand |
+| 18 | *TBD* `18-site-surfaces.md` | `site_list`, `site_detail` |
+| 19 | *TBD* `19-site-dal-api-ui.md` | DAL, API, `/sites` UI |
+| 20 | *TBD* | `party_location` on `contact_detail` — **only if** task 16 chooses follow-up path |
+
+**Deferred (documented, not Slice 2):** `job` / `job_party` / `job_location` → Slice 5; `party_user` / `user_class` → future identity slice ([decisions.md](../decisions.md)).
+
+```mermaid
+flowchart LR
+  t15[15 entity flow] --> t16[16 planning gate]
+  t16 --> t17[17 migration]
+  t17 --> t18[18 surfaces]
+  t18 --> t19[19 DAL and UI]
+  t16 -.->|optional| t20[20 party_location]
+```
 
 ---
 
@@ -93,7 +108,7 @@ flowchart TD
 
 | # | Task | Delivers |
 |---|------|----------|
-| 18–20 | *TBD* | `manufacturer_part`, `item`, surfaces, UI |
+| 21–23 | *TBD* | `manufacturer_part`, `item`, surfaces, UI |
 
 ---
 
@@ -103,7 +118,7 @@ flowchart TD
 
 | # | Task | Delivers |
 |---|------|----------|
-| 21–23 | *TBD* | `estimate`, `estimate_line`, UI |
+| 24–26 | *TBD* | `estimate`, `estimate_line`, UI |
 
 ---
 
@@ -113,7 +128,7 @@ flowchart TD
 
 | # | Task | Delivers |
 |---|------|----------|
-| 24–27 | *TBD* | `job`, `job_line`, `change_order`, UI |
+| 27–30 | *TBD* | `job`, `job_line`, `change_order`, UI |
 
 ---
 
@@ -123,7 +138,7 @@ flowchart TD
 
 | # | Task | Delivers |
 |---|------|----------|
-| 28–30 | *TBD* | `invoice`, `purchase_order`, SOV simplified |
+| 31–33 | *TBD* | `invoice`, `purchase_order`, SOV simplified |
 
 ---
 
@@ -133,7 +148,7 @@ flowchart TD
 
 | # | Task | Delivers |
 |---|------|----------|
-| 31 | *TBD* | Read-only report pages (custom SQL) |
+| 34 | *TBD* | Read-only report pages (custom SQL) |
 
 ---
 

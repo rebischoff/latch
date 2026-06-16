@@ -132,6 +132,19 @@ const { fields, append, remove } = useFieldArray({ control, name: "phones" });
 
 **Validation:** element schema from codegen patch schema; resolver surfaces per-row errors.
 
+## Site collections (`site_detail` — Slice 2)
+
+Same replace-on-save pattern for child collections on `site_detail`:
+
+| Field id | Child table | Notes |
+|----------|-------------|-------|
+| `locations` | `site_location` + joined `location` | Nested DTO: `purpose` + address fields — see [purpose examples](./decisions.md#decision-location-attachments-2026-06-15) |
+| `contacts` | `site_contact` + `site_contact_relation` | `party_id`, `relation_id` (display name from catalog) |
+
+`party_location` on `contact_detail` (Slice 2+) — same pattern for billing/HQ addresses.
+
+Installed systems at a site deferred to catalog slice (items/parts linkage), not `site_detail` collections.
+
 ## Line items (estimates, jobs, invoices)
 
 Same pattern at larger scale:
@@ -169,4 +182,5 @@ Log in [latch-feedback.md](./latch-feedback.md):
 ## Tasks
 
 - Slice 1 task **14** — implement phones/emails on `contact_detail` ([01-task-index.md](./tasks/01-task-index.md))
+- Slice 2 task **18+** — `site_detail` collections ([17-site-migration.md](./tasks/17-site-migration.md))
 - Slice 4+ — line items on estimate/job surfaces

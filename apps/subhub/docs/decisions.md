@@ -44,6 +44,8 @@ _None._
 
 **Choice:** One `party` table (`kind`: `person` \| `organization`) with `party_role` tags (`customer`, `vendor`, `manufacturer`, `employee`). Subset list Surfaces filter by role; one `contact_detail` Surface for CRUD.
 
+**Amended (2026-06-15):** Master role enum expanded and split from job-scoped relations — see [party_role master tags vs job-scoped relations](#decision-party_role-master-tags-vs-job-scoped-relations-2026-06-15).
+
 **Rationale:** Avoids duplicate CRUD across Customer/Vendor/Manufacturer tables; matches “subset of contacts” language.
 
 ### Decision: explicit routes — no catch-all surface pages or APIs (2026-06-12)
@@ -159,3 +161,156 @@ _None._
 | **Surface YAML** | Map a column to a Field only when the UI/API needs it **and** manifest should gate read/write. Do **not** expose audit-metadata (`created_at`, `created_by`) on IAM surfaces; omit on business surfaces unless product requires manifest-gated display. |
 
 **Rationale:** Audit and row timestamps answer different questions; lighter audit modes (`standard`, `recovery`) do not always record enough on `insert` to replace `created_at` for list UX. Surface Fields add patch surface area — metadata columns should not be writable via PATCH unless explicitly intended.
+
+### Decision: party_role master tags vs job-scoped relations (2026-06-15)
+
+**Choice:** Two layers — do not overload `party_role` with job context.
+
+| Layer | Table | Purpose |
+|-------|-------|---------|
+| **Master tags** | `party_role` | Address-book classification; drives filtered list Surfaces; **editable** on `contact_detail` (logical Field, multi-select) |
+| **Job stakeholders** | `job_party` *(job slice)* | Per-job counterparty graph: customer, owner, bill-to, GC, sub chain, etc. |
+
+**Master `party_role` enum (v1):** `customer`, `vendor`, `manufacturer`, `employee`, `property_owner`, `other`.
+
+- **Not** master tags: `general_contractor`, `subcontractor` — express these on `job_party` (the GC may *also* be tagged `customer` in the address book).
+- **`employee`** remains a master tag for internal staff; IAM login linkage stays on `employee.latch_user_id` until the [party identity slice](#decision-party-identity--party_user--user_class-deferred-2026-06-15) lands.
+
+**Rationale:** Same site can host jobs with different customer/owner graphs (e.g. GC on one job, building owner direct on another). Master tags answer “who is this party to us generally?”; job relations answer “who plays which part on *this* engagement?”
+
+### Decision: site vs location — separate entities (2026-06-15)
+
+**Choice:** **`site`** = logical place (portfolio, campus, property, job site). **`location`** = normalized physical address / geocode record. Link via junction tables — **do not** embed address columns on `site`.
+
+| Entity | Holds |
+|--------|--------|
+| `site` | `name`, optional `parent_site_id` (hierarchy) — no inline `notes` ([shared notes](#decision-notes-and-attachments-shared-tables-deferred-2026-06-15)) |
+| `location` | Address lines, `city`, `state`, `postal_code`, `country`, optional `lat`/`lng`, `label` — manual entry in v1 |
+
+**Rationale:** One address row can attach to a site, a party, and (later) a job work area without duplication. Site hierarchy supports portfolio → building → wing without conflating “where on the map” with “what we call this place in the business.”
+
+### Decision: location attachments (2026-06-15)
+
+**Choice:** `location` is shared; context is on junction rows with a **`purpose`** column — the **role of that address in this link**, not a description of the place (use `location.label` for “Suite 1200”, “Loading dock B”, etc.).
+
+| Junction | Slice | When to use |
+|----------|-------|-------------|
+| `site_location` | **2** (task 17) | Which address(es) apply to this site |
+| `party_location` | **2** (task 17) | Billing / HQ / mailing for this party |
+| `job_location` | **5** (job slice) | Work area for this job |
+
+Same `location` id may appear on multiple junctions.
+
+#### `purpose` — examples
+
+**`site_location`** — one site, multiple addresses or roles:
+
+| `purpose` | Example |
+|-----------|---------|
+| `primary` | 200 Market St — main property address on the deed |
+| `service_entrance` | Alley loading door — where techs park and enter |
+| `loading_dock` | Dock 3, rear of building — deliveries |
+| `other` | Guard shack entrance; overflow parking lot address |
+
+**`party_location`** — one org, different addresses for different functions:
+
+| `purpose` | Example |
+|-----------|---------|
+| `hq` | Corporate office on file |
+| `billing` | Where invoices are mailed |
+| `remit_to` | Lockbox / AP address (≠ billing) |
+| `mailing` | Marketing / statements |
+| `other` | Warehouse ship-from |
+
+**`job_location`** *(job slice)* — work happens at the site but not everywhere:
+
+| `purpose` | Example |
+|-----------|---------|
+| `work_area` | Tenant fit-out on floor 12 only |
+| `mdf_room` | IDF/MDF closet 12-401 |
+| `floor` | Phased job — floors 3–5 this phase |
+
+**Concrete combo:** Location row `id=L1` = “200 Market St, San Francisco”. `site_location (site=Tower, L1, primary)`. Same `L1` also `party_location (party=Tower REIT, L1, hq)`. Job later: `job_location (job=Phase-2, L1, floor)` with `location.label` = “Floors 3–5” or a separate location row for a suite.
+
+**Rationale:** Full attachment model is locked up front; Slice 2 ships site + party junctions. `job_location` DDL waits for the `job` anchor table in the job slice but uses the same `location` shape — no redesign later.
+
+### Decision: address verification — deferred (2026-06-15)
+
+**Choice:** **Defer** third-party address verification and autocomplete (type-ahead) to a later slice. Slice 2 `location` DDL is **manual entry** — address lines, city, state, postal code, country, optional `lat`/`lng`. No verification provider columns, no geocoder integration, in task 17.
+
+**Rationale:** Primary payoff of verification APIs is **type-ahead UX** at data entry time; that belongs with `site_detail` / `contact_detail` UI work, not bare DDL. Add `verified_at` / provider metadata when a vendor is chosen.
+
+### Decision: site contacts — `site_contact_relation` catalog (2026-06-15)
+
+**Choice:**
+
+- **`site_contact_relation`** — catalog table (`id`, `display_name`, `sort_order`; optional stable `code` for fixtures). Seeded defaults in DDL migration only if discussed ([seeding rule](#decision-business-data-seeding-2026-06-15)); otherwise empty catalog + app admin later.
+- **`site_contact`:** `site_id` + `party_id` + `relation_id` FK → `site_contact_relation`. Standing people/orgs at a property. **Not** a substitute for `job_party`.
+- **No inline `notes`** on `site_contact` — use [shared notes](#decision-notes-and-attachments-shared-tables-deferred-2026-06-15) when that slice lands.
+
+Default relation rows to plan for (display names): Property owner, Property manager, Site superintendent, Billing contact, Other.
+
+**Rationale:** Relation labels will grow; a catalog avoids repeated CHECK migrations. Job-scoped relations (`job_party`) may get a parallel catalog in the job slice.
+
+### Decision: installed systems — deferred to catalog slice (2026-06-15)
+
+**Choice:** **Drop `site_system` from Slice 2** (task 17). Installed assets at a site will be modeled later as **rows tied to catalog items/parts**, not a free-text equipment register.
+
+**Services — three layers (unchanged intent; shifted timing):**
+
+| Layer | Where | Slice |
+|-------|--------|-------|
+| Installed assets at site | TBD — linked to `item` / parts | 3+ (with catalog) |
+| Sellable offerings (SKUs) | `item` / catalog | 3 |
+| Scoped work on an engagement | `job_line` / job scope | 5 |
+
+**Rationale:** Equipment without catalog linkage duplicates manufacturer/model text and fights the parts domain. Site slice delivers place + addresses + standing contacts only.
+
+### Decision: notes and attachments — shared tables (deferred) (2026-06-15)
+
+**Choice:** **Do not** add ad-hoc `notes TEXT` columns on business anchors (`party`, `site`, `site_contact`, …). **Deferred** shared model:
+
+- `note` — polymorphic (`entity_type`, `entity_id`, body, plain/rich format, …)
+- `attachment` — polymorphic files/images
+
+Surfaces expose logical Fields (`notes`, `attachments`) on any anchor. Slice 2 DDL omits inline notes columns on new tables.
+
+**Rationale:** Notes and files are cross-cutting; one pattern beats scattered text columns.
+
+### Decision: site contacts and systems (2026-06-15) — **superseded**
+
+**Superseded by** [site contacts — `site_contact_relation` catalog](#decision-site-contacts--site_contact_relation-catalog-2026-06-15) and [installed systems — deferred](#decision-installed-systems--deferred-to-catalog-slice-2026-06-15) above.
+
+### Decision: job anchor and stakeholders — deferred to job slice (2026-06-15)
+
+**Choice:** `job` (and `job_party`, `job_location`, estimates, lines) are **out of Slice 2**. Locked contract for Slice 5:
+
+- `job.site_id` NOT NULL → where work happens
+- `job_party (job_id, party_id, relation)` — relations include at least: `customer`, `property_owner`, `bill_to`, `sold_to`, `general_contractor`, `subcontractor`, `subcontract_through`
+- No `customer_id` column on `site` or `job` as the sole counterparty link
+
+**Rationale:** Site slice establishes place + standing contacts; job slice adds engagement-specific stakeholder flexibility without painting Slice 2 into a single-FK corner.
+
+### Decision: party identity — `party_user` + `user_class` (deferred) (2026-06-15)
+
+**Choice:** **Deferred** to a future SubHub slice (and matching `@latch/*` platform work). Document now; do **not** implement in Slice 2.
+
+| Piece | Intent |
+|-------|--------|
+| `party_user` | Generalize `latch_users` ↔ `party` beyond `employee.latch_user_id` (customer portal persons need login too) |
+| `latch_users.user_class` | `internal` \| `external` — separates staff auth plane from customer/partner portal principals |
+| Portal app roles + row scope | External users see only data tied to their party / `job_party` rows |
+
+Until then: staff login via `employee.latch_user_id`; customer portal and external row scope are out of scope.
+
+**Rationale:** Identity generalization is platform-shaped (principal kind, scoped manifests). Slice 2 proceeds on sites/locations without blocking on Latch policy changes.
+
+### Decision: business data seeding (2026-06-15)
+
+**Choice:**
+
+1. **Do not add business seed migrations** (`*_dev_seed.sql`, fixture `INSERT`s in DDL tasks) **without prior discussion** — default for new slices is **DDL only**.
+2. When seeding **is** approved: let Postgres assign ids (`DEFAULT gen_random_uuid()::text` or `INSERT … RETURNING id`); **do not** hard-code string ids like `seed-party-acme` in new seeds.
+3. **`/setup`** (first admin user) is not business seeding — it stays the only runtime identity bootstrap.
+
+**Rationale:** Fixed seed ids leak into docs, tests, and manual QA paths and fight the repo’s normal id convention. Seeds are a product choice (what demo data exists), not an automatic deliverable per migration task. Historical seeds (e.g. `017_party_dev_seed.sql`) predate this rule; do not extend that pattern without explicit approval.

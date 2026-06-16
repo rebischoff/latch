@@ -1,6 +1,6 @@
 # 14 — Contact child collections
 
-> **Status:** Complete (2026-06-13). Next: Slice 2 — create [15-site-migration.md](./15-site-migration.md) when starting sites.
+> **Status:** Complete (2026-06-13). Next: [15-entity-flow.md](./15-entity-flow.md).
 
 ## Goal
 
@@ -34,7 +34,7 @@ Phones and emails as logical Fields on `contact_detail` — DAL replace semantic
 - [x] Read-only role sees phones as static text, no add button
 - [x] Field omitted entirely when no `read` on `phones`
 - [x] Slice 1 exit: customer list + contact detail with collections works
-- [x] [`../../STATUS.md`](../../STATUS.md) → Slice 2 task **15** (create `15-site-migration.md` when starting sites)
+- [x] [`../../STATUS.md`](../../STATUS.md) → Slice 2 tasks **15**–**17** ([01-task-index.md](./01-task-index.md#slice-02--sites))
 
 ## Out of scope
 
