@@ -1,5 +1,7 @@
 # 15 — Entity flow (cross-slice sketch)
 
+> **Status:** Complete (2026-06-16). Next: [16-slice2-planning-gate.md](./16-slice2-planning-gate.md).
+
 ## Goal
 
 Add a one-page **entity flow** to [`architecture.md`](../architecture.md) so Slice 2 DDL (task **17**) fits the full domain picture — without drafting tasks for slices 3–7.
@@ -35,8 +37,8 @@ Task-scoped choices (doc structure for this sketch) are recorded **here**, not i
 ---
 
 1. Add `## Entity flow` after the data model summary (or after `## Data model (summary)` tables). — **done (2026-06-15)**
-2. Diagram **implemented** entities solid; **deferred** entities dashed (notes/attachments, `party_user`, address verification, catalog installs at site).
-3. Minimum paths to show:
+2. Diagram **implemented** entities solid; **deferred** entities dashed (notes/attachments, `party_user`, address verification, catalog installs at site). — **done (2026-06-16)**
+3. Minimum paths to show: — **done (2026-06-16)**
 
    ```text
    party ── party_location ── location ── site_location ── site
@@ -48,15 +50,15 @@ Task-scoped choices (doc structure for this sketch) are recorded **here**, not i
    item / part (slice 3) ── job_line (slice 5)
    ```
 
-4. Call out what **task 17** creates vs what later slices add (one short table).
-5. Link to relevant [decisions.md](../decisions.md) blocks — do not duplicate locked choices.
+4. Call out what **task 17** creates vs what later slices add (one short table). — **done (2026-06-16)**
+5. Link to relevant [decisions.md](../decisions.md) blocks — do not duplicate locked choices. — **done (2026-06-16)**
 
 ## Verify (stop gate)
 
-- [ ] `architecture.md` has `## Entity flow` with mermaid (or equivalent) and deferred items marked
-- [ ] Flow includes `party` ↔ `location` ↔ `site` and forward pointers to job / catalog / financial slices
-- [ ] No contradictions with existing decision blocks (fix decisions first if found)
-- [ ] [`../../STATUS.md`](../../STATUS.md) → [16-slice2-planning-gate.md](./16-slice2-planning-gate.md)
+- [x] `architecture.md` has `## Entity flow` with mermaid (or equivalent) and deferred items marked
+- [x] Flow includes `party` ↔ `location` ↔ `site` and forward pointers to job / catalog / financial slices
+- [x] No contradictions with existing decision blocks (fix decisions first if found)
+- [x] [`../../STATUS.md`](../../STATUS.md) → [16-slice2-planning-gate.md](./16-slice2-planning-gate.md)
 
 ## Out of scope
 

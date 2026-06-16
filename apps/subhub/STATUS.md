@@ -1,7 +1,7 @@
 # STATUS — SubHub
 
 > App-local quarterback. Platform pointer: [`../../STATUS.md`](../../STATUS.md).
-> Updated: 2026-06-15.
+> Updated: 2026-06-16.
 
 - **Package:** `@latch/subhub` · **Port:** 3003
 - **Docs:** [`docs/README.md`](./docs/README.md) · **Tasks:** [`docs/tasks/01-task-index.md`](./docs/tasks/01-task-index.md)
@@ -9,7 +9,7 @@
 
 ## Right now — do this next
 
-**Slice 2 — task 15** — entity flow sketch per [`15-entity-flow.md`](./docs/tasks/15-entity-flow.md) (docs only; then **16** planning gate, then **17** migration).
+**Slice 2 — task 16** — planning gate per [`16-slice2-planning-gate.md`](./docs/tasks/16-slice2-planning-gate.md) (lock open Slice 2 choices; align task **17** before DDL).
 
 ## Blockers
 
@@ -30,6 +30,7 @@ None.
 
 ## Recently completed
 
+- **15 — Entity flow** — cross-slice relationship map in [`architecture.md`](./docs/architecture.md#entity-flow): mermaid diagram (solid = Slice 1 + task 17, dashed = deferred), task-17 vs later-slices table, decision links (2026-06-16).
 - **14 — Contact child collections** — `phones`/`emails` on `contact_detail`: hand descriptor in `lib/contacts/descriptors.ts`, repository replace semantics, `PhoneEmailFields` + RHF `useFieldArray` (2026-06-13).
 - **13 — Contact UI** — `/contacts` master-detail (`ContactList` + `ContactDetailForm`), `SurfaceToolbar` Save/Delete, React Query hooks wired via `SURFACE_API` (2026-06-13).
 - **12 — Contact DAL and API** — `lib/contacts/{descriptors,repository,dal}`, `/api/contacts*` + filtered `/api/customers|vendors|manufacturers`; `party_role` list filter; projection contract test (2026-06-13).

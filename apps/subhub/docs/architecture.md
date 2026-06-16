@@ -1,6 +1,6 @@
 # SubHub — architecture
 
-> **Status:** Planning (2026-06-12). **Decisions:** [decisions.md](./decisions.md).
+> **Status:** Planning (2026-06-16). **Decisions:** [decisions.md](./decisions.md).
 
 ## System context
 
@@ -85,11 +85,88 @@ Physical DDL lands in numbered migrations (`014+` for business tables; `013` = p
 
 **Timestamps:** Business anchors get `created_at` / `updated_at` in DDL for list sort and freshness; IAM catalog tables follow platform P11 (audit only, no row timestamps). Neither belongs in Surface YAML unless manifest-gated UI requires it — see [decisions.md](./decisions.md#decision-row-timestamps-vs-audit--ddl-vs-surface-fields-2026-06-13).
 
-## Entity flow
+## Entity flow {#entity-flow}
 
-How business entities **link** across slices (relationship map — not a duplicate of the table list above). **Solid** = implemented (Slice 1) or created in task **17** migration; **dashed** = deferred (later slices or [decisions.md](./decisions.md)).
+How business entities **link** across slices (relationship map — not a duplicate of the table list above). **Solid** lines = implemented (Slice 1) or created in task **17** migration; **dashed** lines = deferred (later slices or [decisions.md](./decisions.md)). Locked placement: [15-entity-flow.md](./tasks/15-entity-flow.md#step-1--section-placement-2026-06-15-).
 
-> **In progress (task 15):** diagram and task-17 vs later-slices table follow in steps 2–5. Step 1 locked in [15-entity-flow.md](./tasks/15-entity-flow.md#step-1--section-placement-2026-06-15-).
+```mermaid
+flowchart TB
+  subgraph slice1["Slice 1 — implemented"]
+    party
+    employee
+  end
+
+  subgraph slice2["Slice 2 — task 17"]
+    location
+    site
+    party_location
+    site_location
+    scr["site_contact_relation"]
+    sc["site_contact"]
+  end
+
+  subgraph slice3["Slice 3 — catalog"]
+    part["manufacturer_part"]
+    item
+  end
+
+  subgraph slice4["Slice 4 — estimates"]
+    estimate
+    est_line["estimate_line"]
+  end
+
+  subgraph slice5["Slice 5 — jobs"]
+    job
+    job_party
+    job_location
+    job_line
+  end
+
+  subgraph slice6["Slice 6 — financial"]
+    invoice
+    po["purchase_order"]
+  end
+
+  party --- party_location
+  party_location ---|"purpose: billing, hq, …"| location
+  location --- site_location
+  site_location ---|"purpose: primary, …"| site
+  site ---|parent_site_id| site
+  site --- sc
+  sc --- party
+  sc --- scr
+
+  site -.-> job
+  job -.-> job_party
+  job_party -.-> party
+  job -.-> job_location
+  job_location -.-> location
+  estimate -.->|"won quote → job"| job
+  est_line -.-> estimate
+  part -.-> job_line
+  item -.-> job_line
+  job_line -.-> job
+  job -.-> invoice
+  job -.-> po
+  employee --- party
+```
+
+**Reading the map:** A shared `location` row can attach to a `party` (billing / HQ) and to a `site` (service address) via junction `purpose` columns — see [location attachments](./decisions.md#decision-location-attachments-2026-06-15). `site_contact` links standing people at a property; per-job counterparty graphs use `job_party` in Slice 5 ([party_role vs job relations](./decisions.md#decision-party_role-master-tags-vs-job-scoped-relations-2026-06-15)). Sales flow: `estimate` → `job` → billing (`invoice`) and procurement (`purchase_order`); line items snapshot at each hop ([line-item snapshots](./decisions.md#decision-line-item-snapshots-on-estimate--job--invoice-2026-06-12)).
+
+**Deferred (dashed or omitted):** [address verification](./decisions.md#decision-address-verification--deferred-2026-06-15) on `location`; [shared notes / attachments](./decisions.md#decision-notes-and-attachments-shared-tables-deferred-2026-06-15); [installed assets at site](./decisions.md#decision-installed-systems--deferred-to-catalog-slice-2026-06-15) (catalog-linked, not Slice 2); [`party_user` / portal identity](./decisions.md#decision-party-identity--party_user--user_class-deferred-2026-06-15) (generalizes `employee.latch_user_id` later).
+
+### Task 17 DDL vs later slices
+
+| Entity / junction | Task **17** (Slice 2) | Later slice |
+|-------------------|----------------------|-------------|
+| `party`, `party_role`, `party_phone`, `party_email`, `employee` | ✓ Slice 1 | — |
+| `location`, `site`, `site_location`, `party_location` | ✓ | `job_location` → Slice 5 ([job anchor](./decisions.md#decision-job-anchor-and-stakeholders--deferred-to-job-slice-2026-06-15)) |
+| `site_contact_relation`, `site_contact` | ✓ | — |
+| `party_role` enum expand (`property_owner`, `other`) | ✓ | Job-scoped relations on `job_party`, not master tags |
+| `manufacturer_part`, `item`, vendor pricing | — | Slice 3 |
+| `estimate`, `estimate_line` | — | Slice 4 |
+| `job`, `job_party`, `job_line`, `change_order` | — | Slice 5 |
+| `invoice`, `purchase_order`, SOV lines | — | Slice 6 |
 
 ## Surface catalog
 
