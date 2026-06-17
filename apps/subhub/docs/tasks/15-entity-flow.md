@@ -41,11 +41,10 @@ Task-scoped choices (doc structure for this sketch) are recorded **here**, not i
 3. Minimum paths to show: — **done (2026-06-16)**
 
    ```text
-   party ── party_location ── location ── site_location ── site
-                              ↑                    │
-                              └── party (billing)  └── parent_site (hierarchy)
+   party ── party_location ── location
    site ── site_contact ── party
-   site ── job (slice 5) ── job_party / job_location
+   site ── parent_site (hierarchy)
+   site ── job (slice 5) ── job_party / job_location ── location
    job ── estimate (slice 4) ── invoice / PO (slice 6)
    item / part (slice 3) ── job_line (slice 5)
    ```

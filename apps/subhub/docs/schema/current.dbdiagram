@@ -1,0 +1,322 @@
+{
+  "version": "2.0.0",
+  "darkMode": true,
+  "gridEnabling": false,
+  "currentViewName": null,
+  "defaultView": {
+    "detailLevel": "All",
+    "tablePositions": [
+      {
+        "name": "latch_roles",
+        "schemaName": "public",
+        "x": 12,
+        "y": 566
+      },
+      {
+        "name": "latch_user_roles",
+        "schemaName": "public",
+        "x": 510.283203125,
+        "y": 1152
+      },
+      {
+        "name": "latch_role_surfaces",
+        "schemaName": "public",
+        "x": 510.283203125,
+        "y": 566
+      },
+      {
+        "name": "latch_role_grants",
+        "schemaName": "public",
+        "x": 510.283203125,
+        "y": 772
+      },
+      {
+        "name": "latch_role_delegations",
+        "schemaName": "public",
+        "x": 510.283203125,
+        "y": 1010
+      },
+      {
+        "name": "latch_scopes",
+        "schemaName": "public",
+        "x": 12,
+        "y": 760
+      },
+      {
+        "name": "latch_audit",
+        "schemaName": "public",
+        "x": 644.26708984375,
+        "y": 12
+      },
+      {
+        "name": "latch_pending_changes",
+        "schemaName": "public",
+        "x": 990.78173828125,
+        "y": 32
+      },
+      {
+        "name": "latch_app_config",
+        "schemaName": "public",
+        "x": 297.669921875,
+        "y": 12
+      },
+      {
+        "name": "latch_policy_version",
+        "schemaName": "public",
+        "x": 12,
+        "y": 12
+      },
+      {
+        "name": "party",
+        "schemaName": "public",
+        "x": 851.62451171875,
+        "y": 566
+      },
+      {
+        "name": "party_role",
+        "schemaName": "public",
+        "x": 1354.86376953125,
+        "y": 566
+      },
+      {
+        "name": "party_phone",
+        "schemaName": "public",
+        "x": 1354.86376953125,
+        "y": 708
+      },
+      {
+        "name": "party_email",
+        "schemaName": "public",
+        "x": 1354.86376953125,
+        "y": 978
+      },
+      {
+        "name": "employee",
+        "schemaName": "public",
+        "x": 1354.86376953125,
+        "y": 1248
+      },
+      {
+        "name": "latch_users",
+        "schemaName": "public",
+        "x": 12,
+        "y": 1394
+      }
+    ],
+    "tableGroupCollapseStates": [],
+    "stickyNoteLayouts": [],
+    "referencePaths": [
+      {
+        "firstFieldNames": [
+          "role_id"
+        ],
+        "firstTableName": "latch_user_roles",
+        "firstSchemaName": "public",
+        "firstRelation": "*",
+        "secondFieldNames": [
+          "id"
+        ],
+        "secondTableName": "latch_roles",
+        "secondSchemaName": "public",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "scope_id"
+        ],
+        "firstTableName": "latch_user_roles",
+        "firstSchemaName": "public",
+        "firstRelation": "*",
+        "secondFieldNames": [
+          "id"
+        ],
+        "secondTableName": "latch_scopes",
+        "secondSchemaName": "public",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "role_id"
+        ],
+        "firstTableName": "latch_role_surfaces",
+        "firstSchemaName": "public",
+        "firstRelation": "*",
+        "secondFieldNames": [
+          "id"
+        ],
+        "secondTableName": "latch_roles",
+        "secondSchemaName": "public",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "role_id"
+        ],
+        "firstTableName": "latch_role_grants",
+        "firstSchemaName": "public",
+        "firstRelation": "*",
+        "secondFieldNames": [
+          "id"
+        ],
+        "secondTableName": "latch_roles",
+        "secondSchemaName": "public",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "role_id"
+        ],
+        "firstTableName": "latch_role_delegations",
+        "firstSchemaName": "public",
+        "firstRelation": "*",
+        "secondFieldNames": [
+          "id"
+        ],
+        "secondTableName": "latch_roles",
+        "secondSchemaName": "public",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "assignable_role_id"
+        ],
+        "firstTableName": "latch_role_delegations",
+        "firstSchemaName": "public",
+        "firstRelation": "*",
+        "secondFieldNames": [
+          "id"
+        ],
+        "secondTableName": "latch_roles",
+        "secondSchemaName": "public",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "parent_id"
+        ],
+        "firstTableName": "latch_scopes",
+        "firstSchemaName": "public",
+        "firstRelation": "*",
+        "secondFieldNames": [
+          "id"
+        ],
+        "secondTableName": "latch_scopes",
+        "secondSchemaName": "public",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "supersedes_id"
+        ],
+        "firstTableName": "latch_pending_changes",
+        "firstSchemaName": "public",
+        "firstRelation": "*",
+        "secondFieldNames": [
+          "id"
+        ],
+        "secondTableName": "latch_pending_changes",
+        "secondSchemaName": "public",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "party_id"
+        ],
+        "firstTableName": "party_role",
+        "firstSchemaName": "public",
+        "firstRelation": "*",
+        "secondFieldNames": [
+          "id"
+        ],
+        "secondTableName": "party",
+        "secondSchemaName": "public",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "party_id"
+        ],
+        "firstTableName": "party_phone",
+        "firstSchemaName": "public",
+        "firstRelation": "*",
+        "secondFieldNames": [
+          "id"
+        ],
+        "secondTableName": "party",
+        "secondSchemaName": "public",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "party_id"
+        ],
+        "firstTableName": "party_email",
+        "firstSchemaName": "public",
+        "firstRelation": "*",
+        "secondFieldNames": [
+          "id"
+        ],
+        "secondTableName": "party",
+        "secondSchemaName": "public",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "party_id"
+        ],
+        "firstTableName": "employee",
+        "firstSchemaName": "public",
+        "firstRelation": "*",
+        "secondFieldNames": [
+          "id"
+        ],
+        "secondTableName": "party",
+        "secondSchemaName": "public",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "user_id"
+        ],
+        "firstTableName": "latch_user_roles",
+        "firstSchemaName": "public",
+        "firstRelation": "*",
+        "secondFieldNames": [
+          "id"
+        ],
+        "secondTableName": "latch_users",
+        "secondSchemaName": "public",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "latch_user_id"
+        ],
+        "firstTableName": "employee",
+        "firstSchemaName": "public",
+        "firstRelation": "*",
+        "secondFieldNames": [
+          "id"
+        ],
+        "secondTableName": "latch_users",
+        "secondSchemaName": "public",
+        "secondRelation": "1",
+        "checkPoints": []
+      }
+    ]
+  },
+  "views": {}
+}

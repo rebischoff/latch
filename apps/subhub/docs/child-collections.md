@@ -138,8 +138,11 @@ Same replace-on-save pattern for child collections on `site_detail`:
 
 | Field id | Child table | Notes |
 |----------|-------------|-------|
-| `locations` | `site_location` + joined `location` | Nested DTO: `purpose` + address fields — see [purpose examples](./decisions.md#decision-location-attachments-2026-06-15) |
 | `contacts` | `site_contact` + `site_contact_relation` | `party_id`, `relation_id` (display name from catalog) |
+
+Catalog starts **empty** in `019_site.sql`. Ongoing edit via **`site_contact_relation_table`** ([catalog table page](./decisions.md#decision-catalog-tables--editable-table-page-not-master-detail-2026-06-16)); optional first-use suggestions via [progressive setup](./decisions.md#decision-progressive-setup--master-catalogs-2026-06-16); local dev rows via [`020_site_contact_relation_dev_seed.sql`](../../migrations/020_site_contact_relation_dev_seed.sql).
+
+No address collection on `site_detail` — sites are logical places; addresses live on `party_location` and estimate/job scope ([decision](./decisions.md#decision-in-building-work-scope--estimate--job-lifecycle-2026-06-16)).
 
 `party_location` on `contact_detail` (Slice 2+) — same pattern for billing/HQ addresses.
 
@@ -157,7 +160,7 @@ Same pattern at larger scale:
 
 Extra rules (implemented in DAL, not generic kernel):
 
-- **Snapshot on copy** — `copyEstimateToJob(estimateId)` creates `job_line` from `estimate_line` values
+- **Snapshot on copy** — `copyEstimateToJob(estimateId)` creates `job_line` from `estimate_line` values (including planned `location_id` for in-building scope — [decision](../decisions.md#decision-in-building-work-scope--estimate--job-lifecycle-2026-06-16))
 - **Ordering** — `line_number` or `sort_order` column
 - **Progress** — `job_line_progress` may be a nested array Field or separate sub-section with its own Field id
 
@@ -182,5 +185,5 @@ Log in [latch-feedback.md](./latch-feedback.md):
 ## Tasks
 
 - Slice 1 task **14** — implement phones/emails on `contact_detail` ([01-task-index.md](./tasks/01-task-index.md))
-- Slice 2 task **18+** — `site_detail` collections ([17-site-migration.md](./tasks/17-site-migration.md))
+- Slice 2 task **19+** — `site_detail` collections ([18-site-migration.md](./tasks/18-site-migration.md))
 - Slice 4+ — line items on estimate/job surfaces

@@ -12,6 +12,7 @@ End-to-end **service-trades / AV integration** business app on Latch. Real Postg
 
 | Doc | Contents |
 |-----|----------|
+| [schema/current.dbml](./schema/current.dbml) | Full v1 business schema draft (Slices 1–6); [shared diagram](https://dbdiagram.io/d/latch-6a3215ad5c789b8acb9d5278) — see [schema/README.md](./schema/README.md) |
 | [architecture.md](./architecture.md) | Party spine, tables, surfaces, delivery slices |
 | [routing-and-libraries.md](./routing-and-libraries.md) | Explicit routes, sidebar grouping, app header, SurfaceToolbar overflow, Ant Design / RHF / React Query |
 | [child-collections.md](./child-collections.md) | Related records (phones, emails, line items) on a parent Surface |

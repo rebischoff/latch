@@ -1,0 +1,901 @@
+// SubHub schema view — design draft (see docs/schema/README.md for workflow).
+// Task 17 complete (2026-06-16): Slices 1–6 at column level. Next: task 18 SQL.
+//
+// Shipped baseline: migrations 001–016 (party interim shape). Target below.
+// Task 18 batches: 018_party_refactor → 019_site → 020_site_contact_relation_dev_seed.
+//
+// **Editorial (diagram):** Do not rename TableGroups or change group [color] values.
+// Do not edit current.dbdiagram for schema-only updates (layout canvas only).
+//
+// **016 → target delta:** drop `party.notes`; add `party_person`, `party_organization`,
+// `note`; retarget `employee` → `party_person`; widen `party_role`; then Slice 2 tables.
+// **Still draft (no DDL yet):** `party_user` (replaces interim `employee.latch_user_id`).
+
+Project subhub {
+  database_type: 'PostgreSQL'
+  Note: '''
+    **Latch platform** (`latch_*`) + **SubHub business** (Slices 1–6 design target).
+
+    Migration order (task 18): party refactor → sites/locations → optional dev seed.
+    Slices 3–6 tables are design-only until their implementation tasks.
+
+    SQL migrations remain canonical once shipped; refresh this file after each batch.
+  '''
+}
+
+// ─── Platform (Latch) ───────────────────────────────────────────────────────
+
+TableGroup latch_platform {
+  latch_users
+  latch_roles
+  latch_user_roles
+  latch_role_surfaces
+  latch_role_grants
+  latch_role_delegations
+  latch_scopes
+  latch_audit
+  latch_pending_changes
+  latch_app_config
+  latch_policy_version
+}
+
+Table latch_users {
+  id text [pk]
+  login_name text [unique, note: 'nullable until /setup or party link']
+  login_email text [unique, note: 'nullable']
+  password_hash text [note: 'Better Auth; nullable']
+  created_at timestamptz [not null, default: `now()`]
+
+  Note: '''
+    Platform identity — credentials only (Better Auth). No profile chrome here.
+    `display_name` removed in 014; address-book name on `party`, session chrome on
+    `party_user` (draft). Deferred: `user_class` (`internal` | `external`) for portal
+    principals — see `party_user` and decisions.md.
+  '''
+}
+
+Table latch_roles {
+  id uuid [pk, default: `gen_random_uuid()`]
+  role_class text [not null, note: 'CHECK: system_data | system_iam | app']
+  display_name text [not null]
+
+  Note: 'Runtime role catalog. System rows identified by role_class (partial unique index).'
+}
+
+Table latch_user_roles {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id text [not null]
+  role_id uuid [not null]
+  scope_id uuid [note: 'NULL = company-wide']
+
+  indexes {
+    (user_id, role_id, scope_id) [unique, name: 'latch_user_roles_assignment_unique']
+  }
+
+  Note: '''
+    User ↔ role assignment (what they may do). Separate from `party_user` (who they are
+  in the business). PK changed from composite to surrogate id in 010.
+  '''
+}
+
+Table latch_role_surfaces {
+  role_id uuid [not null]
+  surface_id text [not null]
+  row_scope text
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (role_id, surface_id) [pk]
+  }
+}
+
+Table latch_role_grants {
+  role_id uuid [not null]
+  surface_id text [not null]
+  field_id text [note: 'nullable = surface-level grant']
+  action text [not null]
+  mode text
+
+  indexes {
+    (role_id, surface_id, field_id, action) [unique]
+  }
+}
+
+Table latch_role_delegations {
+  role_id uuid [not null]
+  assignable_role_id uuid [not null]
+
+  indexes {
+    (role_id, assignable_role_id) [pk]
+  }
+}
+
+Table latch_scopes {
+  id uuid [pk, default: `gen_random_uuid()`]
+  kind text [not null]
+  parent_id uuid [note: 'self-ref; nullable']
+  display_name text [not null]
+}
+
+Table latch_audit {
+  id bigint [pk, increment]
+  occurred_at timestamptz [not null, default: `now()`]
+  actor_id text [not null]
+  action text [not null]
+  module_id text
+  entity_type text [not null]
+  entity_id text [not null]
+  field_ids text[]
+  before jsonb
+  after jsonb
+  patch jsonb
+  request_id text
+  approval_id text
+
+  Note: 'INSERT-only at DB role level. Immutable via trigger.'
+}
+
+Table latch_pending_changes {
+  id uuid [pk]
+  surface_id text [not null]
+  entity_id text [not null]
+  field_ids text[] [not null]
+  patch jsonb [not null]
+  status text [not null, note: 'CHECK: submitted | accepted | rejected | withdrawn']
+  submitted_by text [not null]
+  submitted_at timestamptz [not null]
+  decided_by text
+  decided_at timestamptz
+  comment text
+  batch_id uuid
+  supersedes_id uuid
+
+  Note: 'Verification queue (platform). SubHub v1 skips approval UX.'
+}
+
+Table latch_app_config {
+  id smallint [pk, default: 1, note: 'CHECK id = 1 (single row)']
+  audit_mode text [not null, default: 'full', note: 'CHECK: full | standard | recovery']
+  setup_complete boolean [not null, default: false]
+}
+
+Table latch_policy_version {
+  id smallint [pk, default: 1, note: 'CHECK id = 1 (single row)']
+  version bigint [not null, default: 1]
+}
+
+// ─── Cross-cutting ───────────────────────────────────────────────────────────
+
+TableGroup cross_cutting [color: #9b59b6] {
+  note
+}
+
+Table note {
+  id text [pk, default: `gen_random_uuid()::text`]
+  entity_type text [not null, note: 'CHECK allowlist — see Note']
+  entity_id text [not null]
+  body text [not null, default: '']
+  format text [not null, default: 'plain', note: 'plain | rich — when needed']
+  sort_order int [not null, default: 0]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (entity_type, entity_id, sort_order) [name: 'note_entity_sort_idx']
+  }
+
+  Note: '''
+    Polymorphic notes for any business anchor. Surfaces expose logical Field `notes`
+    (v1 may aggregate to one editor; schema allows multiple rows per entity).
+
+    Shipped 016: inline `party.notes` only. Task 18 backfill: non-empty `party.notes`
+    → one `note` row per party (`entity_type = 'party'`), then drop the column.
+
+    v1 entity_type allowlist (extend with migrations): party, site, estimate, job,
+    invoice, purchase_order, change_order — align with `latch_audit.entity_type`.
+
+    No FK on entity_id — polymorphic; enforce allowlist in migration/DAL.
+  '''
+}
+
+// ─── Business (SubHub Slice 1) ──────────────────────────────────────────────
+
+TableGroup party [color: #1abc9c] {
+  party
+  party_person
+  party_organization
+  party_role
+  party_phone
+  party_email
+  party_location
+  party_user
+  employee
+}
+
+Table party {
+  id text [pk, default: `gen_random_uuid()::text`]
+  kind text [not null, note: 'CHECK: person | organization; immutable after create']
+  display_name text [not null, note: 'list sort; DAL maintains from kind extension on save']
+  legal_name text
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Note: '''
+    Unified contact anchor. Kind-specific columns live in 1:1 extension tables — not on `party`.
+    `display_name` / `legal_name` — address-book and list sort. DAL maintains `display_name`
+    from kind extension on save (person: first + last; org: legal_name or dba_name).
+    Session shell label may override via `party_user` (draft). Notes → `note` table (no column here).
+  '''
+}
+
+Table party_person {
+  party_id text [pk]
+  first_name text [not null]
+  last_name text [not null, default: '']
+
+  Note: '''
+    1:1 when party.kind = person. Demographics only — not login, not staff HR.
+    Enforce kind match in migration (trigger or app txn). Login link → `party_user` (draft).
+
+    Task 18 backfill from 016: `first_name` ← `party.display_name`, `last_name` ← ''.
+    Split heuristic (e.g. on space) is optional post-migration cleanup — not required in DDL.
+  '''
+}
+
+Table party_organization {
+  party_id text [pk]
+  dba_name text [note: 'doing-business-as; nullable when same as legal_name']
+
+  Note: '''
+    1:1 when party.kind = organization. Enforce kind match in migration (trigger or app txn).
+
+    Task 18 backfill: insert row for every organization party; set `dba_name` when
+    `display_name` ≠ `legal_name`, else leave null.
+  '''
+}
+
+Table party_role {
+  party_id text [not null]
+  role text [not null, note: 'CHECK: customer | vendor | manufacturer | employee | property_owner | other']
+
+  indexes {
+    (party_id, role) [pk]
+  }
+
+  Note: '''
+    Master address-book tags (who is this party to us generally?). Drives filtered list
+    Surfaces (`customer_list`, `employee_list`, …). Not job context — job stakeholders use
+    `job_party` (Slice 5). `employee` tag marks staff; portal access is separate (`party_user`).
+    `property_owner` / `other` widened in `018_party_refactor.sql`. GC / sub roles stay
+    on `job_party`, not here.
+  '''
+}
+
+Table party_phone {
+  id text [pk, default: `gen_random_uuid()::text`]
+  party_id text [not null]
+  label text [not null, default: '']
+  number text [not null]
+  is_primary boolean [not null, default: false]
+  sort_order int [not null, default: 0]
+
+  Note: '''
+    Child collection on `party` (person or org). Logical Field `phones` on contact Surfaces.
+    `is_primary` + `sort_order` drive list display; at most one primary per party (app/DAL).
+  '''
+}
+
+Table party_email {
+  id text [pk, default: `gen_random_uuid()::text`]
+  party_id text [not null]
+  label text [not null, default: '']
+  address text [not null]
+  is_primary boolean [not null, default: false]
+  sort_order int [not null, default: 0]
+
+  Note: '''
+    Child collection on `party`. A row may be promoted to `latch_users.login_email` when
+    the person has a `party_user` / interim `employee` login link (unique guard).
+  '''
+}
+
+Table party_user {
+  party_id text [pk, note: 'FK → party_person — persons only; organizations do not log in']
+  latch_user_id text [unique, not null]
+  display_name text [note: 'nullable — app shell / avatar label; falls back to party.display_name']
+  avatar_url text [note: 'nullable — URL until polymorphic attachment lands']
+
+  Note: '''
+    DRAFT — not in migrations. Login bridge + session-facing profile for any person with
+    SubHub access (staff, customers, GCs, site contacts, …). Opt-in: most `party_person`
+    rows never get a `party_user` row. Replaces interim `employee.latch_user_id`.
+    Permissions stay on `latch_user_roles`; `user_class` on `latch_users` (deferred).
+    Who may receive a login is TBD — hold implementation until identity slice is scoped.
+  '''
+}
+
+Table employee {
+  party_id text [pk]
+  latch_user_id text [unique, note: 'INTERIM — nullable FK → latch_users; migrate to party_user']
+
+  Note: '''
+    Staff-only HR/ops extension. FK → party_person (not bare `party`); requires
+    `party.kind = person` and `party_role` tag `employee`. Not all persons are employees;
+    not all employees have login (nullable interim `latch_user_id`).
+
+    `latch_user_id` is temporary until `party_user` lands — portal users use `party_user`, not `employee`.
+
+    Deferred columns (document only — do not add to DDL yet):
+    hire_date, termination_date, employee_number, job_title, department,
+    reports_to → employee, employment_status, primary_site_id.
+    Name / phones / emails stay on party spine; permissions on latch_user_roles.
+  '''
+}
+
+Table party_location {
+  party_id text [not null]
+  location_id text [not null]
+  purpose text [not null, note: 'CHECK: billing | remit_to | hq | mailing | other']
+
+  indexes {
+    (party_id, location_id, purpose) [pk]
+  }
+
+  Note: '''
+    Party ↔ address junction (`019_site.sql`). Same `location` row may attach to a job via
+    `job_location` (Slice 5). Purpose = role of this address for the party (billing, HQ, …).
+    In-building work scope lives on estimate/job lines — not here. Sites have no location link.
+  '''
+}
+
+// ─── Business (SubHub Slice 2) ──────────────────────────────────────────────
+
+TableGroup site [color: #3498db] {
+  location
+  site
+  site_contact_relation
+  site_contact
+}
+
+Table location {
+  id text [pk, default: `gen_random_uuid()::text`]
+  label text [not null, default: '', note: 'short place name — Suite 1200, Loading dock B']
+  line1 text [not null, default: '']
+  line2 text [not null, default: '']
+  city text [not null, default: '']
+  state text [not null, default: '']
+  postal_code text [not null, default: '']
+  country text [not null, default: 'US']
+  lat numeric [note: 'nullable — optional manual pin']
+  lng numeric [note: 'nullable — optional manual pin']
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Note: '''
+    Normalized physical address — shared spine. Manual entry in v1; address verification /
+    type-ahead deferred until `site_detail` / `contact_detail` UI. Attached via `party_location`,
+    `job_location` (Slice 5), and line-level scope on estimate/job — not via `site`.
+  '''
+}
+
+Table site {
+  id text [pk, default: `gen_random_uuid()::text`]
+  name text [not null]
+  parent_site_id text [note: 'nullable FK → site.id; ON DELETE SET NULL']
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    parent_site_id [name: 'site_parent_site_id_idx']
+  }
+
+  Note: '''
+    Logical place — portfolio, campus, building, job site. **No address columns. No
+    `site_location` junction** — rejected pattern; in-building scope is on estimate/job
+    lines and `job_location`, not on site.
+
+    Worked example (Tower REIT / 200 Market Tower):
+      party "Tower REIT" + party_location → location "200 Market St" (purpose: hq)
+      site "200 Market Tower" — name only; site_contact → Jane (Site superintendent)
+      estimate @ site → estimate_line.location_id "Floors 3–5"
+      job (won) @ same site → job_party customer = Tower REIT; job_location same location row
+
+    Hierarchy (optional): parent_site_id — e.g. Portfolio → Building → Wing.
+    Standing people: `site_contact`. Per-job counterparties: `job_party` (Slice 5).
+    Notes: polymorphic `note` (`entity_type = 'site'`).
+  '''
+}
+
+Table site_contact_relation {
+  id text [pk, default: `gen_random_uuid()::text`]
+  display_name text [not null]
+  sort_order int [not null, default: 0]
+
+  indexes {
+    display_name [unique, name: 'site_contact_relation_display_name_unique']
+  }
+
+  Note: '''
+    Catalog of standing-contact roles at a property (Slice 2). `019_site.sql` creates
+    empty table (task 16). Suggested rows for progressive setup / dev seed (`020`): Property
+    owner, Property manager, Site superintendent, Other — Postgres-assigned ids only.
+
+    Billing contact is on the customer (`party_location` billing or `job_party` bill_to) —
+    not a site standing role. Not a substitute for `job_party` job-scoped relations.
+  '''
+}
+
+Table site_contact {
+  id text [pk, default: `gen_random_uuid()::text`]
+  site_id text [not null]
+  party_id text [not null]
+  relation_id text [not null, note: 'FK → site_contact_relation']
+  sort_order int [not null, default: 0]
+
+  indexes {
+    (site_id, party_id, relation_id) [unique, name: 'site_contact_site_party_relation_unique']
+  }
+
+  Note: '''
+    Standing people/orgs at a site. Child collection on `site_detail`. Links existing `party`
+    rows — create contacts first, then attach. Unique per (site, party, relation) unless
+    product later needs duplicates.
+  '''
+}
+
+// ─── Business (SubHub Slice 3 — catalog) ─────────────────────────────────────
+
+TableGroup catalog [color: #e67e22] {
+  manufacturer_part
+  vendor_part_price
+  item_category
+  item
+  item_part_link
+}
+
+Table manufacturer_part {
+  id text [pk, default: `gen_random_uuid()::text`]
+  manufacturer_party_id text [not null, note: 'FK → party (manufacturer tag)']
+  mpn text [not null, note: 'manufacturer part number']
+  description text [not null, default: '']
+  specs text [not null, default: '']
+  cut_sheet_url text [note: 'nullable — URL until polymorphic attachment lands']
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (manufacturer_party_id, mpn) [unique, name: 'manufacturer_part_mpn_unique']
+  }
+
+  Note: '''
+    Manufacturer catalog part (MPN/SKU). Vendor pricing on `vendor_part_price`.
+    Unique MPN per manufacturer party. Installed assets at site link through job lines
+    / items — not a free-text `site_system` register (decisions.md 2026-06-15).
+  '''
+}
+
+Table vendor_part_price {
+  vendor_party_id text [not null, note: 'FK → party (vendor tag)']
+  part_id text [not null, note: 'FK → manufacturer_part']
+  unit_price numeric [not null]
+  currency text [not null, default: 'USD']
+
+  indexes {
+    (vendor_party_id, part_id) [pk]
+  }
+
+  Note: '''
+    Current vendor price for a catalog part. v1: one row per vendor+part (no price history).
+    Snapshot unit_price onto estimate/job/PO lines at creation — live joins not used for billed amounts.
+  '''
+}
+
+Table item_category {
+  id text [pk, default: `gen_random_uuid()::text`]
+  name text [not null]
+  parent_id text [note: 'nullable FK → item_category.id; ON DELETE SET NULL']
+  sort_order int [not null, default: 0]
+
+  Note: 'Optional hierarchy for sellable/engineering items. Admin catalog — may get `item_category_table` Surface later.'
+}
+
+Table item {
+  id text [pk, default: `gen_random_uuid()::text`]
+  name text [not null]
+  description text [not null, default: '']
+  kind text [not null, default: 'product', note: 'CHECK: product | labor | assembly']
+  category_id text [note: 'nullable FK → item_category']
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Note: '''
+    Sellable SKU or engineering resource. BOM composition via `item_part_link`.
+    Referenced from estimate/job lines for traceability; amounts snapshot on lines.
+  '''
+}
+
+Table item_part_link {
+  item_id text [not null]
+  part_id text [not null]
+  quantity numeric [not null, default: 1]
+  sort_order int [not null, default: 0]
+
+  indexes {
+    (item_id, part_id) [pk]
+  }
+
+  Note: 'BOM link — how many of each manufacturer part compose an item. Child collection on `item_detail`.'
+}
+
+// ─── Business (SubHub Slice 4 — estimates) ───────────────────────────────────
+
+TableGroup estimate [color: #f39c12] {
+  job_party_relation
+  estimate
+  estimate_party
+  estimate_line
+}
+
+Table job_party_relation {
+  id text [pk, default: `gen_random_uuid()::text`]
+  display_name text [not null]
+  sort_order int [not null, default: 0]
+
+  indexes {
+    display_name [unique, name: 'job_party_relation_display_name_unique']
+  }
+
+  Note: '''
+    Catalog of engagement-scoped stakeholder roles (estimate + job). Parallel to
+    `site_contact_relation`. Suggested defaults: Customer, Property owner, Bill to, Sold to,
+    General contractor, Subcontractor, Subcontract through — empty at first migration in
+    Slice 4/5; progressive setup + catalog table page (decisions.md 2026-06-15).
+    Not master `party_role` tags (GC/sub live here).
+  '''
+}
+
+Table estimate {
+  id text [pk, default: `gen_random_uuid()::text`]
+  site_id text [not null, note: 'FK → site — logical place for quote']
+  title text [not null, default: '']
+  status text [not null, default: 'draft', note: 'CHECK: draft | sent | won | lost | expired']
+  estimate_date date [note: 'nullable — quote date']
+  valid_until date [note: 'nullable — quote expiry']
+  source_estimate_id text [note: 'nullable FK → estimate.id; revision chain']
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Note: '''
+    Sales quote anchor. Stakeholders on `estimate_party` (not a sole customer_id column).
+    Won quote → `job` copies site, parties, and line snapshots. In-building scope on lines
+    via `estimate_line.location_id` (decisions.md 2026-06-16).
+  '''
+}
+
+Table estimate_party {
+  estimate_id text [not null]
+  party_id text [not null]
+  relation_id text [not null, note: 'FK → job_party_relation']
+
+  indexes {
+    (estimate_id, party_id, relation_id) [pk]
+  }
+
+  Note: 'Per-quote stakeholder graph. Copied to `job_party` when estimate is won.'
+}
+
+Table estimate_line {
+  id text [pk, default: `gen_random_uuid()::text`]
+  estimate_id text [not null]
+  line_number int [not null]
+  description text [not null, default: '']
+  quantity numeric [not null, default: 1]
+  unit text [not null, default: 'ea']
+  unit_price numeric [not null, default: 0]
+  location_id text [note: 'nullable FK → location — in-building install/work scope']
+  item_id text [note: 'nullable FK → item — catalog ref at quote time']
+  part_id text [note: 'nullable FK → manufacturer_part']
+  sort_order int [not null, default: 0]
+
+  indexes {
+    (estimate_id, line_number) [unique, name: 'estimate_line_number_unique']
+  }
+
+  Note: '''
+    Quote line — snapshot description/qty/price at save. Child collection `line_items` on
+    `estimate_detail`. Catalog FKs are traceability only; billed amounts use copied values.
+  '''
+}
+
+// ─── Business (SubHub Slice 5 — jobs) ─────────────────────────────────────────
+
+TableGroup job [color: #e74c3c] {
+  job
+  job_party
+  job_location
+  job_line
+  job_line_progress
+  change_order
+  change_order_line
+}
+
+Table job {
+  id text [pk, default: `gen_random_uuid()::text`]
+  site_id text [not null, note: 'FK → site — where work happens']
+  estimate_id text [note: 'nullable FK → estimate — source won quote']
+  title text [not null, default: '']
+  status text [not null, default: 'planned', note: 'CHECK: planned | active | complete | cancelled']
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Note: '''
+    Operations anchor. No sole customer_id — counterparty graph on `job_party`.
+    Work areas on `job_location`; line-level in-building scope on `job_line.location_id`.
+  '''
+}
+
+Table job_party {
+  job_id text [not null]
+  party_id text [not null]
+  relation_id text [not null, note: 'FK → job_party_relation']
+
+  indexes {
+    (job_id, party_id, relation_id) [pk]
+  }
+
+  Note: 'Per-job stakeholders. Relations from `job_party_relation` catalog — not master `party_role`.'
+}
+
+Table job_location {
+  job_id text [not null]
+  location_id text [not null]
+  purpose text [not null, note: 'CHECK: work_area | mdf_room | floor | other']
+
+  indexes {
+    (job_id, location_id, purpose) [pk]
+  }
+
+  Note: '''
+    Job work-area attachment to a shared `location` row. Same location id may also appear on
+    `party_location`. Use `location.label` for human place names within the building.
+  '''
+}
+
+Table job_line {
+  id text [pk, default: `gen_random_uuid()::text`]
+  job_id text [not null]
+  line_number int [not null]
+  description text [not null, default: '']
+  quantity numeric [not null, default: 1]
+  unit text [not null, default: 'ea']
+  unit_price numeric [not null, default: 0]
+  location_id text [note: 'nullable FK → location — copied from estimate_line when applicable']
+  item_id text [note: 'nullable FK → item']
+  part_id text [note: 'nullable FK → manufacturer_part']
+  estimate_line_id text [note: 'nullable FK → estimate_line — traceability']
+  sort_order int [not null, default: 0]
+
+  indexes {
+    (job_id, line_number) [unique, name: 'job_line_number_unique']
+  }
+
+  Note: '''
+    Exploded BOM / scope line — snapshot from `estimate_line` on win. Child collection
+    `line_items` on `job_detail`. Progress tracked on `job_line_progress`.
+  '''
+}
+
+Table job_line_progress {
+  id text [pk, default: `gen_random_uuid()::text`]
+  job_line_id text [not null]
+  recorded_at timestamptz [not null, default: `now()`]
+  percent_complete numeric [not null, default: 0, note: '0–100']
+
+  Note: 'Per-line progress history. May be nested Field on `job_detail` or separate sub-section.'
+}
+
+Table change_order {
+  id text [pk, default: `gen_random_uuid()::text`]
+  job_id text [not null]
+  title text [not null, default: '']
+  status text [not null, default: 'draft', note: 'CHECK: draft | approved | rejected']
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Note: 'Job scope delta. Lines snapshot added/changed work; may adjust contract value.'
+}
+
+Table change_order_line {
+  id text [pk, default: `gen_random_uuid()::text`]
+  change_order_id text [not null]
+  line_number int [not null]
+  description text [not null, default: '']
+  quantity numeric [not null, default: 1]
+  unit text [not null, default: 'ea']
+  unit_price numeric [not null, default: 0]
+  sort_order int [not null, default: 0]
+
+  indexes {
+    (change_order_id, line_number) [unique, name: 'change_order_line_number_unique']
+  }
+
+  Note: 'CO line — snapshot values. Child collection on `change_order_detail`.'
+}
+
+// ─── Business (SubHub Slice 6 — financial) ───────────────────────────────────
+
+TableGroup financial [color: #8e44ad] {
+  invoice
+  invoice_line
+  purchase_order
+  po_line
+  schedule_of_value
+  sov_line
+}
+
+Table invoice {
+  id text [pk, default: `gen_random_uuid()::text`]
+  job_id text [not null]
+  invoice_number text [note: 'nullable until issued — unique when set']
+  status text [not null, default: 'draft', note: 'CHECK: draft | sent | paid | void']
+  invoice_date date [note: 'nullable']
+  due_date date [note: 'nullable']
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Note: 'Customer billing from job. Lines snapshot amounts; optional link back to `job_line`.'
+}
+
+Table invoice_line {
+  id text [pk, default: `gen_random_uuid()::text`]
+  invoice_id text [not null]
+  line_number int [not null]
+  description text [not null, default: '']
+  quantity numeric [not null, default: 1]
+  unit text [not null, default: 'ea']
+  unit_price numeric [not null, default: 0]
+  job_line_id text [note: 'nullable FK → job_line — billed against scope line']
+  sort_order int [not null, default: 0]
+
+  indexes {
+    (invoice_id, line_number) [unique, name: 'invoice_line_number_unique']
+  }
+
+  Note: 'Invoice line — snapshot. Child collection `line_items` on `invoice_detail`.'
+}
+
+Table purchase_order {
+  id text [pk, default: `gen_random_uuid()::text`]
+  job_id text [not null]
+  vendor_party_id text [not null, note: 'FK → party (vendor tag)']
+  po_number text [note: 'nullable until issued — unique when set']
+  status text [not null, default: 'draft', note: 'CHECK: draft | sent | received | cancelled']
+  order_date date [note: 'nullable']
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Note: 'Procurement from job. Vendor is a party; lines snapshot catalog parts and prices.'
+}
+
+Table po_line {
+  id text [pk, default: `gen_random_uuid()::text`]
+  purchase_order_id text [not null]
+  line_number int [not null]
+  description text [not null, default: '']
+  quantity numeric [not null, default: 1]
+  unit text [not null, default: 'ea']
+  unit_price numeric [not null, default: 0]
+  part_id text [note: 'nullable FK → manufacturer_part']
+  job_line_id text [note: 'nullable FK → job_line — ties PO to job scope']
+  sort_order int [not null, default: 0]
+
+  indexes {
+    (purchase_order_id, line_number) [unique, name: 'po_line_number_unique']
+  }
+
+  Note: 'PO line — snapshot. Child collection on `purchase_order_detail`.'
+}
+
+Table schedule_of_value {
+  id text [pk, default: `gen_random_uuid()::text`]
+  job_id text [not null]
+  name text [not null, default: '']
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Note: 'Simplified progress billing schedule on a job (Slice 6). One job may have one SOV in v1.'
+}
+
+Table sov_line {
+  id text [pk, default: `gen_random_uuid()::text`]
+  schedule_of_value_id text [not null]
+  line_number int [not null]
+  description text [not null, default: '']
+  scheduled_value numeric [not null, default: 0, note: 'contract amount for milestone']
+  sort_order int [not null, default: 0]
+
+  indexes {
+    (schedule_of_value_id, line_number) [unique, name: 'sov_line_number_unique']
+  }
+
+  Note: '''
+    SOV milestone line. Link to `job_line` for progress-to-bill mapping — deferred detail;
+    v1 may bill against SOV lines manually. Child collection on SOV detail Surface.
+  '''
+}
+
+// ─── Relationships ────────────────────────────────────────────────────────────
+
+Ref: latch_user_roles.user_id > latch_users.id [delete: cascade]
+Ref: latch_user_roles.role_id > latch_roles.id [delete: restrict]
+Ref: latch_user_roles.scope_id > latch_scopes.id
+
+Ref: latch_role_surfaces.role_id > latch_roles.id [delete: cascade]
+Ref: latch_role_grants.role_id > latch_roles.id [delete: cascade]
+Ref: latch_role_delegations.role_id > latch_roles.id [delete: cascade]
+Ref: latch_role_delegations.assignable_role_id > latch_roles.id [delete: cascade]
+Ref: latch_scopes.parent_id > latch_scopes.id
+
+Ref: latch_pending_changes.supersedes_id > latch_pending_changes.id
+
+Ref: party_person.party_id > party.id [delete: cascade]
+Ref: party_organization.party_id > party.id [delete: cascade]
+Ref: party_role.party_id > party.id [delete: cascade]
+Ref: party_phone.party_id > party.id [delete: cascade]
+Ref: party_email.party_id > party.id [delete: cascade]
+Ref: party_location.party_id > party.id [delete: cascade]
+Ref: party_user.party_id > party_person.party_id [delete: cascade]
+Ref: party_user.latch_user_id > latch_users.id [delete: cascade]
+Ref: employee.party_id > party_person.party_id [delete: cascade]
+Ref: employee.latch_user_id > latch_users.id [delete: set null]
+
+Ref: party_location.location_id > location.id [delete: cascade]
+Ref: site.parent_site_id > site.id [delete: set null]
+Ref: site_contact.site_id > site.id [delete: cascade]
+Ref: site_contact.party_id > party.id [delete: cascade]
+Ref: site_contact.relation_id > site_contact_relation.id [delete: restrict]
+
+Ref: manufacturer_part.manufacturer_party_id > party.id [delete: restrict]
+Ref: vendor_part_price.vendor_party_id > party.id [delete: cascade]
+Ref: vendor_part_price.part_id > manufacturer_part.id [delete: cascade]
+Ref: item.category_id > item_category.id [delete: set null]
+Ref: item_category.parent_id > item_category.id [delete: set null]
+Ref: item_part_link.item_id > item.id [delete: cascade]
+Ref: item_part_link.part_id > manufacturer_part.id [delete: restrict]
+
+Ref: estimate.site_id > site.id [delete: restrict]
+Ref: estimate.source_estimate_id > estimate.id [delete: set null]
+Ref: estimate_party.estimate_id > estimate.id [delete: cascade]
+Ref: estimate_party.party_id > party.id [delete: cascade]
+Ref: estimate_party.relation_id > job_party_relation.id [delete: restrict]
+Ref: estimate_line.estimate_id > estimate.id [delete: cascade]
+Ref: estimate_line.location_id > location.id [delete: set null]
+Ref: estimate_line.item_id > item.id [delete: set null]
+Ref: estimate_line.part_id > manufacturer_part.id [delete: set null]
+
+Ref: job.site_id > site.id [delete: restrict]
+Ref: job.estimate_id > estimate.id [delete: set null]
+Ref: job_party.job_id > job.id [delete: cascade]
+Ref: job_party.party_id > party.id [delete: cascade]
+Ref: job_party.relation_id > job_party_relation.id [delete: restrict]
+Ref: job_location.job_id > job.id [delete: cascade]
+Ref: job_location.location_id > location.id [delete: cascade]
+Ref: job_line.job_id > job.id [delete: cascade]
+Ref: job_line.location_id > location.id [delete: set null]
+Ref: job_line.item_id > item.id [delete: set null]
+Ref: job_line.part_id > manufacturer_part.id [delete: set null]
+Ref: job_line.estimate_line_id > estimate_line.id [delete: set null]
+Ref: job_line_progress.job_line_id > job_line.id [delete: cascade]
+Ref: change_order.job_id > job.id [delete: cascade]
+Ref: change_order_line.change_order_id > change_order.id [delete: cascade]
+
+Ref: invoice.job_id > job.id [delete: restrict]
+Ref: invoice_line.invoice_id > invoice.id [delete: cascade]
+Ref: invoice_line.job_line_id > job_line.id [delete: set null]
+Ref: purchase_order.job_id > job.id [delete: restrict]
+Ref: purchase_order.vendor_party_id > party.id [delete: restrict]
+Ref: po_line.purchase_order_id > purchase_order.id [delete: cascade]
+Ref: po_line.part_id > manufacturer_part.id [delete: set null]
+Ref: po_line.job_line_id > job_line.id [delete: set null]
+Ref: schedule_of_value.job_id > job.id [delete: cascade]
+Ref: sov_line.schedule_of_value_id > schedule_of_value.id [delete: cascade]

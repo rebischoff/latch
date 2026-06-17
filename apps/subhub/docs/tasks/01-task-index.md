@@ -20,8 +20,8 @@ Orient the SubHub delivery slices and task chain. Global status: [`../../STATUS.
   → 06-iam-surfaces → 07-iam-dal-api → 08-iam-ui → 09-dev-roles-seed
   → 10-party-migration → 11-contact-surfaces → 12-contact-dal-api
   → 13-contact-ui → 14-contact-child-collections
-  → 15-entity-flow → 16-slice2-planning-gate → 17-site-migration
-  → (slice 2+ — see below)
+  → 15-entity-flow → 16-slice2-planning-gate → 17-schema-design-pass
+  → 18-site-migration → (slice 2 surfaces/UI — see below)
 ```
 
 ## Dependency diagram (Slice 0–1)
@@ -76,28 +76,39 @@ flowchart TD
 
 ---
 
+## Schema design (pre-migration)
+
+**Exit criteria:** [`current.dbml`](../schema/current.dbml) covers Slices 2–6 at column level; decisions locked; no new SQL until pass exits.
+
+| # | Task | Delivers |
+|---|------|----------|
+| 17 | [17-schema-design-pass.md](./17-schema-design-pass.md) | DBML through catalog, estimates, jobs, financial; schema-first decision |
+
+---
+
 ## Slice 02 — Sites
 
-**Exit criteria:** Sites with locations (site + party attachments) and linked contacts (relation catalog).
+**Exit criteria:** CRUD flat sites (`name`); standing contacts on `site_detail`; editable `site_contact_relation` catalog table page. DDL includes `location` + `party_location` junction; **no** party-address UI or site hierarchy UI in this slice ([decision](../decisions.md#decision-slice-2-ui-scope--planning-gate-2026-06-16)).
 
 | # | Task | Delivers |
 |---|------|----------|
 | 15 | [15-entity-flow.md](./15-entity-flow.md) | Cross-slice entity flow in `architecture.md` (docs only) |
-| 16 | [16-slice2-planning-gate.md](./16-slice2-planning-gate.md) | Lock Slice 2 open choices; align task 17 before DDL |
-| 17 | [17-site-migration.md](./17-site-migration.md) | `location`, `site`, junctions, `site_contact_relation`, `site_contact`; `party_role` expand |
-| 18 | *TBD* `18-site-surfaces.md` | `site_list`, `site_detail` |
-| 19 | *TBD* `19-site-dal-api-ui.md` | DAL, API, `/sites` UI |
-| 20 | *TBD* | `party_location` on `contact_detail` — **only if** task 16 chooses follow-up path |
+| 16 | [16-slice2-planning-gate.md](./16-slice2-planning-gate.md) | Lock Slice 2 open choices; align migration before DDL |
+| 18 | [18-site-migration.md](./18-site-migration.md) | `location`, `site`, junctions, `site_contact_relation` (empty DDL) + dev seed |
+| 19 | *TBD* `19-site-surfaces.md` | `site_list`, `site_detail`, `site_contact_relation_table` |
+| 20 | *TBD* `20-site-dal-api-ui.md` | DAL, API, `/sites` master-detail + `/sites/contact-relations` catalog table |
+| 21 | *TBD* | `party_location` on `contact_detail` — deferred until more domain context |
 
-**Deferred (documented, not Slice 2):** `job` / `job_party` / `job_location` → Slice 5; `party_user` / `user_class` → future identity slice ([decisions.md](../decisions.md)).
+**Deferred (documented, not Slice 2 UI):** `parent_site_id` picker; `party_location` on contacts; progressive-setup wizards for empty catalogs ([decisions.md](../decisions.md#decision-progressive-setup--master-catalogs-2026-06-16)); estimate/job DDL → Slices 4–5 (designed in DBML, task 17); `party_user` / `user_class` / employee HR columns → future identity slice.
 
 ```mermaid
 flowchart LR
   t15[15 entity flow] --> t16[16 planning gate]
-  t16 --> t17[17 migration]
-  t17 --> t18[18 surfaces]
-  t18 --> t19[19 DAL and UI]
-  t16 -.->|optional| t20[20 party_location]
+  t16 --> t17[17 schema pass]
+  t17 --> t18[18 migration]
+  t18 --> t19[19 surfaces]
+  t19 --> t20[20 DAL and UI]
+  t20 -.->|later| t21[21 party_location]
 ```
 
 ---
@@ -108,7 +119,7 @@ flowchart LR
 
 | # | Task | Delivers |
 |---|------|----------|
-| 21–23 | *TBD* | `manufacturer_part`, `item`, surfaces, UI |
+| 21–23 | *TBD* | `manufacturer_part`, `item`, surfaces, UI — **DBML drafted** ([`schema/current.dbml`](../schema/current.dbml)) |
 
 ---
 
@@ -118,7 +129,7 @@ flowchart LR
 
 | # | Task | Delivers |
 |---|------|----------|
-| 24–26 | *TBD* | `estimate`, `estimate_line`, UI |
+| 24–26 | *TBD* | `estimate`, `estimate_line`, UI — **DBML drafted** |
 
 ---
 
@@ -128,7 +139,7 @@ flowchart LR
 
 | # | Task | Delivers |
 |---|------|----------|
-| 27–30 | *TBD* | `job`, `job_line`, `change_order`, UI |
+| 27–30 | *TBD* | `job`, `job_line`, `change_order`, UI — **DBML drafted** |
 
 ---
 
@@ -138,7 +149,7 @@ flowchart LR
 
 | # | Task | Delivers |
 |---|------|----------|
-| 31–33 | *TBD* | `invoice`, `purchase_order`, SOV simplified |
+| 31–33 | *TBD* | `invoice`, `purchase_order`, SOV simplified — **DBML drafted** |
 
 ---
 

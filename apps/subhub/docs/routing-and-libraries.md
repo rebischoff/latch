@@ -82,6 +82,27 @@ Phase 02 CRM used `?id=` query params; SubHub uses **path segments** for shareab
 
 ---
 
+## Catalog tables — editable table page
+
+Small master/catalog tables (`site_contact_relation`, future job relation catalogs, …) use a **single Surface** — not master-detail ([decision](./decisions.md#decision-catalog-tables--editable-table-page-not-master-detail-2026-06-16)).
+
+```
+app/(app)/sites/contact-relations/page.tsx   → editable Table (site_contact_relation_table)
+api/sites/contact-relations/route.ts         → GET list, POST create
+api/sites/contact-relations/[id]/route.ts    → PATCH | DELETE
+```
+
+| Piece | Pattern |
+|-------|---------|
+| Surface id | `{table}_table` |
+| Nav | Same sidebar group as consuming domain (e.g. Sites → “Contact relations”) |
+| UI | Ant Design `Table` + row add/edit/delete (or modal rows); `SurfaceToolbar` for New / Save as needed |
+| vs master-detail | No `/[id]` detail route; sparse catalogs do not need a list sider + detail split |
+
+Progressive setup may **suggest** initial catalog rows on first use; the catalog table page is the permanent edit path.
+
+---
+
 ## Next.js App Router (16)
 
 | Practice | SubHub usage |
