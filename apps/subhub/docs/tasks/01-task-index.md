@@ -10,7 +10,7 @@ Orient the SubHub delivery slices and task chain. Global status: [`../../STATUS.
 
 - [00-decisions.md](./00-decisions.md) complete.
 - Platform scaffold applied (`migrations/001`–`012`, `.env.local`, auth smoke test).
-- Skim [`../architecture.md`](../architecture.md) and [`../decisions.md`](../decisions.md).
+- Skim [`../architecture.md`](../architecture.md) and [`../decisions/README.md`](../decisions/README.md).
 
 ## Execution order (Slice 0 → 1 → …)
 
@@ -21,7 +21,7 @@ Orient the SubHub delivery slices and task chain. Global status: [`../../STATUS.
   → 10-party-migration → 11-contact-surfaces → 12-contact-dal-api
   → 13-contact-ui → 14-contact-child-collections
   → 15-entity-flow → 16-slice2-planning-gate → 17-schema-design-pass
-  → 18-site-migration → (slice 2 surfaces/UI — see below)
+  → 18-surface-catalog → 19-surface-implement-specs → (implementation waves — see below)
 ```
 
 ## Dependency diagram (Slice 0–1)
@@ -78,7 +78,7 @@ flowchart TD
 
 ## Schema design (pre-migration)
 
-**Exit criteria:** [`current.dbml`](../schema/current.dbml) covers Slices 2–6 at column level; decisions locked; no new SQL until pass exits.
+**Exit criteria:** [`current.dbml`](../schema/current.dbml) covers Slices 2–6 at column level; decisions locked.
 
 | # | Task | Delivers |
 |---|------|----------|
@@ -86,30 +86,84 @@ flowchart TD
 
 ---
 
-## Slice 02 — Sites
+## Surface & Field catalog (pre-implementation)
 
-**Exit criteria:** CRUD flat sites (`name`); standing contacts on `site_detail`; editable `site_contact_relation` catalog table page. DDL includes `location` + `party_location` junction; **no** party-address UI or site hierarchy UI in this slice ([decision](../decisions.md#decision-slice-2-ui-scope--planning-gate-2026-06-16)).
+**Exit criteria:** [`surfaces.md`](../surfaces.md) design-complete at Field level; open decisions O1–O7 resolved; implementation waves re-cut. **Complete 2026-06-17.**
+
+| # | Task | Delivers |
+|---|------|----------|
+| 18 | [18-surface-catalog.md](./18-surface-catalog.md) | Canonical Surface/Field catalog; resolve open UI decisions — **complete** |
+
+**Deferred migration spec (preserved):** [deferred/site-migration.md](./deferred/site-migration.md) — wave 1 DDL; **starts after task 19**.
+
+---
+
+## Surface implement specs (pre-code)
+
+**Exit criteria:** Every v1 Surface has implement-tier spec in [`surface-specs/`](../surface-specs/README.md); [`00-scan.md`](../surface-specs/00-scan.md) all ✅. **No SQL/YAML/DAL/UI until exit.**
+
+| # | Task | Delivers |
+|---|------|----------|
+| 19 | [19-surface-implement-specs.md](./19-surface-implement-specs.md) | Full v1 DAL/UI/policy spec per Surface |
+
+---
+
+## Implementation waves
+
+Delivery order **after** task **19** exits. Slices remain useful labels; waves are the ship sequence.
+
+### Wave 1 — Sites (+ party refactor migration)
+
+**Exit criteria:** CRUD flat sites; standing contacts; relation catalog table. DDL per [`deferred/site-migration.md`](./deferred/site-migration.md). **Requires task 19 complete.**
+
+| # | Task | Delivers |
+|---|------|----------|
+| *TBD* | `deferred/site-migration.md` | `018`–`020` SQL — party refactor + sites |
+| *TBD* | site surfaces | `site_list`, `site_detail`, `site_contact_relation_table` YAML |
+| *TBD* | site DAL/UI | `/sites` master-detail + contact-relations catalog |
+
+**Deferred within wave 1 UI:** `parent_site_id` picker; `site_section` / `site_location` on `site_detail` (wave 2b).
+
+```mermaid
+flowchart LR
+  t19[19 surface specs] --> w1m[wave 1 migration]
+  w1m --> w1s[wave 1 surfaces]
+  w1s --> w1u[wave 1 DAL UI]
+```
+
+### Wave 2 — Party addresses + site geography
+
+| # | Task | Delivers |
+|---|------|----------|
+| *TBD* | | `addresses` on `{role}_detail` lenses |
+| *TBD* | | `sections`, `locations` on `site_detail` |
+
+### Waves 3–7
+
+| Wave | Exit criteria | Surfaces (headline) |
+|------|---------------|---------------------|
+| 3 Catalog | Parts, items, vendor pricing | `part_*`, `item_*`, `category_table`, `labor_class_table`, `phase_table` |
+| 4 Estimates | Quote + snapshot lines | `estimate_*`, `job_party_relation_table` |
+| 5 Jobs | Sold scope, field status, COs | `job_*`, `change_order_*` |
+| 6a Procurement | Requisition → PO → receipts | `requested_order_*`, `purchase_order_*`, `material_receipt_*` |
+| 6b Billing | Billable staging → invoice | `invoice_*`, `billable_items` + `sov_milestones` on `job_detail` |
+| 7 Reports | Job progress aggregates | Custom SQL pages |
+
+Field detail: [`surfaces.md`](../surfaces.md). DBML: [`current.dbml`](../schema/current.dbml).
+
+---
+
+## Slice 02 — Sites *(legacy label → wave 1)*
+
+> **Superseded by [Implementation waves](#implementation-waves)** (2026-06-17). Kept for decision traceability.
+
+**Exit criteria:** CRUD flat sites (`name`); standing contacts on `site_detail`; editable `site_contact_relation` catalog table page. DDL includes `address` + `party_address` junction + `site_section` / `site_location` (no UI for geography in wave 1); **no** party-address UI or site hierarchy UI in wave 1 ([decision](../decisions/site.md#decision-slice-2-ui-scope--planning-gate-2026-06-16).
 
 | # | Task | Delivers |
 |---|------|----------|
 | 15 | [15-entity-flow.md](./15-entity-flow.md) | Cross-slice entity flow in `architecture.md` (docs only) |
 | 16 | [16-slice2-planning-gate.md](./16-slice2-planning-gate.md) | Lock Slice 2 open choices; align migration before DDL |
-| 18 | [18-site-migration.md](./18-site-migration.md) | `location`, `site`, junctions, `site_contact_relation` (empty DDL) + dev seed |
-| 19 | *TBD* `19-site-surfaces.md` | `site_list`, `site_detail`, `site_contact_relation_table` |
-| 20 | *TBD* `20-site-dal-api-ui.md` | DAL, API, `/sites` master-detail + `/sites/contact-relations` catalog table |
-| 21 | *TBD* | `party_location` on `contact_detail` — deferred until more domain context |
-
-**Deferred (documented, not Slice 2 UI):** `parent_site_id` picker; `party_location` on contacts; progressive-setup wizards for empty catalogs ([decisions.md](../decisions.md#decision-progressive-setup--master-catalogs-2026-06-16)); estimate/job DDL → Slices 4–5 (designed in DBML, task 17); `party_user` / `user_class` / employee HR columns → future identity slice.
-
-```mermaid
-flowchart LR
-  t15[15 entity flow] --> t16[16 planning gate]
-  t16 --> t17[17 schema pass]
-  t17 --> t18[18 migration]
-  t18 --> t19[19 surfaces]
-  t19 --> t20[20 DAL and UI]
-  t20 -.->|later| t21[21 party_location]
-```
+| — | [deferred/site-migration.md](./deferred/site-migration.md) | Migration spec (was task 18) |
 
 ---
 
@@ -145,11 +199,11 @@ flowchart LR
 
 ## Slice 06 — Financial
 
-**Exit criteria:** Invoice from job; PO from job parts.
+**Exit criteria:** Billable staging → invoice from job; PO from job parts; SOV milestones for progress jobs.
 
 | # | Task | Delivers |
 |---|------|----------|
-| 31–33 | *TBD* | `invoice`, `purchase_order`, SOV simplified — **DBML drafted** |
+| 31–33 | *TBD* | `billable_line`, `invoice`, `purchase_order`, SOV + `sov_allocation` — **DBML drafted** |
 
 ---
 

@@ -1,10 +1,10 @@
 # 17 — Schema design pass (Slices 2–6)
 
-> **Status:** Complete (2026-06-16). Next: [18-site-migration.md](./18-site-migration.md).
+> **Status:** Complete (2026-06-16). Next: [18-surface-catalog.md](./18-surface-catalog.md) *(was site migration; repointed 2026-06-17)*.
 
 ## Goal
 
-Finish the **business schema in [`current.dbml`](../schema/current.dbml)** before writing more SQL migrations or Surfaces. Slice 2 (sites/locations) is already drafted; extend through catalog, estimates, jobs, and financial tables with refs and `Note` blocks. Lock any open forks in [`decisions.md`](../decisions.md). **DBML + docs only** — no `migrations/*.sql` in this task.
+Finish the **business schema in [`current.dbml`](../schema/current.dbml)** before writing more SQL migrations or Surfaces. Slice 2 (sites/locations) is already drafted; extend through catalog, estimates, jobs, and financial tables with refs and `Note` blocks. Lock any open forks in [`decisions.md`](../decisions/README.md). **DBML + docs only** — no `migrations/*.sql` in this task.
 
 ## Prerequisites
 
@@ -19,7 +19,7 @@ Shipped `016_party.sql` still differs from the design target (`party_person`, po
 | File | Action |
 |------|--------|
 | [`../schema/current.dbml`](../schema/current.dbml) | **Extend** — Slices 3–6 tables, refs, `TableGroup`s; review Slice 1–2 draft |
-| [`../decisions.md`](../decisions.md) | **Update** — schema-first gate; resolve forks from the pass |
+| [`../decisions/README.md`](../decisions/README.md) | **Update** — schema-first gate; resolve forks from the pass |
 | [`../architecture.md`](../architecture.md) | **Update** — data model summary + entity flow labels |
 | [`01-task-index.md`](./01-task-index.md) | **Update** — execution order; defer task **18** until this exits |
 | [`../../STATUS.md`](../../STATUS.md) | **Update** — point here until verify passes |
@@ -33,16 +33,16 @@ Shipped `016_party.sql` still differs from the design target (`party_person`, po
 | Slice | Tables |
 |-------|--------|
 | **1** *(review)* | `party_person`, `party_organization`, `note`; `employee` FK → `party_person`; align `party` with shipped `016` migration path |
-| **2** *(review)* | `location`, `site`, `party_location`, `site_contact_relation`, `site_contact` — already drafted |
-| **3** | `manufacturer_part`, `vendor_part_price`, `item_category`, `item`, `item_part_link` |
-| **4** | `estimate`, `estimate_party`, `estimate_line` |
-| **5** | `job_party_relation`, `job`, `job_party`, `job_location`, `job_line`, `job_line_progress`, `change_order`, `change_order_line` |
-| **6** | `invoice`, `invoice_line`, `purchase_order`, `po_line`, `schedule_of_value`, `sov_line` |
+| **2** *(review)* | `address`, `site`, `site_section`, `site_location`, `party_address`, `site_contact_relation`, `site_contact` |
+| **3** | `category`, `labor_class`, `manufacturer_part`, `vendor_part`, `item`, `item_part_link` |
+| **4** | `estimate`, `estimate_party`, `estimate_section`, `estimate_line` |
+| **5** | `job_party_relation`, `job`, `job_party`, `job_location`, `job_line`, `job_line_part`, `job_line_progress`, `change_order`, `change_order_line` |
+| **6** | `billable_line`, `invoice`, `invoice_line`, `purchase_order`, `purchase_order_line`, `schedule_of_value`, `sov_line`, `sov_allocation` |
 
 ### Still deferred (Notes only — no columns)
 
 - `attachment` polymorphic files
-- Address verification columns on `location`
+- Address verification columns on `address`
 - `party_user`, `latch_users.user_class` (identity slice)
 - Employee HR columns on `employee`
 - Slice 7 report views (custom SQL, not tables)
@@ -51,31 +51,31 @@ Shipped `016_party.sql` still differs from the design target (`party_person`, po
 
 ### 1. Review Slice 1–2 draft
 
-Confirm party kind extensions, `note` replacing interim `party.notes`, and site/location junctions match locked [decisions](../decisions.md). No `site_location` table.
+Confirm party kind extensions, `note` replacing interim `party.notes`, and site/address junctions match locked [decisions](../decisions/README.md). `site_section` + `site_location` on site.
 
 ### 2. Catalog (Slice 3)
 
-- `manufacturer_part` — FK → `party` (manufacturer tag); MPN, description, specs, `cut_sheet_url`
-- `vendor_part_price` — vendor `party` + part; current unit price (v1: one row per vendor+part)
-- `item` / `item_category` / `item_part_link` — sellable/engineering BOM composition
+- `category` — hierarchy with optional `csi_code` (MasterFormat when org chooses)
+- `manufacturer_part` — UOM on part only; `vendor_part` — vendor PN + price
+- `item` — `default_part_id` + `default_vendor_part_id` for costing; kinds include `expense`
+- `item_part_link` — alternates or assembly part components (only item composition table)
+- `labor_class` — rate bucket on labor items (rates deferred)
 
 ### 3. Estimates (Slice 4)
 
-- `estimate` — anchor at `site_id`; status lifecycle; optional link to source estimate on revision
-- `estimate_party` — per-quote stakeholders via `job_party_relation` catalog (same relations as job slice)
-- `estimate_line` — snapshot `description`, `quantity`, `unit_price`; optional `location_id`, `item_id`, `part_id` refs
+- `estimate` — optional `category_id`; `estimate_section` — group by `category` or location
+- `estimate_line` — snapshot cost/sell; kits via `parent_line_id`; category on section not line
 
 ### 4. Jobs (Slice 5)
 
-- `job_party_relation` — catalog (parallel to `site_contact_relation`); relations per [job anchor decision](../decisions.md#decision-job-anchor-and-stakeholders--deferred-to-job-slice-2026-06-15)
-- `job` — `site_id` NOT NULL; optional `estimate_id`; no sole `customer_id` column
-- `job_party`, `job_location`, `job_line`, `job_line_progress`, `change_order` + lines
+- `job_line` (sold scope) + `job_line_part` (engineering/procurement 3C)
 
 ### 5. Financial (Slice 6)
 
-- `invoice` / `invoice_line` — from `job`; snapshot lines; optional `job_line_id` link
-- `purchase_order` / `po_line` — vendor + job; snapshot lines; optional `part_id` / `job_line_id`
-- `schedule_of_value` / `sov_line` — simplified progress billing milestones on job
+- `billable_line` — earned staging before invoice; auto from work items / manual pickup
+- `invoice` / `invoice_line` — from job; snapshot lines; `billing_kind`, retainage/deposit header fields
+- `purchase_order` / `purchase_order_line` — vendor + job; snapshot lines; optional `part_id` / `job_line_id`
+- `schedule_of_value` / `sov_line` / `sov_allocation` — SOV milestones mapped to `job_line` / `phase`
 
 ### 6. Sync docs
 
@@ -90,12 +90,14 @@ In task **18** or a short note in `decisions.md`: ordered migration batches afte
 - [x] `current.dbml` includes all tables in **Scope** with `Ref:` lines
 - [x] Slice 3–6 `TableGroup`s added; group names/colors unchanged for existing groups
 - [x] `job.site_id` NOT NULL; no `customer_id` on `site` or `job`; `estimate` uses `site_id` + `estimate_party`
-- [x] Line tables (`estimate_line`, `job_line`, `invoice_line`, `po_line`) document snapshot columns per [line-item decision](../decisions.md#decision-line-item-snapshots-on-estimate--job--invoice-2026-06-12)
-- [x] `estimate_line.location_id` / `job_line.location_id` present for in-building scope
+- [x] Line tables (`estimate_line`, `job_line`, `invoice_line`, `purchase_order_line`) document snapshot columns per [line-item decision](../decisions/general.md#decision-line-item-snapshots-on-estimate--job--invoice-2026-06-12)
+- [x] `estimate_line.site_location_id` / `job_line.site_location_id` present for in-building scope
+- [x] `estimate_section` groups by `category` — not per line ([catalog decision](../decisions/catalog.md#decision-catalog--simplified-parts-items-categories-2026-06-16))
+- [x] `job_line` + `job_line_part` (sold vs engineering 3C)
 - [x] `job_party_relation` catalog documented (not master `party_role` tags for GC/sub)
-- [x] No `site_system` table; no `site` ↔ `location` junction
+- [x] No `site_system` table; no `site` ↔ `address` junction
 - [x] Decision block: schema-first before migrations (dated)
-- [x] [`../../STATUS.md`](../../STATUS.md) → [18-site-migration.md](./18-site-migration.md)
+- [x] [`../../STATUS.md`](../../STATUS.md) → [18-surface-catalog.md](./18-surface-catalog.md) *(repointed 2026-06-17; was site migration)*
 
 ## Out of scope
 

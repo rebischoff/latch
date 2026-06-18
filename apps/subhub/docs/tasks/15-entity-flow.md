@@ -22,7 +22,7 @@ Slice 1 complete ([14-contact-child-collections.md](./14-contact-child-collectio
 
 ### Locked during task
 
-Task-scoped choices (doc structure for this sketch) are recorded **here**, not in [`decisions.md`](../decisions.md) — unless a contradiction with a global Decision is found.
+Task-scoped choices (doc structure for this sketch) are recorded **here**, not in [`decisions.md`](../decisions/README.md) — unless a contradiction with a global Decision is found.
 
 #### Step 1 — section placement (2026-06-15) ✓
 
@@ -30,7 +30,7 @@ Task-scoped choices (doc structure for this sketch) are recorded **here**, not i
 |--------|----------------|
 | **Section title** | `## Entity flow` |
 | **Placement** | After `## Data model (summary)` (including timestamps note), **before** `## Surface catalog` |
-| **Intro** | One paragraph: relationship map across slices; solid = Slice 1 + task 17 DDL; dashed = deferred per [decisions.md](../decisions.md) |
+| **Intro** | One paragraph: relationship map across slices; solid = Slice 1 + task 17 DDL; dashed = deferred per [decisions.md](../decisions/README.md) |
 
 **Recorded in:** [`architecture.md`](../architecture.md) `#entity-flow` (section stub; diagram completed in steps 2–5).
 
@@ -50,7 +50,7 @@ Task-scoped choices (doc structure for this sketch) are recorded **here**, not i
    ```
 
 4. Call out what **task 17** creates vs what later slices add (one short table). — **done (2026-06-16)**
-5. Link to relevant [decisions.md](../decisions.md) blocks — do not duplicate locked choices. — **done (2026-06-16)**
+5. Link to relevant [decisions.md](../decisions/README.md) blocks — do not duplicate locked choices. — **done (2026-06-16)**
 
 ## Verify (stop gate)
 
@@ -63,9 +63,9 @@ Task-scoped choices (doc structure for this sketch) are recorded **here**, not i
 
 - Full task files for slices 3–7
 - DDL or Surface YAML
-- Changes to [`decisions.md`](../decisions.md) unless a contradiction is found (then fix decisions, not this sketch)
+- Changes to [`decisions.md`](../decisions/README.md) unless a contradiction is found (then fix decisions, not this sketch)
 
 ## Reference
 
-- [decisions.md](../decisions.md) — locked CRM model (2026-06-15)
+- [decisions.md](../decisions/README.md) — locked CRM model (2026-06-15)
 - [01-task-index.md](./01-task-index.md) — slice map

@@ -21,7 +21,7 @@ Slice 0 complete ([09-dev-roles-seed.md](./09-dev-roles-seed.md)).
 
 ## Steps
 
-1. `party`: `id TEXT PK`, `kind`, `display_name`, `legal_name`, `notes`, `created_at` / `updated_at` (business-anchor convenience — list sort; mutation history stays in `latch_audit`). Do **not** add `created_by` until row-scope needs it ([decisions.md](../decisions.md#decision-row-timestamps-vs-audit--ddl-vs-surface-fields-2026-06-13)).
+1. `party`: `id TEXT PK`, `kind`, `display_name`, `legal_name`, `notes`, `created_at` / `updated_at` (business-anchor convenience — list sort; mutation history stays in `latch_audit`). Do **not** add `created_by` until row-scope needs it ([decisions.md](../decisions/general.md#decision-row-timestamps-vs-audit--ddl-vs-surface-fields-2026-06-13).
 2. `party_role`: `(party_id, role)` unique; check constraint on role enum.
 3. `party_phone` / `party_email`: FK `party_id ON DELETE CASCADE`, `is_primary`, sort order.
 4. `employee`: `party_id` PK/FK, `latch_user_id` nullable FK → `latch_users`.

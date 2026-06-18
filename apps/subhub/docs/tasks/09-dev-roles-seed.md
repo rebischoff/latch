@@ -24,7 +24,7 @@
 | `components/shell/LoginForm.tsx` | **Edit** — accept username or email identifier |
 | `lib/auth-utils.ts` | **Edit** — `setupHref`, gate helpers |
 | `modules/iam/user_*.surface.yaml` | **Edit** — expose `login_name` Field |
-| `docs/decisions.md` | Decision block — setup + identity model |
+| `docs/decisions/README.md` | Decision block — setup + identity model |
 | `docs/architecture.md` | Replace dev SQL seed section |
 
 ## Steps

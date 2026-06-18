@@ -26,7 +26,7 @@ Contacts                     ← type: 'group' (manifest)
   Contacts, …
 ```
 
-App header chrome (title, settings dropdown) stays as implemented in task 03/04; this task delivers **sidebar nav data + `SideNav` only**. Page toolbars (`SurfaceToolbar`) are task **08** onward — see [decisions.md](../decisions.md).
+App header chrome (title, settings dropdown) stays as implemented in task 03/04; this task delivers **sidebar nav data + `SideNav` only**. Page toolbars (`SurfaceToolbar`) are task **08** onward — see [decisions.md](../decisions/README.md).
 
 ## Prerequisites
 
@@ -76,7 +76,7 @@ App header chrome (title, settings dropdown) stays as implemented in task 03/04;
 - [x] User without IAM grants sees no IAM group
 - [x] Home and Settings are top-level sidebar items (not inside Surface groups)
 - [x] Surface links render under `type: 'group'` labels (IAM, Contacts, …)
-- [x] Nav hrefs are explicit paths per [decisions.md](../decisions.md)
+- [x] Nav hrefs are explicit paths per [decisions.md](../decisions/README.md)
 - [x] Sidebar links use `next/link` (route prefetch enabled); no `router.push`-only sidebar nav
 - [x] [`../../STATUS.md`](../../STATUS.md) → [06-iam-surfaces.md](./06-iam-surfaces.md)
 
@@ -90,5 +90,5 @@ App header chrome (title, settings dropdown) stays as implemented in task 03/04;
 
 ## Reference
 
-- [decisions.md](../decisions.md) — nav sources, sidebar grouping, shell chrome layers
+- [decisions.md](../decisions/README.md) — nav sources, sidebar grouping, shell chrome layers
 - [routing-and-libraries.md](../routing-and-libraries.md) — sidebar navigation pattern

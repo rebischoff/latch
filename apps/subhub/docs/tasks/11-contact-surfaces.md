@@ -28,7 +28,7 @@ Surface YAML for contacts and subset lists; codegen + registry.
 1. `anchorTable: party` for contact surfaces; `employee` for employee detail.
 2. Logical collection fields: `columns: []` with comment pointing to [child-collections.md](../child-collections.md).
 3. Run codegen; fix any migration cross-check mismatches.
-4. Omit `created_at` / `updated_at` / `created_by` from Surface Fields unless product requires manifest-gated display ([decisions.md](../decisions.md#decision-row-timestamps-vs-audit--ddl-vs-surface-fields-2026-06-13)).
+4. Omit `created_at` / `updated_at` / `created_by` from Surface Fields unless product requires manifest-gated display ([decisions.md](../decisions/general.md#decision-row-timestamps-vs-audit--ddl-vs-surface-fields-2026-06-13).
 5. Log **L1/L2** in latch-feedback if glue stubs missing.
 
 ## Verify (stop gate)

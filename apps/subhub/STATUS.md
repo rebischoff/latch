@@ -1,15 +1,15 @@
 # STATUS — SubHub
 
 > App-local quarterback. Platform pointer: [`../../STATUS.md`](../../STATUS.md).
-> Updated: 2026-06-16.
+> Updated: 2026-06-17.
 
 - **Package:** `@latch/subhub` · **Port:** 3003
 - **Docs:** [`docs/README.md`](./docs/README.md) · **Tasks:** [`docs/tasks/01-task-index.md`](./docs/tasks/01-task-index.md)
-- **State:** Slice 1 complete (contacts UI). **Schema design pass** — DBML through Slice 6; migrations deferred.
+- **State:** DBML + Field catalog complete. **Surface implement specs (task 19)** — full v1 DAL/UI planning before code.
 
 ## Right now — do this next
 
-**Task 18 — site migration** — first SQL batch after schema pass: party refactor + sites/locations per [`18-site-migration.md`](./docs/tasks/18-site-migration.md). Review [`schema/current.dbml`](./docs/schema/current.dbml) and migration batch order before writing `018+`.
+**Task 19 — Surface implement specs** — one-by-one DAL/policy/UI specs per [`surface-specs/00-scan.md`](./docs/surface-specs/00-scan.md). **Next: #2 `iam-role.md`**. Progress: 1/28 ([`iam-user.md`](./docs/surface-specs/iam-user.md) ✅).
 
 ## Blockers
 
@@ -21,31 +21,20 @@ None.
 |-------|--------|-------|
 | [00 — App shell](./docs/tasks/01-task-index.md#slice-00--app-shell) | Layout, nav, auth, IAM surfaces | complete (tasks 04–09) |
 | [01 — Party / contacts](./docs/tasks/01-task-index.md#slice-01--party--contacts) | `party` model, phones/emails, subsets | **complete** (tasks 10–14) |
-| **Schema** | DBML Slices 2–6 | **complete** (task [17](./docs/tasks/17-schema-design-pass.md)) — migrations next |
-| [02 — Sites](./docs/tasks/01-task-index.md#slice-02--sites) | Sites, locations, site contacts | **pending** (task [18](./docs/tasks/18-site-migration.md) migration → 19–20 surfaces/UI) |
-| [03 — Catalog](./docs/tasks/01-task-index.md#slice-03--catalog) | Parts, items, vendor pricing | planned (DBML drafted) |
-| [04 — Estimates](./docs/tasks/01-task-index.md#slice-04--estimates) | Sales quotes + line items | planned (DBML drafted) |
-| [05 — Jobs](./docs/tasks/01-task-index.md#slice-05--jobs--change-orders) | BOM explosion, progress, COs | planned (DBML drafted) |
-| [06 — Financial](./docs/tasks/01-task-index.md#slice-06--financial) | Invoices, POs, progress billing | planned (DBML drafted) |
-| [07 — Reports](./docs/tasks/01-task-index.md#slice-07--reports) | Job progress aggregates | planned |
+| **Schema** | DBML Slices 2–6 | **complete** (task [17](./docs/tasks/17-schema-design-pass.md)) |
+| **Field catalog** | Fields + waves | **complete** (task [18](./docs/tasks/18-surface-catalog.md)) |
+| **Surface specs** | DAL + UI + policy per Surface | **active** (task [19](./docs/tasks/19-surface-implement-specs.md)) — **1/28** [`iam-user.md`](./docs/surface-specs/iam-user.md) ✅ |
+| [02 — Sites](./docs/tasks/01-task-index.md#wave-1--sites-party-refactor-migration) | Sites, party refactor | **blocked** until task 19 |
+| [03–07](./docs/tasks/01-task-index.md) | Catalog → reports | planned (DBML drafted) |
 
 ## Recently completed
 
-- **17 — Schema design pass** — `current.dbml` extended through Slice 6 (catalog, estimates, jobs, financial); `job_party_relation` catalog; schema-first decision ([`decisions.md`](./docs/decisions.md#decision-schema-first--finish-dbml-before-migrations-2026-06-16)) (2026-06-16).
-- **16 — Slice 2 planning gate** — empty relation catalog; deferred `party_location` UI + site hierarchy; progressive setup for catalogs; tasks 18–19 headline scope ([`decisions.md`](./docs/decisions.md#decision-slice-2-ui-scope--planning-gate-2026-06-16)) (2026-06-16).
-- **15 — Entity flow** — cross-slice relationship map in [`architecture.md`](./docs/architecture.md#entity-flow) (2026-06-16).
-- **14 — Contact child collections** — phones/emails on `contact_detail` (2026-06-13).
-- **13 — Contact UI** — `/contacts` master-detail (2026-06-13).
-- **12 — Contact DAL and API** (2026-06-13).
-- **11 — Contact surfaces** (2026-06-13).
-- **10 — Party migration** — `016_party.sql` (2026-06-13).
+- **18 — Surface & Field catalog** — O1–O7 locked; [`surfaces.md`](./docs/surfaces.md); decisions in [`decisions/`](./docs/decisions/README.md) (2026-06-17).
+- **Planning model clarified** — task 19 + [`surface-specs/`](./docs/surface-specs/README.md) for full v1 implement depth before code (2026-06-17).
 
 ## Pointers
 
-- [Schema DBML](./docs/schema/current.dbml) · [Schema workflow](./docs/schema/README.md) · [dbdiagram](https://dbdiagram.io/d/latch-6a3215ad5c789b8acb9d5278)
-- [Decisions](./docs/decisions.md) — locked choices
-- [Architecture](./docs/architecture.md) — data model + entity flow
-- [Routing & libraries](./docs/routing-and-libraries.md)
-- [Child collections](./docs/child-collections.md)
-- [Latch feedback](./docs/latch-feedback.md)
-- [Scaffold runbook](../../packages/codegen/docs/scaffold-runbook.md)
+- [Schema DBML](./docs/schema/current.dbml) · [Schema workflow](./docs/schema/README.md)
+- [Decisions](./docs/decisions/README.md) · [Surface catalog](./docs/surfaces.md) · [Surface specs](./docs/surface-specs/README.md)
+- [Architecture](./docs/architecture.md) · [Child collections](./docs/child-collections.md)
+- [Tasks](./docs/tasks/01-task-index.md) · [Scaffold runbook](../../packages/codegen/docs/scaffold-runbook.md)

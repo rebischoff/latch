@@ -14,13 +14,13 @@ Planning session complete (2026-06-12).
 
 | File | Action |
 |------|--------|
-| [`../decisions.md`](../decisions.md) | Decision blocks for party model, routes, UI stack, collections |
+| [`../decisions/README.md`](../decisions/README.md) | Decision blocks for party model, routes, UI stack, collections |
 | [`../routing-and-libraries.md`](../routing-and-libraries.md) | Dynamic vs explicit routes; parallel routes; library practices |
 | [`../child-collections.md`](../child-collections.md) | Related-record pattern |
 | [`../architecture.md`](../architecture.md) | Data model + surface catalog |
 | [`../../STATUS.md`](../../STATUS.md) | Points at task **02** |
 
-## Decisions locked (see [`../decisions.md`](../decisions.md))
+## Decisions locked (see [`../decisions/README.md`](../decisions/README.md))
 
 1. Party spine — `party` + `party_role` subsets.
 2. No approval / verification workflow.
@@ -33,7 +33,7 @@ Planning session complete (2026-06-12).
 
 ## Verify (stop gate)
 
-- [x] [`../decisions.md`](../decisions.md) has dated Decision blocks
+- [x] [`../decisions/README.md`](../decisions/README.md) has dated Decision blocks
 - [x] Routing questions answered in [`../routing-and-libraries.md`](../routing-and-libraries.md)
 - [x] Child collection plan in [`../child-collections.md`](../child-collections.md)
 - [x] [`../../STATUS.md`](../../STATUS.md) **Right now** → [02-ui-dependencies.md](./02-ui-dependencies.md)

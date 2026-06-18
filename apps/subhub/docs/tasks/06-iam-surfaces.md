@@ -29,7 +29,7 @@ Surface YAML for users, roles, and user-role assignment; codegen + policy regist
 3. Column entries use `{ column, type }` objects.
 4. Run `npm run codegen -w @latch/subhub`; wire registry.
 5. **No** `*.policies.yaml` — grants come from DB seeds (task **09**).
-6. **No audit-metadata Fields** — omit `created_at` / `created_by` from IAM surface YAML; `user_roles_detail.profile` matches Phase 03 (`id`, `display_name` only). See [decisions.md](../decisions.md#decision-row-timestamps-vs-audit--ddl-vs-surface-fields-2026-06-13).
+6. **No audit-metadata Fields** — omit `created_at` / `created_by` from IAM surface YAML; `user_roles_detail.profile` matches Phase 03 (`id`, `display_name` only). See [decisions.md](../decisions/general.md#decision-row-timestamps-vs-audit--ddl-vs-surface-fields-2026-06-13).
 
 ## Verify (stop gate)
 

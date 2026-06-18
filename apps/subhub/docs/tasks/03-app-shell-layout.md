@@ -30,7 +30,7 @@
 3. `AppShell`: fixed left sider (~240px), header with app title + user menu placeholder; `ConfigProvider` + `App`; customize via `theme.useToken()` (antd v6 CSS variables on by default).
 4. Desktop-only: no mobile collapse requirement beyond Ant default.
 
-**Follow-on (documented, later tasks):** task **05** replaces `ShellNav` with manifest-aware `SideNav`; app header gains settings dropdown extensions; per-route **`SurfaceToolbar`** lands in task **08** — see [decisions.md](../decisions.md) and [routing-and-libraries.md](../routing-and-libraries.md).
+**Follow-on (documented, later tasks):** task **05** replaces `ShellNav` with manifest-aware `SideNav`; app header gains settings dropdown extensions; per-route **`SurfaceToolbar`** lands in task **08** — see [decisions.md](../decisions/README.md) and [routing-and-libraries.md](../routing-and-libraries.md).
 
 ## Verify (stop gate)
 
@@ -45,4 +45,4 @@
 ## Reference
 
 - [architecture.md](../architecture.md) — directory shape
-- [decisions.md](../decisions.md) — desktop-only
+- [decisions.md](../decisions/README.md) — desktop-only

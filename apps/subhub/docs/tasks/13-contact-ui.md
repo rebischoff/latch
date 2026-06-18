@@ -23,7 +23,7 @@
 
 ## Steps
 
-1. **No parallel routes** — list lives in `layout.tsx` ([decisions.md](../decisions.md)).
+1. **No parallel routes** — list lives in `layout.tsx` ([decisions.md](../decisions/README.md)).
 2. Row click → `router.push(/contacts/${id})`.
 3. React Query: `useSurfaceList('contact_list')`, `useSurfaceDetail('contact_detail', id)`.
 4. **`SurfaceToolbar`:** New / Delete / Save from manifest; reuse component from task **08** ([routing-and-libraries.md](../routing-and-libraries.md#surface-toolbar)).

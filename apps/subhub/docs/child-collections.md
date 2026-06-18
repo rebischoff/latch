@@ -39,7 +39,9 @@ When the client PATCHes `phones`, the body includes the **full desired array**. 
 
 **Defer delta/op-based patches** (`{ op: 'add', ... }`) until needed — replace is easier to test and matches RHF field-array submit shape.
 
-## Example: `contact_detail`
+## Example: `customer_detail` *(lens — pattern shared across `{role}_detail`)*
+
+Slice 1 implemented the same shape on interim `contact_detail`; wave 1 splits type lenses per [party list/detail decision](./decisions/party.md#decision-party-listdetail-surface-shape-2026-06-16-locked-2026-06-17).
 
 ### Surface YAML (sketch)
 
@@ -140,11 +142,11 @@ Same replace-on-save pattern for child collections on `site_detail`:
 |----------|-------------|-------|
 | `contacts` | `site_contact` + `site_contact_relation` | `party_id`, `relation_id` (display name from catalog) |
 
-Catalog starts **empty** in `019_site.sql`. Ongoing edit via **`site_contact_relation_table`** ([catalog table page](./decisions.md#decision-catalog-tables--editable-table-page-not-master-detail-2026-06-16)); optional first-use suggestions via [progressive setup](./decisions.md#decision-progressive-setup--master-catalogs-2026-06-16); local dev rows via [`020_site_contact_relation_dev_seed.sql`](../../migrations/020_site_contact_relation_dev_seed.sql).
+Catalog starts **empty** in `019_site.sql`. Ongoing edit via **`site_contact_relation_table`** ([catalog table page](./decisions/general.md#decision-catalog-tables--editable-table-page-not-master-detail-2026-06-16); optional first-use suggestions via [progressive setup](./decisions/cross-cutting.md#decision-progressive-setup--master-catalogs-2026-06-16); local dev rows via [`020_site_contact_relation_dev_seed.sql`](../../migrations/020_site_contact_relation_dev_seed.sql).
 
-No address collection on `site_detail` — sites are logical places; addresses live on `party_location` and estimate/job scope ([decision](./decisions.md#decision-in-building-work-scope--estimate--job-lifecycle-2026-06-16)).
+No address collection on `site_detail` — sites are logical places; postal addresses live on `party_address`; in-building scope on `site_section` / `site_location` ([decision](./decisions/site.md#decision-address-vs-site-geography--rename-and-split-2026-06-17).
 
-`party_location` on `contact_detail` (Slice 2+) — same pattern for billing/HQ addresses.
+`party_address` on `{role}_detail` lenses (wave 2) — same pattern for billing/HQ addresses.
 
 Installed systems at a site deferred to catalog slice (items/parts linkage), not `site_detail` collections.
 
@@ -160,9 +162,38 @@ Same pattern at larger scale:
 
 Extra rules (implemented in DAL, not generic kernel):
 
-- **Snapshot on copy** — `copyEstimateToJob(estimateId)` creates `job_line` from `estimate_line` values (including planned `location_id` for in-building scope — [decision](../decisions.md#decision-in-building-work-scope--estimate--job-lifecycle-2026-06-16))
+- **Snapshot on copy** — `copyEstimateToJob(estimateId)` creates `job_line` from `estimate_line` values (including planned `location_id` for in-building scope — [decision](../decisions/site.md#decision-site-owned-sections-and-locations--lifecycle-and-history-2026-06-17))
 - **Ordering** — `line_number` or `sort_order` column
-- **Progress** — `job_line_progress` may be a nested array Field or separate sub-section with its own Field id
+- **Progress** — `job_work_item` nested array Field or sub-section on `job_detail` ([decision](./decisions/job.md#decision-field-status--job_work_item-2026-06-17))
+
+## Billable staging (jobs → invoices)
+
+Parallel to requisition before PO — earned rows before customer invoice:
+
+| Surface | Field id | Child table |
+|---------|----------|-------------|
+| `job_detail` (billing section) | `billable_items` | `billable_line` |
+
+Extra rules (DAL):
+
+- **Auto-generate** — refresh `open` rows from `job_work_item` (install), receipt qty (deferred), or manual entry per [billing decision](./decisions/billing.md#decision-billing--earned-staging-progress-sov-retainage-2026-06-17))
+- **Pickup** — selected `open` rows → `invoice_line` with `billable_line_id` (canonical); set `billable_line.invoice_line_id` in same transaction
+- **Void invoice** — revert linked billable rows to `open`
+- **Cap** — billed qty per `job_line` cannot exceed sold quantity
+
+## SOV milestones (`progress_sov` jobs)
+
+| Surface | Field id | Child tables |
+|---------|----------|--------------|
+| `job_detail` (Billing tab) | `sov_milestones` | `schedule_of_value`, `sov_line`, `sov_allocation` |
+
+Visible when `job.billing_model = progress_sov`. No standalone SOV Surface — [SOV UI decision](./decisions/billing.md#decision-sov-ui--nested-on-job_detail-billing-tab-2026-06-17).
+
+Extra rules (DAL):
+
+- **Allocation XOR** — each `sov_allocation` row: exactly one of `allocation_pct` or `allocated_value`
+- **Cap** — milestone billing cannot exceed `sov_line.scheduled_value` minus prior invoiced amounts
+- **Sync warning** — DAL warns when SUM(`sov_line.scheduled_value`) diverges from active sold scope (auto-sync deferred)
 
 ## Permissions
 
@@ -185,5 +216,5 @@ Log in [latch-feedback.md](./latch-feedback.md):
 ## Tasks
 
 - Slice 1 task **14** — implement phones/emails on `contact_detail` ([01-task-index.md](./tasks/01-task-index.md))
-- Slice 2 task **19+** — `site_detail` collections ([18-site-migration.md](./tasks/18-site-migration.md))
+- Slice 2 — `site_detail` collections ([surfaces.md](./surfaces.md), wave 1)
 - Slice 4+ — line items on estimate/job surfaces

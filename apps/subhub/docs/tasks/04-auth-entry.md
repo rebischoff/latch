@@ -22,7 +22,7 @@ Next.js 16 deprecates `middleware.ts` in favor of `proxy.ts` — a **network bou
 | DAL / `resolveContext` | Authorization (403/404) — separate from authentication |
 | `UserMenu` (client) | Voluntary login link with `usePathname()` → `callbackUrl` |
 
-**Why not gate in `(private)/layout.tsx` with `callbackUrl`?** Server layouts cannot read the current URL ([Next.js `usePathname` docs](https://nextjs.org/docs/app/api-reference/functions/use-pathname)). SubHub uses **explicit routes** — each protected page passes its own href to `requireAuth`. See [decisions.md](../decisions.md) and [routing-and-libraries.md](../routing-and-libraries.md#auth-gating).
+**Why not gate in `(private)/layout.tsx` with `callbackUrl`?** Server layouts cannot read the current URL ([Next.js `usePathname` docs](https://nextjs.org/docs/app/api-reference/functions/use-pathname)). SubHub uses **explicit routes** — each protected page passes its own href to `requireAuth`. See [decisions.md](../decisions/README.md) and [routing-and-libraries.md](../routing-and-libraries.md#auth-gating).
 
 ## Files
 
@@ -69,5 +69,5 @@ Next.js 16 deprecates `middleware.ts` in favor of `proxy.ts` — a **network bou
 
 ## Reference
 
-- [decisions.md](../decisions.md) — auth gating, no proxy, login route group
+- [decisions.md](../decisions/README.md) — auth gating, no proxy, login route group
 - [routing-and-libraries.md](../routing-and-libraries.md#auth-gating) — Next.js 16 patterns

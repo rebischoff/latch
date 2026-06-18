@@ -6,7 +6,7 @@
 
 ### Recommendation: **no** `app/[surface]/…` catch-all
 
-Your instinct matches ours ([decision](./decisions.md)): each domain page is its own route tree because:
+Your instinct matches ours ([decision](./decisions/README.md)): each domain page is its own route tree because:
 
 | Concern | Why catch-all fails |
 |---------|---------------------|
@@ -84,7 +84,7 @@ Phase 02 CRM used `?id=` query params; SubHub uses **path segments** for shareab
 
 ## Catalog tables — editable table page
 
-Small master/catalog tables (`site_contact_relation`, future job relation catalogs, …) use a **single Surface** — not master-detail ([decision](./decisions.md#decision-catalog-tables--editable-table-page-not-master-detail-2026-06-16)).
+Small master/catalog tables (`site_contact_relation`, future job relation catalogs, …) use a **single Surface** — not master-detail ([decision](./decisions/general.md#decision-catalog-tables--editable-table-page-not-master-detail-2026-06-16).
 
 ```
 app/(app)/sites/contact-relations/page.tsx   → editable Table (site_contact_relation_table)
@@ -159,7 +159,7 @@ Public routes: `(public)/page.tsx`, `(public)/login/page.tsx`, auth API routes.
 
 ### Sidebar navigation
 
-Nav merges **public** routes (always), **session** items (authenticated, not Surfaces), and **manifest-filtered** Surface catalog entries — see [task 05](./tasks/05-nav-manifest.md) and [decisions](./decisions.md).
+Nav merges **public** routes (always), **session** items (authenticated, not Surfaces), and **manifest-filtered** Surface catalog entries — see [task 05](./tasks/05-nav-manifest.md) and [decisions](./decisions/README.md).
 
 | Practice | Detail |
 |----------|--------|
@@ -302,6 +302,6 @@ Each hook knows the **explicit API path** for that surface (not a dynamic URL bu
 
 ## Related
 
-- [decisions.md](./decisions.md) — explicit routes, no parallel routes
+- [decisions.md](./decisions/README.md) — explicit routes, no parallel routes
 - [child-collections.md](./child-collections.md) — `useFieldArray` + DAL array Fields
 - [architecture.md](./architecture.md) — directory layout
