@@ -14,7 +14,7 @@ General scan before one-by-one implement specs. **Legend:** ✅ spec complete ·
 | Catalog-table Surfaces | 5 |
 | List+detail pairs | 13 |
 | Shipped (backfill spec) | 8 |
-| DBML tables without Surface | 2 (`phase` — gap; `party_user` — deferred identity) |
+| DBML tables without Surface | 1 (`phase` — gap) |
 | Report pages (wave 7) | 1+ (out of scope for Surface specs) |
 
 **Recommendation:** Still correct to fully plan all Surfaces before implementation code. DBML gives *data* depth; this pass gives *screen + DAL + UI* depth so waves do not re-debate the same patterns.
@@ -25,12 +25,12 @@ General scan before one-by-one implement specs. **Legend:** ✅ spec complete ·
 
 | # | Spec file | Surface(s) | Wave | Spec |
 |---|-----------|------------|------|------|
-| 1 | [iam-user.md](./iam-user.md) | `user_list` · `user_detail` | 0 | ✅ |
-| 2 | [iam-role.md](./iam-role.md) | `role_list` · `role_detail` | 0 | ⬜ |
-| 3 | [iam-user-roles.md](./iam-user-roles.md) | `user_roles_detail` | 0 | ⬜ |
-| 4 | [customer.md](./customer.md) | `customer_list` · `customer_detail` | 0→1 | ⬜ |
-| 5 | [vendor.md](./vendor.md) | `vendor_list` · `vendor_detail` | 0→1 | ⬜ |
-| 6 | [manufacturer.md](./manufacturer.md) | `manufacturer_list` · `manufacturer_detail` | 0→1 | ⬜ |
+| 1 | [iam-user.md](./iam-user.md) | `user_list` · `user_roles_detail` | 0 | ✅ target (2026-06-18); code interim |
+| 2 | [iam-role.md](./iam-role.md) | `role_list` · `role_detail` | 0 | ✅ target (2026-06-18); code interim |
+| 3 | — | `user_roles_detail` · `role_assignments` | 0 | ↪ **merged** into [iam-user.md](./iam-user.md) (2026-06-18) |
+| 4 | [customer.md](./customer.md) | `customer_list` · `customer_detail` | 0→1 | ✅ target (2026-06-18) |
+| 5 | [vendor.md](./vendor.md) | `vendor_list` · `vendor_detail` | 0→1 | ✅ target (2026-06-18) |
+| 6 | [manufacturer.md](./manufacturer.md) | `manufacturer_list` · `manufacturer_detail` | 0→1 | ✅ target (2026-06-18); list shipped |
 | 7 | [property-owner.md](./property-owner.md) | `property_owner_list` · `property_owner_detail` | 1 | ⬜ |
 | 8 | [employee.md](./employee.md) | `employee_list` · `employee_detail` | 0 | ⬜ |
 | 9 | [contact-retire.md](./contact-retire.md) | `contact_*` retire | 1 | ⬜ |
@@ -62,7 +62,7 @@ General scan before one-by-one implement specs. **Legend:** ✅ spec complete ·
 
 | Table | Surface | Notes |
 |-------|---------|-------|
-| `latch_users` | `user_*` | Platform IAM |
+| `latch_users` | `user_*` (join) | Credentials; IAM list anchors `party_person` |
 | `latch_roles`, grants, bindings | `role_*`, `user_roles_detail` | |
 | `latch_audit` | 🚫 | Append-only; no Surface |
 | `latch_*` config | 🚫 | Admin out of v1 |
@@ -72,19 +72,20 @@ General scan before one-by-one implement specs. **Legend:** ✅ spec complete ·
 | Table | Surface | Notes |
 |-------|---------|-------|
 | `party` | `{role}_detail` lenses | List filters via `party_role` |
-| `party_person`, `party_organization` | 🚫 | Kind extensions on detail `profile` |
+| `party_person` | `user_list`, `user_roles_detail`, `{role}_detail` `profile` | Login link + session chrome; IAM lens when linked |
+| `party_organization` | org `{role}_detail` `profile`, `parent_customer`, subsidiaries | `parent_party_id` — hub wave |
+| `party_contact` + `party_contact_relation` | `contacts` on org `customer_detail` / `vendor_detail` | catalog table spec TBD |
 | `party_role` | 🚫 | `add_role` / `remove_role` actions |
-| `party_phone`, `party_email` | `phones`, `emails` collections | |
+| `party_phone`, `party_email` | `phones`, `emails` collections | `is_login_email` on `party_email`; sync to `latch_users.login_email` |
 | `party_address` + `address` | `addresses` wave 2 | |
-| `party_user` | ➖ identity slice | Defer spec with portal |
-| `employee` | `employee_detail` | Staff marker; HR later (O7) |
+| `employee` | `employee_detail` | Staff marker; `add_as_db_user` provision |
 | `note` | cross-cutting | Opt-in per Surface |
 
 ### Site
 
 | Table | Surface | Notes |
 |-------|---------|-------|
-| `site` | `site_*` | |
+| `site` | `site_*` | `customer_party_id` — portfolio hub ([site decision](../decisions/site.md)) |
 | `site_contact` | `contacts` on `site_detail` | |
 | `site_contact_relation` | `site_contact_relation_table` | |
 | `site_section`, `site_location` | `site_detail` wave 2b | DDL wave 1 |
@@ -135,6 +136,7 @@ General scan before one-by-one implement specs. **Legend:** ✅ spec complete ·
 | Procurement PO batching one-liner only | 24 |
 | `estimate_detail` `win` action undeclared in policy | 20 |
 | Cross-cutting notes/attachments per-Surface table incomplete | 28 |
+| `party_contact_relation_table` missing from catalog | customer / party-contact spec |
 | Wave 2 `addresses` not broken out per lens | 12 |
 
 ---

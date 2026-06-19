@@ -37,7 +37,7 @@ Task-scoped choices (doc structure for this sketch) are recorded **here**, not i
 ---
 
 1. Add `## Entity flow` after the data model summary (or after `## Data model (summary)` tables). — **done (2026-06-15)**
-2. Diagram **implemented** entities solid; **deferred** entities dashed (notes/attachments, `party_user`, address verification, catalog installs at site). — **done (2026-06-16)**
+2. Diagram **implemented** entities solid; **deferred** entities dashed (notes/attachments, portal `user_class`, address verification, catalog installs at site). — **done (2026-06-16)**; identity shape locked 2026-06-18 ([party decision](../decisions/party.md#decision-party-identity--party_person-login-link-2026-06-18)).
 3. Minimum paths to show: — **done (2026-06-16)**
 
    ```text

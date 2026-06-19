@@ -18,7 +18,7 @@
 
 **Rationale:** Schema answers what exists; Surfaces answer what users see and change under policy. Designing Fields across the full v1 map avoids migration/UI rework when later slices (estimates, jobs, billing) clarify child collections and pickers. Delivery still lands in waves — design is holistic, ship is incremental.
 
-**Amended (2026-06-17):** Task 18 = Field catalog only. Task [19](../tasks/19-surface-implement-specs.md) = **full v1 implement specs** ([`surface-specs/`](../surface-specs/README.md)) before any implementation code. No migrations/YAML/DAL/UI until task 19 exits.
+**Amended (2026-06-18):** Discuss Surfaces at **implement-spec** depth (schema + fields + policy + DAL + UI in chat) **before** migrations or UI — as in the IAM identity thread leading to [party identity](./party.md#decision-party-identity--party_person-login-link-2026-06-18). One spec file per Surface group; fold decisions into DBML + `decisions/` in the same pass.
 
 
 ### Decision: schema-first — finish DBML before migrations (2026-06-16)
@@ -42,7 +42,7 @@
 | Field status | **`job_work_item`** |
 | Engagements | **`job.job_kind`** — project / service / warranty |
 
-**Still deferred:** `attachment`, address verification, `party_user`, employee HR columns, Slice 7 report SQL, `margin_rule`, `labor_rate` / `burden_profile`, **`job_phase` scheduling (v2)**, **`site_audit`** (typed geography timeline — use `latch_audit` until needed), `installed_asset` registry, vendor price history, `classification_system`, **org-wide warehouse WMS**.
+**Still deferred:** `attachment`, address verification, `latch_users.user_class` (portal), employee HR columns, Slice 7 report SQL, `margin_rule`, `labor_rate` / `burden_profile`, **`job_phase` scheduling (v2)**, **`site_audit`** (typed geography timeline — use `latch_audit` until needed), `installed_asset` registry, vendor price history, `classification_system`, **org-wide warehouse WMS**.
 
 
 ### Decision: single `/login` page — no modal (2026-06-12)
@@ -92,6 +92,19 @@
 **Choice:** List + detail uses a **shared parent `layout.tsx`** (list in the layout, detail in child `page.tsx` / `[id]/page.tsx`). **Do not** use parallel route slots (`@list` / `@detail`) in v1.
 
 **Rationale:** Parallel routes add slot wiring, soft-navigation edge cases, and duplicate data-fetch coordination for modest gain. Nested layouts keep the list mounted when switching ids, URLs stay shareable (`/contacts/abc`), and implementation matches prior CRM split-shell learning without `?id=` query strings. Revisit parallel routes only if independent `loading.tsx` / `error.tsx` per pane becomes a measured need.
+
+
+### Decision: cross-Surface related records — navigation only v1 (2026-06-18)
+
+**Choice:** When one Surface surfaces **related** rows owned by another Surface (customer hub → job, site, invoice; job → customer), v1 uses **manifest-gated navigation** to the target’s **canonical route** (`/jobs/[id]`, `/sites/[id]`, …). **No** drawer or modal hosting a full foreign Surface form in v1.
+
+| Pattern | v1 | Later |
+|---------|-----|-------|
+| Link row / tree leaf → open record | `<Link>` / `router.push` + auto-select in master-detail layout | — |
+| Read-only summary on hub | Synthetic Fields (`related_jobs`, `related_invoices`) — omit when no target `read` grant | Optional drawer peek |
+| Quick create contact / subsidiary | Inline action or small create form on **same** Surface; full edit on target lens URL | — |
+
+**Rationale:** Each Surface keeps its own policy boundary, toolbar, and URL. Re-resolve manifest on navigation ([`access-control.md`](../../../packages/policy/docs/access-control.md)); avoids ambiguous Save/delete scope. Drawer previews revisited after hub ships.
 
 
 ### Decision: catalog tables — editable table page, not master-detail (2026-06-16)
@@ -208,7 +221,7 @@
 
 **Choice:** Platform migrate leaves **`latch_users` empty**. First admin via **`/setup`**: validate `LATCH_SETUP_KEY`, collect **login_name** + password, create user with `system_data` + `system_iam`. Migration `013_latch_identity_guards.sql` adds `login_name`, `setup_complete`, and DB triggers (immutable `role_class`, system catalog not deletable, last system-role holder not revocable). DAL mirrors last-holder guard. No `bootstrap-admin`, no SQL dev user seed.
 
-**Identity:** `login_name` is the setup login identifier. `login_email` stays null until linked from `party_email` (task 10+). **Address-book display name** on `party`; **session chrome** (shell label, avatar) on draft `party_user` when linked — not on `latch_users`. Until `party_user` ships, interim staff link via `employee.latch_user_id`. Sign-in accepts username or linked email (`resolveLatchUserId`).
+**Identity:** `login_name` is the setup login identifier. **Target (2026-06-18):** `latch_users.login_email` (nullable, UNIQUE) — app copies from `party_email.is_login_email`; session chrome on `party_person`; link via `party_person.latch_user_id`. Provision login from person Surfaces (`add_as_db_user`), not IAM user Surface. Sign-in: `login_name` or `login_email` on `latch_users` only (`resolveLatchUserId`). **Shipped interim:** `employee.latch_user_id` until identity implementation wave; `login_email` column already on `latch_users`.
 
 **Rationale:** Matches production bootstrap (customer chooses admin identity). `PolicyService` synthesizes IAM for `system_iam` — no grant seed. Platform-locked: [P4b amendment](../../../packages/policy/docs/tasks/00-decisions-needed.md#amendment-first-run-setup--db-identity-guards-2026-06-13) + [scaffold runbook](../../../packages/codegen/docs/scaffold-runbook.md#first-run-setup).
 

@@ -43,7 +43,7 @@ Shipped `016_party.sql` still differs from the design target (`party_person`, po
 
 - `attachment` polymorphic files
 - Address verification columns on `address`
-- `party_user`, `latch_users.user_class` (identity slice)
+- `latch_users.user_class` (portal row scope) — identity locked 2026-06-18 in [party.md](../decisions/party.md); SQL deferred post–task 19
 - Employee HR columns on `employee`
 - Slice 7 report views (custom SQL, not tables)
 

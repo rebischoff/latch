@@ -129,7 +129,8 @@ Unique `(site_id, party_id, relation_id)`.
 | Address verification / type-ahead API | later |
 | `attachment` shared table | deferred |
 | `job`, `job_party`, estimates, financial tables | waves 4–6 |
-| `party_user`, `latch_users.user_class` | future identity slice |
+| `party_person` login link, `party_email.is_login_email`, login email sync | identity wave (post–task 19) — [decision](../decisions/party.md#decision-login-email--app-sync-to-latch_userslogin_email-2026-06-18) |
+| `latch_users.user_class` | portal row scope — deferred |
 | Surface YAML, codegen, DAL, UI | wave 1 after this migration |
 
 ## Verify (stop gate)

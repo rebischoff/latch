@@ -119,33 +119,40 @@ Design is holistic; **ship** in waves after catalog exits.
 
 ## Wave 0 — IAM (shipped)
 
-### `user_list` · `user_detail`
+### `user_list` · `user_detail` · `user_roles_detail`
 
 | | |
 |--|--|
-| **Status** | shipped |
+| **Status** | shipped code (interim); **target spec** [iam-user.md](./surface-specs/iam-user.md) (2026-06-18) |
 | **Wave** | 0 |
-| **Route** | `/users`, `/users/[id]` *(detail pane: `user_roles_detail` — [spec](./surface-specs/iam-user.md))* |
+| **Route** | `/users`, `/users/[id]` |
 | **Nav group** | IAM |
-| **Anchor** | `latch_users` |
+| **Anchor (target)** | `party_person` — lens `latch_user_id IS NOT NULL` |
+| **Anchor (shipped)** | `latch_users` — catch up at identity wave |
 
-**`user_list` Field:** `summary` → `id`, `login_name`, `login_email` (nullable). UI table columns: Login, Login email.
+**Purpose:** IAM convenience directory — view linked app users and manage **roles** (and password actions). **Not** create/delete users; provision via **`add_as_db_user`** on person Surfaces (`employee_detail`, etc.).
 
-**`user_detail` Fields:** *(YAML + DAL; no dedicated route — profile shown via `user_roles_detail` UI.)*
+**`user_list` Fields (target):** `summary` → person chrome + login identifiers — `party_person` (`party_id`, `display_name`, `nick_name`, `avatar_url`), joined `latch_users.login_name`, `latch_users.login_email`.
 
-### `role_list` · `role_detail` · `user_roles_detail`
+**`user_roles_detail`:** role bindings — joins `party_person` → `latch_users` → `latch_user_roles`
+
+### `role_list` · `role_detail`
 
 | | |
 |--|--|
-| **Status** | shipped |
+| **Status** | shipped code (interim); **target spec** [iam-role.md](./surface-specs/iam-role.md) (2026-06-18) |
 | **Wave** | 0 |
-| **Route** | `/iam/roles`, `/iam/roles/[id]`, user role assignment pane |
+| **Route** | `/roles`, `/roles/[id]` |
 | **Nav group** | IAM |
-| **Anchor** | `latch_roles` / bindings |
+| **Anchor** | `latch_roles` |
 
-**`role_detail` Fields:** `profile` (name, `role_class`), grants collection (hand-written descriptor)
+**Purpose:** Role **definitions** — catalog row, per-surface `row_scope` bindings, sparse allow-grants. Sibling of `user_roles_detail` (assignments). See [iam-role.md](./surface-specs/iam-role.md).
 
-**`user_roles_detail`:** role bindings for a user — multi-table Surface
+**`role_list` Fields:** `summary` → `id`, `role_class`, `display_name`.
+
+**`role_detail` Fields:** `catalog` (name, `role_class`); `surface_bindings` + `grants` (grant matrix) — **`app` roles only in UI**; system classes show catalog only ([iam-role.md](./surface-specs/iam-role.md)).
+
+**`user_roles_detail`:** role bindings for a linked app user — [`iam-user.md`](./surface-specs/iam-user.md) § `role_assignments`.
 
 ---
 
@@ -159,7 +166,7 @@ Design is holistic; **ship** in waves after catalog exits.
 |------------|------|---------------|-------|--------|
 | `customer` | `customer_list` | `customer_detail` | `/customers` | list shipped; **detail new** |
 | `vendor` | `vendor_list` | `vendor_detail` | `/vendors` | list shipped; **detail new** |
-| `manufacturer` | `manufacturer_list` | `manufacturer_detail` | `/manufacturers` | list YAML; **detail new** |
+| `manufacturer` | `manufacturer_list` | `manufacturer_detail` | `/manufacturers` | list shipped; **detail target spec** |
 | `property_owner` | `property_owner_list` | `property_owner_detail` | `/property-owners` | **new** |
 | `employee` | `employee_list` | `employee_detail` | `/employees` | shipped (anchor `employee`) |
 
@@ -183,7 +190,7 @@ No `other_list`. Tag `other` → pickers / future global search only.
 |-------|------|-------|
 | `profile` | scalar | **Person:** `first_name`, `last_name` (`party_person`). **Org:** `legal_name`, `dba_name`. `kind` at create. `display_name` DAL-maintained for lists — not primary edit field ([decision](./decisions/party.md#decision-party-profile-fields-on-type-lenses-2026-06-17)) |
 | `phones` | collection | `party_phone` |
-| `emails` | collection | `party_email` |
+| `emails` | collection | `party_email` — include `is_login_email` when person has login; sync → `latch_users.login_email` ([decision](./decisions/party.md#decision-login-email--app-sync-to-latch_userslogin_email-2026-06-18)) |
 
 `notes` / `attachments` — deferred; opt-in per [cross-cutting table](#cross-cutting-fields-notes-attachments).
 
@@ -191,10 +198,13 @@ No `other_list`. Tag `other` → pickers / future global search only.
 
 | Detail Surface | Extra Field | When |
 |----------------|-------------|------|
+| `customer_detail` | org hub: `subsidiaries`, `contacts`, `portfolio_tree`, `related_engagements`, `related_invoices` | party hub wave — [customer.md](./surface-specs/customer.md) |
+| `vendor_detail` | org hub: `parent_vendor`, `subsidiaries`, `contacts`, `subsidiary_tree`, `related_purchase_orders` (no sites) | party hub wave — [vendor.md](./surface-specs/vendor.md) |
 | `vendor_detail` | `vendor_pricing` | wave 3 — `vendor_part` child collection |
-| `manufacturer_detail` | `parts` or link to `part_list` filter | wave 3 |
+| `manufacturer_detail` | *(none — base lens only)* | wave 1 — [spec](./surface-specs/manufacturer.md) |
+| `part_list` | filter by `manufacturer_party_id` | wave 3 — not on `manufacturer_detail` |
 | `{role}_detail` | `addresses` | wave 2 — `party_address` + nested `address` |
-| `employee_detail` | `account_link` | wave 0 — interim `latch_user_id`; promote with `party_user` |
+| `employee_detail` | `add_as_db_user` | identity wave — provision `latch_users` + link on `party_person` |
 | `employee_detail` | HR scalars (`hire_date`, `job_title`, …) | HR + identity slice — [decision](./decisions/party.md#decision-employee_detail-scope--marker-now-hr-later-2026-06-17) |
 
 **Surface actions (type lenses):** standard `read` / `write` / `delete` + **`add_role`** / **`remove_role`** (optional) — server adds/removes `party_role` row; does not patch lens-specific Fields on the wrong Surface.
@@ -203,27 +213,41 @@ No `other_list`. Tag `other` → pickers / future global search only.
 
 | | |
 |--|--|
-| **Status** | list shipped; detail **planned** wave 1 |
+| **Status** | list shipped; detail **target spec** [customer.md](./surface-specs/customer.md) (2026-06-18) |
 | **Route** | `/customers`, `/customers/[id]` |
 | **Anchor** | `party` — DAL filter `party_role = customer` |
 
-**List columns:** `display_name`, `kind`. **Detail:** base Fields above.
+**List columns:** `display_name`, `kind`.
+
+**`customer_detail` Fields (person):** base `profile`, `phones`, `emails`.
+
+**`customer_detail` Fields (organization):** base + org hub — `parent_customer`, `subsidiaries`, `contacts`, combined `portfolio_tree`, `related_engagements`, `related_invoices` ([spec](./surface-specs/customer.md)).
 
 ### `vendor_list` · `vendor_detail`
 
 | | |
 |--|--|
-| **Status** | list shipped; detail **planned** wave 1 |
+| **Status** | list shipped; detail **target spec** [vendor.md](./surface-specs/vendor.md) (2026-06-18) |
 | **Route** | `/vendors`, `/vendors/[id]` |
 | **Anchor** | `party` — filter `vendor` |
+
+**List columns:** `display_name`, `kind`. **Search:** `display_name`, `legal_name`.
+
+**`vendor_detail` Fields (person):** base `profile`, `phones`, `emails`.
+
+**`vendor_detail` Fields (organization):** base + org hub — `parent_vendor`, `subsidiaries`, `contacts`, `subsidiary_tree`, `related_purchase_orders` ([spec](./surface-specs/vendor.md)). No sites, engagements, or invoices.
 
 ### `manufacturer_list` · `manufacturer_detail`
 
 | | |
 |--|--|
-| **Status** | list YAML; detail **planned** wave 1 |
+| **Status** | list shipped; detail **target spec** [manufacturer.md](./surface-specs/manufacturer.md) (2026-06-18) |
 | **Route** | `/manufacturers`, `/manufacturers/[id]` |
 | **Anchor** | `party` — filter `manufacturer` |
+
+**List columns:** `display_name`, `kind`. **Search:** `display_name`, `legal_name`.
+
+**`manufacturer_detail` Fields (person and organization):** base `profile`, `phones`, `emails` only — no subsidiaries, contacts, related lists, or parts ([spec](./surface-specs/manufacturer.md)).
 
 ### `property_owner_list` · `property_owner_detail`
 
@@ -250,9 +274,9 @@ No `other_list`. Tag `other` → pickers / future global search only.
 
 | Field | Type | Notes |
 |-------|------|-------|
-| `profile` | scalar | Person name via `party_person` (`first_name`, `last_name`) |
+| `profile` | scalar | Person name via `party_person` (`first_name`, `last_name`, `nick_name`, `display_name`, `avatar_url`) |
 | `staff` | scalar | `employee` row marker |
-| `account_link` | scalar | Interim `employee.latch_user_id` → IAM user; promote to `party_user` in identity slice |
+| `add_as_db_user` | action | Create `latch_users`, set `party_person.latch_user_id`, designate `party_email.is_login_email`, sync → `login_email` — [identity decision](./decisions/party.md#decision-login-email--app-sync-to-latch_userslogin_email-2026-06-18) |
 
 **HR Fields deferred** to identity/HR slice — no DDL or Surface Fields until then ([decision](./decisions/party.md#decision-employee_detail-scope--marker-now-hr-later-2026-06-17)).
 

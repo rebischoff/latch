@@ -198,6 +198,74 @@ fields:
 
 Optional global setting: **404** instead of **403** for sensitive Fields.
 
+### Decision: grant authoring model v2 (target) (2026-06-18)
+
+**Status:** Target — supersedes **read/write checkbox** role-editor UX (shipped interim in `apps/subhub` and policy spike). Rewriting `PolicyService` / manifest compile is in scope for the implementation wave.
+
+**Choice:** Role editor authors a structured grant model per **(role × surface)** and **(role × surface × field)**. Runtime still resolves to a `Manifest` for DAL/UI; storage may compile to today's sparse `latch_role_grants` rows or evolve schema.
+
+#### Surface capabilities (per role × surface)
+
+| Control | Type | Meaning |
+|---------|------|---------|
+| **`grantLevel`** | `none` \| `readOnly` \| `update` | List/detail access and ongoing field edit ceiling. `update` ⇒ read + write (no write-without-read). |
+| **`canCreate`** | bool | May INSERT new anchor rows (`mode: create` / surface create). Independent of `grantLevel` — e.g. `readOnly` + `canCreate` = create-then-view-only (timesheet). |
+| **`canDelete`** | bool | May **hard_delete** anchor ([v1 lifecycle](../../audit/docs/audit-and-lifecycle.md)); no soft delete. |
+| **`canRestore`** | bool | May replay eligible **`delete`** audit rows for this surface ([`restoreFromAuditEntry`](../../audit/src/restore.ts)). Implies surface-scoped read of delete audit (deleted-list lens); not a global `latch_audit` admin Surface. |
+| **`row_scope`** | `own` \| `all` \| `scope` | Unchanged — on `latch_role_surfaces`; row filter only. |
+
+**Compile (v2 → manifest actions):**
+
+| Authoring | `Manifest` / runtime |
+|-----------|----------------------|
+| `grantLevel: readOnly` | field `read` |
+| `grantLevel: update` | field `read` + `write` |
+| `canCreate` | surface `create` (and create-mode field write where applicable) |
+| `canDelete` | `hard_delete` (collapse legacy `delete` in contracts) |
+| `canRestore` | surface `restore` |
+
+#### Field capabilities (per role × surface × field)
+
+| Control | Type | Rule |
+|---------|------|------|
+| **`grantLevel`** | `none` \| `readOnly` \| `update` | **Must be ≤ surface `grantLevel`** — enforced in grant-matrix UI and DAL on save. |
+| **`canPropose`** | bool | On fields with YAML `requires_verification` — staged **field update** (`submit` ∧ ¬`write`) → `latch_pending_changes` ([Phase 05](../../docs/phases/05-verification/decisions.md)). |
+| **`canApprove`** | bool | May accept/reject pending **updates** on those fields (`approve`). |
+
+**`canPropose` / `canApprove` today:** guard **PATCH proposals** on existing rows only. **Target extension** (not shipped): surface-level **`canProposeCreate`**, **`canProposeDelete`**, and unified **`canApprove`** for pending create/delete — same pending store, `kind: create \| update \| delete`.
+
+| Pending kind | Authoring (target) | Live effect after approve |
+|--------------|-------------------|---------------------------|
+| `update` | `canPropose` on field | PATCH from pending |
+| `create` | `canProposeCreate` on surface | INSERT from pending |
+| `delete` | `canProposeDelete` on surface | hard_delete from pending |
+
+**Approval ≠ restore:** approval is forward-looking staging; restore is backward replay of a **completed** delete from audit.
+
+#### Invariants
+
+1. **Field `grantLevel` ≤ surface `grantLevel`** (ordered enum).
+2. **`update` implies read** — no write-without-read on detail/edit.
+3. **`canPropose*` ⇒ at least `readOnly`** on the same field/surface (must see what is proposed).
+4. **Allow-only authoring** — absence = deny (P2a); no explicit deny in editor; engine `denyWins` unchanged for tests.
+5. **`canRestore` + delete audit:** only rows with full `before` snapshot (role had restore at delete time) are restorable; metadata-only deletes show in deleted lens but Restore disabled.
+
+#### Deleted-list lens (list UI)
+
+Per business **list Surface**, filter/group dropdown includes **Deleted** (trash):
+
+- Lists `latch_audit` rows `action = delete` for `module_id` / surface, anchor absent from live table, filtered by `row_scope`.
+- User selects row → **Restore** when `canRestore`.
+- API: scoped list query + `POST …/restore { auditId }` — not raw audit table browsing for operators.
+
+#### Shipped interim
+
+Apps still use **read/write checkboxes** in role editors and `FieldAction[]` in contracts. v2 is the **target** for role wave + optional `PolicyService` compile refactor.
+
+**Reference:** SubHub decision + role-editor spec — [`apps/subhub/docs/decisions/iam.md`](../../../apps/subhub/docs/decisions/iam.md#decision-grant-authoring-model-v2-target-2026-06-18), [`apps/subhub/docs/surface-specs/iam-role.md`](../../../apps/subhub/docs/surface-specs/iam-role.md) § L.
+
+**Rationale:** Encodes write⇒read, surface/field hierarchy, create-without-edit, hard delete + audit restore UX, and approval staging without write-without-read footguns. `PolicyService` / `@latch/contracts` may be refactored to compile v2 → manifest rather than bolting on checkboxes.
+
 ## Row-level rules
 
 ### Decision: row scope v1 + expansion deferred (2026-06-06)

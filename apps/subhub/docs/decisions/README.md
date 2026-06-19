@@ -11,6 +11,7 @@ _None._
 | File | Scope |
 |------|--------|
 | [general.md](./general.md) | App shell, auth, nav, routes, schema-first, Surface patterns |
+| [iam.md](./iam.md) | Role catalog, grant matrix v2, IAM routes, assignment guards |
 | [party.md](./party.md) | Party spine, type lenses, profile, identity, employee |
 | [site.md](./site.md) | Sites, addresses, geography, standing contacts |
 | [estimate.md](./estimate.md) | Estimates and quote line grouping |
@@ -24,10 +25,21 @@ _None._
 
 | Decision | File | Date | Status |
 |----------|------|------|--------|
+| grant authoring model v2 (platform target) | [iam.md](./iam.md) | 2026-06-18 | active (impl deferred) |
+| delete blocked by referential use — structured errors | [cross-cutting.md](./cross-cutting.md) | 2026-06-18 | active (impl deferred) |
+| IAM role catalog — app CRUD, system cosmetic edit | [iam.md](./iam.md) | 2026-06-18 | active |
+| IAM role editor — allow-only grants | [iam.md](./iam.md) | 2026-06-18 | active |
+| IAM role create — list POST + New toolbar | [iam.md](./iam.md) | 2026-06-18 | active (impl deferred) |
+| IAM role detail UI — grant matrix app-only | [iam.md](./iam.md) | 2026-06-18 | active |
+| IAM routes — `/roles`, `/users` | [iam.md](./iam.md) | 2026-06-18 | active |
+| IAM assignment self-patch — platform rule, IAM DAL | [iam.md](./iam.md) | 2026-06-18 | active |
 | SQL-first persistence | [general.md](./general.md) | inherits platform 2026-06-11 | active |
 | employee HR fields | [party.md](./party.md) | 2026-06-16, deferred | active |
 | notes and attachments — shared tables | [cross-cutting.md](./cross-cutting.md) | 2026-06-15, deferred, **amended 2026-06-17** | active |
-| party identity — `party_user` + `user_class` | [party.md](./party.md) | 2026-06-15, deferred | active |
+| party identity — `party_person` login link | [party.md](./party.md) | 2026-06-18 | active |
+| login email — app sync to `latch_users.login_email` | [party.md](./party.md) | 2026-06-18 | active |
+| party_email.address unique — login safety | [party.md](./party.md) | 2026-06-18 | superseded |
+| party identity — `party_user` + `user_class` | [party.md](./party.md) | 2026-06-15 | superseded |
 | billing — earned staging, progress, SOV, retainage | [billing.md](./billing.md) | 2026-06-17 | active |
 | SOV UI — nested on `job_detail` Billing tab | [billing.md](./billing.md) | 2026-06-17 | active |
 | labor phases — catalog only in v1 | [catalog.md](./catalog.md) | 2026-06-17 | active |
@@ -45,6 +57,14 @@ _None._
 | site geography — slim rows and `latch_audit` | [site.md](./site.md) | 2026-06-17 | active |
 | site geography on `site_detail` — timing | [site.md](./site.md) | 2026-06-17 | active |
 | party list/detail Surface shape | [party.md](./party.md) | 2026-06-16, **locked 2026-06-17** | active |
+| org subsidiaries — Model A | [party.md](./party.md) | 2026-06-18 | active (DDL deferred) |
+| org contacts — `party_contact` | [party.md](./party.md) | 2026-06-18 | active (DDL deferred) |
+| customer hub — portal tree | [party.md](./party.md) | 2026-06-18 | active |
+| vendor hub — subsidiaries, POs, no sites | [party.md](./party.md) | 2026-06-18 | active |
+| manufacturer hub — base lens only | [party.md](./party.md) | 2026-06-18 | active |
+| parent org Field — `parent_customer` / `parent_vendor` | [party.md](./party.md) | 2026-06-18 | active |
+| `site.customer_party_id` — portfolio link | [site.md](./site.md) | 2026-06-18 | active (DDL deferred) |
+| cross-Surface related records — navigation only v1 | [general.md](./general.md) | 2026-06-18 | active |
 | catalog — simplified parts, items, categories | [catalog.md](./catalog.md) | 2026-06-16 | active |
 | progressive setup — master catalogs | [cross-cutting.md](./cross-cutting.md) | 2026-06-16 | active |
 | schema-first — finish DBML before migrations | [general.md](./general.md) | 2026-06-16 | active |

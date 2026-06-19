@@ -68,6 +68,6 @@
 
 ## Out of scope
 
-- Linking `login_email` from `party_email` (task 10+)
+- Linking login email from `party_email` — **target:** `is_login_email` + copy to `latch_users.login_email` ([login email sync](../decisions/party.md#decision-login-email--app-sync-to-latch_userslogin_email-2026-06-18)); identity wave post–task 19. **Shipped:** nullable `login_email` on `latch_users` (no sync from party yet).
 - App roles (`admin`, `sales`, …)
 - `LATCH_STUB_USER` dev stub (optional local shortcut only)

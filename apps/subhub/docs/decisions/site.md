@@ -26,6 +26,35 @@
 **Rationale:** Domain “location” means where work is performed at a property, not a street address row. One address row can serve party billing without conflating it with camera positions.
 
 
+### Decision: `site.customer_party_id` — explicit portfolio link (2026-06-18)
+
+**Status:** Locked for **customer** hub tree ([customer hub](./party.md#decision-customer-hub--portal-tree-and-related-lists-2026-06-18)). Vendors do not use portfolio sites ([vendor hub](./party.md#decision-vendor-hub--subsidiaries-contacts-and-pos-2026-06-18)). **DDL deferred** until site migration wave.
+
+**Choice:** Add nullable → required-on-create-from-hub FK **`site.customer_party_id` → `party.id`** (customer- or vendor-tagged org in practice). Identifies which **address-book party** owns the property in portfolio UI. Distinct from:
+
+| Mechanism | Purpose |
+|-----------|---------|
+| **`site.customer_party_id`** | Standing portfolio link for tree + “create site from customer” |
+| **`site.parent_site_id`** | Geographic hierarchy (campus → building) — unchanged |
+| **`job_party`** | Per-engagement counterparty graph (customer, bill-to, GC, …) on a specific job |
+
+**Rules:**
+
+- Creating a site from **`customer_detail`** sets `customer_party_id` to the selected tree org node (subsidiary or top-level). Vendors do not create sites ([vendor hub](./party.md#decision-vendor-hub--subsidiaries-contacts-and-pos-2026-06-18)).
+- **`job` / `estimate` create** may default primary customer `job_party` row from `site.customer_party_id` and/or user-selected subsidiary; engagement graph remains authoritative per job.
+- Sites without a portfolio owner may exist briefly in migration; hub UI treats unassigned sites as outside the tree until linked.
+
+#### Options considered (site ↔ customer link)
+
+| Option | Pros | Cons | Example |
+|--------|------|------|---------|
+| **A — Explicit `site.customer_party_id` (chosen)** | Tree works before any job; “all properties for Tower REIT”; subsidiary can own sites; create site from customer hub | Must set on create; can diverge from `job_party` if users mis-pick | Tower REIT → subsidiary “Tower West” → site “200 Market Tower” appears under West in tree **before** first estimate |
+| **B — Derive only from `job_party` + `site_id` on jobs** | No redundant FK; job graph is sole source | Empty customer tree until jobs exist; same physical site ambiguous when different jobs name different customers; cannot list portfolio for new customer | New customer — no jobs yet — **cannot** show sites |
+| **C — Derive from `site_contact` only** | Reflects standing people at property | Conflates contacts with ownership; org property portfolio still missing | REIT listed as site contact ≠ portfolio ownership |
+
+**Rationale:** Combined customer tree (subsidiaries + sites) and create-from-hub require a stable party↔site edge that does not depend on job history. Per-job roles stay on `job_party`; portfolio ownership is **`site.customer_party_id`**.
+
+
 ### Decision: site-owned sections and locations — lifecycle and history (2026-06-17)
 
 **Amended (2026-06-17):** flat sections, slim rows, `latch_audit` for provenance — see [site geography audit](#decision-site-geography--slim-rows-and-latch_audit-2026-06-17).

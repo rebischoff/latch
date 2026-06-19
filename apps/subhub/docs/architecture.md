@@ -46,18 +46,17 @@ Every gated request: `getPrincipal` → `resolveContext({ surfaceId, entityId? }
 | `party` | Person or organization — anchor for contacts |
 | `party_person`, `party_organization` | 1:1 kind extensions (names, DBA) — *pending migration; see [`schema/current.dbml`](./schema/current.dbml)* |
 | `party_role` | Master tags: `customer`, `vendor`, `manufacturer`, `employee`, `property_owner`, `other` |
-| `party_phone`, `party_email` | Child collections |
+| `party_phone`, `party_email` | Child collections (`party_email.address` UNIQUE — login safety) |
 | `party_address` | `party_id` + `address_id` + `purpose` (billing, hq, …) |
-| `party_user` | Login bridge + session profile (`display_name`, `avatar_url`) for any person with access — *draft; see [`schema/current.dbml`](./schema/current.dbml)* |
-| `employee` | Staff-only HR extension: FK → `party_person`; interim `latch_user_id` until `party_user` ships — *planned HR columns documented, not in DDL* |
+| `employee` | Staff-only HR extension: FK → `party_person` — *planned HR columns documented, not in DDL* |
 
 **Identity split (where data lives):**
 
 | Concern | Table |
 |---------|--------|
-| Credentials (`login_name`, password) | `latch_users` |
-| Login ↔ person bridge + shell profile | `party_user` *(draft)* |
-| Address-book name, legal name | `party` |
+| Credentials (`login_name`, password, `login_email`) | `latch_users` |
+| Login ↔ person link + session chrome | `party_person` (`latch_user_id`, `nick_name`, `display_name`, `avatar_url`) |
+| Address-book list sort | `party.display_name` (DAL-maintained) |
 | First / last name | `party_person` |
 | Phones, emails | `party_phone`, `party_email` |
 | Staff marker + future HR | `employee` |
@@ -202,7 +201,7 @@ flowchart TB
 
 **Reading the map:** `address` attaches to **parties** via `party_address` (billing / HQ / …). In-building scope uses **`site_section` / `site_location`** on the job's site — see [address vs site geography](./decisions/site.md#decision-address-vs-site-geography--rename-and-split-2026-06-17). `site_contact` links standing people at a property; per-job counterparties use `job_party` ([party_role vs job relations](./decisions/party.md#decision-party_role-master-tags-vs-job-scoped-relations-2026-06-15). Sales flow: `estimate` → `job` → requisition (`requested_order`) → procurement (`purchase_order`) and job-site stock (`job_material_movement`); billing is **`billable_line` → `invoice`** with optional SOV milestones ([billing decision](./decisions/billing.md#decision-billing--earned-staging-progress-sov-retainage-2026-06-17), [procurement decision](./decisions/procurement.md#decision-procurement--requisition-layer-and-job-site-inventory-2026-06-17). Line items snapshot at each hop ([line-item snapshots](./decisions/general.md#decision-line-item-snapshots-on-estimate--job--invoice-2026-06-12).
 
-**Deferred (dashed or omitted):** [address verification](./decisions/site.md#decision-address-verification--deferred-2026-06-15) on `address`; [shared notes / attachments](./decisions/cross-cutting.md#decision-notes-and-attachments--shared-tables-deferred-2026-06-15); [installed assets at site](./decisions/site.md#decision-installed-systems--deferred-to-catalog-slice-2026-06-15) (catalog-linked, not Slice 2); [`party_user` / portal identity](./decisions/party.md#decision-party-identity--party_user--user_class-deferred-2026-06-15) (login + session profile; replaces interim `employee.latch_user_id`); [employee HR columns](./decisions/party.md#decision-employee-hr-fields-deferred-2026-06-16).
+**Deferred (dashed or omitted):** [address verification](./decisions/site.md#decision-address-verification--deferred-2026-06-15) on `address`; [shared notes / attachments](./decisions/cross-cutting.md#decision-notes-and-attachments--shared-tables-deferred-2026-06-15); [installed assets at site](./decisions/site.md#decision-installed-systems--deferred-to-catalog-slice-2026-06-15) (catalog-linked, not Slice 2); [`latch_users.user_class` / portal row scope](./decisions/party.md#decision-party-identity--party_person-login-link-2026-06-18) (portal audience); [employee HR columns](./decisions/party.md#decision-employee-hr-fields-deferred-2026-06-16).
 
 ### DBML vs shipped migrations
 
@@ -323,11 +322,11 @@ Platform migration `013_latch_identity_guards.sql` ships DB guards. Task **09** 
 |-------|--------|
 | Gate | No `latch_users` rows and `setup_complete = false` → `/setup` |
 | Form | `LATCH_SETUP_KEY` + **login_name** + password |
-| `latch_users` | `id = gen_random_uuid()::text`; `login_name` unique; `login_email` null until party link |
+| `latch_users` | `id = gen_random_uuid()::text`; `login_name` unique; `login_email` nullable UNIQUE (app syncs from `party_email`) |
 | Role assignments | `system_data` + `system_iam` via `role_class` lookup |
 | IAM grants | **None** — `PolicyService` synthesizes for `system_iam` |
 
-**Login:** username or linked `login_email` (`resolveLatchUserId`). **Party link (task 10+):** interim `employee.latch_user_id` → `party`; promote `party_email` → `login_email` (unique guard). **Target:** `party_user` (login + shell `display_name` / `avatar_url`) for staff and future portal users — [deferred](./decisions/party.md#decision-party-identity--party_user--user_class-deferred-2026-06-15).
+**Login:** username or `latch_users.login_email` (`resolveLatchUserId`). **Party link:** `party_person.latch_user_id`; app syncs login email from `party_email.is_login_email` — [party identity](./decisions/party.md#decision-party-identity--party_person-login-link-2026-06-18). **Shipped interim:** `employee.latch_user_id` until identity wave.
 
 Platform rule: [P4b amendment](../../../packages/policy/docs/tasks/00-decisions-needed.md#amendment-first-run-setup--db-identity-guards-2026-06-13).
 

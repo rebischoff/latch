@@ -14,6 +14,8 @@
 
 **Choice:** Fully plan **all v1 Surfaces** at implement depth before any implementation code. Not wave-by-wave at ship time — one scan, then one spec file at a time, entire v1 map.
 
+**Discussion model (2026-06-18):** For each Surface group, align in chat on schema + behavior first (as with IAM / `party_person` login link), then capture in spec + `decisions/` + `current.dbml`. Postgres, YAML, DAL, and UI follow after task 19 exit.
+
 **Rationale:** DBML alone does not specify screens. Task 18 alone did not specify DAL/UI. The project keeps recommending holistic planning without delivering implement-tier docs; task 19 is that delivery.
 
 ---

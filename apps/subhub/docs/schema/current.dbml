@@ -13,7 +13,9 @@
 //
 // **016 → target delta:** drop `party.notes`; add `party_person`, `party_organization`,
 // `note`; retarget `employee` → `party_person`; widen `party_role`; then Slice 2 tables.
-// **Still draft (no DDL yet):** `party_user` (replaces interim `employee.latch_user_id`).
+// **Identity target (2026-06-18):** `party_person.latch_user_id` + profile chrome;
+// `latch_users.login_email` (unique copy — app syncs from `party_email.is_login_email`).
+// Drop `party_user` and `employee.latch_user_id`. Shipped SQL partially aligned — see decisions.
 
 Project subhub {
   database_type: 'PostgreSQL'
@@ -45,16 +47,26 @@ TableGroup latch_platform {
 
 Table latch_users {
   id text [pk]
-  login_name text [unique, note: 'nullable until /setup or party link']
-  login_email text [unique, note: 'nullable']
+  login_name text [unique, not null, note: 'required after /setup or provision']
+  login_email text [unique, note: 'nullable — app copies from designated party_email; Latch enforces UNIQUE']
   password_hash text [note: 'Better Auth; nullable']
   created_at timestamptz [not null, default: `now()`]
 
   Note: '''
-    Platform identity — credentials only (Better Auth). No profile chrome here.
-    `display_name` removed in 014; address-book name on `party`, session chrome on
-    `party_user` (draft). Deferred: `user_class` (`internal` | `external`) for portal
-    principals — see `party_user` and decisions.md.
+    Platform auth principal — credentials only (Better Auth). No FK to business tables.
+    Session chrome (`display_name`, `avatar_url`, `nick_name`) on `party_person`. Person link
+    via `party_person.latch_user_id` (nullable unique).
+
+    `login_email` is a **copied** login alias — the business app chooses which `party_email`
+    row is login (see `is_login_email`) and syncs `address` → `login_email` on provision
+    and when the login email row is edited. Sign-in: `login_name` OR `login_email`
+    (`resolveLatchUserId` — `latch_users` only).
+
+    **Login email uniqueness:** `login_email` UNIQUE on this table is the platform guarantee;
+    duplicate addresses may exist on `party_email` until one is promoted to login.
+
+    Bootstrap `/setup` master may exist without `party_person` until linked.
+    **Deferred:** `user_class` (`internal` | `external`) for portal row scope — decisions.md.
   '''
 }
 
@@ -77,8 +89,8 @@ Table latch_user_roles {
   }
 
   Note: '''
-    User ↔ role assignment (what they may do). Separate from `party_user` (who they are
-  in the business). PK changed from composite to surrogate id in 010.
+    User ↔ role assignment (what they may do). Separate from `party_person.latch_user_id`
+    (who they are in the business). PK changed from composite to surrogate id in 010.
   '''
 }
 
@@ -212,8 +224,9 @@ TableGroup party [color: #1abc9c] {
   party_role
   party_phone
   party_email
+  party_contact_relation
+  party_contact
   party_address
-  party_user
   employee
 }
 
@@ -229,7 +242,7 @@ Table party {
     Unified contact anchor. Kind-specific columns live in 1:1 extension tables — not on `party`.
     `display_name` / `legal_name` — address-book and list sort. DAL maintains `display_name`
     from kind extension on save (person: first + last; org: legal_name or dba_name).
-    Session shell label may override via `party_user` (draft). Notes → `note` table (no column here).
+    Session shell label on `party_person.display_name` when linked. Notes → `note` table (no column here).
   '''
 }
 
@@ -237,10 +250,19 @@ Table party_person {
   party_id text [pk]
   first_name text [not null]
   last_name text [not null, default: '']
+  nick_name text [note: 'nullable — casual label']
+  display_name text [note: 'nullable — session / nav override; fallback chain in DAL']
+  avatar_url text [note: 'nullable — URL until polymorphic attachment lands']
+  latch_user_id text [unique, note: 'nullable FK → latch_users — app login; persons only']
 
   Note: '''
-    1:1 when party.kind = person. Demographics only — not login, not staff HR.
-    Enforce kind match in migration (trigger or app txn). Login link → `party_user` (draft).
+    1:1 when party.kind = person. Structured name + optional session chrome. Staff HR on
+    `employee` only. Login: opt-in via `latch_user_id` — any person (not only employees)
+    may become an app user. Provision from person Surfaces ("add as db user"); IAM user
+    Surface lists linked persons for role admin (no create/delete there).
+
+    **Name layers:** `first_name` / `last_name` (structured); `party.display_name` (list sort,
+    DAL-maintained); `nick_name` / `display_name` (session chrome when logged in).
 
     Task 18 backfill from 016: `first_name` ← `party.display_name`, `last_name` ← ''.
     Split heuristic (e.g. on space) is optional post-migration cleanup — not required in DDL.
@@ -249,13 +271,20 @@ Table party_person {
 
 Table party_organization {
   party_id text [pk]
+  parent_party_id text [note: 'nullable FK → party.id — org subsidiary; persons forbidden; DAL anti-cycle']
   dba_name text [note: 'doing-business-as; nullable when same as legal_name']
+
+  indexes {
+    parent_party_id [name: 'party_organization_parent_party_id_idx']
+  }
 
   Note: '''
     1:1 when party.kind = organization. Enforce kind match in migration (trigger or app txn).
+    `parent_party_id` — corporate tree for customer/vendor hub (Model A: each node is its own
+    tagged party). See party.md 2026-06-18 subsidiaries decision.
 
     Task 18 backfill: insert row for every organization party; set `dba_name` when
-    `display_name` ≠ `legal_name`, else leave null.
+    `display_name` ≠ `legal_name`, else leave null. `parent_party_id` null for existing rows.
   '''
 }
 
@@ -270,7 +299,7 @@ Table party_role {
   Note: '''
     Master address-book tags (who is this party to us generally?). Drives filtered list
     Surfaces (`customer_list`, `employee_list`, …). Not job context — job stakeholders use
-    `job_party` (Slice 5). `employee` tag marks staff; portal access is separate (`party_user`).
+    `job_party` (Slice 5). `employee` tag marks staff; app login via `party_person.latch_user_id`.
     `property_owner` / `other` widened in `018_party_refactor.sql`. GC / sub roles stay
     on `job_party`, not here.
   '''
@@ -296,39 +325,68 @@ Table party_email {
   label text [not null, default: '']
   address text [not null]
   is_primary boolean [not null, default: false]
+  is_login_email boolean [not null, default: false, note: 'at most one true per party when linked to latch_users']
   sort_order int [not null, default: 0]
 
   Note: '''
-    Child collection on `party`. A row may be promoted to `latch_users.login_email` when
-    the person has a `party_user` / interim `employee` login link (unique guard).
+    Child collection on `party`. Multiple rows per party; **`address` is not globally UNIQUE**
+    (same address may appear on different parties as contact data).
+
+    **Login email (app-owned):** mark one row `is_login_email` when the person has
+    `party_person.latch_user_id`; app DAL copies `address` → `latch_users.login_email`
+    (platform UNIQUE). On patch to the login row, sync `login_email` in the same transaction.
+    Before setting `is_login_email` or copying, app checks `login_email` uniqueness (DB
+    constraint is authoritative).
+
+  v1: one login email per linked person. `is_primary` and `is_login_email` are independent.
   '''
 }
 
-Table party_user {
-  party_id text [pk, note: 'FK → party_person — persons only; organizations do not log in']
-  latch_user_id text [unique, not null]
-  display_name text [note: 'nullable — app shell / avatar label; falls back to party.display_name']
-  avatar_url text [note: 'nullable — URL until polymorphic attachment lands']
+Table party_contact_relation {
+  id text [pk, default: `gen_random_uuid()::text`]
+  display_name text [not null]
+  sort_order int [not null, default: 0]
+
+  indexes {
+    display_name [unique, name: 'party_contact_relation_display_name_unique']
+  }
 
   Note: '''
-    DRAFT — not in migrations. Login bridge + session-facing profile for any person with
-    SubHub access (staff, customers, GCs, site contacts, …). Opt-in: most `party_person`
-    rows never get a `party_user` row. Replaces interim `employee.latch_user_id`.
-    Permissions stay on `latch_user_roles`; `user_class` on `latch_users` (deferred).
-    Who may receive a login is TBD — hold implementation until identity slice is scoped.
+    Catalog of org-level contact roles (AP, billing, superintendent, …). Progressive setup +
+    `party_contact_relation_table` catalog page. Distinct from `site_contact_relation` (property).
+  '''
+}
+
+Table party_contact {
+  id text [pk, default: `gen_random_uuid()::text`]
+  organization_party_id text [not null, note: 'FK → party (organization)']
+  contact_party_id text [not null, note: 'FK → party (person)']
+  relation_id text [not null, note: 'FK → party_contact_relation']
+  title text [not null, default: '']
+  sort_order int [not null, default: 0]
+
+  indexes {
+    (organization_party_id, contact_party_id, relation_id) [unique, name: 'party_contact_org_person_relation_unique']
+  }
+
+  Note: '''
+    Org-level contacts — person parties linked to an organization lens. Logical Field `contacts`
+    on `customer_detail` / `vendor_detail` (org only). Quick-create person + attach via
+    `add_contact` action. Same person may also appear on `site_contact`.
   '''
 }
 
 Table employee {
   party_id text [pk]
-  latch_user_id text [unique, note: 'INTERIM — nullable FK → latch_users; migrate to party_user']
 
   Note: '''
     Staff-only HR/ops extension. FK → party_person (not bare `party`); requires
     `party.kind = person` and `party_role` tag `employee`. Not all persons are employees;
-    not all employees have login (nullable interim `latch_user_id`).
+    not all employees have login (`party_person.latch_user_id` null until provisioned).
 
-    `latch_user_id` is temporary until `party_user` lands — portal users use `party_user`, not `employee`.
+    Login provision: "add as db user" on `employee_detail` (or any person lens) — not on
+    IAM user Surface. Termination: HR marks employee; IAM suspends roles — do not delete
+    `latch_users` when payroll/history access may still be needed.
 
     Deferred columns (document only — do not add to DDL yet):
     hire_date, termination_date, employee_number, job_title, department,
@@ -387,11 +445,13 @@ Table address {
 Table site {
   id text [pk, default: `gen_random_uuid()::text`]
   name text [not null]
+  customer_party_id text [note: 'nullable FK → party — portfolio owner for customer hub tree (not vendor hub)']
   parent_site_id text [note: 'nullable FK → site.id; ON DELETE SET NULL']
   created_at timestamptz [not null, default: `now()`]
   updated_at timestamptz [not null, default: `now()`]
 
   indexes {
+    customer_party_id [name: 'site_customer_party_id_idx']
     parent_site_id [name: 'site_parent_site_id_idx']
   }
 
@@ -399,6 +459,10 @@ Table site {
     Logical place — portfolio, campus, building, job site. **No address columns** on `site`.
     Postal address on customer via `party_address`. **Site-owned geography** (as-built):
     `site_section` + `site_location` — persists across jobs; estimates may add `proposed` rows.
+
+    **`customer_party_id`** — which customer org owns this property in the address-book
+    hub (subsidiary or top-level). Set when creating site from **customer_detail** only.
+    Vendor hub does not create sites. Per-job counterparties remain on `job_party`. See site.md 2026-06-18.
 
     Worked example (Tower REIT / 200 Market Tower):
       party "Tower REIT" + party_address → address "200 Market St" (purpose: hq)
@@ -838,7 +902,7 @@ Table job_work_item {
   phase_id text [note: 'nullable FK → phase']
   status text [not null, default: 'pending', note: 'CHECK: pending | in_progress | installed | issue | verified | skipped']
   recorded_at timestamptz [not null, default: `now()`]
-  reported_by text [note: 'nullable FK → employee.party_id — interim until party_user']
+  reported_by text [note: 'nullable FK → employee.party_id']
 
   Note: '''
     Field-reported work unit — one row per sold line (+ optional `job_line_part`) × `site_location`
@@ -1257,16 +1321,19 @@ Ref: latch_pending_changes.supersedes_id > latch_pending_changes.id
 
 Ref: party_person.party_id > party.id [delete: cascade]
 Ref: party_organization.party_id > party.id [delete: cascade]
+Ref: party_organization.parent_party_id > party.id [delete: set null]
 Ref: party_role.party_id > party.id [delete: cascade]
 Ref: party_phone.party_id > party.id [delete: cascade]
 Ref: party_email.party_id > party.id [delete: cascade]
+Ref: party_contact.organization_party_id > party.id [delete: cascade]
+Ref: party_contact.contact_party_id > party.id [delete: cascade]
+Ref: party_contact.relation_id > party_contact_relation.id [delete: restrict]
 Ref: party_address.party_id > party.id [delete: cascade]
-Ref: party_user.party_id > party_person.party_id [delete: cascade]
-Ref: party_user.latch_user_id > latch_users.id [delete: cascade]
+Ref: party_person.latch_user_id > latch_users.id [delete: set null]
 Ref: employee.party_id > party_person.party_id [delete: cascade]
-Ref: employee.latch_user_id > latch_users.id [delete: set null]
 
 Ref: party_address.address_id > address.id [delete: cascade]
+Ref: site.customer_party_id > party.id [delete: set null]
 Ref: site.parent_site_id > site.id [delete: set null]
 Ref: site_section.site_id > site.id [delete: cascade]
 Ref: site_location.site_id > site.id [delete: cascade]

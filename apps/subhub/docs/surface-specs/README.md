@@ -17,6 +17,8 @@ One file per Surface group (see [00-scan.md](./00-scan.md)). Template: [`_templa
 
 ## How to work
 
+**Rhythm:** Discuss each Surface group in chat at implement depth (fields, policy, DAL, UI, edge cases) — then write the spec and fold decisions into DBML + `decisions/`. Example: IAM identity thread → [party identity](../decisions/party.md#decision-party-identity--party_person-login-link-2026-06-18). **No migrations/UI until task 19 exits.**
+
 1. Read [00-scan.md](./00-scan.md) — inventory + progress table.
 2. Pick the next ⬜ row; copy `_template.md` → named file.
 3. Fill **A–K** using DBML, `surfaces.md`, `decisions/`, `child-collections.md`, shipped code where relevant.

@@ -21,7 +21,7 @@ Produce **implement-tier** specs for **every v1 Surface** — DAL contracts, pol
 | [`surface-specs/README.md`](../surface-specs/README.md) | Index + workflow |
 | [`surface-specs/00-scan.md`](../surface-specs/00-scan.md) | **Create** — v1 inventory + progress table |
 | [`surface-specs/_template.md`](../surface-specs/_template.md) | Per-Surface template (A–K) |
-| [`surface-specs/<name>.md`](../surface-specs/) | **Create** — one per scan row (28 files) |
+| [`surface-specs/<name>.md`](../surface-specs/) | **Create** — one per scan row (27 files; row #3 merged into `iam-user.md`) |
 | [`surfaces.md`](../surfaces.md) | **Patch** — fix catalog gaps found during specs (e.g. `phase_table`) |
 | [`surface-planning-depth.md`](../surface-planning-depth.md) | Align with full-v1 approach |
 | [`01-task-index.md`](./01-task-index.md) | Insert task 19; block wave implementation until exit |
@@ -61,7 +61,7 @@ After all specs: `surfaces.md` matches spec files; `00-scan` shows all ✅.
 
 - Writing SQL, Surface YAML, DAL, UI
 - Wireframes / pixel design
-- `party_user` portal spec (defer with identity slice — note in scan only)
+- `latch_users.user_class` (portal row scope) — see [party identity](../decisions/party.md#decision-party-identity--party_person-login-link-2026-06-18)
 
 ## Reference
 

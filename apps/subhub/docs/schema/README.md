@@ -78,9 +78,9 @@ Collaborative **design draft** for the database. During planning, `current.dbml`
 ## Tips
 
 - **Table groups** color-code sections on dbdiagram.
-- **Notes** on tables carry CHECK constraints, deferred slice context, and **column plans not yet in DDL** (e.g. `employee` HR fields, draft `party_user`) — not every detail is in column types.
+- **Notes** on tables carry CHECK constraints, deferred slice context, and **column plans not yet in DDL** (e.g. `employee` HR fields, `party_person` login columns) — not every detail is in column types.
+- **Target vs shipped:** `current.dbml` may run ahead of `migrations/` (e.g. identity model 2026-06-18) — identity SQL/UI deferred until after task 19.
 - **Cross-cutting** tables (`note`, future `attachment`) live in `cross_cutting`, not under `party`.
-- **Draft tables** (`party_user`, kind extensions) appear in `current.dbml` with `DRAFT` / `INTERIM` notes; migrations catch up at the identity or party-extension implementation gate.
 - For AI: `@apps/subhub/docs/schema/current.dbml` plus active task and relevant [`decisions.md`](../decisions/README.md) blocks.
 
 ## Related docs
