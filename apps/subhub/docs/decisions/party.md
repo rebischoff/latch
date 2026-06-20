@@ -222,7 +222,7 @@ Type-specific **extra Fields** (e.g. `vendor_pricing` on `vendor_detail` in cata
 | **Person customers** | **No** subsidiaries — DAL rejects `parent_party_id` when `kind = person` |
 | **Cycles** | DAL rejects `parent_party_id` chains that loop |
 | **Create** | Optional **`parent_customer`** (or `parent_party_id`) on org create — separate field, not inferred from tree selection alone |
-| **Lenses** | **`customer_detail`** and **`vendor_detail`** (wave 1 hub) — both use Model A branches; vendor hub omits sites ([vendor hub](#decision-vendor-hub--subsidiaries-contacts-and-pos-2026-06-18)). **`manufacturer_detail`** excluded — flat org, no `parent_party_id` ([manufacturer hub](#decision-manufacturer-hub--base-lens-only-2026-06-18)) |
+| **Lenses** | **`customer_detail`**, **`vendor_detail`**, **`property_owner_detail`** (wave 1 hub) — Model A branches; vendor omits sites ([vendor hub](#decision-vendor-hub--subsidiaries-contacts-and-pos-2026-06-18)); property owner links sites via `site.property_owner_party_id` ([property owner hub](#decision-property-owner-hub--subsidiaries-contacts-and-sites-2026-06-18)). **`manufacturer_detail`** excluded — flat org, no `parent_party_id` ([manufacturer hub](#decision-manufacturer-hub--base-lens-only-2026-06-18)) |
 
 **Surface Fields (org lenses only):** `subsidiaries` collection (child org parties: `id`, `display_name`, link to lens URL); actions **`add_subsidiary`**, **`attach_subsidiary`** (existing org + set parent).
 
@@ -243,7 +243,7 @@ Type-specific **extra Fields** (e.g. `vendor_pricing` on `vendor_detail` in cata
 | **Person lenses** | **Omit** `contacts` — the person **is** the contact |
 | **vs `site_contact`** | `site_contact` = standing roles **at a property**; `party_contact` = **org-level** roster (HQ, AP) with no site required |
 
-**Lenses (v1):** `customer_detail`, `vendor_detail` — shared `contacts` shape; customer adds sites/engagements/invoices ([vendor hub](#decision-vendor-hub--subsidiaries-contacts-and-pos-2026-06-18)). **`manufacturer_detail`** omits contacts ([manufacturer hub](#decision-manufacturer-hub--base-lens-only-2026-06-18)).
+**Lenses (v1):** `customer_detail`, `vendor_detail`, `property_owner_detail` — shared `contacts` shape; customer adds engagements/invoices ([customer hub](#decision-customer-hub--portal-tree-and-related-lists-2026-06-18)); vendor adds POs ([vendor hub](#decision-vendor-hub--subsidiaries-contacts-and-pos-2026-06-18)); property owner adds `related_sites` ([property owner hub](#decision-property-owner-hub--subsidiaries-contacts-and-sites-2026-06-18)). **`manufacturer_detail`** omits contacts ([manufacturer hub](#decision-manufacturer-hub--base-lens-only-2026-06-18)).
 
 **Rationale:** Reuses the party spine (one person = one `party`); same person may appear on org `party_contact` and on `site_contact` at different sites. Quick-create avoids forcing a detour through a separate create flow for every AP clerk.
 
@@ -291,7 +291,7 @@ Type-specific **extra Fields** (e.g. `vendor_pricing` on `vendor_detail` in cata
 
 ### Decision: parent org Field — `parent_customer` / `parent_vendor` (2026-06-18)
 
-**Status:** Locked in [`customer.md`](../surface-specs/customer.md) / [`vendor.md`](../surface-specs/vendor.md).
+**Status:** Locked in [`customer.md`](../surface-specs/customer.md) / [`vendor.md`](../surface-specs/vendor.md) / [`property-owner.md`](../surface-specs/property-owner.md).
 
 **Choice:** **Lens-specific Field ids** mapping to one DDL column (`party_organization.parent_party_id`):
 
@@ -299,6 +299,7 @@ Type-specific **extra Fields** (e.g. `vendor_pricing` on `vendor_detail` in cata
 |---------|----------|------------------------|
 | `customer_detail` | `parent_customer` | customer-tagged orgs |
 | `vendor_detail` | `parent_vendor` | vendor-tagged orgs |
+| `property_owner_detail` | `parent_property_owner` | property_owner-tagged orgs |
 
 **Options considered:**
 
@@ -308,7 +309,7 @@ Type-specific **extra Fields** (e.g. `vendor_pricing` on `vendor_detail` in cata
 | **`parent_party` shared id** | One Field id in codegen | Ambiguous grants; picker must infer lens from `surfaceId`; worse policy docs |
 | **`parent_organization` generic** | Neutral naming | Hides business meaning in Contacts nav |
 
-**Rationale:** Surface-scoped permissions and UX labels should say “parent customer” vs “parent vendor” even though the FK is shared. DAL normalizes both to `parent_party_id` on write.
+**Rationale:** Surface-scoped permissions and UX labels should say “parent customer” vs “parent vendor” vs “parent property owner” even though the FK is shared. DAL normalizes all to `parent_party_id` on write.
 
 
 ### Decision: manufacturer hub — base lens only (2026-06-18)
@@ -331,3 +332,34 @@ Type-specific **extra Fields** (e.g. `vendor_pricing` on `vendor_detail` in cata
 **Contrast:** [`customer.md`](../surface-specs/customer.md) (portfolio tree + related lists), [`vendor.md`](../surface-specs/vendor.md) (subsidiaries + contacts + POs).
 
 **Rationale:** Manufacturers are referenced from the parts catalog; operators do not need a corporate hub or inline MPN list on the address-book lens. Flat org rows keep pickers simple.
+
+
+### Decision: property owner hub — subsidiaries, contacts, and sites (2026-06-18)
+
+**Status:** Locked in [`property-owner.md`](../surface-specs/property-owner.md). **DDL deferred** until site migration wave (`site.property_owner_party_id`).
+
+**Choice:**
+
+| UI | Rule |
+|----|------|
+| **Base lens** | `profile`, `phones`, `emails` on person and org — same as other party lenses |
+| **Org tree** | **`subsidiary_tree`** — org nodes only (Model A via `party_organization.parent_party_id`) |
+| **Parent** | **`parent_property_owner`** on create / read — link to parent property-owner org |
+| **Contacts** | Same **`contacts`** + **`add_contact`** as customer/vendor org hubs |
+| **Related sites** | Read-only **`related_sites`** — `site.property_owner_party_id` in anchor subtree ([site decision](./site.md#decision-siteproperty_owner_party_id--portfolio-link-2026-06-18)) |
+| **Create from hub** | **`add_site`** sets `property_owner_party_id` to selected org node; does **not** set `customer_party_id` |
+| **Omit** | No `related_engagements`, `related_invoices`, `portfolio_tree` (customer hub), POs (vendor hub) |
+| **Person layout** | Profile + phones + emails only |
+| **Delete** | No catalog RESTRICT blocker; sub-owner child orgs block; owned sites **unlink** (`property_owner_party_id` → null) |
+
+**Three “property owner” layers** (document in spec — do not conflate):
+
+| Layer | Mechanism |
+|-------|-----------|
+| Master tag | `party_role.property_owner` → `/property-owners` |
+| Standing at site | `site_contact` + `site_contact_relation` label — does **not** auto-set master tag |
+| Per job | `job_party` + `job_party_relation` label — does **not** auto-set master tag |
+
+**Customer overlap:** dual tag (`customer` + `property_owner`) is normal; customer hub remains canonical for `customer_party_id`, engagements, and invoices.
+
+**Rationale:** Legal property owners need org roster + subsidiary structure + owned-site portfolio without duplicating the customer engagement hub. Explicit `property_owner_party_id` parallels `customer_party_id` when payer ≠ owner.

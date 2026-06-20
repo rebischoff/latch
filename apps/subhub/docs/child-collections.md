@@ -146,7 +146,7 @@ Catalog starts **empty** in `019_site.sql`. Ongoing edit via **`site_contact_rel
 
 No address collection on `site_detail` — sites are logical places; postal addresses live on `party_address`; in-building scope on `site_section` / `site_location` ([decision](./decisions/site.md#decision-address-vs-site-geography--rename-and-split-2026-06-17).
 
-`party_address` on `{role}_detail` lenses (wave 2) — same pattern for billing/HQ addresses.
+`party_address` on `{role}_detail` lenses (wave 2) — same replace-array pattern; two-table spine + copy-on-write — [`surface-specs/party-addresses.md`](./surface-specs/party-addresses.md).
 
 Installed systems at a site deferred to catalog slice (items/parts linkage), not `site_detail` collections.
 

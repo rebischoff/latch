@@ -51,10 +51,12 @@ No address verification / type-ahead columns in this migration ([deferred](../..
 |--------|------|-------|
 | `id` | `TEXT PK` | |
 | `name` | `TEXT NOT NULL` | |
+| `customer_party_id` | `TEXT` | nullable FK → `party.id` (`ON DELETE SET NULL`) — customer hub portfolio |
+| `property_owner_party_id` | `TEXT` | nullable FK → `party.id` (`ON DELETE SET NULL`) — property-owner hub |
 | `parent_site_id` | `TEXT` | nullable FK → `site.id` (`ON DELETE SET NULL`) |
 | `created_at`, `updated_at` | `TIMESTAMPTZ` | |
 
-Index on `parent_site_id`. No address columns on `site`; no inline `notes` ([shared notes](../../decisions/cross-cutting.md#decision-notes-and-attachments--shared-tables-deferred-2026-06-15).
+Indexes on `customer_party_id`, `property_owner_party_id`, `parent_site_id`. No address columns on `site`; no inline `notes` ([shared notes](../../decisions/cross-cutting.md#decision-notes-and-attachments--shared-tables-deferred-2026-06-15).
 
 ### 4. `site_section` — coarse site geography
 

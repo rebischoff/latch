@@ -62,8 +62,17 @@ _None._
 | customer hub — portal tree | [party.md](./party.md) | 2026-06-18 | active |
 | vendor hub — subsidiaries, POs, no sites | [party.md](./party.md) | 2026-06-18 | active |
 | manufacturer hub — base lens only | [party.md](./party.md) | 2026-06-18 | active |
-| parent org Field — `parent_customer` / `parent_vendor` | [party.md](./party.md) | 2026-06-18 | active |
+| property owner hub — subsidiaries, contacts, sites | [party.md](./party.md) | 2026-06-18 | active (DDL deferred) |
+| parent org Field — `parent_customer` / `parent_vendor` / `parent_property_owner` | [party.md](./party.md) | 2026-06-18 | active |
 | `site.customer_party_id` — portfolio link | [site.md](./site.md) | 2026-06-18 | active (DDL deferred) |
+| `site.property_owner_party_id` — portfolio link | [site.md](./site.md) | 2026-06-18 | active (DDL deferred) |
+| portfolio FKs on `site_detail` — writable scalars | [site.md](./site.md) | 2026-06-19 | active |
+| site delete — blockers and cascade | [site.md](./site.md) | 2026-06-19 | active |
+| site orphans and naming | [site.md](./site.md) | 2026-06-19 | active |
+| postal address — normalized spine and party vs site roles | [site.md](./site.md) | 2026-06-19 | active (physical FK DDL wave 2b) |
+| shared `address` row — copy-on-write on PATCH | [site.md](./site.md) | 2026-06-19 | active |
+| site nesting — when site vs location vs job | [site.md](./site.md) | 2026-06-19 | active |
+| section vs location — granularity | [site.md](./site.md) | 2026-06-19 | active |
 | cross-Surface related records — navigation only v1 | [general.md](./general.md) | 2026-06-18 | active |
 | catalog — simplified parts, items, categories | [catalog.md](./catalog.md) | 2026-06-16 | active |
 | progressive setup — master catalogs | [cross-cutting.md](./cross-cutting.md) | 2026-06-16 | active |

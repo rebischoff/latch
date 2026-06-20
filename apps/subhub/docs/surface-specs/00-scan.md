@@ -31,13 +31,13 @@ General scan before one-by-one implement specs. **Legend:** ✅ spec complete ·
 | 4 | [customer.md](./customer.md) | `customer_list` · `customer_detail` | 0→1 | ✅ target (2026-06-18) |
 | 5 | [vendor.md](./vendor.md) | `vendor_list` · `vendor_detail` | 0→1 | ✅ target (2026-06-18) |
 | 6 | [manufacturer.md](./manufacturer.md) | `manufacturer_list` · `manufacturer_detail` | 0→1 | ✅ target (2026-06-18); list shipped |
-| 7 | [property-owner.md](./property-owner.md) | `property_owner_list` · `property_owner_detail` | 1 | ⬜ |
-| 8 | [employee.md](./employee.md) | `employee_list` · `employee_detail` | 0 | ⬜ |
-| 9 | [contact-retire.md](./contact-retire.md) | `contact_*` retire | 1 | ⬜ |
-| 10 | [site.md](./site.md) | `site_list` · `site_detail` | 1 | ⬜ |
-| 11 | [site-contact-relation.md](./site-contact-relation.md) | `site_contact_relation_table` | 1 | ⬜ |
-| 12 | [party-addresses.md](./party-addresses.md) | `addresses` on `{role}_detail` | 2 | ⬜ |
-| 13 | [site-geography.md](./site-geography.md) | `sections` · `locations` on `site_detail` | 2b | ⬜ |
+| 7 | [property-owner.md](./property-owner.md) | `property_owner_list` · `property_owner_detail` | 1 | ✅ target (2026-06-18) |
+| 8 | [employee.md](./employee.md) | `employee_list` · `employee_detail` | 0 | ✅ target (2026-06-19) |
+| 9 | [contact-retire.md](./contact-retire.md) | `contact_*` retire | 1 | ✅ target (2026-06-19) |
+| 10 | [site.md](./site.md) | `site_list` · `site_detail` | 1 | ✅ target (2026-06-19) |
+| 11 | [site-contact-relation.md](./site-contact-relation.md) | `site_contact_relation_table` | 1 | ✅ target (2026-06-19) |
+| 12 | [party-addresses.md](./party-addresses.md) | `addresses` on `{role}_detail` | 2 | ✅ target (2026-06-19) |
+| 13 | [site-geography.md](./site-geography.md) | `sections` · `locations` on `site_detail` | 2b | ✅ target (2026-06-19) |
 | 14 | [part.md](./part.md) | `part_list` · `part_detail` | 3 | ⬜ |
 | 15 | [item.md](./item.md) | `item_list` · `item_detail` | 3 | ⬜ |
 | 16 | [category.md](./category.md) | `category_table` | 3 | ⬜ |
@@ -77,7 +77,7 @@ General scan before one-by-one implement specs. **Legend:** ✅ spec complete ·
 | `party_contact` + `party_contact_relation` | `contacts` on org `customer_detail` / `vendor_detail` | catalog table spec TBD |
 | `party_role` | 🚫 | `add_role` / `remove_role` actions |
 | `party_phone`, `party_email` | `phones`, `emails` collections | `is_login_email` on `party_email`; sync to `latch_users.login_email` |
-| `party_address` + `address` | `addresses` wave 2 | |
+| `party_address` + `address` | `addresses` wave 2 | [`party-addresses.md`](./party-addresses.md) |
 | `employee` | `employee_detail` | Staff marker; `add_as_db_user` provision |
 | `note` | cross-cutting | Opt-in per Surface |
 
@@ -137,7 +137,6 @@ General scan before one-by-one implement specs. **Legend:** ✅ spec complete ·
 | `estimate_detail` `win` action undeclared in policy | 20 |
 | Cross-cutting notes/attachments per-Surface table incomplete | 28 |
 | `party_contact_relation_table` missing from catalog | customer / party-contact spec |
-| Wave 2 `addresses` not broken out per lens | 12 |
 
 ---
 

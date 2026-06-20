@@ -1,7 +1,7 @@
 # STATUS — SubHub
 
 > App-local quarterback. Platform pointer: [`../../STATUS.md`](../../STATUS.md).
-> Updated: 2026-06-18.
+> Updated: 2026-06-19.
 
 - **Package:** `@latch/subhub` · **Port:** 3003
 - **Docs:** [`docs/README.md`](./docs/README.md) · **Tasks:** [`docs/tasks/01-task-index.md`](./docs/tasks/01-task-index.md)
@@ -9,7 +9,7 @@
 
 ## Right now — do this next
 
-**Task 19 — Surface implement specs** — one-by-one DAL/policy/UI specs per [`surface-specs/00-scan.md`](./docs/surface-specs/00-scan.md). **Next: #7 [`property-owner.md`](./docs/surface-specs/property-owner.md)**. Progress: **5/27** spec files ([`iam-user.md`](./docs/surface-specs/iam-user.md) incl. `role_assignments`, [`iam-role.md`](./docs/surface-specs/iam-role.md), [`customer.md`](./docs/surface-specs/customer.md), [`vendor.md`](./docs/surface-specs/vendor.md), [`manufacturer.md`](./docs/surface-specs/manufacturer.md) ✅).
+**Task 19 — Surface implement specs** — one-by-one DAL/policy/UI specs per [`surface-specs/00-scan.md`](./docs/surface-specs/00-scan.md). **Next: #14 [`part.md`](./docs/surface-specs/part.md)**. Progress: **12/27** spec files ([`site-geography.md`](./docs/surface-specs/site-geography.md) ✅ — `parent_site`, `physical_address`, `sections`, `locations` on `site_detail`).
 
 ## Blockers
 
@@ -23,12 +23,19 @@ None.
 | [01 — Party / contacts](./docs/tasks/01-task-index.md#slice-01--party--contacts) | `party` model, phones/emails, subsets | **complete** (tasks 10–14) |
 | **Schema** | DBML Slices 2–6 | **complete** (task [17](./docs/tasks/17-schema-design-pass.md)) |
 | **Field catalog** | Fields + waves | **complete** (task [18](./docs/tasks/18-surface-catalog.md)) |
-| **Surface specs** | DAL + UI + policy per Surface | **active** (task [19](./docs/tasks/19-surface-implement-specs.md)) — **5/27** |
+| **Surface specs** | DAL + UI + policy per Surface | **active** (task [19](./docs/tasks/19-surface-implement-specs.md)) — **12/27** |
 | [02 — Sites](./docs/tasks/01-task-index.md#wave-1--sites-party-refactor-migration) | Sites, party refactor | **blocked** until task 19 |
 | [03–07](./docs/tasks/01-task-index.md) | Catalog → reports | planned (DBML drafted) |
 
 ## Recently completed
 
+- **site geography field spec** — `parent_site`, `physical_address`, `sections`, `locations` on `site_detail`; default `active` on admin add; tombstone + relocate rules ([`site-geography.md`](./docs/surface-specs/site-geography.md), [`decisions/site.md`](./docs/decisions/site.md)) (2026-06-19).
+- **party addresses field spec** — `addresses` on customer/vendor/manufacturer/property_owner detail; replace-array; copy-on-write shared `address` spine; orphan GC ([`party-addresses.md`](./docs/surface-specs/party-addresses.md), [`decisions/site.md`](./docs/decisions/site.md)) (2026-06-19).
+- **site contact relation catalog spec** — `site_contact_relation_table` editable page; per-row POST/PATCH/DELETE; `ConflictError` when `site_contact` references row ([`site-contact-relation.md`](./docs/surface-specs/site-contact-relation.md)) (2026-06-19).
+- **site implement spec** — forks 1–9 locked (portfolio, create, delete A+, contacts, list, layout, policy, cross-nav, orphans) ([`site.md`](./docs/surface-specs/site.md), [`decisions/site.md`](./docs/decisions/site.md)) (2026-06-19).
+- **contact retire spec** — remove `contact_list` / `contact_detail` / `/contacts`; five type lens prerequisites; `/contacts/[id]` compat redirect ([`contact-retire.md`](./docs/surface-specs/contact-retire.md), [party lens decision](./docs/decisions/party.md)) (2026-06-19).
+- **employee implement spec** — person-only base lens; HR + costing deferred; `default_labor_class_id` documented for costing slice; `add_as_db_user` ([`employee.md`](./docs/surface-specs/employee.md), [`decisions/party.md`](./docs/decisions/party.md)) (2026-06-19).
+- **property owner implement spec** — org hub: subsidiaries, contacts, `related_sites`; `site.property_owner_party_id`; person owners allowed ([`property-owner.md`](./docs/surface-specs/property-owner.md), [`decisions/party.md`](./docs/decisions/party.md), [`decisions/site.md`](./docs/decisions/site.md)) (2026-06-18).
 - **manufacturer implement spec** — base lens only; no hub, no related UI, no sub-manufacturers ([`manufacturer.md`](./docs/surface-specs/manufacturer.md), [`decisions/party.md`](./docs/decisions/party.md)) (2026-06-18).
 - **`role_assignments` merged into iam-user** — cancelled `iam-user-roles.md` row; v1 flat picker, all roles; `scope_id` on assignment deferred ([`iam-user.md`](./docs/surface-specs/iam-user.md), [`decisions/iam.md`](./docs/decisions/iam.md)) (2026-06-18).
 - **vendor implement spec** — org hub: subsidiaries, contacts, POs; no sites; `parent_vendor` ([`vendor.md`](./docs/surface-specs/vendor.md), [`decisions/party.md`](./docs/decisions/party.md)) (2026-06-18).

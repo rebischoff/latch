@@ -230,6 +230,10 @@ TableGroup party [color: #1abc9c] {
   employee
 }
 
+TableGroup postal [color: #95a5a6] {
+  address
+}
+
 Table party {
   id text [pk, default: `gen_random_uuid()::text`]
   kind text [not null, note: 'CHECK: person | organization; immutable after create']
@@ -413,7 +417,6 @@ Table party_address {
 // ─── Business (SubHub Slice 2) ──────────────────────────────────────────────
 
 TableGroup site [color: #3498db] {
-  address
   site
   site_section
   site_location
@@ -436,33 +439,45 @@ Table address {
   updated_at timestamptz [not null, default: `now()`]
 
   Note: '''
-    Normalized **postal** address — shared spine. Manual entry in v1; verification deferred.
-    Attached via `party_address` only. Domain **location** (work spot) = `site_location` on a
-    `site` — see decisions.md 2026-06-17.
+    Normalized **postal** address — shared spine (`TableGroup postal`). Manual entry in v1;
+    verification deferred. Attached via `party_address` and optional `site.physical_address_id`.
+    Do **not** merge with `party_address`. Domain **location** (work spot) = `site_location` on a
+    `site` — see decisions.md 2026-06-19.
   '''
 }
 
 Table site {
   id text [pk, default: `gen_random_uuid()::text`]
   name text [not null]
-  customer_party_id text [note: 'nullable FK → party — portfolio owner for customer hub tree (not vendor hub)']
+  customer_party_id text [note: 'nullable FK → party — portfolio customer for customer hub tree (not vendor hub)']
+  property_owner_party_id text [note: 'nullable FK → party — legal owner for property_owner hub related_sites']
   parent_site_id text [note: 'nullable FK → site.id; ON DELETE SET NULL']
+  physical_address_id text [note: 'nullable FK → address — dispatch/maps; wave 2b; many sites may share one row']
   created_at timestamptz [not null, default: `now()`]
   updated_at timestamptz [not null, default: `now()`]
 
   indexes {
     customer_party_id [name: 'site_customer_party_id_idx']
+    property_owner_party_id [name: 'site_property_owner_party_id_idx']
     parent_site_id [name: 'site_parent_site_id_idx']
+    physical_address_id [name: 'site_physical_address_id_idx']
   }
 
   Note: '''
-    Logical place — portfolio, campus, building, job site. **No address columns** on `site`.
-    Postal address on customer via `party_address`. **Site-owned geography** (as-built):
+    Logical place — portfolio, campus, building, job site. **No inline postal columns** on `site`.
+    Optional **`physical_address_id`** → `address` for dispatch/maps (wave 2b). Billing postal on
+    party via `party_address`. **Site-owned geography** (as-built):
     `site_section` + `site_location` — persists across jobs; estimates may add `proposed` rows.
 
     **`customer_party_id`** — which customer org owns this property in the address-book
     hub (subsidiary or top-level). Set when creating site from **customer_detail** only.
-    Vendor hub does not create sites. Per-job counterparties remain on `job_party`. See site.md 2026-06-18.
+    Vendor hub does not create sites.
+
+    **`property_owner_party_id`** — which property-owner party legally owns this site for
+    **property_owner_detail** `related_sites`. Set when creating site from **property_owner_detail**.
+    May differ from `customer_party_id` when payer ≠ owner. `ON DELETE SET NULL` on owner party.
+
+    Per-job counterparties remain on `job_party`. See site.md 2026-06-18.
 
     Worked example (Tower REIT / 200 Market Tower):
       party "Tower REIT" + party_address → address "200 Market St" (purpose: hq)
@@ -484,7 +499,8 @@ Table site_section {
   status text [not null, default: 'proposed', note: 'CHECK: proposed | active | removed | cancelled']
 
   Note: '''
-    Coarse site geography — Floor 3, Mauka, Courtyard. **Flat list** (no nested sections).
+    Coarse site geography — Floor 3, wing, warehouse, suite-as-zone. **Flat list** (no nested
+    sections). Optional grouping parent for `site_location`; lines FK location only.
     **Site-owned**; survives job completion (as-built). Child collection on `site_detail`
     (`sections`). Provenance (who introduced/removed, when) → `latch_audit` on mutations —
     no `*-by-*` columns on this row. Never hard-delete rows referenced by lines — tombstone
@@ -1333,7 +1349,9 @@ Ref: party_person.latch_user_id > latch_users.id [delete: set null]
 Ref: employee.party_id > party_person.party_id [delete: cascade]
 
 Ref: party_address.address_id > address.id [delete: cascade]
+Ref: site.physical_address_id > address.id [delete: set null]
 Ref: site.customer_party_id > party.id [delete: set null]
+Ref: site.property_owner_party_id > party.id [delete: set null]
 Ref: site.parent_site_id > site.id [delete: set null]
 Ref: site_section.site_id > site.id [delete: cascade]
 Ref: site_location.site_id > site.id [delete: cascade]

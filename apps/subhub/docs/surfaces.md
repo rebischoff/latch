@@ -170,7 +170,7 @@ Design is holistic; **ship** in waves after catalog exits.
 | `property_owner` | `property_owner_list` | `property_owner_detail` | `/property-owners` | **new** |
 | `employee` | `employee_list` | `employee_detail` | `/employees` | shipped (anchor `employee`) |
 
-**Retired in wave 1:** `contact_list`, `contact_detail`, `/contacts` (Slice 1 interim — remove from nav, routes, registry).
+**Retired in wave 1:** `contact_list`, `contact_detail`, `/contacts` — [retirement spec](./surface-specs/contact-retire.md); type lens pairs replace interim UI.
 
 No `other_list`. Tag `other` → pickers / future global search only.
 
@@ -202,8 +202,9 @@ No `other_list`. Tag `other` → pickers / future global search only.
 | `vendor_detail` | org hub: `parent_vendor`, `subsidiaries`, `contacts`, `subsidiary_tree`, `related_purchase_orders` (no sites) | party hub wave — [vendor.md](./surface-specs/vendor.md) |
 | `vendor_detail` | `vendor_pricing` | wave 3 — `vendor_part` child collection |
 | `manufacturer_detail` | *(none — base lens only)* | wave 1 — [spec](./surface-specs/manufacturer.md) |
+| `property_owner_detail` | org hub: `parent_property_owner`, `subsidiaries`, `contacts`, `subsidiary_tree`, `related_sites` | wave 1 — [property-owner.md](./surface-specs/property-owner.md) |
 | `part_list` | filter by `manufacturer_party_id` | wave 3 — not on `manufacturer_detail` |
-| `{role}_detail` | `addresses` | wave 2 — `party_address` + nested `address` |
+| `{role}_detail` | `addresses` | wave 2 — `party_address` + nested `address` — [`party-addresses.md`](./surface-specs/party-addresses.md) |
 | `employee_detail` | `add_as_db_user` | identity wave — provision `latch_users` + link on `party_person` |
 | `employee_detail` | HR scalars (`hire_date`, `job_title`, …) | HR + identity slice — [decision](./decisions/party.md#decision-employee_detail-scope--marker-now-hr-later-2026-06-17) |
 
@@ -219,9 +220,9 @@ No `other_list`. Tag `other` → pickers / future global search only.
 
 **List columns:** `display_name`, `kind`.
 
-**`customer_detail` Fields (person):** base `profile`, `phones`, `emails`.
+**`customer_detail` Fields (person):** base `profile`, `phones`, `emails`; wave 2 + `addresses` ([`party-addresses.md`](./surface-specs/party-addresses.md)).
 
-**`customer_detail` Fields (organization):** base + org hub — `parent_customer`, `subsidiaries`, `contacts`, combined `portfolio_tree`, `related_engagements`, `related_invoices` ([spec](./surface-specs/customer.md)).
+**`customer_detail` Fields (organization):** base + wave 2 `addresses` + org hub — `parent_customer`, `subsidiaries`, `contacts`, combined `portfolio_tree`, `related_engagements`, `related_invoices` ([spec](./surface-specs/customer.md)).
 
 ### `vendor_list` · `vendor_detail`
 
@@ -233,9 +234,9 @@ No `other_list`. Tag `other` → pickers / future global search only.
 
 **List columns:** `display_name`, `kind`. **Search:** `display_name`, `legal_name`.
 
-**`vendor_detail` Fields (person):** base `profile`, `phones`, `emails`.
+**`vendor_detail` Fields (person):** base `profile`, `phones`, `emails`; wave 2 + `addresses` ([`party-addresses.md`](./surface-specs/party-addresses.md)).
 
-**`vendor_detail` Fields (organization):** base + org hub — `parent_vendor`, `subsidiaries`, `contacts`, `subsidiary_tree`, `related_purchase_orders` ([spec](./surface-specs/vendor.md)). No sites, engagements, or invoices.
+**`vendor_detail` Fields (organization):** base + wave 2 `addresses` + org hub — `parent_vendor`, `subsidiaries`, `contacts`, `subsidiary_tree`, `related_purchase_orders` ([spec](./surface-specs/vendor.md)). No sites, engagements, or invoices.
 
 ### `manufacturer_list` · `manufacturer_detail`
 
@@ -247,38 +248,46 @@ No `other_list`. Tag `other` → pickers / future global search only.
 
 **List columns:** `display_name`, `kind`. **Search:** `display_name`, `legal_name`.
 
-**`manufacturer_detail` Fields (person and organization):** base `profile`, `phones`, `emails` only — no subsidiaries, contacts, related lists, or parts ([spec](./surface-specs/manufacturer.md)).
+**`manufacturer_detail` Fields (person and organization):** base `profile`, `phones`, `emails`; wave 2 + `addresses` ([`party-addresses.md`](./surface-specs/party-addresses.md)) — no subsidiaries, contacts, related lists, or parts ([spec](./surface-specs/manufacturer.md)).
 
 ### `property_owner_list` · `property_owner_detail`
 
 | | |
 |--|--|
-| **Status** | **planned** wave 1 |
+| **Status** | **target spec** [property-owner.md](./surface-specs/property-owner.md) (2026-06-18) |
 | **Route** | `/property-owners`, `/property-owners/[id]` |
 | **Anchor** | `party` — filter `property_owner` |
+
+**List columns:** `display_name`, `kind`. **Search:** `display_name`, `legal_name`.
+
+**`property_owner_detail` Fields (person):** base `profile`, `phones`, `emails`; wave 2 + `addresses` ([`party-addresses.md`](./surface-specs/party-addresses.md)).
+
+**`property_owner_detail` Fields (organization):** base + wave 2 `addresses` + `parent_property_owner`, `subsidiaries`, `contacts`, `subsidiary_tree`, read-only `related_sites` via `site.property_owner_party_id` — no engagements / invoices ([spec](./surface-specs/property-owner.md)).
 
 ### `employee_list` · `employee_detail`
 
 | | |
 |--|--|
-| **Status** | shipped |
+| **Status** | shipped (target spec [employee.md](./surface-specs/employee.md)) |
 | **Wave** | 0 |
 | **Route** | `/employees`, `/employees/[id]` |
-| **Nav group** | Contacts *(or HR — TBD)* |
-| **Anchor** | `employee` |
+| **Nav group** | Contacts |
+| **Anchor** | `employee` (list: `party` + lens) |
 | **Tables** | `employee`, `party`, `party_person` *(after refactor)* |
 
-**`employee_list` columns:** `display_name` (from party)
+**`employee_list` columns:** `display_name`; deferred: `employment_status`, `default_labor_class`, login chip
 
-**`employee_detail` Fields:**
+**`employee_detail` Fields (wave 0):**
 
 | Field | Type | Notes |
 |-------|------|-------|
 | `profile` | scalar | Person name via `party_person` (`first_name`, `last_name`, `nick_name`, `display_name`, `avatar_url`) |
+| `phones` | collection | `party_phone` |
+| `emails` | collection | `party_email`; `is_login_email` sync |
 | `staff` | scalar | `employee` row marker |
 | `add_as_db_user` | action | Create `latch_users`, set `party_person.latch_user_id`, designate `party_email.is_login_email`, sync → `login_email` — [identity decision](./decisions/party.md#decision-login-email--app-sync-to-latch_userslogin_email-2026-06-18) |
 
-**HR Fields deferred** to identity/HR slice — no DDL or Surface Fields until then ([decision](./decisions/party.md#decision-employee_detail-scope--marker-now-hr-later-2026-06-17)).
+**Deferred Fields:** `default_labor_class` (costing slice); HR scalars `employment`, `job_title`, `department`, `reports_to`, `primary_site` — [spec](./surface-specs/employee.md), [decision](./decisions/party.md#decision-employee_detail-scope--marker-now-hr-later-2026-06-17).
 
 ---
 
@@ -288,7 +297,7 @@ No `other_list`. Tag `other` → pickers / future global search only.
 
 | | |
 |--|--|
-| **Status** | draft |
+| **Status** | **target spec** [site.md](./surface-specs/site.md) (2026-06-19) |
 | **Wave** | 1 |
 | **Route** | `/sites`, `/sites/[id]` |
 | **Nav group** | Sites |
@@ -302,23 +311,19 @@ No `other_list`. Tag `other` → pickers / future global search only.
 | Field | Type | Notes |
 |-------|------|-------|
 | `profile` | scalar | `name` |
+| `customer_party` | scalar | `customer_party_id` → customer-tagged **org** — writable; [decision](./decisions/site.md#decision-portfolio-fks-on-site_detail--writable-scalars-2026-06-19) |
+| `property_owner_party` | scalar | `property_owner_party_id` → property_owner-tagged party — writable |
 | `contacts` | collection | `party_id`, `relation_id`, `sort_order` |
 
-**`site_detail` Fields (wave 2b — deferred):**
+**`site_detail` Fields (wave 2b):** see [`surface-specs/site-geography.md`](./surface-specs/site-geography.md) — `parent_site`, `physical_address`, `sections`, `locations`.
 
-| Field | Type | Notes |
-|-------|------|-------|
-| `sections` | collection | `site_section` — `title`, `sort_order`, `status` |
-| `locations` | collection | `site_location` — `label`, `site_section_id`, `status`, `replaced_by_site_location_id` |
-| `parent_site` | scalar | `parent_site_id` picker |
-
-**Notes:** No address block on site. Polymorphic `notes` on `site` deferred with shared notes pattern.
+**Notes:** Billing postal on `party_address`; dispatch on `physical_address`. Polymorphic `notes` on `site` deferred with shared notes pattern.
 
 ### `site_contact_relation_table`
 
 | | |
 |--|--|
-| **Status** | draft |
+| **Status** | **target spec** [site-contact-relation.md](./surface-specs/site-contact-relation.md) (2026-06-19) |
 | **Wave** | 1 |
 | **Route** | `/sites/contact-relations` |
 | **Nav group** | Sites |
@@ -330,17 +335,38 @@ No `other_list`. Tag `other` → pickers / future global search only.
 
 ---
 
-## Wave 2 — Party addresses (draft)
+## Wave 2 — Party addresses
+
+> **Implement spec:** [`surface-specs/party-addresses.md`](./surface-specs/party-addresses.md) (2026-06-19)
 
 ### `{role}_detail` — add `addresses`
 
-Applies to customer, vendor, manufacturer, property_owner detail lenses.
+Applies to **customer, vendor, manufacturer, property_owner** detail lenses — **person and org** layouts. **Not** `employee_detail`.
 
 | Field | Type | Notes |
 |-------|------|-------|
 | `addresses` | collection | `party_address` + nested `address` row: `purpose`, `label`, `line1`, `line2`, `city`, `state`, `postal_code`, `country`, optional `lat`/`lng` |
 
 **Purpose CHECK:** `billing`, `remit_to`, `hq`, `mailing`, `other`
+
+**PATCH:** replace-array; shared `address` row → copy-on-write when postal fields change ([decision](./decisions/site.md#decision-shared-address-row--copy-on-write-on-patch-2026-06-19)).
+
+---
+
+## Wave 2b — Site geography
+
+> **Implement spec:** [`surface-specs/site-geography.md`](./surface-specs/site-geography.md) (2026-06-19)
+
+### `site_detail` — add geography Fields
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `parent_site` | scalar | `parent_site_id` — acyclic picker |
+| `physical_address` | scalar | `site.physical_address_id` → `address` — dispatch/maps; copy-on-write when shared |
+| `sections` | collection | `site_section` — `title`, `sort_order`, `status` |
+| `locations` | collection | `site_location` — `label`, `site_section_id`, `sort_order`, `status`, `replaced_by_site_location_id` |
+
+**PATCH:** replace-array for `sections` / `locations`; admin-created rows default **`active`**; line-referenced locations tombstone via status — [spec](./surface-specs/site-geography.md).
 
 ---
 

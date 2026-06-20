@@ -73,7 +73,7 @@ Every gated request: `getPrincipal` → `resolveContext({ surfaceId, entityId? }
 
 | Table | Purpose |
 |-------|---------|
-| `site` | Logical place; optional `parent_site_id` hierarchy — no address link |
+| `site` | Logical place; optional `parent_site_id` hierarchy; `customer_party_id` and `property_owner_party_id` portfolio FKs — no address link |
 | `address` | Normalized postal address (manual entry v1; verification deferred) |
 | `party_address` | `party_id` + `address_id` + `purpose` |
 | `site_section` | Coarse site geography — Floor 3, wing, … (flat list; site-owned as-built) |
