@@ -7,8 +7,8 @@ import {
   createPgStoreAdapter,
 } from "@latch/adapter-pg-store";
 
-import type { UserDetailRow } from "./user_detail.glue.generated.js";
-import { userDetailColumnMap } from "./user_detail.schema.generated.js";
+import type { UserDetailRow } from "./user_detail.glue.generated";
+import { userDetailColumnMap } from "./user_detail.schema.generated";
 
 /** Parameterized single-table store SQL for `latch_users`. */
 export const createUserDetailStore = (

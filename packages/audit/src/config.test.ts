@@ -6,7 +6,7 @@ import {
   getAuditConfig,
   resetAuditConfig,
   setAuditConfig,
-} from "./config.js";
+} from "./config";
 
 describe("audit config", () => {
   afterEach(() => {

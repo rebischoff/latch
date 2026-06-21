@@ -15,7 +15,7 @@ vi.mock("pg", () => ({
 
 import { Pool } from "pg";
 
-import { createDatabaseConnections } from "./create-database-connections.js";
+import { createDatabaseConnections } from "./create-database-connections";
 
 const POOLED =
   "postgresql://owner:secret@ep-abc-pooler.us-east-2.aws.neon.tech/neondb?sslmode=require";

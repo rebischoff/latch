@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { createAuthRouteHandlers } from "./auth-route.js";
-import type { BetterAuthInstance } from "./better-auth-server.js";
+import { createAuthRouteHandlers } from "./auth-route";
+import type { BetterAuthInstance } from "./better-auth-server";
 
 const mockAuth = (): BetterAuthInstance => {
   const handler = vi.fn(async () => new Response("ok", { status: 200 }));

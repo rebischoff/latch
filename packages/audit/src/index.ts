@@ -9,7 +9,7 @@ export {
   shapeAuditEntryForMode,
   type AuditMode,
   type AuditMutationClass,
-} from "./audit-mode.js";
+} from "./audit-mode";
 export {
   DEFAULT_AUDIT_CONFIG,
   DEFAULT_AUDIT_RETENTION_YEARS,
@@ -17,22 +17,22 @@ export {
   resetAuditConfig,
   setAuditConfig,
   type AuditConfig,
-} from "./config.js";
+} from "./config";
 export {
   createMemoryAuditWriter,
   setAuditWriter,
   writeAudit,
   type AuditWriter,
   type MemoryAuditWriter,
-} from "./audit-service.js";
-export type { AuditAction, AuditEntryInput, AuditJson } from "./types.js";
+} from "./audit-service";
+export type { AuditAction, AuditEntryInput, AuditJson } from "./types";
 export {
   bindPermissionSession,
   LATCH_DEFAULT_COMPANY_ID,
   withPermissionDb,
-} from "./permission-db.js";
+} from "./permission-db";
 export {
   restoreFromAuditEntry,
   type RestoreFromAuditDeps,
   type StoredAuditEntry,
-} from "./restore.js";
+} from "./restore";

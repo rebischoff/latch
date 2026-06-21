@@ -1,8 +1,8 @@
 # Surface spec scan — v1 inventory
 
-> **Task:** [19-surface-implement-specs.md](../tasks/19-surface-implement-specs.md). **Schema:** [`current.dbml`](../schema/current.dbml). **Field catalog:** [`surfaces.md`](../surfaces.md).
+> **Spec task:** [19-surface-implement-specs.md](../tasks/19-surface-implement-specs.md) — **paused** at checkpoint. **Active:** [20-ui-discovery.md](../tasks/20-ui-discovery.md). **Schema:** [`current.dbml`](../schema/current.dbml). **Field catalog:** [`surfaces.md`](../surfaces.md).
 
-General scan before one-by-one implement specs. **Legend:** ✅ spec complete · 🟡 shipped code exists (spec backfill) · ⬜ pending · 🚫 not a Surface · ➖ wave field-add only
+General scan before one-by-one implement specs. **Legend:** ✅ spec complete · 🟡 shipped code exists (spec backfill) · ⬜ pending · ⏸ deferred until after UI discovery · 🚫 not a Surface · ➖ wave field-add only
 
 ---
 
@@ -11,13 +11,11 @@ General scan before one-by-one implement specs. **Legend:** ✅ spec complete ·
 | Metric | Count |
 |--------|------:|
 | Surface records to spec | **32** |
-| Catalog-table Surfaces | 5 |
-| List+detail pairs | 13 |
+| Spec checkpoint (task 19) | **13** files ✅ (rows #1–14) |
+| Deferred pending discovery | **14** rows (#15–28) |
 | Shipped (backfill spec) | 8 |
-| DBML tables without Surface | 1 (`phase` — gap) |
-| Report pages (wave 7) | 1+ (out of scope for Surface specs) |
 
-**Recommendation:** Still correct to fully plan all Surfaces before implementation code. DBML gives *data* depth; this pass gives *screen + DAL + UI* depth so waves do not re-debate the same patterns.
+**Process (2026-06-20):** CRM hub specs are enough to **build** sites + run estimate spike ([task 20](../tasks/20-ui-discovery.md)). Resume spec rows **#15–28** after planning session — **`estimate.md` before `item.md`**. See [planning decision](../decisions/general.md#decision-planning-model--ui-discovery-before-ops-specs-2026-06-20).
 
 ---
 
@@ -38,21 +36,21 @@ General scan before one-by-one implement specs. **Legend:** ✅ spec complete ·
 | 11 | [site-contact-relation.md](./site-contact-relation.md) | `site_contact_relation_table` | 1 | ✅ target (2026-06-19) |
 | 12 | [party-addresses.md](./party-addresses.md) | `addresses` on `{role}_detail` | 2 | ✅ target (2026-06-19) |
 | 13 | [site-geography.md](./site-geography.md) | `sections` · `locations` on `site_detail` | 2b | ✅ target (2026-06-19) |
-| 14 | [part.md](./part.md) | `part_list` · `part_detail` | 3 | ⬜ |
-| 15 | [item.md](./item.md) | `item_list` · `item_detail` | 3 | ⬜ |
-| 16 | [category.md](./category.md) | `category_table` | 3 | ⬜ |
-| 17 | [labor-class.md](./labor-class.md) | `labor_class_table` | 3 | ⬜ |
-| 18 | [phase.md](./phase.md) | `phase_table` *(add to surfaces.md)* | 3 | ⬜ |
-| 19 | [job-party-relation.md](./job-party-relation.md) | `job_party_relation_table` | 4 | ⬜ |
-| 20 | [estimate.md](./estimate.md) | `estimate_list` · `estimate_detail` | 4 | ⬜ |
-| 21 | [job.md](./job.md) | `job_list` · `job_detail` | 5 | ⬜ |
-| 22 | [change-order.md](./change-order.md) | `change_order_list` · `change_order_detail` | 5 | ⬜ |
-| 23 | [requested-order.md](./requested-order.md) | `requested_order_list` · `requested_order_detail` | 6a | ⬜ |
-| 24 | [purchase-order.md](./purchase-order.md) | `purchase_order_list` · `purchase_order_detail` | 6a | ⬜ |
-| 25 | [material-receipt.md](./material-receipt.md) | `material_receipt_list` · `material_receipt_detail` | 6a | ⬜ |
-| 26 | [invoice.md](./invoice.md) | `invoice_list` · `invoice_detail` | 6b | ⬜ |
-| 27 | [job-billing-fields.md](./job-billing-fields.md) | `billable_items` · `sov_milestones` on `job_detail` | 6b | ⬜ |
-| 28 | [notes-attachments.md](./notes-attachments.md) | cross-cutting `notes` / `attachments` | TBD | ⬜ |
+| 14 | [part.md](./part.md) | `part_list` · `part_detail` | 3 | ✅ target (2026-06-19) |
+| 15 | [item.md](./item.md) | `item_list` · `item_detail` | 3 | ⏸ after discovery |
+| 16 | [category.md](./category.md) | `category_table` | 3 | ⏸ after discovery |
+| 17 | [labor-class.md](./labor-class.md) | `labor_class_table` | 3 | ⏸ after discovery |
+| 18 | [phase.md](./phase.md) | `phase_table` *(add to surfaces.md)* | 3 | ⏸ after discovery |
+| 19 | [job-party-relation.md](./job-party-relation.md) | `job_party_relation_table` | 4 | ⏸ after discovery |
+| 20 | [estimate.md](./estimate.md) | `estimate_list` · `estimate_detail` | 4 | ⏸ **resume here** post–step 4 |
+| 21 | [job.md](./job.md) | `job_list` · `job_detail` | 5 | ⏸ after discovery |
+| 22 | [change-order.md](./change-order.md) | `change_order_list` · `change_order_detail` | 5 | ⏸ after discovery |
+| 23 | [requested-order.md](./requested-order.md) | `requested_order_list` · `requested_order_detail` | 6a | ⏸ after discovery |
+| 24 | [purchase-order.md](./purchase-order.md) | `purchase_order_list` · `purchase_order_detail` | 6a | ⏸ after discovery |
+| 25 | [material-receipt.md](./material-receipt.md) | `material_receipt_list` · `material_receipt_detail` | 6a | ⏸ after discovery |
+| 26 | [invoice.md](./invoice.md) | `invoice_list` · `invoice_detail` | 6b | ⏸ after discovery |
+| 27 | [job-billing-fields.md](./job-billing-fields.md) | `billable_items` · `sov_milestones` on `job_detail` | 6b | ⏸ after discovery |
+| 28 | [notes-attachments.md](./notes-attachments.md) | cross-cutting `notes` / `attachments` | TBD | ⏸ after discovery |
 
 ---
 

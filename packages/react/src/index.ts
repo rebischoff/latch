@@ -3,8 +3,8 @@ export {
   CapabilitiesProvider,
   type CanProps,
   type CapabilitiesProviderProps,
-} from "./capabilities.js";
+} from "./capabilities";
 export {
   FieldControl,
   type FieldControlProps,
-} from "./field-control.js";
+} from "./field-control";

@@ -13,8 +13,8 @@ import { principalRoleIds, type PolicyScope, type SurfaceId } from "@latch/contr
 import { PolicyService } from "@latch/policy";
 import { headers } from "next/headers";
 
-import { getConnections, getPool } from "./db.js";
-import { __APP_REGISTRY__ } from "./policy-registry.js";
+import { getConnections, getPool } from "./db";
+import { __APP_REGISTRY__ } from "./policy-registry";
 
 let authInstance: ReturnType<typeof createBetterAuth> | undefined;
 

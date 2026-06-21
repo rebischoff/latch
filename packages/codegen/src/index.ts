@@ -1,15 +1,15 @@
-export { runCodegen } from "./run.js";
-export type { CodegenResult } from "./run.js";
+export { runCodegen } from "./run";
+export type { CodegenResult } from "./run";
 export {
   discoverSurfaceYamls,
   generateAllSurfaces,
   generateSurfaceFile,
   parseSurfaceYaml,
   REPO_ROOT,
-} from "./generate.js";
-export type { GeneratedArtifact } from "./generate.js";
-export { analyzeSurfaceGlue, generateGlueFile } from "./glue.js";
-export { COLUMN_TYPES, FIELD_ACTIONS } from "./types.js";
+} from "./generate";
+export type { GeneratedArtifact } from "./generate";
+export { analyzeSurfaceGlue, generateGlueFile } from "./glue";
+export { COLUMN_TYPES, FIELD_ACTIONS } from "./types";
 export type {
   ColumnType,
   GeneratedGlueFile,
@@ -22,4 +22,4 @@ export type {
   SurfaceGlueMode,
   SurfaceKind,
   SurfacePolicyMode,
-} from "./types.js";
+} from "./types";

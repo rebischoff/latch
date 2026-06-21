@@ -1,4 +1,4 @@
-export { createDatabaseConnections } from "./create-database-connections.js";
+export { createDatabaseConnections } from "./create-database-connections";
 export {
   applyLatchAppRole,
   LATCH_APP_ROLE,
@@ -6,4 +6,4 @@ export {
   resolveDatabaseEnv,
   type DatabaseEnv,
   type ResolvedDatabaseEnv,
-} from "./resolve-database-env.js";
+} from "./resolve-database-env";

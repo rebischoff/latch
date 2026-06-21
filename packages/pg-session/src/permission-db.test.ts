@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { bindPermissionSession, withPermissionDb } from "./permission-db.js";
+import { bindPermissionSession, withPermissionDb } from "./permission-db";
 
 describe("withPermissionDb", () => {
   it("issues session bind before work inside BEGIN/COMMIT", async () => {

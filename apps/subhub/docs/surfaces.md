@@ -2,7 +2,7 @@
 
 > **Status:** Complete (2026-06-17). Canonical UI/policy contract for v1. **Schema:** [`schema/current.dbml`](./schema/current.dbml). **Catalog task:** [tasks/18-surface-catalog.md](./tasks/18-surface-catalog.md) (complete).
 >
-> Field-level detail here; headline slice map stays in [`architecture.md`](./architecture.md#surface-catalog). Child-collection patch semantics: [`child-collections.md`](./child-collections.md). **Implement specs (DAL/UI):** [`surface-specs/`](./surface-specs/README.md) — task 19.
+> Field-level detail here; headline slice map stays in [`architecture.md`](./architecture.md#surface-catalog). Child-collection patch semantics: [`child-collections.md`](./child-collections.md). **Implement specs:** [`surface-specs/`](./surface-specs/README.md) — task 19 checkpoint. **Active build:** [task 20 — UI discovery](./tasks/20-ui-discovery.md).
 
 ## Conventions
 
@@ -80,7 +80,7 @@ Resolve during [task 18](./tasks/18-surface-catalog.md) before implementation wa
 | O6 | ~~Site geography timing~~ | **Locked 2026-06-17** — wave 1 DDL only; UI wave 2b; estimates flat until registry exists ([decision](./decisions/site.md#decision-site-geography-on-site_detail--timing-2026-06-17)) | — |
 | O7 | ~~`employee_detail` scope~~ | **Locked 2026-06-17** — staff marker through wave 1+; HR Fields with identity slice ([decision](./decisions/party.md#decision-employee_detail-scope--marker-now-hr-later-2026-06-17)) | — |
 
-_All open decisions resolved (2026-06-17). Implement-tier specs: [task 19](./tasks/19-surface-implement-specs.md)._
+_All open decisions resolved (2026-06-17). Implement specs: task 19 (checkpoint ✅ CRM). **Build:** [task 20](./tasks/20-ui-discovery.md)._
 
 ## Cross-cutting Fields (notes, attachments) {#cross-cutting-fields-notes-attachments}
 
@@ -203,7 +203,7 @@ No `other_list`. Tag `other` → pickers / future global search only.
 | `vendor_detail` | `vendor_pricing` | wave 3 — `vendor_part` child collection |
 | `manufacturer_detail` | *(none — base lens only)* | wave 1 — [spec](./surface-specs/manufacturer.md) |
 | `property_owner_detail` | org hub: `parent_property_owner`, `subsidiaries`, `contacts`, `subsidiary_tree`, `related_sites` | wave 1 — [property-owner.md](./surface-specs/property-owner.md) |
-| `part_list` | filter by `manufacturer_party_id` | wave 3 — not on `manufacturer_detail` |
+| `part_list` | *(no manufacturer filter v1)* | wave 3 — [part.md](./surface-specs/part.md); not on `manufacturer_detail` |
 | `{role}_detail` | `addresses` | wave 2 — `party_address` + nested `address` — [`party-addresses.md`](./surface-specs/party-addresses.md) |
 | `employee_detail` | `add_as_db_user` | identity wave — provision `latch_users` + link on `party_person` |
 | `employee_detail` | HR scalars (`hire_date`, `job_title`, …) | HR + identity slice — [decision](./decisions/party.md#decision-employee_detail-scope--marker-now-hr-later-2026-06-17) |
@@ -376,21 +376,21 @@ Applies to **customer, vendor, manufacturer, property_owner** detail lenses — 
 
 | | |
 |--|--|
-| **Status** | draft |
+| **Status** | **target spec** [part.md](./surface-specs/part.md) (2026-06-19) |
 | **Wave** | 3 |
 | **Route** | `/parts`, `/parts/[id]` |
 | **Nav group** | Catalog |
 | **Anchor** | `manufacturer_part` |
 | **Tables** | `manufacturer_part`, `vendor_part` |
 
-**`part_list` columns:** `mpn`, `description`, `manufacturer` *(party FK or denormalized label)*
+**`part_list` columns:** `mpn`, `description`, `manufacturer` label — search `mpn` + `description`; sort manufacturer then `mpn`; no price columns; no manufacturer filter v1
 
 **`part_detail` Fields:**
 
 | Field | Type | Notes |
 |-------|------|-------|
-| `profile` | scalar | `mpn`, `description`, `unit`, `purchase_unit`, `units_per_purchase`, manufacturer ref |
-| `vendor_pricing` | collection | `vendor_part` — `vendor_id`, `vendor_pn`, `unit_cost`, effective date |
+| `profile` | scalar | `manufacturer_party_id`, `mpn`, `description`, `unit`, `purchase_unit`, `units_per_purchase` — defer `specs`, `cut_sheet_url` |
+| `vendor_pricing` | collection | `vendor_part` — `vendor_party_id`, `vendor_pn`, `vendor_description`, `unit_price`, `is_preferred` (one preferred per part) |
 
 ### `item_list` · `item_detail`
 

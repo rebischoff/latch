@@ -7,7 +7,7 @@ import type {
   SurfaceDef,
   SurfaceGlueAnalysis,
   SurfaceGlueMode,
-} from "./types.js";
+} from "./types";
 
 const toPascalCase = (snake: string): string =>
   snake
@@ -209,7 +209,7 @@ import { z } from "zod";
 
 import {
   ${prefix}PatchSchema,${verificationImport ? `\n${verificationImport}` : ""}
-} from "./${surface.id}.schema.generated.js";
+} from "./${surface.id}.schema.generated";
 
 ${listQueryBlock}export type ${prefix}Row = {
 ${rowTypeProps}

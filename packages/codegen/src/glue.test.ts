@@ -9,10 +9,10 @@ import {
 } from "@latch/contracts";
 import { createSurfaceDal } from "@latch/dal";
 
-import { REPO_ROOT } from "./generate.js";
-import { analyzeSurfaceGlue, generateGlueFile } from "./glue.js";
-import { parseSurfaceYaml } from "./generate.js";
-import type { SurfaceDef } from "./types.js";
+import { REPO_ROOT } from "./generate";
+import { analyzeSurfaceGlue, generateGlueFile } from "./glue";
+import { parseSurfaceYaml } from "./generate";
+import type { SurfaceDef } from "./types";
 
 const widgetListYaml = `
 id: widget_list

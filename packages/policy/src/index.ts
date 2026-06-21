@@ -3,12 +3,12 @@ export {
   synthesizeDataMasterBinding,
   synthesizeIamMasterBinding,
   unionGrantsStrategy,
-} from "./policy-service.js";
+} from "./policy-service";
 export type {
   MultiRoleCombine,
   PolicyServiceConfig,
   RoleMergeStrategy,
-} from "./policy-service.js";
+} from "./policy-service";
 
 export {
   CachingPolicyService,
@@ -19,45 +19,45 @@ export {
   parseManifestCacheKey,
   parseManifestCacheMode,
   POLICY_VERSION_KEY_SENTINEL,
-} from "./manifest-cache.js";
+} from "./manifest-cache";
 export type {
   ManifestCacheConfig,
   ManifestCacheKeyParts,
   ManifestCacheMode,
   ManifestCacheStore,
   ResolveManifestOptions,
-} from "./manifest-cache.js";
+} from "./manifest-cache";
 
 export {
   ensureFieldKeys,
   mergeRowScope,
   unionGrants,
   unionSurfaceActions,
-} from "./merge.js";
-export type { MergeOptions } from "./merge.js";
+} from "./merge";
+export type { MergeOptions } from "./merge";
 
 export {
   createMemoryRoleGrantProvider,
   emptyRoleGrantProvider,
   MemoryRoleGrantProvider,
-} from "./grant-provider.js";
+} from "./grant-provider";
 export type {
   MemoryRoleGrantBinding,
   RoleGrant,
   RoleGrantProvider,
-} from "./grant-provider.js";
+} from "./grant-provider";
 
 export {
   definePolicyRegistry,
   defineSurfacePolicy,
-} from "./registry.js";
+} from "./registry";
 
 export {
   resolveGrantSurfaceDef,
   validateGrantAgainstCatalog,
   validateGrantTuple,
-} from "./validate-grant.js";
-export type { GrantTuple } from "./validate-grant.js";
+} from "./validate-grant";
+export type { GrantTuple } from "./validate-grant";
 export type {
   ModePolicyOverlay,
   PolicyMode,
@@ -66,4 +66,4 @@ export type {
   RolePolicyBinding,
   SurfaceKind,
   SurfacePolicyDefinition,
-} from "./registry.js";
+} from "./registry";

@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-import { generateAllSurfaces } from "./generate.js";
+import { generateAllSurfaces } from "./generate";
 
 export type CodegenResult = {
   ok: boolean;

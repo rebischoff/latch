@@ -1,6 +1,6 @@
 import type { Manifest } from "@latch/contracts";
 
-import type { SurfaceDescriptor } from "./surface-descriptor.js";
+import type { SurfaceDescriptor } from "./surface-descriptor";
 
 /**
  * Build a Field-keyed DTO from a store row using the surface descriptor.

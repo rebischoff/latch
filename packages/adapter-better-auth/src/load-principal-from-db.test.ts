@@ -9,7 +9,7 @@ vi.mock("@latch/pg-session", () => ({
   }),
 }));
 
-import { loadPrincipalFromDb } from "./load-principal-from-db.js";
+import { loadPrincipalFromDb } from "./load-principal-from-db";
 import { Pool } from "pg";
 
 describe("loadPrincipalFromDb", () => {

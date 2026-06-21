@@ -45,6 +45,7 @@ apps/<app>/docs/              app/spike docs — independent of packages
 | [`foundations/global-options.md`](./foundations/global-options.md) | Platform defaults (v1 vs deferred) |
 | [`foundations/naming.md`](./foundations/naming.md) | Name + domain terms |
 | [`foundations/development.md`](./foundations/development.md) | Vercel + Neon (all envs); stub principal |
+| [`foundations/typescript-monorepo.md`](./foundations/typescript-monorepo.md) | Bundler monorepo — extensionless relative imports |
 | [`foundations/open-questions.md`](./foundations/open-questions.md) | Active + resolved decisions |
 
 ## Phases — the plan

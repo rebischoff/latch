@@ -11,7 +11,7 @@ vi.mock("@latch/pg-session", () => ({
 import { withPermissionDb } from "@latch/pg-session";
 import { Pool } from "pg";
 
-import { resolveLatchUserId } from "./resolve-latch-user-id.js";
+import { resolveLatchUserId } from "./resolve-latch-user-id";
 
 describe("resolveLatchUserId", () => {
   const pool = new Pool({ connectionString: "postgres://test" });

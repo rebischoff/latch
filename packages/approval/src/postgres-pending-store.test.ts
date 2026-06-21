@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 
-import { createPostgresPendingStore } from "./postgres-pending-store.js";
+import { createPostgresPendingStore } from "./postgres-pending-store";
 
 const pendingDatabaseUrl = (): string | undefined => {
   const appUrl = process.env.LATCH_APP_DATABASE_URL?.trim();

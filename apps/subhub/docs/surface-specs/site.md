@@ -297,4 +297,4 @@ Hub lists omit site rows when principal lacks `site_detail` `read` ([customer](.
 - [x] Locked answers forks 1–9 (2026-06-19) reflected in decisions + catalog
 - [x] A–K complete
 - [x] [`site-contact-relation.md`](./site-contact-relation.md) catalog spec (#11)
-- [ ] Implementation deferred until task 19 exit + site migration wave
+- [ ] Implementation — [task 20](../tasks/20-ui-discovery.md) steps 1–2 (migration + sites UI)

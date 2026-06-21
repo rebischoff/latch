@@ -1,5 +1,6 @@
 import { hashLatchPassword } from "@latch/adapter-better-auth";
 import type { Pool, PoolClient } from "pg";
+import { cache } from "react";
 
 import { getPool } from "./db";
 
@@ -66,6 +67,10 @@ const insertMasterUser = async (
   return userId;
 };
 
+/** When setup has completed, skip the DB probe for the process lifetime. */
+let setupCompleteCache: boolean | undefined;
+let setupInflight: Promise<boolean> | undefined;
+
 export const readSetupState = async (
   pool: Pool,
 ): Promise<{ needsSetup: boolean }> => {
@@ -78,10 +83,25 @@ export const readSetupState = async (
 };
 
 /** True when no users exist and first-run setup has not completed. */
-export const needsSetup = async (): Promise<boolean> => {
-  const { needsSetup: pending } = await readSetupState(getPool());
-  return pending;
-};
+export const needsSetup = cache(async (): Promise<boolean> => {
+  if (setupCompleteCache) {
+    return false;
+  }
+  if (setupInflight) {
+    return setupInflight;
+  }
+  setupInflight = readSetupState(getPool())
+    .then(({ needsSetup: pending }) => {
+      if (!pending) {
+        setupCompleteCache = true;
+      }
+      return pending;
+    })
+    .finally(() => {
+      setupInflight = undefined;
+    });
+  return setupInflight;
+});
 
 /** Create master user + system role assignments; mark setup complete. */
 export const completeSetup = async (
@@ -111,6 +131,7 @@ export const completeSetup = async (
     client.release();
   }
 
+  setupCompleteCache = true;
   return { userId };
 };
 

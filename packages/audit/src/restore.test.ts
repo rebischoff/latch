@@ -13,9 +13,9 @@ import {
 import {
   createMemoryAuditWriter,
   setAuditWriter,
-} from "./audit-service.js";
-import type { AuditJson } from "./types.js";
-import { restoreFromAuditEntry, type StoredAuditEntry } from "./restore.js";
+} from "./audit-service";
+import type { AuditJson } from "./types";
+import { restoreFromAuditEntry, type StoredAuditEntry } from "./restore";
 
 const WIDGET_ID = "widget-alpha";
 const PRINCIPAL = "principal-restore";

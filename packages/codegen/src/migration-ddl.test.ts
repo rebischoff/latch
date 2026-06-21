@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   crossCheckYamlColumnTypes,
   parseCreateTableColumns,
-} from "./migration-ddl.js";
+} from "./migration-ddl";
 
 const widgetsSql = `
 CREATE TABLE widgets (

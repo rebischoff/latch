@@ -10,10 +10,10 @@ import {
   parseManifestCacheKey,
   parseManifestCacheMode,
   POLICY_VERSION_KEY_SENTINEL,
-} from "./manifest-cache.js";
-import { createMemoryRoleGrantProvider } from "./grant-provider.js";
-import { PolicyService } from "./policy-service.js";
-import { definePolicyRegistry, defineSurfacePolicy } from "./registry.js";
+} from "./manifest-cache";
+import { createMemoryRoleGrantProvider } from "./grant-provider";
+import { PolicyService } from "./policy-service";
+import { definePolicyRegistry, defineSurfacePolicy } from "./registry";
 
 const principal = (
   roles: string[],
@@ -160,7 +160,7 @@ describe("CachingPolicyService", () => {
       inner,
       { mode: "request" },
       createMapManifestCacheStore(map),
-    ) as import("./manifest-cache.js").CachingPolicyService;
+    ) as import("./manifest-cache").CachingPolicyService;
 
     const spy = vi.spyOn(inner, "resolve");
     const p = principal(["editor"], { policyVersion: 1 });
@@ -175,7 +175,7 @@ describe("CachingPolicyService", () => {
     const wrapped = createCachingPolicyService(inner, {
       mode: "ttl",
       ttlMs: 60_000,
-    }) as import("./manifest-cache.js").CachingPolicyService;
+    }) as import("./manifest-cache").CachingPolicyService;
 
     const spy = vi.spyOn(inner, "resolve");
     const p = principal(["editor"], { policyVersion: 5 });

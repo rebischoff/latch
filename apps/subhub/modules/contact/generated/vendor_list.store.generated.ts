@@ -7,8 +7,8 @@ import {
   createPgStoreAdapter,
 } from "@latch/adapter-pg-store";
 
-import type { VendorListRow } from "./vendor_list.glue.generated.js";
-import { vendorListColumnMap } from "./vendor_list.schema.generated.js";
+import type { VendorListRow } from "./vendor_list.glue.generated";
+import { vendorListColumnMap } from "./vendor_list.schema.generated";
 
 /** Parameterized single-table store SQL for `party`. */
 export const createVendorListStore = (

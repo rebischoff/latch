@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { narrowSchema } from "./narrow.js";
-import type { Manifest } from "./types.js";
+import { narrowSchema } from "./narrow";
+import type { Manifest } from "./types";
 
 const JobSchema = z.object({
   summary: z.string(),

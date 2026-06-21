@@ -109,7 +109,7 @@ Single-table emit (illustrative):
 ```ts
 // generated/widget_list.glue.generated.ts — DO NOT EDIT
 import type { SurfaceDescriptor } from "@latch/dal";
-import { WidgetListPatchSchema } from "./widget_list.schema.generated.js";
+import { WidgetListPatchSchema } from "./widget_list.schema.generated";
 
 export const projectWidgetListRow = (row, manifest, ...) => { /* manifest-narrowed projection */ };
 export const applyWidgetListPatch = (row, patch) => { /* column-backed patch */ };

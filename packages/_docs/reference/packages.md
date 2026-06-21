@@ -19,6 +19,7 @@ How the codebase is partitioned. The repo is a **monorepo from day one** so pack
 | Package manager | **npm workspaces** | Already in use; zero adoption cost. Move to pnpm only if hoisting issues arise. |
 | Task runner | **npm scripts** initially | Add Turborepo or Nx only when build times demand it. |
 | TS project refs | **Yes** | One `tsconfig.base.json` + per-package `tsconfig.json` with `references`. |
+| Relative imports | **Extensionless** | `moduleResolution: "bundler"` — see [`typescript-monorepo.md`](../foundations/typescript-monorepo.md#decision-bundler-monorepo--extensionless-relative-imports-2026-06-20). |
 | Lint | Shared `eslint.config.mjs` at root; per-package overrides | |
 | Test | Single test runner across packages (Vitest TBD) | |
 

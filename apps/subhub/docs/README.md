@@ -6,10 +6,11 @@ End-to-end **service-trades / AV integration** business app on Latch. Real Postg
 
 1. [`../STATUS.md`](../STATUS.md) — what to do next (single immediate step).
 2. [`decisions/`](./decisions/README.md) — locked choices by domain; do not re-debate in tasks.
-3. [`surfaces.md`](./surfaces.md) — Surface & Field catalog (UI/policy contract).
-4. [`surface-specs/`](./surface-specs/README.md) — implement-tier DAL/UI specs (task 19).
-5. [`surface-planning-depth.md`](./surface-planning-depth.md) — checklist A–K.
-6. [`tasks/01-task-index.md`](./tasks/01-task-index.md) — execution order and wave map.
+3. [`tasks/20-ui-discovery.md`](./tasks/20-ui-discovery.md) — **active** migration + sites + estimate spike.
+4. [`surfaces.md`](./surfaces.md) — Surface & Field catalog (UI/policy contract).
+5. [`surface-specs/`](./surface-specs/README.md) — implement-tier specs (task 19 checkpoint + resume).
+6. [`surface-planning-depth.md`](./surface-planning-depth.md) — process map + checklist A–K.
+7. [`tasks/01-task-index.md`](./tasks/01-task-index.md) — execution order and wave map.
 
 ## Reference
 

@@ -55,6 +55,14 @@ const actionsRenderEqual = (
   });
 };
 
+const manifestRenderEqual = (
+  prev: Manifest,
+  next: Manifest,
+): boolean =>
+  prev.surface === next.surface &&
+  JSON.stringify(prev.fields) === JSON.stringify(next.fields) &&
+  JSON.stringify(prev.actions) === JSON.stringify(next.actions);
+
 const registrationRenderEqual = (
   prev: SurfaceActionsRegistration | null,
   next: SurfaceActionsRegistration,
@@ -63,7 +71,10 @@ const registrationRenderEqual = (
     return false;
   }
 
-  return prev.manifest === next.manifest && actionsRenderEqual(prev.actions, next.actions);
+  return (
+    manifestRenderEqual(prev.manifest, next.manifest) &&
+    actionsRenderEqual(prev.actions, next.actions)
+  );
 };
 
 export const SurfaceActionsProvider = ({ children }: { children: ReactNode }) => {
@@ -73,9 +84,10 @@ export const SurfaceActionsProvider = ({ children }: { children: ReactNode }) =>
 
   const register = useCallback((next: SurfaceActionsRegistration) => {
     registrationRef.current = next;
-    setRegistration((prev) =>
-      registrationRenderEqual(prev, next) ? prev : next,
-    );
+    setRegistration((prev) => {
+      const equal = registrationRenderEqual(prev, next);
+      return equal ? prev : next;
+    });
   }, []);
 
   const unregister = useCallback(() => {
@@ -113,7 +125,7 @@ export const useRegisterSurfaceActions = (
 
   useLayoutEffect(() => {
     register({ manifest, actions });
-  });
+  }, [actions, manifest, register]);
 
   useEffect(() => unregister, [unregister]);
 };

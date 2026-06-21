@@ -1,9 +1,9 @@
-import type { BetterAuthInstance } from "./better-auth-server.js";
+import type { BetterAuthInstance } from "./better-auth-server";
 import {
   findLatchUserByCredentialEmail,
   toAuthCredentialEmail,
-} from "./latch-credentials-plugin.js";
-import { verifyLatchPassword } from "./latch-password.js";
+} from "./latch-credentials-plugin";
+import { verifyLatchPassword } from "./latch-password";
 import type { Pool } from "pg";
 
 export type LatchSignInInput = {

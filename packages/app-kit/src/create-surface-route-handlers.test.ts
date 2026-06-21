@@ -8,7 +8,7 @@ import {
 } from "@latch/contracts";
 import type { SurfaceDal } from "@latch/dal";
 
-import { createSurfaceRouteHandlers } from "./create-surface-route-handlers.js";
+import { createSurfaceRouteHandlers } from "./create-surface-route-handlers";
 
 const manifest: Manifest = {
   surface: "widget_detail",

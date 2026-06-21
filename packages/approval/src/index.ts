@@ -6,9 +6,9 @@ export {
   type PendingResolveInput,
   type PendingStatus,
   type PendingStore,
-} from "./pending-store.js";
+} from "./pending-store";
 export {
   createPostgresPendingStore,
   PostgresPendingStore,
   type PostgresPendingStoreHandle,
-} from "./postgres-pending-store.js";
+} from "./postgres-pending-store";

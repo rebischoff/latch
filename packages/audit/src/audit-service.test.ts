@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it } from "vitest";
 
-import { resetAuditMode, setAuditMode } from "./audit-mode.js";
+import { resetAuditMode, setAuditMode } from "./audit-mode";
 import {
   createMemoryAuditWriter,
   setAuditWriter,
   writeAudit,
-} from "./audit-service.js";
+} from "./audit-service";
 
 describe("writeAudit", () => {
   const memory = createMemoryAuditWriter();

@@ -10,10 +10,11 @@ import {
 } from "@latch/policy";
 import type { Pool } from "pg";
 
-import { createRoleListStore } from "../../modules/iam/generated/role_list.store.generated.js";
-import { createUserDetailStore } from "../../modules/iam/generated/user_detail.store.generated.js";
-import { createUserListStore } from "../../modules/iam/generated/user_list.store.generated.js";
-import { subhubRegistry } from "../policy-registry.js";
+import { createRoleListStore } from "../../modules/iam/generated/role_list.store.generated";
+import { createUserDetailStore } from "../../modules/iam/generated/user_detail.store.generated";
+import { createUserListStore } from "../../modules/iam/generated/user_list.store.generated";
+import { subhubRegistry } from "../policy-registry";
+import { ensureAuditBootstrap, getPool, getPrincipal } from "../latch";
 
 import {
   roleDetailDescriptor,
@@ -25,8 +26,8 @@ import {
   type RoleDetailRow,
   type RoleDetailStoreRelated,
   type UserRolesRow,
-} from "./descriptors.js";
-import { assertIamSurfaceRead } from "./gate.js";
+} from "./descriptors";
+import { assertIamSurfaceRead } from "./gate";
 import {
   allRoleIdsExist,
   assertNotLastSystemRoleHolder,
@@ -41,7 +42,7 @@ import {
   replaceUserRoles,
   updateRoleDisplayName,
   type RoleGrantTuple,
-} from "./repository.js";
+} from "./repository";
 
 export type IamDal = {
   userList: SurfaceDal;
@@ -313,9 +314,7 @@ export const initIamDal = (options: CreateIamDalOptions): IamDal => {
 };
 
 export const ensureIamDal = async (): Promise<IamDal> => {
-  const { ensureAuditBootstrap: bootstrap, getPool, getPrincipal } =
-    await import("../latch.js");
-  await bootstrap();
+  await ensureAuditBootstrap();
 
   if (!iamDal) {
     initIamDal({

@@ -1,0 +1,171 @@
+# 21 — Bundler import convention (Turbopack)
+
+> **Status:** Complete (2026-06-20). Next: resume [20 — UI discovery](./20-ui-discovery.md) (task 21 unblocks Turbopack dev; no further steps).
+>
+> **Blocks:** Defaulting SubHub dev to Turbopack (Next.js 16 default bundler). **Does not block** task [20](./20-ui-discovery.md) feature work — may run **in parallel**.
+
+## Goal
+
+Align the Latch monorepo with how it **actually runs**: a **bundler monorepo** (`moduleResolution: "bundler"`, `noEmit: true`, `@latch/*` exports `./src/index.ts`), not a Node ESM emit pipeline.
+
+Today, relative imports use **`.js` extensions** on **`.ts` sources** (e.g. `from "./contact_detail.schema.generated.js"`). That is correct for `NodeNext` emit (`foo.ts` → `foo.js` on disk). Webpack dev works only because `next.config.ts` patches resolution:
+
+```ts
+config.resolve.extensionAlias = { ".js": [".ts", ".tsx", ".js"] };
+```
+
+**Turbopack has no equivalent** ([vercel/next.js#82945](https://github.com/vercel/next.js/issues/82945)). SubHub fails to build with `Module not found: …generated.js`.
+
+**This is not a SubHub rewrite.** SubHub follows the Phase 09 scaffold and codegen. The mismatch is **platform-wide** (codegen templates, `@latch/*` packages, consumer app hand code). Fix the convention once; all apps benefit.
+
+## Prerequisites
+
+- Task [02](./02-ui-dependencies.md) complete (Next.js app exists).
+- Skim [`packages/codegen/template/next.config.ts`](../../../../packages/codegen/template/next.config.ts) and [`metadata-and-codegen.md`](../../../../packages/codegen/docs/reference/metadata-and-codegen.md).
+- Reproduce Turbopack failure: `npm run dev:turbo -w @latch/subhub` → `policy-registry.ts` cannot resolve `*.schema.generated.js`.
+
+## Problem summary
+
+| Layer | Current state | Expected for bundler monorepo |
+|-------|---------------|--------------------------------|
+| Generated imports | `from "./foo.schema.generated.js"` | `from "./foo.schema.generated"` (extensionless) |
+| Hand-written app imports | `from "../lib/latch.js"` | extensionless relative imports |
+| `@latch/*` package internals | `from "./bar.js"` | extensionless relative imports |
+| Package `exports` | `"./src/index.ts"` ✓ | unchanged |
+| `tsconfig` | `moduleResolution: "bundler"` ✓ | unchanged |
+| Dev bundler | webpack + `extensionAlias` crutch | **Turbopack** (first-class) |
+
+**Not in scope:** renaming generated files from `.ts` to something else — files are already `.ts`. Only **import specifiers** change.
+
+## Outcomes
+
+1. **Turbopack dev works** without `extensionAlias`.
+2. **Codegen** emits extensionless relative imports in all `*.generated.ts` and scaffold template files.
+3. **CI** prevents regression (lint or `codegen --check` + grep gate).
+4. **Webpack `extensionAlias`** removed from consumer `next.config.ts` after verification (or kept briefly as transitional safety net — document removal date).
+5. **Decision** recorded in platform docs (canonical location below).
+
+---
+
+## Step 1 — Lock decision
+
+**Deliverable:** Dated decision block — bundler monorepo relative imports are **extensionless**.
+
+| Location (pick one canonical) | Action |
+|-------------------------------|--------|
+| [`packages/_docs/foundations/typescript-monorepo.md`](../../../../packages/_docs/foundations/typescript-monorepo.md) | **Canonical** — decision locked 2026-06-20 |
+| [`apps/subhub/docs/decisions/general.md`](../decisions/general.md) | Mirror + rollout table |
+
+**Choice to lock:**
+
+- Relative imports in app + package source: **no file extension** (`from "./latch"`, `from "./contact_detail.schema.generated"`).
+- **Do not** switch to `.ts` extensions in import paths (extensionless is idiomatic with `moduleResolution: "bundler"`).
+- **Do not** adopt `NodeNext` + emit `.js` dist for `@latch/*` in v1 (separate Phase 07 publish concern).
+
+**Exit:** Decision merged; task index + codegen scope doc updated. ✅ (2026-06-20)
+
+---
+
+## Step 2 — Codegen + scaffold
+
+**Deliverable:** `@latch/codegen` emits extensionless imports; scaffold template matches.
+
+| File / area | Action |
+|-------------|--------|
+| `packages/codegen/src/glue.ts` | `from "./${id}.schema.generated"` (no `.js`) |
+| `packages/codegen/src/store.ts` | same for glue + schema imports |
+| `packages/codegen/template/**` | codemod all relative imports |
+| `packages/codegen/docs/reference/metadata-and-codegen.md` | Update examples |
+| `packages/codegen/docs/scaffold-runbook.md` | Note Turbopack-first dev |
+
+**Exit:** `npm run codegen` on SubHub produces extensionless `generated/` imports; `codegen --check` clean. ✅ (2026-06-20)
+
+---
+
+## Step 3 — Monorepo codemod (`packages/*`)
+
+**Deliverable:** All `@latch/*` package `src/` relative imports extensionless.
+
+| Package | Notes |
+|---------|--------|
+| `contracts`, `policy`, `dal`, `app-kit`, … | Mechanical replace `from "./x.js"` → `from "./x"` |
+| Tests (`*.test.ts`) | Same |
+| `dist/` | Regenerated by build if applicable; source is canonical |
+
+**Tooling:** [`scripts/codemod-extensionless-imports.mjs`](../../../../scripts/codemod-extensionless-imports.mjs) — mechanical replace; reused in step 4.
+
+**Exit:** `npm run test` passes; no `from ['\"]\.\.?/.*\.js['\"]` in `packages/*/src`. ✅ (2026-06-20)
+
+---
+
+## Step 4 — SubHub consumer app
+
+**Deliverable:** `apps/subhub` hand-written imports extensionless; policy registry, DAL, API routes, `lib/**`.
+
+| File / area | Action |
+|-------------|--------|
+| `lib/**`, `app/**`, `components/**` | Codemod relative `.js` imports |
+| `modules/**/generated/*.ts` | Regenerated via step 2 (do not hand-edit) |
+| `next.config.ts` | Turbopack `resolveAlias` for `better-auth/next-js`; **remove** webpack-only `extensionAlias` after verify |
+| `package.json` | `dev` → Turbopack default; `dev:webpack` optional escape hatch until step 5 |
+
+**Exit:** `npm run dev -w @latch/subhub` uses Turbopack; app loads `/`, `/users`, `/contacts` without module-not-found. ✅ (2026-06-20)
+
+---
+
+## Step 5 — Guardrails + cleanup
+
+**Deliverable:** Regression prevention; remove transitional cruft.
+
+| Item | Action |
+|------|--------|
+| CI script | `scripts/check-extensionless-imports.mjs` — `npm run check:imports` in CI |
+| ESLint | `no-restricted-imports` guard on `packages/*/src` (IDE feedback) |
+| Root `package.json` `dev` | Already delegates to SubHub — inherits Turbopack default |
+| Performance debug instrumentation | Removed from `layout.tsx`, `nav-server.ts`, `latch.ts`, `require-auth.ts`, `surface-api.ts`, `SurfaceActionsProvider.tsx`, `contacts/route.ts` |
+| `dev:webpack` | Kept as **permanent optional fallback** (`dev:webpack` script); documented in scaffold runbook |
+| Scaffold template | `dev` → Turbopack default; `dev:webpack` optional; `build` without `--webpack` |
+
+**Exit:** CI green; Turbopack is documented default in scaffold runbook. ✅ (2026-06-20)
+
+---
+
+## Verify (stop gate)
+
+- [x] Decision block published (step 1)
+- [x] Codegen emits extensionless imports; scaffold template matches (step 2)
+- [x] `npm run codegen -w @latch/subhub` + `npm run codegen:check` pass
+- [x] `npm run test` (repo root) passes
+- [x] `npm run build -w @latch/subhub` passes
+- [x] `npm run dev -w @latch/subhub` starts with **Turbopack** (no `--webpack` flag)
+- [x] Home, Users, Roles, Contacts load without `Module not found` for `*.generated.js`
+- [x] No relative `from "…/*.js"` imports remain in `apps/subhub` source (excluding `node_modules`)
+- [x] No relative `from "…/*.js"` imports remain in `packages/*/src`
+- [x] CI guardrail active (step 5)
+- [x] [`01-task-index.md`](./01-task-index.md) and [`../../STATUS.md`](../../STATUS.md) updated on completion
+
+## Parallelism vs task 20
+
+| Track | Focus |
+|-------|--------|
+| [20 — UI discovery](./20-ui-discovery.md) | Domain Surfaces (sites, estimate spike) |
+| **21 — this task** | Platform dev ergonomics (imports, Turbopack) |
+
+No ordering dependency. Prefer landing **21** early if Turbopack compile speed matters for discovery UX. Regenerate codegen after step 2 before adding new Surface YAML in task 20.
+
+## Out of scope
+
+- Rewriting SubHub routes, DAL, or UI architecture
+- Publishing `@latch/*` to npm with compiled `.js` dist (Phase 07)
+- Waiting for upstream Turbopack `extensionAlias` (may obsolete step 2–4 later — re-evaluate if #82945 closes)
+- Changing `@latch/*` package `exports` map to dist files
+- Production `next build` bundler switch risks beyond verifying `next build` still passes
+
+## References
+
+- [next.js#82945](https://github.com/vercel/next.js/issues/82945) — Turbopack `extensionAlias` parity
+- [`packages/codegen/template/next.config.ts`](../../../../packages/codegen/template/next.config.ts) — template webpack crutch
+- [`apps/subhub/next.config.ts`](../../next.config.ts) — consumer config
+- [`tsconfig.base.json`](../../../../tsconfig.base.json) — `moduleResolution: "bundler"`
+- [`scaffold-runbook.md`](../../../../packages/codegen/docs/scaffold-runbook.md)
+- Performance investigation (2026-06-21) — webpack compile + DB round-trips; separate from this task except debug-log cleanup in step 5

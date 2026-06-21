@@ -5,7 +5,7 @@ import {
   principalHoldsRole,
   principalRoleIds,
   principalWithRoles,
-} from "./principal.js";
+} from "./principal";
 
 describe("principal helpers", () => {
   it("principalWithRoles builds company-wide bindings", () => {

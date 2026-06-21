@@ -6,7 +6,7 @@ import { z } from "zod";
 
 import {
   CustomerListPatchSchema,
-} from "./customer_list.schema.generated.js";
+} from "./customer_list.schema.generated";
 
 
 export const CustomerListListQuerySchema = z.object({

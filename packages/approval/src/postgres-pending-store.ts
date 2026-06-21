@@ -7,7 +7,7 @@ import type {
   PendingResolveInput,
   PendingStatus,
   PendingStore,
-} from "./pending-store.js";
+} from "./pending-store";
 
 type PendingRow = {
   id: string;

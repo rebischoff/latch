@@ -1,5 +1,5 @@
-import { getAuditMode, shapeAuditEntryForMode } from "./audit-mode.js";
-import type { AuditEntryInput } from "./types.js";
+import { getAuditMode, shapeAuditEntryForMode } from "./audit-mode";
+import type { AuditEntryInput } from "./types";
 
 export type AuditWriter = (entry: AuditEntryInput) => void | Promise<void>;
 

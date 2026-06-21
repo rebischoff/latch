@@ -1,4 +1,4 @@
-import type { BetterAuthInstance } from "./better-auth-server.js";
+import type { BetterAuthInstance } from "./better-auth-server";
 
 export type ProviderSession = {
   /** Better Auth subject id (not authoritative for Latch permissions). */

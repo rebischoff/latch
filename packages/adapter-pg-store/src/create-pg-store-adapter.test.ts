@@ -6,7 +6,7 @@ import type { Manifest, PermissionContext } from "@latch/contracts";
 import { principalWithRoles } from "@latch/contracts";
 import { Pool } from "pg";
 
-import { createPgStoreAdapter } from "./create-pg-store-adapter.js";
+import { createPgStoreAdapter } from "./create-pg-store-adapter";
 
 type WidgetRow = {
   id: string;

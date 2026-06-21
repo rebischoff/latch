@@ -6,7 +6,7 @@ import { z } from "zod";
 
 import {
   RoleListPatchSchema,
-} from "./role_list.schema.generated.js";
+} from "./role_list.schema.generated";
 
 
 export const RoleListListQuerySchema = z.object({

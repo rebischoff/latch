@@ -5,7 +5,7 @@ import {
   type PermissionContext,
 } from "@latch/contracts";
 
-import { patchedFieldIds } from "./patch-utils.js";
+import { patchedFieldIds } from "./patch-utils";
 
 export type SplitVerificationPatchResult = {
   directPatch: Record<string, unknown>;

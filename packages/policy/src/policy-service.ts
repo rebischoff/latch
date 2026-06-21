@@ -14,15 +14,15 @@ import { principalRoleIds } from "@latch/contracts";
 import {
   emptyRoleGrantProvider,
   type RoleGrantProvider,
-} from "./grant-provider.js";
+} from "./grant-provider";
 import {
   ensureFieldKeys,
   mergeRowScope,
   unionGrants,
   unionSurfaceActions,
   type MergeOptions,
-} from "./merge.js";
-import type { PolicyRegistry, SurfacePolicyDefinition } from "./registry.js";
+} from "./merge";
+import type { PolicyRegistry, SurfacePolicyDefinition } from "./registry";
 
 const BUILTIN_FIELD_ACTIONS: FieldAction[] = ["read", "write"];
 const BUILTIN_SURFACE_ACTIONS: FieldAction[] = ["read", "write"];

@@ -11,7 +11,7 @@ import {
 import {
   createResolveContext,
   runWithManifestRequestScope,
-} from "./index.js";
+} from "./index";
 
 const registry = definePolicyRegistry(
   defineSurfacePolicy({

@@ -1,8 +1,8 @@
 import { writeAudit } from "@latch/audit";
 import { surfaceAllows, type PermissionContext } from "@latch/contracts";
 
-import type { StoreAdapter } from "./store-adapter.js";
-import type { SurfaceDescriptor } from "./surface-descriptor.js";
+import type { StoreAdapter } from "./store-adapter";
+import type { SurfaceDescriptor } from "./surface-descriptor";
 
 export const canDeleteRow = <TRow, TRelated>(
   descriptor: SurfaceDescriptor<TRow, TRelated>,

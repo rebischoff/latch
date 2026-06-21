@@ -1,6 +1,6 @@
 import { readableFieldIds, surfaceAllows, type Manifest } from "@latch/contracts";
 
-import { resolveContext } from "./latch";
+import { getPrincipal, resolveContext } from "./latch";
 import { subhubRegistry } from "./policy-registry";
 import {
   NAV_CHROME,
@@ -9,6 +9,14 @@ import {
   type NavItem,
   type NavItemEntry,
 } from "./nav";
+
+type NavGroupsCache = {
+  principalId: string;
+  policyVersion: number | undefined;
+  groups: NavGroupEntry[];
+};
+
+let navGroupsCache: NavGroupsCache | undefined;
 
 const surfaceNavVisible = (manifest: Manifest): boolean =>
   surfaceAllows(manifest, "read") || readableFieldIds(manifest).length > 0;
@@ -23,6 +31,21 @@ const chromeItems = (): NavItemEntry[] =>
   }));
 
 const visibleSurfaceGroups = async (): Promise<NavGroupEntry[]> => {
+  let principal;
+  try {
+    principal = await getPrincipal();
+  } catch {
+    return [];
+  }
+
+  if (
+    navGroupsCache &&
+    navGroupsCache.principalId === principal.id &&
+    navGroupsCache.policyVersion === principal.policyVersion
+  ) {
+    return navGroupsCache.groups;
+  }
+
   const childrenByGroup = new Map<string, NavItemEntry[]>();
 
   for (const entry of SURFACE_NAV_CATALOG) {
@@ -31,8 +54,9 @@ const visibleSurfaceGroups = async (): Promise<NavGroupEntry[]> => {
     }
 
     const { manifest } = await resolveContext({ surfaceId: entry.surfaceId });
+    const visible = surfaceNavVisible(manifest);
 
-    if (!surfaceNavVisible(manifest)) {
+    if (!visible) {
       continue;
     }
 
@@ -47,12 +71,18 @@ const visibleSurfaceGroups = async (): Promise<NavGroupEntry[]> => {
     childrenByGroup.set(entry.group, groupChildren);
   }
 
-  return [...childrenByGroup.entries()].map(([label, children]) => ({
-    type: "group",
+  const groups = [...childrenByGroup.entries()].map(([label, children]) => ({
+    type: "group" as const,
     key: `group:${label}`,
     label,
     children,
   }));
+  navGroupsCache = {
+    principalId: principal.id,
+    policyVersion: principal.policyVersion,
+    groups,
+  };
+  return groups;
 };
 
 /** Server-resolved sidebar tree for `SideNav`. */

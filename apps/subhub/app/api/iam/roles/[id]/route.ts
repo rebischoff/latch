@@ -1,7 +1,7 @@
 import { createSurfaceRouteHandlers } from "@latch/app-kit";
 
-import { ensureIamDal } from "../../../../../lib/iam/dal.js";
-import { resolveContext, resolveContextFresh } from "../../../../../lib/latch.js";
+import { ensureIamDal } from "../../../../../lib/iam/dal";
+import { resolveContext, resolveContextFresh } from "../../../../../lib/latch";
 
 const baseHandlers = createSurfaceRouteHandlers({
   resolveContext,

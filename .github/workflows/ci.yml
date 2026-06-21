@@ -19,6 +19,7 @@ jobs:
           cache: "npm"
       - run: npm ci
       - run: npm run codegen:check
+      - run: npm run check:imports
       - run: npm run test
       - run: npm run lint
       - run: npm run build -w @latch/subhub

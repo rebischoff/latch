@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { foldRoleGrantRows } from "./preload-role-grants.js";
+import { foldRoleGrantRows } from "./preload-role-grants";
 
 describe("foldRoleGrantRows", () => {
   it("folds sparse grant rows with row_scope from latch_role_surfaces", () => {

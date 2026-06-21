@@ -6,8 +6,8 @@ import {
   parseAuditMode,
   resetAuditMode,
   shapeAuditEntryForMode,
-} from "./audit-mode.js";
-import type { AuditEntryInput } from "./types.js";
+} from "./audit-mode";
+import type { AuditEntryInput } from "./types";
 
 const sampleInsert: AuditEntryInput = {
   actorId: "user-1",

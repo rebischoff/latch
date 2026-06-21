@@ -4,7 +4,7 @@ import { Pool } from "pg";
 import {
   resolveDatabaseEnv,
   type DatabaseEnv,
-} from "./resolve-database-env.js";
+} from "./resolve-database-env";
 
 /**
  * Hosting adapter: dual Neon URLs over standard `pg`.

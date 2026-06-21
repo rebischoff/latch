@@ -1,6 +1,6 @@
 import type { SurfaceDal } from "@latch/dal";
 
-import type { ResolveContextApi } from "./create-resolve-context.js";
+import type { ResolveContextApi } from "./create-resolve-context";
 
 export type SurfaceActionsConfig<TInput extends { surfaceId: string }> = {
   dal: Pick<SurfaceDal, "patch" | "delete">;

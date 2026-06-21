@@ -6,7 +6,7 @@ import { z } from "zod";
 
 import {
   ContactListPatchSchema,
-} from "./contact_list.schema.generated.js";
+} from "./contact_list.schema.generated";
 
 
 export const ContactListListQuerySchema = z.object({

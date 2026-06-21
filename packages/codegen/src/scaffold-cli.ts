@@ -3,7 +3,7 @@ import {
   resolveScaffoldTarget,
   scaffoldApp,
   toPackageName,
-} from "./scaffold.js";
+} from "./scaffold";
 
 const slugFromArgv = (): string => {
   const positional = process.argv.slice(2).filter((arg) => !arg.startsWith("-"));

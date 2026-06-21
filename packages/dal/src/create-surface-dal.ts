@@ -12,16 +12,16 @@ import {
   type PermissionContext,
 } from "@latch/contracts";
 
-import { bulkDelete, bulkUpdate } from "./bulk.js";
-import { canDeleteRow, deleteRowWithAudit } from "./delete-row.js";
+import { bulkDelete, bulkUpdate } from "./bulk";
+import { canDeleteRow, deleteRowWithAudit } from "./delete-row";
 import {
   assertVerificationDirectWrite,
   splitVerificationPatch,
-} from "./pending-routing.js";
-import { patchedFieldIds } from "./patch-utils.js";
-import { projectRow } from "./project.js";
-import type { StoreAdapter } from "./store-adapter.js";
-import type { SurfaceDescriptor } from "./surface-descriptor.js";
+} from "./pending-routing";
+import { patchedFieldIds } from "./patch-utils";
+import { projectRow } from "./project";
+import type { StoreAdapter } from "./store-adapter";
+import type { SurfaceDescriptor } from "./surface-descriptor";
 
 export type SurfaceDalDeps = {
   pendingStore?: PendingStore;

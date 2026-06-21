@@ -8,7 +8,7 @@ import type {
   RoleGrantTuple,
   SurfaceBindingTuple,
   UserRolesRow,
-} from "./descriptors.js";
+} from "./descriptors";
 
 export type { RoleGrantTuple, SurfaceBindingTuple };
 

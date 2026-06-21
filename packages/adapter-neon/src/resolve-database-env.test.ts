@@ -4,7 +4,7 @@ import {
   applyLatchAppRole,
   LATCH_APP_ROLE_PASSWORD_DEFAULT,
   resolveDatabaseEnv,
-} from "./resolve-database-env.js";
+} from "./resolve-database-env";
 
 const POOLED =
   "postgresql://owner:secret@ep-abc-pooler.us-east-2.aws.neon.tech/neondb?sslmode=require";

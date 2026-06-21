@@ -5,15 +5,15 @@ import { z } from "zod";
 import {
   roleListDescriptor,
   type RoleListRow,
-} from "../../modules/iam/generated/role_list.glue.generated.js";
+} from "../../modules/iam/generated/role_list.glue.generated";
 import {
   userDetailDescriptor,
   type UserDetailRow,
-} from "../../modules/iam/generated/user_detail.glue.generated.js";
+} from "../../modules/iam/generated/user_detail.glue.generated";
 import {
   userListDescriptor,
   type UserListRow,
-} from "../../modules/iam/generated/user_list.glue.generated.js";
+} from "../../modules/iam/generated/user_list.glue.generated";
 
 export {
   roleListDescriptor,

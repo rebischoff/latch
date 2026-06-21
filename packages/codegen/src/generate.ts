@@ -4,10 +4,10 @@ import { fileURLToPath } from "node:url";
 
 import { parse } from "yaml";
 
-import { generateGlueFile } from "./glue.js";
-import { crossCheckYamlColumnTypes } from "./migration-ddl.js";
-import { generateStoreFile } from "./store.js";
-import { findMonorepoRoot } from "./workspace-root.js";
+import { generateGlueFile } from "./glue";
+import { crossCheckYamlColumnTypes } from "./migration-ddl";
+import { generateStoreFile } from "./store";
+import { findMonorepoRoot } from "./workspace-root";
 import {
   COLUMN_TYPES,
   FIELD_ACTIONS,
@@ -20,7 +20,7 @@ import {
   type SurfaceDef,
   type SurfaceFieldDef,
   type SurfacePolicyMode,
-} from "./types.js";
+} from "./types";
 
 const PACKAGE_ROOT = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),

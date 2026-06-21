@@ -2,12 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import { ValidationError } from "@latch/contracts";
 
-import { definePolicyRegistry, defineSurfacePolicy } from "./registry.js";
+import { definePolicyRegistry, defineSurfacePolicy } from "./registry";
 import {
   resolveGrantSurfaceDef,
   validateGrantAgainstCatalog,
   validateGrantTuple,
-} from "./validate-grant.js";
+} from "./validate-grant";
 
 const widgetList = defineSurfacePolicy({
   surface: "widget_list",

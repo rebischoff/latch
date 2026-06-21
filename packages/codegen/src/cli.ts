@@ -1,5 +1,5 @@
-import { generateAllSurfaces } from "./generate.js";
-import { runCodegen } from "./run.js";
+import { generateAllSurfaces } from "./generate";
+import { runCodegen } from "./run";
 
 const main = async (): Promise<void> => {
   const check = process.argv.includes("--check");

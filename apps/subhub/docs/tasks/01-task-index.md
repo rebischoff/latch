@@ -21,7 +21,9 @@ Orient the SubHub delivery slices and task chain. Global status: [`../../STATUS.
   → 10-party-migration → 11-contact-surfaces → 12-contact-dal-api
   → 13-contact-ui → 14-contact-child-collections
   → 15-entity-flow → 16-slice2-planning-gate → 17-schema-design-pass
-  → 18-surface-catalog → 19-surface-implement-specs → (implementation waves — see below)
+  → 18-surface-catalog → 19-surface-implement-specs (checkpoint)
+  → 20-ui-discovery → resume 19 → implementation waves
+  → 21-bundler-import-convention (parallel — Turbopack / import paths)
 ```
 
 ## Dependency diagram (Slice 0–1)
@@ -94,41 +96,87 @@ flowchart TD
 |---|------|----------|
 | 18 | [18-surface-catalog.md](./18-surface-catalog.md) | Canonical Surface/Field catalog; resolve open UI decisions — **complete** |
 
-**Deferred migration spec (preserved):** [deferred/site-migration.md](./deferred/site-migration.md) — wave 1 DDL; **starts after task 19**.
+**Migration spec:** [deferred/site-migration.md](./deferred/site-migration.md) — **complete** (task 20 step 1, 2026-06-20).
 
 ---
 
-## Surface implement specs (pre-code)
+## Surface implement specs
 
-**Exit criteria:** Every v1 Surface has implement-tier spec in [`surface-specs/`](../surface-specs/README.md); [`00-scan.md`](../surface-specs/00-scan.md) all ✅. **No SQL/YAML/DAL/UI until exit.**
+**Checkpoint (2026-06-20):** CRM hub + sites specs complete — **13/27** rows. Task **paused**; ops/catalog rows resume after [task 20](#task-20--ui-discovery) planning session.
 
 | # | Task | Delivers |
 |---|------|----------|
-| 19 | [19-surface-implement-specs.md](./19-surface-implement-specs.md) | Full v1 DAL/UI/policy spec per Surface |
+| 19 | [19-surface-implement-specs.md](./19-surface-implement-specs.md) | Implement specs — **resume** at `estimate.md` after discovery |
+| 20 | [20-ui-discovery.md](./20-ui-discovery.md) | Migration + sites UI + estimate spike + planning session — **active** |
+| 21 | [21-bundler-import-convention.md](./21-bundler-import-convention.md) | Extensionless imports; Turbopack-first dev — **complete** (2026-06-20; [decision](../../../../packages/_docs/foundations/typescript-monorepo.md)) |
+
+---
+
+## Task 21 — Bundler import convention
+
+**Exit criteria:** Turbopack dev works without webpack `extensionAlias`; codegen + packages + SubHub use extensionless relative imports; CI guardrail; decision documented.
+
+| Step | Delivers |
+|------|----------|
+| 1 | Platform decision — bundler monorepo import convention ✅ |
+| 2 | Codegen + scaffold template emit extensionless paths |
+| 3 | `packages/*/src` codemod |
+| 4 | `apps/subhub` codemod + `next.config` Turbopack default |
+| 5 | CI lint + remove transitional webpack/debug cruft ✅ |
+
+**Parallel with task 20** — no domain dependency. Prefer early if dev compile speed blocks discovery.
+
+---
+
+## Task 20 — UI discovery
+
+**Exit criteria:** Wave 1 migration applied; `site_list` / `site_detail` shipped; estimate line-editor spike reviewed; planning session captured in decisions + `estimate.md`; STATUS names next wave.
+
+| Step | Delivers | Spec / doc |
+|------|----------|------------|
+| **1** ✅ | `018`–`020` SQL | [deferred/site-migration.md](./deferred/site-migration.md) |
+| **2** | Sites YAML, DAL, UI | [site.md](../surface-specs/site.md), [site-contact-relation.md](../surface-specs/site-contact-relation.md) |
+| **3** | Estimate line-editor spike | [spikes/estimate-line-editor.md](../spikes/estimate-line-editor.md) |
+| **4** | Planning session | `decisions/` + [estimate.md](../surface-specs/estimate.md); repoint STATUS |
+
+```mermaid
+flowchart LR
+  mig[step 1 migration]
+  sites[step 2 sites UI]
+  spike[step 3 estimate spike]
+  plan[step 4 planning session]
+  t19[resume task 19]
+  mig --> sites
+  sites --> spike
+  spike --> plan
+  plan --> t19
+```
+
+**Parallel:** Step 3 may use fixture routes before step 2 completes; wire live `site_id` after sites ship.
 
 ---
 
 ## Implementation waves
 
-Delivery order **after** task **19** exits. Slices remain useful labels; waves are the ship sequence.
+Delivery order **after task 20 step 4** (planning session names exact next wave). Task 19 final exit may overlap with waves 2+.
 
-### Wave 1 — Sites (+ party refactor migration)
+### Wave 1 — Sites (+ party refactor migration) — **task 20 steps 1–2**
 
-**Exit criteria:** CRUD flat sites; standing contacts; relation catalog table. DDL per [`deferred/site-migration.md`](./deferred/site-migration.md). **Requires task 19 complete.**
+**Exit criteria:** CRUD flat sites; standing contacts; relation catalog table. DDL per [`deferred/site-migration.md`](./deferred/site-migration.md).
 
 | # | Task | Delivers |
 |---|------|----------|
-| *TBD* | `deferred/site-migration.md` | `018`–`020` SQL — party refactor + sites |
-| *TBD* | site surfaces | `site_list`, `site_detail`, `site_contact_relation_table` YAML |
-| *TBD* | site DAL/UI | `/sites` master-detail + contact-relations catalog |
+| 20.1 | `deferred/site-migration.md` | `018`–`020` SQL — party refactor + sites |
+| 20.2 | site surfaces + DAL/UI | `site_list`, `site_detail`, `site_contact_relation_table` |
 
-**Deferred within wave 1 UI:** `parent_site_id` picker; `site_section` / `site_location` on `site_detail` (wave 2b).
+**Deferred within wave 1 UI:** `parent_site_id` picker; `site_section` / `site_location` on `site_detail` (wave 2b — promote if estimate spike selects grouped mode).
 
 ```mermaid
 flowchart LR
-  t19[19 surface specs] --> w1m[wave 1 migration]
-  w1m --> w1s[wave 1 surfaces]
-  w1s --> w1u[wave 1 DAL UI]
+  t20[20 UI discovery]
+  w1m[step 1 migration]
+  w1u[step 2 sites UI]
+  t20 --> w1m --> w1u
 ```
 
 ### Wave 2 — Party addresses + site geography

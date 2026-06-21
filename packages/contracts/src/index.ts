@@ -21,7 +21,7 @@ export type {
   ScopeId,
   SurfaceId,
   SurfacePolicies,
-} from "./types.js";
+} from "./types";
 
 export {
   isSystemRoleClass,
@@ -29,8 +29,8 @@ export {
   principalHoldsRole,
   principalRoleIds,
   principalWithRoles,
-} from "./principal.js";
-export type { PrincipalBindingRow } from "./principal.js";
+} from "./principal";
+export type { PrincipalBindingRow } from "./principal";
 
 export {
   fieldAllows,
@@ -42,7 +42,7 @@ export {
   submittableFieldIds,
   surfaceAllows,
   writableFieldIds,
-} from "./narrow.js";
+} from "./narrow";
 
 export {
   ConflictError,
@@ -53,4 +53,4 @@ export {
   LatchError,
   NotFoundError,
   ValidationError,
-} from "./errors.js";
+} from "./errors";

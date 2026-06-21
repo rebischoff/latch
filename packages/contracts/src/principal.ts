@@ -4,7 +4,7 @@ import type {
   RoleClass,
   RoleId,
   ScopeId,
-} from "./types.js";
+} from "./types";
 
 /** System catalog classes are always company-wide — never scoped. */
 export const isSystemRoleClass = (roleClass: RoleClass): boolean =>

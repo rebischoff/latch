@@ -12,7 +12,7 @@ export const ContactDetailFieldIds = {
 export type ContactDetailFieldId = (typeof ContactDetailFieldIds)[keyof typeof ContactDetailFieldIds];
 
 export const contactDetailColumnMap = {
-  profile: ["party.id", "party.kind", "party.display_name", "party.legal_name", "party.notes"],
+  profile: ["party.id", "party.kind", "party.display_name", "party.legal_name", "note.body"],
   phones: [],
   emails: [],
 } as const satisfies Record<ContactDetailFieldId, readonly string[]>;
@@ -25,7 +25,7 @@ export const ContactDetailSchema = z.object({
     kind: z.string(),
     display_name: z.string(),
     legal_name: z.string().nullable(),
-    notes: z.string().nullable(),
+    body: z.string().nullable(),
   }),
   phones: z.array(z.object({ user_id: z.string() })),
   emails: z.array(z.object({ user_id: z.string() })),
@@ -39,7 +39,7 @@ export const ContactDetailPatchSchema = z.object({
       kind: z.string().optional(),
       display_name: z.string().optional(),
       legal_name: z.string().nullable().optional(),
-      notes: z.string().nullable().optional(),
+      body: z.string().nullable().optional(),
     })
     .optional(),
   phones: z.array(z.object({ user_id: z.string() })).optional(),

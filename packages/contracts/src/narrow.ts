@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import type { FieldAction, FieldId, Manifest } from "./types.js";
+import type { FieldAction, FieldId, Manifest } from "./types";
 
 export const fieldAllows = (
   manifest: Manifest,

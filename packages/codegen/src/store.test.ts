@@ -9,7 +9,7 @@ import {
 } from "@latch/contracts";
 import { Pool } from "pg";
 
-import { REPO_ROOT } from "./generate.js";
+import { REPO_ROOT } from "./generate";
 
 const widgetDatabaseUrl = (): string | undefined =>
   process.env.DATABASE_URL?.trim() || undefined;

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { createGetPrincipal } from "./create-get-principal.js";
+import { createGetPrincipal } from "./create-get-principal";
 import type { Principal } from "@latch/contracts";
 import { Pool } from "pg";
 

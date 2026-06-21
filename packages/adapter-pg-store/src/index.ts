@@ -4,4 +4,4 @@ export {
   type CreatePgStoreAdapterOptions,
   type PgColumnBinding,
   type PgColumnMap,
-} from "./create-pg-store-adapter.js";
+} from "./create-pg-store-adapter";

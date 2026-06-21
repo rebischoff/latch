@@ -3,8 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 import {
   authCredentialLookupKeys,
   toAuthCredentialEmail,
-} from "./latch-credential-keys.js";
-import { verifyLatchPassword, hashLatchPassword } from "./latch-password.js";
+} from "./latch-credential-keys";
+import { verifyLatchPassword, hashLatchPassword } from "./latch-password";
 
 describe("latch credential keys", () => {
   it("maps login names to synthetic Better Auth emails", () => {
@@ -31,7 +31,7 @@ describe("latch password", () => {
 describe("latchCredentialsPlugin", () => {
   it("exports a plugin id", async () => {
     const { latchCredentialsPlugin } = await import(
-      "./latch-credentials-plugin.js"
+      "./latch-credentials-plugin"
     );
     const pool = { query: vi.fn() } as never;
     const getAuth = () => ({}) as never;

@@ -1,5 +1,5 @@
 export {
   createPostgresAuditWriter,
   type PostgresAuditWriter,
-} from "./postgres-audit-writer.js";
-export { readAuditModeFromPool } from "./read-audit-mode.js";
+} from "./postgres-audit-writer";
+export { readAuditModeFromPool } from "./read-audit-mode";

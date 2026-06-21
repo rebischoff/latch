@@ -59,6 +59,7 @@ There is **no single source of truth** spanning all layers. Surface YAML is *not
 3. Codegen **does not generate page components or form JSX.** It generates the metadata/schema that the runtime `<SurfaceForm>` / `<FieldControl>` consume.
 4. Codegen **does not generate policy/enforcement logic** — only the Field/action **vocabulary** catalog from `*.surface.yaml`. Role **grants** are runtime DB data (`latch_role_grants`), never generated.
 5. Generated files live under `generated/`, are committed, and are **never hand-edited** (invariant 8).
+6. Generated and scaffold-emitted **relative import specifiers are extensionless** (`from "./foo.schema.generated"`, not `from "./foo.schema.generated.js"`) — platform decision [2026-06-20](../../../_docs/foundations/typescript-monorepo.md#decision-bundler-monorepo--extensionless-relative-imports-2026-06-20). Rollout: [SubHub task 21](../../../../apps/subhub/docs/tasks/21-bundler-import-convention.md).
 
 ## Multi-table policy (refinement of [Decision B](../../../docs/discussions/01-codegen.md))
 

@@ -1,4 +1,4 @@
-import type { BetterAuthInstance } from "./better-auth-server.js";
+import type { BetterAuthInstance } from "./better-auth-server";
 
 export type AuthRouteInput = BetterAuthInstance | (() => BetterAuthInstance);
 

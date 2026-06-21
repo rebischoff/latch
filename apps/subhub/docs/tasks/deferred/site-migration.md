@@ -1,8 +1,8 @@
 # Site and address migration (deferred)
 
-> **Status:** Deferred (2026-06-17). Resume after [18-surface-catalog.md](../18-surface-catalog.md) exits. Former task **18** — migration spec preserved; do not delete.
+> **Status:** Complete (2026-06-20). Step 1 of [task 20 — UI discovery](../20-ui-discovery.md). **Next:** task 20 [Step 2 — sites CRM slice](../20-ui-discovery.md#step-2--sites-crm-slice-thin-vertical).
 >
-> **Why deferred:** Holistic Surface/Field catalog ([`surfaces.md`](../../surfaces.md)) completes the UI contract before the next SQL batch. File numbers (`018`–`020`) assigned at implementation time.
+> **Why it was deferred:** Holistic Surface/Field catalog ([`surfaces.md`](../../surfaces.md)) completed before the next SQL batch. **Now unblocked** at task 19 CRM checkpoint.
 
 ## Goal
 
@@ -137,15 +137,15 @@ Unique `(site_id, party_id, relation_id)`.
 
 ## Verify (stop gate)
 
-- [ ] `node scripts/db-migrate.mjs --dir=apps/subhub --check` passes
-- [ ] `party_person`, `party_organization`, `note` exist; `party.notes` dropped; `employee.party_id` → `party_person`
-- [ ] Tables exist: `address`, `site`, `site_section`, `site_location`, `party_address`, `site_contact_relation`, `site_contact`
-- [ ] `party_role` accepts `property_owner` and `other`
-- [ ] `site.parent_site_id` self-FK works; no address columns on `site`
-- [ ] `site_location.replaced_by_site_location_id` self-FK; status CHECK includes `relocated`
-- [ ] `site_contact.relation_id` → `site_contact_relation`; unique `display_name` on relation catalog
-- [ ] No `site_system` table; no `site` ↔ `address` direct FK
-- [ ] `site_contact_relation` empty after `019_site.sql` only (dev seed in `020` is separate)
+- [x] `node scripts/db-migrate.mjs --dir=apps/subhub --check` passes
+- [x] `party_person`, `party_organization`, `note` exist; `party.notes` dropped; `employee.party_id` → `party_person`
+- [x] Tables exist: `address`, `site`, `site_section`, `site_location`, `party_address`, `site_contact_relation`, `site_contact`
+- [x] `party_role` accepts `property_owner` and `other`
+- [x] `site.parent_site_id` self-FK works; no address columns on `site`
+- [x] `site_location.replaced_by_site_location_id` self-FK; status CHECK includes `relocated`
+- [x] `site_contact.relation_id` → `site_contact_relation`; unique `display_name` on relation catalog
+- [x] No `site_system` table; no `site` ↔ `address` direct FK
+- [x] `site_contact_relation` empty after `019_site.sql` only (dev seed in `020` is separate)
 
 ## Reference
 

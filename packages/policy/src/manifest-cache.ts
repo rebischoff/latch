@@ -1,6 +1,6 @@
 import type { Manifest, PolicyScope, Principal } from "@latch/contracts";
 
-import { PolicyService } from "./policy-service.js";
+import { PolicyService } from "./policy-service";
 
 /** v1 cache modes; `session` is seam-only until a session store exists. */
 export type ManifestCacheMode = "none" | "request" | "ttl" | "session";

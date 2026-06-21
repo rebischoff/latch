@@ -1,7 +1,7 @@
 import path from "node:path";
 
-import { analyzeSurfaceGlue } from "./glue.js";
-import type { GeneratedStoreFile, SurfaceDef } from "./types.js";
+import { analyzeSurfaceGlue } from "./glue";
+import type { GeneratedStoreFile, SurfaceDef } from "./types";
 
 const toPascalCase = (snake: string): string =>
   snake
@@ -95,8 +95,8 @@ import {
   createPgStoreAdapter,
 } from "@latch/adapter-pg-store";
 
-import type { ${prefix}Row } from "./${surface.id}.glue.generated.js";
-import { ${columnMapName} } from "./${surface.id}.schema.generated.js";
+import type { ${prefix}Row } from "./${surface.id}.glue.generated";
+import { ${columnMapName} } from "./${surface.id}.schema.generated";
 
 /** Parameterized single-table store SQL for \`${surface.anchorTable}\`. */
 export const create${prefix}Store = (

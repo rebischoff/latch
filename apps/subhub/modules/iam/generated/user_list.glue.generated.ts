@@ -6,7 +6,7 @@ import { z } from "zod";
 
 import {
   UserListPatchSchema,
-} from "./user_list.schema.generated.js";
+} from "./user_list.schema.generated";
 
 
 export const UserListListQuerySchema = z.object({

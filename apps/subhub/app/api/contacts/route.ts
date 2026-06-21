@@ -3,8 +3,8 @@ import {
   parseOffsetLimitQuery,
 } from "@latch/app-kit";
 
-import { ensureContactsDal } from "../../../lib/contacts/dal.js";
-import { resolveContext, resolveContextFresh } from "../../../lib/latch.js";
+import { ensureContactsDal } from "../../../lib/contacts/dal";
+import { resolveContext, resolveContextFresh } from "../../../lib/latch";
 
 const handlers = createSurfaceListRouteHandlers({
   resolveContext,

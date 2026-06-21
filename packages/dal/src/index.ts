@@ -1,14 +1,14 @@
-export { createSurfaceDal } from "./create-surface-dal.js";
-export type { SurfaceDal, SurfaceDalDeps } from "./create-surface-dal.js";
+export { createSurfaceDal } from "./create-surface-dal";
+export type { SurfaceDal, SurfaceDalDeps } from "./create-surface-dal";
 
-export type { SurfaceDescriptor, SurfaceCapability } from "./surface-descriptor.js";
+export type { SurfaceDescriptor, SurfaceCapability } from "./surface-descriptor";
 
-export type { StoreAdapter, ListQuery, ListResult } from "./store-adapter.js";
+export type { StoreAdapter, ListQuery, ListResult } from "./store-adapter";
 
-export { projectRow } from "./project.js";
-export { patchedFieldIds } from "./patch-utils.js";
-export { bulkUpdate, bulkDelete } from "./bulk.js";
-export { canDeleteRow, deleteRowWithAudit } from "./delete-row.js";
+export { projectRow } from "./project";
+export { patchedFieldIds } from "./patch-utils";
+export { bulkUpdate, bulkDelete } from "./bulk";
+export { canDeleteRow, deleteRowWithAudit } from "./delete-row";
 
 export type { PendingStore } from "@latch/approval";
 export { createMemoryPendingStore } from "@latch/approval";

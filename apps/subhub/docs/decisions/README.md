@@ -25,6 +25,10 @@ _None._
 
 | Decision | File | Date | Status |
 |----------|------|------|--------|
+| Bundler monorepo — extensionless relative imports | [general.md](./general.md) | 2026-06-20 | active (rollout task 21) |
+| Planning model — UI discovery before ops specs | [general.md](./general.md) | 2026-06-20 | active |
+| `part_detail` — MPN catalog and vendor pricing | [catalog.md](./catalog.md) | 2026-06-19 | active |
+| list+detail Surface create — toolbar and picker add-new | [general.md](./general.md) | 2026-06-19 | active |
 | grant authoring model v2 (platform target) | [iam.md](./iam.md) | 2026-06-18 | active (impl deferred) |
 | delete blocked by referential use — structured errors | [cross-cutting.md](./cross-cutting.md) | 2026-06-18 | active (impl deferred) |
 | IAM role catalog — app CRUD, system cosmetic edit | [iam.md](./iam.md) | 2026-06-18 | active |

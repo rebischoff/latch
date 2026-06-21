@@ -6,7 +6,7 @@ import { z } from "zod";
 
 import {
   VendorListPatchSchema,
-} from "./vendor_list.schema.generated.js";
+} from "./vendor_list.schema.generated";
 
 
 export const VendorListListQuerySchema = z.object({

@@ -4,8 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "next dev --webpack --port __APP_PORT__",
-    "build": "next build --webpack",
+    "dev": "next dev --port __APP_PORT__",
+    "dev:webpack": "next dev --webpack --port __APP_PORT__",
+    "build": "next build",
     "start": "next start --port __APP_PORT__",
     "db:migrate": "node __MONOREPO_REL__/scripts/db-migrate.mjs --dir=.",
     "codegen": "LATCH_CODEGEN_ROOTS=. tsx __MONOREPO_REL__/packages/codegen/src/cli.ts",

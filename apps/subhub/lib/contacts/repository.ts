@@ -11,7 +11,7 @@ import type {
   PartyEmailRow,
   PartyPhonePatchRow,
   PartyPhoneRow,
-} from "./descriptors.js";
+} from "./descriptors";
 
 export type PartyRoleFilter = "customer" | "vendor" | "manufacturer";
 
@@ -113,17 +113,42 @@ export const loadPartyList = async (
   };
 };
 
+const PARTY_NOTES_ENTITY = "party";
+
+const loadPartyNotesBody = async (
+  pool: Pool,
+  partyId: string,
+): Promise<string | null> => {
+  const result = await pool.query<{ body: string }>(
+    `SELECT body
+     FROM note
+     WHERE entity_type = $1 AND entity_id = $2
+     ORDER BY sort_order, id
+     LIMIT 1`,
+    [PARTY_NOTES_ENTITY, partyId],
+  );
+  return result.rows[0]?.body ?? null;
+};
+
 export const loadPartyDetail = async (
   pool: Pool,
   id: string,
 ): Promise<ContactDetailRow | undefined> => {
-  const result = await pool.query<ContactDetailRow>(
-    `SELECT id, kind, display_name, legal_name, notes
+  const result = await pool.query<
+    Omit<ContactDetailRow, "notes">
+  >(
+    `SELECT id, kind, display_name, legal_name
      FROM party
      WHERE id = $1`,
     [id],
   );
-  return result.rows[0];
+  const row = result.rows[0];
+  if (!row) {
+    return undefined;
+  }
+
+  const notes = await loadPartyNotesBody(pool, id);
+  return { ...row, notes };
 };
 
 export const loadPartyPhones = async (
@@ -276,6 +301,29 @@ export const replacePartyEmails = async (
   });
 };
 
+const replacePartyNotes = async (
+  client: PoolClient,
+  partyId: string,
+  notes: string | null,
+): Promise<void> => {
+  await client.query(
+    `DELETE FROM note
+     WHERE entity_type = $1 AND entity_id = $2`,
+    [PARTY_NOTES_ENTITY, partyId],
+  );
+
+  const body = notes?.trim();
+  if (!body) {
+    return;
+  }
+
+  await client.query(
+    `INSERT INTO note (entity_type, entity_id, body)
+     VALUES ($1, $2, $3)`,
+    [PARTY_NOTES_ENTITY, partyId, body],
+  );
+};
+
 export const updateParty = async (
   pool: Pool,
   actorId: string,
@@ -287,11 +335,11 @@ export const updateParty = async (
        SET kind = $2,
            display_name = $3,
            legal_name = $4,
-           notes = $5,
            updated_at = now()
        WHERE id = $1`,
-      [row.id, row.kind, row.display_name, row.legal_name, row.notes],
+      [row.id, row.kind, row.display_name, row.legal_name],
     );
+    await replacePartyNotes(client, row.id, row.notes);
   });
 };
 

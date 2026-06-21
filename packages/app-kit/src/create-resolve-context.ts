@@ -16,8 +16,8 @@ import {
   type PolicyService,
 } from "@latch/policy";
 
-import { getManifestCacheMode } from "./manifest-cache-config.js";
-import { getRequestManifestCacheStore } from "./manifest-request-scope.js";
+import { getManifestCacheMode } from "./manifest-cache-config";
+import { getRequestManifestCacheStore } from "./manifest-request-scope";
 
 export type ResolveContextOptions = {
   /**

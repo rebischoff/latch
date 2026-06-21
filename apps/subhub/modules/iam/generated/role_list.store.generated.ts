@@ -7,8 +7,8 @@ import {
   createPgStoreAdapter,
 } from "@latch/adapter-pg-store";
 
-import type { RoleListRow } from "./role_list.glue.generated.js";
-import { roleListColumnMap } from "./role_list.schema.generated.js";
+import type { RoleListRow } from "./role_list.glue.generated";
+import { roleListColumnMap } from "./role_list.schema.generated";
 
 /** Parameterized single-table store SQL for `latch_roles`. */
 export const createRoleListStore = (

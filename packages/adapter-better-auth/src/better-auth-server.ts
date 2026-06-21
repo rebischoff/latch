@@ -3,7 +3,7 @@ import { betterAuth } from "better-auth/minimal";
 import { nextCookies } from "better-auth/next-js";
 import type { Pool } from "pg";
 
-import { latchCredentialsPlugin } from "./latch-credentials-plugin.js";
+import { latchCredentialsPlugin } from "./latch-credentials-plugin";
 
 export type CreateBetterAuthOptions = {
   secret?: string;

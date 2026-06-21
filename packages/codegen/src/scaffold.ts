@@ -9,7 +9,7 @@ import {
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { findMonorepoRoot } from "./workspace-root.js";
+import { findMonorepoRoot } from "./workspace-root";
 
 const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const TEMPLATE_DIR = join(PACKAGE_ROOT, "template");

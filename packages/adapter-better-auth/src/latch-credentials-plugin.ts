@@ -4,9 +4,9 @@ import type { Pool } from "pg";
 import {
   authCredentialLookupKeys,
   toAuthCredentialEmail,
-} from "./latch-credential-keys.js";
-import { verifyLatchPassword } from "./latch-password.js";
-import type { BetterAuthInstance } from "./better-auth-server.js";
+} from "./latch-credential-keys";
+import { verifyLatchPassword } from "./latch-password";
+import type { BetterAuthInstance } from "./better-auth-server";
 
 export type LatchUserCredentialRow = {
   id: string;

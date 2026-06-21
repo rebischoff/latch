@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { resolveScaffoldTarget, scaffoldApp } from "./scaffold.js";
+import { resolveScaffoldTarget, scaffoldApp } from "./scaffold";
 
 describe("scaffoldApp — audit mode", () => {
   let tempRoot: string;

@@ -1,4 +1,4 @@
-import type { ColumnType } from "./types.js";
+import type { ColumnType } from "./types";
 
 const PG_TYPE_TO_YAML: Record<string, ColumnType> = {
   text: "string",

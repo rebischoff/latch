@@ -18,7 +18,7 @@ vi.mock("pg", () => ({
 
 import { withPermissionDb } from "@latch/pg-session";
 
-import { createPostgresAuditWriter } from "./postgres-audit-writer.js";
+import { createPostgresAuditWriter } from "./postgres-audit-writer";
 
 describe("createPostgresAuditWriter", () => {
   beforeEach(() => {

@@ -11,11 +11,17 @@ import {
 } from "@latch/app-kit";
 import { principalRoleIds, type PolicyScope, type SurfaceId } from "@latch/contracts";
 import { PolicyService } from "@latch/policy";
+import { cache } from "react";
 import { headers } from "next/headers";
 
-import { minPasswordLength } from "./auth-password.js";
-import { getConnections, getPool } from "./db.js";
-import { subhubRegistry } from "./policy-registry.js";
+import { minPasswordLength } from "./auth-password";
+import { getConnections, getPool } from "./db";
+import { subhubRegistry } from "./policy-registry";
+import {
+  readGrantsProcessCache,
+  resolveGrantsWithProcessCache,
+  resolvePrincipalWithProcessCache,
+} from "./request-policy-cache";
 
 let authInstance: ReturnType<typeof createBetterAuth> | undefined;
 
@@ -37,9 +43,22 @@ export const auth = new Proxy({} as ReturnType<typeof createBetterAuth>, {
   },
 });
 
-export const getPrincipal = createGetPrincipal({
+const getPrincipalFromDb = createGetPrincipal({
   readSession: () => readBetterAuthSession(getAuth(), () => headers()),
   pool: getPool,
+});
+
+export const getPrincipal = cache(async () => {
+  const session = await readBetterAuthSession(getAuth(), () => headers());
+  if (session) {
+    const { promise } = resolvePrincipalWithProcessCache(
+      session.userId,
+      getPrincipalFromDb,
+    );
+    return promise;
+  }
+
+  return getPrincipalFromDb();
 });
 
 const registry = subhubRegistry;
@@ -60,9 +79,12 @@ const { resolveContext, resolveContextFresh } = createResolveContext({
   getPrincipal,
   policyService,
   getPolicyService: async (principal) => {
-    const grantProvider = await preloadRoleGrantsFromDb(
-      getPool(),
-      principalRoleIds(principal),
+    const cached = readGrantsProcessCache(principal);
+    if (cached) {
+      return new PolicyService({ registry, grantProvider: cached });
+    }
+    const grantProvider = await resolveGrantsWithProcessCache(principal, () =>
+      preloadRoleGrantsFromDb(getPool(), principalRoleIds(principal)),
     );
     return new PolicyService({ registry, grantProvider });
   },

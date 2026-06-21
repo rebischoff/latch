@@ -6,25 +6,25 @@ export {
   contactListDescriptor,
   projectContactListRow,
   type ContactListRow,
-} from "../../modules/contact/generated/contact_list.glue.generated.js";
+} from "../../modules/contact/generated/contact_list.glue.generated";
 
 export {
   customerListDescriptor,
   projectCustomerListRow,
   type CustomerListRow,
-} from "../../modules/contact/generated/customer_list.glue.generated.js";
+} from "../../modules/contact/generated/customer_list.glue.generated";
 
 export {
   vendorListDescriptor,
   projectVendorListRow,
   type VendorListRow,
-} from "../../modules/contact/generated/vendor_list.glue.generated.js";
+} from "../../modules/contact/generated/vendor_list.glue.generated";
 
 export {
   manufacturerListDescriptor,
   projectManufacturerListRow,
   type ManufacturerListRow,
-} from "../../modules/contact/generated/manufacturer_list.glue.generated.js";
+} from "../../modules/contact/generated/manufacturer_list.glue.generated";
 
 export type ContactDetailRow = {
   display_name: string;

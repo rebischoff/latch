@@ -196,7 +196,7 @@ No `related_parts` list or inline MPN table on `manufacturer_detail`.
 | **Org without `party_organization` row** | DAL ensures extension row on org create |
 | **Shipped gap** | `contact_detail` YAML uses interim `display_name` profile — lens wave aligns to kind-specific profile |
 | **Codegen L1/L2** | Hand-written descriptor + repository for collections until codegen ships |
-| **Wave 3 parts** | `part_list` filter by manufacturer; no parts Field added to this Surface |
+| **Wave 3 parts** | MPN catalog on `part_list` / `part_detail` only — no parts Field or filter on this Surface ([`part.md`](./part.md)) |
 
 ---
 

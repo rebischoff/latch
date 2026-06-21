@@ -79,7 +79,7 @@ Collaborative **design draft** for the database. During planning, `current.dbml`
 
 - **Table groups** color-code sections on dbdiagram.
 - **Notes** on tables carry CHECK constraints, deferred slice context, and **column plans not yet in DDL** (e.g. `employee` HR fields, `party_person` login columns) — not every detail is in column types.
-- **Target vs shipped:** `current.dbml` may run ahead of `migrations/` (e.g. identity model 2026-06-18) — identity SQL/UI deferred until after task 19.
+- **Target vs shipped:** `current.dbml` may run ahead of `migrations/` — next SQL batch is [task 20 step 1](../tasks/20-ui-discovery.md) (`018`–`020`).
 - **Cross-cutting** tables (`note`, future `attachment`) live in `cross_cutting`, not under `party`.
 - For AI: `@apps/subhub/docs/schema/current.dbml` plus active task and relevant [`decisions.md`](../decisions/README.md) blocks.
 

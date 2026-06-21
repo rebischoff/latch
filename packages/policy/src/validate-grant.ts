@@ -1,7 +1,7 @@
 import { ValidationError } from "@latch/contracts";
 import type { FieldAction, FieldId } from "@latch/contracts";
 
-import type { PolicyRegistry, SurfacePolicyDefinition } from "./registry.js";
+import type { PolicyRegistry, SurfacePolicyDefinition } from "./registry";
 
 /** One grant tuple validated at role-editor write time (P6). */
 export type GrantTuple = {

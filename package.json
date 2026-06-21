@@ -6,8 +6,10 @@
     "apps/*"
   ],
   "scripts": {
+    "dev": "npm run dev -w @latch/subhub",
     "build": "tsc --noEmit -p tsconfig.build.json",
     "lint": "eslint .",
+    "check:imports": "node scripts/check-extensionless-imports.mjs",
     "db:docker:up": "docker compose up -d",
     "db:docker:down": "docker compose down",
     "db:docker:logs": "docker compose logs -f postgres",

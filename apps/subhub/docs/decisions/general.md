@@ -21,6 +21,42 @@
 **Amended (2026-06-18):** Discuss Surfaces at **implement-spec** depth (schema + fields + policy + DAL + UI in chat) **before** migrations or UI — as in the IAM identity thread leading to [party identity](./party.md#decision-party-identity--party_person-login-link-2026-06-18). One spec file per Surface group; fold decisions into DBML + `decisions/` in the same pass.
 
 
+### Decision: planning model — UI discovery before ops specs (2026-06-20)
+
+**Choice:** After task **19 checkpoint** (CRM hub + sites implement specs — scan rows **#1–14**), **pause** the spec conveyor for catalog depth and ops/finance rows (**#15–28**). Run [task 20 — UI discovery](../tasks/20-ui-discovery.md):
+
+1. **Wave 1 migration** (`018`–`020`) + **sites** list/detail (production DAL/UI).
+2. **Estimate line-editor spike** (fixture UI acceptable; parallel with sites once fixtures do not need live DB).
+3. **Planning session** — capture decisions + write `estimate.md` (and related specs) **from what was built**, then resume task 19 or the next implementation wave.
+
+| Phase | Artifact | Code? |
+|-------|----------|-------|
+| CRM hub specs | `surface-specs` rows #1–14 | Docs ✅ |
+| Discovery | [task 20](../tasks/20-ui-discovery.md) | **Yes** — sites slice + estimate spike |
+| Ops specs | `estimate`, `job`, `invoice`, … | Docs **after** spike |
+| Remaining catalog specs | `item`, `category`, … | Docs when pickers need depth |
+
+**Rationale:** CRM list/detail patterns are specced enough to implement. Estimate/job/invoice behavior still depends on **screen feel** (line grid, grouping, tabs). Building a thin CRM slice plus an estimate spike de-risks the model before more markdown on `item` assemblies or invoice pickup flows.
+
+**STATUS discipline:** [`../../STATUS.md`](../../STATUS.md) **Right now** always names the active **step** within task 20 (or the post-discovery wave) — not “next spec file” alone.
+
+
+### Decision: bundler monorepo — extensionless relative imports (2026-06-20)
+
+**Choice:** Platform-wide — relative imports in app and `@latch/*` source omit file extensions. **Canonical doc:** [`typescript-monorepo.md`](../../../../packages/_docs/foundations/typescript-monorepo.md).
+
+| SubHub rollout | Step |
+|----------------|------|
+| Codegen + scaffold emit extensionless paths | [task 21 step 2](../tasks/21-bundler-import-convention.md#step-2--codegen--scaffold) |
+| `packages/*/src` + `apps/subhub` codemod | steps 3–4 |
+| Turbopack default dev; remove webpack `extensionAlias` | step 4 |
+| CI guardrail | step 5 |
+
+**Rationale:** Turbopack (Next.js 16 default) cannot resolve `.js` suffixes on `.ts` sources without webpack's `extensionAlias`. SubHub follows the platform codegen scaffold — fix the convention once, not per app.
+
+**Parallel with task 20** — no domain dependency.
+
+
 ### Decision: schema-first — finish DBML before migrations (2026-06-16)
 
 **Choice:** Defer task **18** (site migration SQL) until [`schema/current.dbml`](../schema/current.dbml) covers **Slices 2–6** at column level and open FK forks are locked. Iterate DBML + decisions + architecture per [`schema/README.md`](../schema/README.md); **no new `migrations/*.sql`** until task **17** (schema design pass) exits.
@@ -105,6 +141,22 @@
 | Quick create contact / subsidiary | Inline action or small create form on **same** Surface; full edit on target lens URL | — |
 
 **Rationale:** Each Surface keeps its own policy boundary, toolbar, and URL. Re-resolve manifest on navigation ([`access-control.md`](../../../packages/policy/docs/access-control.md)); avoids ambiguous Save/delete scope. Drawer previews revisited after hub ships.
+
+
+### Decision: list+detail Surface create — toolbar and picker add-new (2026-06-19)
+
+**Choice:**
+
+1. **List toolbar** — every **list+detail** Surface exposes **New** / **Create** on `SurfaceToolbar` when manifest grants `create` on `*_list`. Flow: **New on list → navigate to create detail → POST** (master-detail layout). Gated by `<Can>`; omit when principal lacks permission. Catalog **table** Surfaces (`*_table`) use their own per-row POST pattern instead.
+2. **Picker add-new** — when another Surface references records via **Select / lookup**, the control normally offers **Add new …** when the principal has `create` on the target `*_list`. Action opens the target create flow (navigate to canonical route; consumer may pass **return context** to restore the originating form with the new id selected). If `create` is not granted, picker is select-only.
+
+**Examples:** `part_list` **New part**; `part_detail` manufacturer picker → **Add new manufacturer**; estimate line part picker → **Add new part** (consumer specs #20+).
+
+**Contrast:** Hub **quick-create** (e.g. site contact person inline) stays a minimal POST on the **same** Surface — not a substitute for full list+detail create.
+
+**Rationale:** Operators need a consistent create path from the catalog screen and from foreign forms without hunting nav. Permission boundary stays on manifest `create`, not UI-only hiding.
+
+**First catalog instance:** [`part.md`](../surface-specs/part.md).
 
 
 ### Decision: catalog tables — editable table page, not master-detail (2026-06-16)

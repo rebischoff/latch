@@ -7,8 +7,8 @@ import {
   type PermissionContext,
 } from "@latch/contracts";
 
-import { writeAudit } from "./audit-service.js";
-import type { AuditEntryInput, AuditJson } from "./types.js";
+import { writeAudit } from "./audit-service";
+import type { AuditEntryInput, AuditJson } from "./types";
 
 /** Persisted audit row — includes stable id for operator replay. */
 export type StoredAuditEntry = AuditEntryInput & { id: string };

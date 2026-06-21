@@ -1,8 +1,8 @@
 import type { PermissionContext } from "@latch/contracts";
 import type { SurfaceDal } from "@latch/dal";
 
-import { jsonSuccess, withApiHandler } from "./api-response.js";
-import type { ResolveContextApi, ResolveContextOptions } from "./create-resolve-context.js";
+import { jsonSuccess, withApiHandler } from "./api-response";
+import type { ResolveContextApi, ResolveContextOptions } from "./create-resolve-context";
 
 type RouteParams = { params: Promise<{ id: string }> };
 

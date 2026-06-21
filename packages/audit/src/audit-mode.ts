@@ -1,4 +1,4 @@
-import type { AuditAction, AuditEntryInput, AuditJson } from "./types.js";
+import type { AuditAction, AuditEntryInput, AuditJson } from "./types";
 
 /** Scaffold-time platform config — immutable at runtime (see audit-and-lifecycle.md). */
 export type AuditMode = "full" | "standard" | "recovery";

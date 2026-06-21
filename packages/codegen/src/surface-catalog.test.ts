@@ -12,7 +12,7 @@ import {
   generateSurfaceFile,
   parseSurfaceYaml,
   REPO_ROOT,
-} from "./generate.js";
+} from "./generate";
 
 const widgetListSurfaceYaml = `
 id: widget_list

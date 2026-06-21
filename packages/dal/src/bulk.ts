@@ -11,14 +11,14 @@ import {
   type PermissionContext,
 } from "@latch/contracts";
 
-import { canDeleteRow, deleteRowWithAudit } from "./delete-row.js";
+import { canDeleteRow, deleteRowWithAudit } from "./delete-row";
 import {
   assertVerificationDirectWrite,
   splitVerificationPatch,
-} from "./pending-routing.js";
-import { patchedFieldIds } from "./patch-utils.js";
-import type { StoreAdapter } from "./store-adapter.js";
-import type { SurfaceDescriptor } from "./surface-descriptor.js";
+} from "./pending-routing";
+import { patchedFieldIds } from "./patch-utils";
+import type { StoreAdapter } from "./store-adapter";
+import type { SurfaceDescriptor } from "./surface-descriptor";
 
 const DEFAULT_BULK_MAX_BATCH = 500;
 

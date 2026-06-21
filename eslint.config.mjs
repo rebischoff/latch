@@ -8,6 +8,21 @@ const tsFiles = [
   "scripts/**/*.{ts,mjs}",
 ];
 
+const extensionlessImportGuard = {
+  patterns: [
+    {
+      group: ["./*.js", "./**/*.js", "../*.js", "../**/*.js"],
+      message:
+        "Relative imports must be extensionless (bundler monorepo convention).",
+    },
+    {
+      group: ["./*.mjs", "./**/*.mjs", "../*.mjs", "../**/*.mjs"],
+      message:
+        "Relative imports must be extensionless (bundler monorepo convention).",
+    },
+  ],
+};
+
 const eslintConfig = defineConfig([
   globalIgnores([
     "**/node_modules/**",
@@ -147,6 +162,12 @@ const eslintConfig = defineConfig([
           ],
         },
       ],
+    },
+  },
+  {
+    files: ["packages/**/src/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": ["error", extensionlessImportGuard],
     },
   },
   {

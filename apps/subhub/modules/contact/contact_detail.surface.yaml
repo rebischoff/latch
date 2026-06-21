@@ -29,7 +29,7 @@ fields:
       - column: party.legal_name
         type: string
         nullable: true
-      - column: party.notes
+      - column: note.body
         type: string
         nullable: true
   - id: phones

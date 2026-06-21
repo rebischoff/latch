@@ -191,4 +191,4 @@ Single full-width page — no master-detail sider ([routing-and-libraries.md](..
 
 - [x] Locked answers (2026-06-19) reflected in decisions + catalog
 - [x] A–K complete; first catalog-table Surface template for wave 1
-- [ ] Implementation deferred until task 19 exit + site migration wave
+- [ ] Implementation — [task 20](../tasks/20-ui-discovery.md) steps 1–2 (with `site_detail` contacts)

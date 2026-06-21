@@ -6,14 +6,14 @@ import {
   type RoleBinding,
 } from "@latch/contracts";
 
-import { createMemoryRoleGrantProvider } from "./grant-provider.js";
-import { unionGrants, mergeRowScope } from "./merge.js";
+import { createMemoryRoleGrantProvider } from "./grant-provider";
+import { unionGrants, mergeRowScope } from "./merge";
 import {
   PolicyService,
   synthesizeDataMasterBinding,
   synthesizeIamMasterBinding,
-} from "./policy-service.js";
-import { definePolicyRegistry, defineSurfacePolicy } from "./registry.js";
+} from "./policy-service";
+import { definePolicyRegistry, defineSurfacePolicy } from "./registry";
 
 const principal = (...roles: string[]): Principal =>
   principalWithRoles("user-1", roles);

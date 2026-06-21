@@ -1,2 +1,2 @@
-export { createMemoryPendingStore, MemoryPendingStore, type PendingChange, type PendingChangeInput, type PendingResolveInput, type PendingStatus, type PendingStore, } from "./pending-store.js";
+export { createMemoryPendingStore, MemoryPendingStore, type PendingChange, type PendingChangeInput, type PendingResolveInput, type PendingStatus, type PendingStore, } from "./pending-store";
 //# sourceMappingURL=index.d.ts.map

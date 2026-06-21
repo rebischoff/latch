@@ -1,40 +1,41 @@
 export {
   createAuthRouteHandlers,
   type AuthRouteInput,
-} from "./auth-route.js";
+} from "./auth-route";
 export {
   authCredentialLookupKeys,
   LATCH_AUTH_EMAIL_SUFFIX,
   toAuthCredentialEmail,
-} from "./latch-credential-keys.js";
+} from "./latch-credential-keys";
 export {
   hashLatchPassword,
   verifyLatchPassword,
-} from "./latch-password.js";
+} from "./latch-password";
 export {
   signInWithLatchCredentials,
   type LatchSignInInput,
-} from "./latch-sign-in.js";
+} from "./latch-sign-in";
 export {
   latchCredentialsPlugin,
   type LatchUserCredentialRow,
-} from "./latch-credentials-plugin.js";
+} from "./latch-credentials-plugin";
 export {
   createBetterAuth,
   type BetterAuthInstance,
   type CreateBetterAuthOptions,
-} from "./better-auth-server.js";
+} from "./better-auth-server";
 export {
   createGetPrincipal,
   type CreateGetPrincipalOptions,
   type GetPrincipal,
-} from "./create-get-principal.js";
-export { loadPrincipalFromDb } from "./load-principal-from-db.js";
+} from "./create-get-principal";
+export { loadPrincipalFromDb } from "./load-principal-from-db";
+export { loadPrincipalFromSession } from "./load-principal-from-session";
 export {
   readBetterAuthSession,
   type ProviderSession,
-} from "./provider-session.js";
+} from "./provider-session";
 export {
   resolveLatchUserId,
   type ResolveLatchUserInput,
-} from "./resolve-latch-user-id.js";
+} from "./resolve-latch-user-id";

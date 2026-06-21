@@ -6,7 +6,7 @@ import { z } from "zod";
 
 import {
   UserDetailPatchSchema,
-} from "./user_detail.schema.generated.js";
+} from "./user_detail.schema.generated";
 
 export type UserDetailRow = {
   id: string;

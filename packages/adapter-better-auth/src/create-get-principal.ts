@@ -1,9 +1,10 @@
 import { principalWithRoles, type Principal } from "@latch/contracts";
 import type { Pool } from "pg";
 
-import { loadPrincipalFromDb } from "./load-principal-from-db.js";
-import type { ProviderSession } from "./provider-session.js";
-import { resolveLatchUserId } from "./resolve-latch-user-id.js";
+import { loadPrincipalFromDb } from "./load-principal-from-db";
+import { loadPrincipalFromSession } from "./load-principal-from-session";
+import type { ProviderSession } from "./provider-session";
+import { resolveLatchUserId } from "./resolve-latch-user-id";
 
 export type GetPrincipal = () => Promise<Principal>;
 
@@ -36,6 +37,8 @@ export const createGetPrincipal = (
         subject: session.userId,
         email: session.email,
       }));
+  const useCombinedSessionLoad =
+    options.loadPrincipal === undefined && options.resolveUserId === undefined;
 
   return async (): Promise<Principal> => {
     const session = await options.readSession();
@@ -45,6 +48,9 @@ export const createGetPrincipal = (
         throw new Error(
           "DATABASE_URL is required to resolve a Better Auth session to a Principal",
         );
+      }
+      if (useCombinedSessionLoad) {
+        return loadPrincipalFromSession(pool, session);
       }
       const latchUserId = await resolveUserId(session, pool);
       return loadPrincipal(pool, latchUserId);

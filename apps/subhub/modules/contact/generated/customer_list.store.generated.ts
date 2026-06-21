@@ -7,8 +7,8 @@ import {
   createPgStoreAdapter,
 } from "@latch/adapter-pg-store";
 
-import type { CustomerListRow } from "./customer_list.glue.generated.js";
-import { customerListColumnMap } from "./customer_list.schema.generated.js";
+import type { CustomerListRow } from "./customer_list.glue.generated";
+import { customerListColumnMap } from "./customer_list.schema.generated";
 
 /** Parameterized single-table store SQL for `party`. */
 export const createCustomerListStore = (

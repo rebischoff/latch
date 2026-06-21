@@ -88,7 +88,8 @@ export const fetchSurfaceList = async (
     throw new Error(`No list API path for surface: ${surfaceId}`);
   }
 
-  return parseResponse<SurfaceListData>(await fetch(path));
+  const response = await fetch(path);
+  return parseResponse<SurfaceListData>(response);
 };
 
 export const fetchSurfaceDetail = async (

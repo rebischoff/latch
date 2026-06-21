@@ -22,6 +22,17 @@
 5. Wire `policy-registry.ts` with generated `*SurfacePolicyDef` imports
 6. **`npm run dev -w @latch/<slug>`**
 
+## Dev bundler (Turbopack-first)
+
+Scaffolded apps use **Turbopack** as the default dev bundler (Next.js 16). Relative imports in app source and codegen output are **extensionless** — see [bundler monorepo decision](../../../_docs/foundations/typescript-monorepo.md#decision-bundler-monorepo--extensionless-relative-imports-2026-06-20).
+
+| Script | Bundler |
+|--------|---------|
+| `npm run dev -w @latch/<slug>` | **Turbopack** (default) |
+| `npm run dev:webpack -w @latch/<slug>` | Webpack (optional fallback if Turbopack misbehaves) |
+
+Relative imports are extensionless — no webpack `extensionAlias` needed for Turbopack. Template `next.config.ts` retains a webpack `extensionAlias` block only for `dev:webpack`.
+
 ## Policy model (runtime DB — not YAML)
 
 | Source | What it defines |

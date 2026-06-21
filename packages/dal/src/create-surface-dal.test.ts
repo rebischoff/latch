@@ -16,10 +16,10 @@ import {
   type PermissionContext,
 } from "@latch/contracts";
 
-import { createSurfaceDal } from "./create-surface-dal.js";
-import { assertVerificationDirectWrite } from "./pending-routing.js";
-import type { ListQuery, StoreAdapter } from "./store-adapter.js";
-import type { SurfaceDescriptor } from "./surface-descriptor.js";
+import { createSurfaceDal } from "./create-surface-dal";
+import { assertVerificationDirectWrite } from "./pending-routing";
+import type { ListQuery, StoreAdapter } from "./store-adapter";
+import type { SurfaceDescriptor } from "./surface-descriptor";
 
 type WidgetChild = { widgetId: string; tag: string };
 

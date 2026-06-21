@@ -1,22 +1,38 @@
 # Surface planning depth
 
-> **Status:** Active (2026-06-17). **Active task:** [19-surface-implement-specs.md](./tasks/19-surface-implement-specs.md).  
-> **Catalog (Field map):** [`surfaces.md`](./surfaces.md). **Implement specs:** [`surface-specs/`](./surface-specs/README.md).
+> **Status:** Active (2026-06-20). **Active task:** [20-ui-discovery.md](./tasks/20-ui-discovery.md).  
+> **Implement specs:** [19-surface-implement-specs.md](./tasks/19-surface-implement-specs.md) — **paused** at checkpoint (13/27).  
+> **Catalog (Field map):** [`surfaces.md`](./surfaces.md).
 
-## Planning model (locked 2026-06-17)
+## Planning model (amended 2026-06-20)
 
 | Layer | Artifact | When |
 |-------|----------|------|
 | **Data** | [`schema/current.dbml`](./schema/current.dbml) | Task 17 ✅ |
 | **Field catalog** | [`surfaces.md`](./surfaces.md) — routes, Fields, waves | Task 18 ✅ |
-| **Implement specs** | [`surface-specs/*.md`](./surface-specs/README.md) — DAL, policy, UI, lifecycle per Surface | **Task 19 — in progress** |
-| **Code** | migrations → YAML → DAL → UI | **After task 19** |
+| **Implement specs — CRM checkpoint** | `surface-specs` rows **#1–14** | Task 19 checkpoint ✅ |
+| **UI discovery** | Migration + sites slice + estimate spike | **Task 20 — active** |
+| **Implement specs — ops/catalog** | Rows **#15–28**; start with `estimate.md` | **After** task 20 planning session |
+| **Production code (ongoing)** | YAML → DAL → UI per wave | Discovery + waves |
 
-**Choice:** Fully plan **all v1 Surfaces** at implement depth before any implementation code. Not wave-by-wave at ship time — one scan, then one spec file at a time, entire v1 map.
+**Choice (2026-06-17):** Plan v1 Surfaces at implement depth holistically.
 
-**Discussion model (2026-06-18):** For each Surface group, align in chat on schema + behavior first (as with IAM / `party_person` login link), then capture in spec + `decisions/` + `current.dbml`. Postgres, YAML, DAL, and UI follow after task 19 exit.
+**Amendment (2026-06-20):** Do **not** finish all specs before any code. Pause task 19 at the **CRM checkpoint**, run [UI discovery](./tasks/20-ui-discovery.md), then write ops/finance specs **from proven UI**. See [decision](./decisions/general.md#decision-planning-model--ui-discovery-before-ops-specs-2026-06-20).
 
-**Rationale:** DBML alone does not specify screens. Task 18 alone did not specify DAL/UI. The project keeps recommending holistic planning without delivering implement-tier docs; task 19 is that delivery.
+**Discussion model:** Chat → spec + `decisions/` + DBML. For estimate/job/invoice, **spike first** when layout is the unknown; then capture A–K in the spec file.
+
+---
+
+## Where you are — quick map
+
+| If STATUS says… | You are… | Open |
+|-----------------|----------|------|
+| Task 20 step 1 | Writing/applying `018`–`020` | [`site-migration.md`](./tasks/deferred/site-migration.md) |
+| Task 20 step 2 | Sites YAML / DAL / UI | [`site.md`](./surface-specs/site.md) |
+| Task 20 step 3 | Estimate line-editor spike | [`spikes/estimate-line-editor.md`](./spikes/estimate-line-editor.md) |
+| Task 20 step 4 | **Planning session** — lock UX, write `estimate.md` | [`20-ui-discovery.md`](./tasks/20-ui-discovery.md#step-4--planning-session-stop-gate) |
+| Resume task 19 | Spec conveyor — **`estimate.md` first** | [`00-scan.md`](./surface-specs/00-scan.md) row #20 |
+| Wave 2b / 3+ | Named in STATUS after step 4 | [`01-task-index.md`](./tasks/01-task-index.md) |
 
 ---
 
@@ -32,13 +48,13 @@ Use one row per Surface (or matched list/detail pair). Tiers: **catalog** · **d
 | **D** | **DAL — read** | Tables joined | DTO shape | `get` / list contracts |
 | **E** | **DAL — write** | PATCH keys | Replace-array semantics | create/patch/delete/actions |
 | **F** | **DAL — domain rules** | Decision pointers | Cross-Surface flows | Testable invariants |
-| **G** | **UI — layout** | List+detail vs table | Tabs/sections | Component map |
+| **G** | **UI — layout** | List+detail vs table | Tabs/sections | Component map — **spike may precede spec for ops Surfaces** |
 | **H** | **UI — chrome** | — | Toolbar priorities | Actions + linked Surfaces |
 | **I** | **UI — collections** | Field ids | Add/remove UX | Pickers, empty states |
 | **J** | **Lifecycle** | — | Status enums | Transitions, create flow |
 | **K** | **Edge cases** | — | Deferrals listed | Seeds, progressive setup |
 
-**Task 19 exit:** every row in [`surface-specs/00-scan.md`](./surface-specs/00-scan.md) at implement tier (A–K filled in spec file).
+**Task 19 final exit:** every row in [`surface-specs/00-scan.md`](./surface-specs/00-scan.md) at implement tier (A–K filled).
 
 ---
 
@@ -49,19 +65,23 @@ flowchart LR
   dbml[current.dbml]
   catalog[surfaces.md]
   scan[00-scan.md]
-  specs[surface-specs/*.md]
+  chk[19 checkpoint CRM specs]
+  discover[20 UI discovery]
+  specs[surface-specs ops + catalog]
   code[migrations YAML DAL UI]
-  dbml --> catalog
-  catalog --> scan
-  scan --> specs
+  dbml --> catalog --> scan --> chk
+  chk --> discover
+  discover --> specs
   specs --> code
+  discover --> code
 ```
 
 ---
 
 ## Related
 
+- [`tasks/20-ui-discovery.md`](./tasks/20-ui-discovery.md) — **active steps**
 - [`surface-specs/00-scan.md`](./surface-specs/00-scan.md) — inventory + progress
 - [`tasks/19-surface-implement-specs.md`](./tasks/19-surface-implement-specs.md)
-- [`tasks/18-surface-catalog.md`](./tasks/18-surface-catalog.md) — catalog tier (complete)
+- [`spikes/README.md`](./spikes/README.md)
 - [`child-collections.md`](./child-collections.md)

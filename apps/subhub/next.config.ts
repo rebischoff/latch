@@ -26,16 +26,16 @@ const nextConfig: NextConfig = {
   transpilePackages: latchPackages,
   turbopack: {
     resolveExtensions: [".tsx", ".ts", ".jsx", ".js", ".mjs", ".json"],
+    resolveAlias: {
+      "better-auth/next-js":
+        "./node_modules/better-auth/dist/integrations/next-js.mjs",
+    },
   },
   webpack: (config) => {
     config.resolve ??= {};
     config.resolve.alias = {
       ...config.resolve.alias,
       "better-auth/next-js": betterAuthNextJs,
-    };
-    config.resolve.extensionAlias = {
-      ".js": [".ts", ".tsx", ".js"],
-      ".mjs": [".mjs"],
     };
     return config;
   },
