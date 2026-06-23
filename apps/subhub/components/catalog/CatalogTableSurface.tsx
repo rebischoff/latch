@@ -13,6 +13,7 @@ import {
   useForm,
   type ArrayPath,
   type DefaultValues,
+  type FieldArray,
   type FieldValues,
   type Path,
 } from "react-hook-form";
@@ -28,7 +29,7 @@ import { SurfaceApiError } from "@/lib/surface-api";
 type CatalogTableSurfaceProps<
   TForm extends FieldValues,
   TName extends ArrayPath<TForm>,
-  TRow extends FieldValues,
+  TRow extends FieldArray<TForm, TName>,
 > = {
   manifest: Manifest;
   field: FieldId;
@@ -48,7 +49,7 @@ type CatalogTableSurfaceProps<
 export const CatalogTableSurface = <
   TForm extends FieldValues,
   TName extends ArrayPath<TForm>,
-  TRow extends FieldValues,
+  TRow extends FieldArray<TForm, TName>,
 >({
   manifest,
   field,

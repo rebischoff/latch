@@ -32,6 +32,7 @@ import {
   type ArrayPath,
   type FieldArray,
   type FieldValues,
+  type Path,
 } from "react-hook-form";
 
 import { useFieldMode } from "@/components/surface/useFieldMode";
@@ -169,12 +170,14 @@ export const FieldArrayTable = <
   const canReorder = orderable && writable;
 
   const reindexSortOrder = () => {
-    const current = getValues(name) as Array<Record<string, unknown>>;
+    const current = getValues(name as Path<T>) as unknown as Array<
+      Record<string, unknown>
+    >;
     const next = current.map((row, index) => ({
       ...row,
       [sortOrderKey]: index + 1,
     }));
-    setValue(name, next as Parameters<typeof setValue>[1], {
+    setValue(name as Path<T>, next as Parameters<typeof setValue>[1], {
       shouldDirty: true,
     });
   };

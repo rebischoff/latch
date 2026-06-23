@@ -658,7 +658,7 @@ export const EstimateLineEditorSpike = ({
             type="info"
             showIcon
             style={{ marginBottom: 16 }}
-            message="Estimate line-editor spike (fixture only)"
+            title="Estimate line-editor spike (fixture only)"
             description="Task 20 step 3 — fixture DTO only (no DAL/API). Toggle flat vs grouped; edit lines; Save logs to console. Spike notes: apps/subhub/docs/spikes/estimate-line-editor.md"
           />
 
