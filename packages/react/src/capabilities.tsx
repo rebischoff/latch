@@ -29,7 +29,7 @@ export const CapabilitiesProvider = ({
   </CapabilitiesContext.Provider>
 );
 
-const useManifest = (): Manifest => {
+export const useManifest = (): Manifest => {
   const manifest = useContext(CapabilitiesContext);
   if (manifest === null) {
     throw new Error("useManifest must be used within CapabilitiesProvider");

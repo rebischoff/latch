@@ -2,7 +2,9 @@
 
 import {
   ContactsOutlined,
+  EnvironmentOutlined,
   HomeOutlined,
+  LinkOutlined,
   SettingOutlined,
   ShopOutlined,
   TeamOutlined,
@@ -25,6 +27,8 @@ const NAV_ICONS: Record<NavIcon, ReactNode> = {
   contacts: <ContactsOutlined />,
   customer: <UsergroupAddOutlined />,
   vendor: <ShopOutlined />,
+  site: <EnvironmentOutlined />,
+  relation: <LinkOutlined />,
   menu: null,
   login: null,
   logout: null,

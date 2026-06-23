@@ -1,25 +1,10 @@
-import {
-  createSurfaceListRouteHandlers,
-  parseOffsetLimitQuery,
-} from "@latch/app-kit";
+import { jsonSuccess, parseOffsetLimitQuery, withApiHandler } from "@latch/app-kit";
 
-import { ensureIamDal } from "../../../../lib/iam/dal";
-import { resolveContext, resolveContextFresh } from "../../../../lib/latch";
+import { loadSurfaceListQuery } from "../../../../lib/surfaces/load-surface-list";
 
-const handlers = createSurfaceListRouteHandlers({
-  resolveContext,
-  resolveContextFresh,
-  toListInput: () => ({ surfaceId: "role_list" }),
-  parseListQuery: parseOffsetLimitQuery,
-  dal: {
-    list: async (ctx, query) => {
-      const dal = await ensureIamDal();
-      return dal.roleList.list!(ctx, query);
-    },
-  },
-});
-
-export const GET = async (request: Request): Promise<Response> => {
-  await ensureIamDal();
-  return handlers.GET(request);
-};
+export const GET = async (request: Request): Promise<Response> =>
+  withApiHandler(async () => {
+    const query = parseOffsetLimitQuery(request);
+    const { data, manifest } = await loadSurfaceListQuery("role_list", query);
+    return jsonSuccess(data, manifest);
+  });

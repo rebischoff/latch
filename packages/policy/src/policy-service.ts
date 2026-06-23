@@ -25,7 +25,7 @@ import {
 import type { PolicyRegistry, SurfacePolicyDefinition } from "./registry";
 
 const BUILTIN_FIELD_ACTIONS: FieldAction[] = ["read", "write"];
-const BUILTIN_SURFACE_ACTIONS: FieldAction[] = ["read", "write"];
+const BUILTIN_SURFACE_ACTIONS: FieldAction[] = ["read", "write", "delete"];
 
 const isBusinessSurface = (surfaceDef: SurfacePolicyDefinition): boolean =>
   (surfaceDef.kind ?? "business") === "business";

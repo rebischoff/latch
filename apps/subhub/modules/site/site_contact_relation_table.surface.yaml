@@ -1,0 +1,28 @@
+# Standing-contact relation catalog (editable table page)
+id: site_contact_relation_table
+displayName: Site contact relations
+anchorTable: site_contact_relation
+
+fieldActions:
+  - read
+  - write
+
+surfaceActions:
+  - read
+  - write
+  - delete
+
+tables:
+  - site_contact_relation
+
+fields:
+  - id: display_name
+    columns:
+      - column: site_contact_relation.id
+        type: string
+      - column: site_contact_relation.display_name
+        type: string
+  - id: sort_order
+    columns:
+      - column: site_contact_relation.sort_order
+        type: number

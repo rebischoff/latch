@@ -30,13 +30,25 @@ const AppShellInner = ({
   const { token } = theme.useToken();
 
   return (
-    <Layout style={{ minHeight: "100vh" }}>
-      <Sider width={SIDER_WIDTH} theme="light">
+    <Layout style={{ height: "100vh", overflow: "hidden" }}>
+      <Sider
+        width={SIDER_WIDTH}
+        theme="light"
+        style={{ height: "100vh", overflow: "auto" }}
+      >
         <SideNav items={navItems} />
       </Sider>
-      <Layout>
+      <Layout
+        style={{
+          height: "100vh",
+          overflow: "hidden",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
         <Header
           style={{
+            flexShrink: 0,
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
@@ -55,7 +67,17 @@ const AppShellInner = ({
             </Suspense>
           </Flex>
         </Header>
-        <Content style={{ minHeight: 280 }}>{children}</Content>
+        <Content
+          style={{
+            flex: 1,
+            minHeight: 0,
+            overflow: "hidden",
+            display: "flex",
+            flexDirection: "column",
+          }}
+        >
+          {children}
+        </Content>
       </Layout>
     </Layout>
   );

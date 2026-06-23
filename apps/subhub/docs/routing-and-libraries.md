@@ -87,8 +87,8 @@ Phase 02 CRM used `?id=` query params; SubHub uses **path segments** for shareab
 Small master/catalog tables (`site_contact_relation`, future job relation catalogs, …) use a **single Surface** — not master-detail ([decision](./decisions/general.md#decision-catalog-tables--editable-table-page-not-master-detail-2026-06-16).
 
 ```
-app/(app)/sites/contact-relations/page.tsx   → editable Table (site_contact_relation_table)
-api/sites/contact-relations/route.ts         → GET list, POST create
+app/(private)/contact-relations/page.tsx      → editable Table (site_contact_relation_table)
+api/sites/contact-relations/route.ts         → GET list, POST create, PATCH replace-array
 api/sites/contact-relations/[id]/route.ts    → PATCH | DELETE
 ```
 
@@ -96,7 +96,7 @@ api/sites/contact-relations/[id]/route.ts    → PATCH | DELETE
 |-------|---------|
 | Surface id | `{table}_table` |
 | Nav | Same sidebar group as consuming domain (e.g. Sites → “Contact relations”) |
-| UI | Ant Design `Table` + row add/edit/delete (or modal rows); `SurfaceToolbar` for New / Save as needed |
+| UI | Ant Design `Table` + `FieldArrayTable` / `CatalogTableSurface` — Save/Revert toolbar, footer add, staged delete, optional drag sort |
 | vs master-detail | No `/[id]` detail route; sparse catalogs do not need a list sider + detail split |
 
 Progressive setup may **suggest** initial catalog rows on first use; the catalog table page is the permanent edit path.
@@ -241,7 +241,7 @@ First consumer: IAM UI (task **08**). Contacts and later Surfaces reuse the same
 | **Registry** | `AntdRegistry` in root layout ([`@ant-design/nextjs-registry`](https://ant.design/docs/react/use-with-next)) |
 | **`App` component** | Wrap client shell for `message`, `modal`, `notification` static APIs |
 | **`ConfigProvider`** | Theme token overrides once in shell — avoid per-form providers |
-| **Forms** | **Do not** use antd `Form` as the source of truth — use **RHF** + antd inputs as controlled children |
+| **Forms** | **RHF** owns state, validation, and submit. Use antd **`Form` / `Form.Item` for layout only** (grid `labelCol`, `wrapperCol`, `labelAlign="right"`, `labelWrap`, `maxWidth`) — not `Form.useForm()`, `onFinish`, or `Form.Item name` / `rules`. Scalar: `FormFieldItem` + `Controller`. Collections: `FieldArrayTable`. See [surface-form-playground § PR 5](./spikes/surface-form-playground.md#pr-5--antd-form-layout-). |
 | **Read-only Fields** | Per Latch alignment: readable ∧ ¬writable → `Typography.Text`, `Descriptions.Item`, or `Input` with `readOnly` + plain styling — **not** `disabled` (disabled grays out and implies non-data) |
 | **Tables** | `Table` for list panes; row click → `<Link>` to `[id]` (or `router.push` when prefetch is undesirable) |
 | **Responsive** | `readOnly` display can use `Descriptions` column={{ xs:1, lg:2 }}` for multi-column labels on wide viewports |
@@ -256,8 +256,8 @@ First consumer: IAM UI (task **08**). Contacts and later Surfaces reuse the same
 |----------|--------|
 | **Resolver** | `zodResolver(narrowPatchSchema(...))` from codegen — same shape server validates |
 | **Default values** | `reset(dto)` when React Query loads detail or `id` changes (`useEffect` on `data.id`) |
-| **Controllers** | One thin wrapper per control (`RhfInput`, `RhfSelect`, …) forwarding `field` + `fieldState` |
-| **Field arrays** | `useFieldArray` for child collections — see [child-collections.md](./child-collections.md) |
+| **Controllers** | Manifest-aware `*Input` in `components/form/` for **scalar** fields. **`FieldArrayTable`** for collection Fields. Legacy `RhfInput` / `RhfSelect` migrate away per [form playground spike](./spikes/surface-form-playground.md). |
+| **Field arrays** | `FieldArrayTable` + `useFieldArray` for child collections — see [child-collections.md](./child-collections.md) |
 | **Strict writes** | Submit only keys present in writable patch schema; unknown keys rejected server-side |
 | **`<Can>` / `<FieldControl>`** | Wrap sections and array add/remove buttons — not every `<Input>` |
 

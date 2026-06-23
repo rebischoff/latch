@@ -1,25 +1,10 @@
-import {
-  createSurfaceListRouteHandlers,
-  parseOffsetLimitQuery,
-} from "@latch/app-kit";
+import { jsonSuccess, parseOffsetLimitQuery, withApiHandler } from "@latch/app-kit";
 
-import { ensureContactsDal } from "../../../lib/contacts/dal";
-import { resolveContext, resolveContextFresh } from "../../../lib/latch";
+import { loadSurfaceListQuery } from "../../../lib/surfaces/load-surface-list";
 
-const handlers = createSurfaceListRouteHandlers({
-  resolveContext,
-  resolveContextFresh,
-  toListInput: () => ({ surfaceId: "contact_list" }),
-  parseListQuery: parseOffsetLimitQuery,
-  dal: {
-    list: async (ctx, query) => {
-      const dal = await ensureContactsDal();
-      return dal.contactList.list!(ctx, query);
-    },
-  },
-});
-
-export const GET = async (request: Request): Promise<Response> => {
-  await ensureContactsDal();
-  return handlers.GET(request);
-};
+export const GET = async (request: Request): Promise<Response> =>
+  withApiHandler(async () => {
+    const query = parseOffsetLimitQuery(request);
+    const { data, manifest } = await loadSurfaceListQuery("contact_list", query);
+    return jsonSuccess(data, manifest);
+  });

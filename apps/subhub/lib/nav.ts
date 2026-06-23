@@ -9,6 +9,8 @@ export type NavIcon =
   | "contacts"
   | "customer"
   | "vendor"
+  | "site"
+  | "relation"
   | "menu"
   | "login"
   | "logout";
@@ -143,5 +145,21 @@ export const SURFACE_NAV_CATALOG: SurfaceNavEntry[] = [
     label: "Vendors",
     group: "Contacts",
     icon: "vendor",
+  },
+  {
+    surfaceId: "site_list",
+    href: "/sites",
+    navKey: "/sites",
+    label: "Sites",
+    group: "Sites",
+    icon: "site",
+  },
+  {
+    surfaceId: "site_contact_relation_table",
+    href: "/contact-relations",
+    navKey: "/contact-relations",
+    label: "Contact relations",
+    group: "Sites",
+    icon: "relation",
   },
 ];

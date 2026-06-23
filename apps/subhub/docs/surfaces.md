@@ -325,7 +325,7 @@ No `other_list`. Tag `other` → pickers / future global search only.
 |--|--|
 | **Status** | **target spec** [site-contact-relation.md](./surface-specs/site-contact-relation.md) (2026-06-19) |
 | **Wave** | 1 |
-| **Route** | `/sites/contact-relations` |
+| **Route** | `/contact-relations` |
 | **Nav group** | Sites |
 | **Anchor** | `site_contact_relation` |
 

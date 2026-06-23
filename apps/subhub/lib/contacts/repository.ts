@@ -13,7 +13,11 @@ import type {
   PartyPhoneRow,
 } from "./descriptors";
 
-export type PartyRoleFilter = "customer" | "vendor" | "manufacturer";
+export type PartyRoleFilter =
+  | "customer"
+  | "vendor"
+  | "manufacturer"
+  | "property_owner";
 
 export type PartyListRow = {
   id: string;
@@ -351,6 +355,45 @@ export const deleteParty = async (
   await withPermissionDb(pool, actorId, async (client) => {
     await client.query(`DELETE FROM party WHERE id = $1`, [id]);
   });
+};
+
+export type CreatePersonPartyInput = {
+  display_name: string;
+  phone?: string;
+};
+
+/** Minimal person party for site standing-contact quick-create — no role tags. */
+export const createPersonParty = async (
+  pool: Pool,
+  actorId: string,
+  input: CreatePersonPartyInput,
+): Promise<PartyListRow> => {
+  const id = crypto.randomUUID();
+  const displayName = input.display_name.trim();
+  const phone = input.phone?.trim();
+
+  await withPermissionDb(pool, actorId, async (client) => {
+    await client.query(
+      `INSERT INTO party (id, kind, display_name, legal_name)
+       VALUES ($1, 'person', $2, '')`,
+      [id, displayName],
+    );
+    await client.query(
+      `INSERT INTO party_person (party_id, first_name, last_name, display_name)
+       VALUES ($1, $2, '', $2)`,
+      [id, displayName],
+    );
+
+    if (phone) {
+      await client.query(
+        `INSERT INTO party_phone (id, party_id, label, number, is_primary, sort_order)
+         VALUES ($1, $2, 'main', $3, true, 0)`,
+        [crypto.randomUUID(), id, phone],
+      );
+    }
+  });
+
+  return { id, display_name: displayName, kind: "person" };
 };
 
 export const createPartyListStore = <TRow extends PartyListRow>(

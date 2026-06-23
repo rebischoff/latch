@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
+import { PageScroll } from "@/components/shell/PageScroll";
 import { SetupForm } from "@/components/shell/SetupForm";
 import { needsSetup } from "@/lib/setup";
 
@@ -10,7 +11,7 @@ const SetupPage = async () => {
   }
 
   return (
-    <>
+    <PageScroll>
       <h2>First-run setup</h2>
       <p>
         Create the master account for this SubHub install. You need the install
@@ -19,7 +20,7 @@ const SetupPage = async () => {
       <Suspense fallback={null}>
         <SetupForm />
       </Suspense>
-    </>
+    </PageScroll>
   );
 };
 

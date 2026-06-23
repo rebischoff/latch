@@ -135,7 +135,7 @@ flowchart TD
 | Step | Delivers | Spec / doc |
 |------|----------|------------|
 | **1** ✅ | `018`–`020` SQL | [deferred/site-migration.md](./deferred/site-migration.md) |
-| **2** | Sites YAML, DAL, UI | [site.md](../surface-specs/site.md), [site-contact-relation.md](../surface-specs/site-contact-relation.md) |
+| **2** ✅ | Sites YAML, DAL, UI | [site.md](../surface-specs/site.md), [site-contact-relation.md](../surface-specs/site-contact-relation.md) |
 | **3** | Estimate line-editor spike | [spikes/estimate-line-editor.md](../spikes/estimate-line-editor.md) |
 | **4** | Planning session | `decisions/` + [estimate.md](../surface-specs/estimate.md); repoint STATUS |
 
@@ -160,14 +160,14 @@ flowchart LR
 
 Delivery order **after task 20 step 4** (planning session names exact next wave). Task 19 final exit may overlap with waves 2+.
 
-### Wave 1 — Sites (+ party refactor migration) — **task 20 steps 1–2**
+### Wave 1 — Sites (+ party refactor migration) — **task 20 steps 1–2** ✅
 
-**Exit criteria:** CRUD flat sites; standing contacts; relation catalog table. DDL per [`deferred/site-migration.md`](./deferred/site-migration.md).
+**Exit criteria:** CRUD flat sites; standing contacts; relation catalog table. DDL per [`deferred/site-migration.md`](./deferred/site-migration.md). **Complete 2026-06-22** (step 2.10 stop gate).
 
 | # | Task | Delivers |
 |---|------|----------|
-| 20.1 | `deferred/site-migration.md` | `018`–`020` SQL — party refactor + sites |
-| 20.2 | site surfaces + DAL/UI | `site_list`, `site_detail`, `site_contact_relation_table` |
+| 20.1 | `deferred/site-migration.md` | `018`–`020` SQL — party refactor + sites ✅ |
+| 20.2 | site surfaces + DAL/UI | `site_list`, `site_detail`, `site_contact_relation_table` ✅ |
 
 **Deferred within wave 1 UI:** `parent_site_id` picker; `site_section` / `site_location` on `site_detail` (wave 2b — promote if estimate spike selects grouped mode).
 

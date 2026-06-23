@@ -187,7 +187,7 @@ describe("PolicyService — system_data synthesis", () => {
     expect(binding.fields).toEqual([
       { field: "widget_name", actions: ["read", "write"] },
     ]);
-    expect(binding.surfaceActions).toEqual(["read", "write"]);
+    expect(binding.surfaceActions).toEqual(["read", "write", "delete"]);
   });
 
   it("system_data UUID on business surface without per-role grant entry", () => {
@@ -203,7 +203,7 @@ describe("PolicyService — system_data synthesis", () => {
 
     expect(manifest.rowScope).toBe("all");
     expect(manifest.fields.widget_name).toEqual(["read", "write"]);
-    expect(manifest.actions).toEqual(["read", "write"]);
+    expect(manifest.actions).toEqual(["read", "write", "delete"]);
   });
 
   it("system_data UUID on fixture alpha: read/write all fields", () => {
@@ -219,7 +219,7 @@ describe("PolicyService — system_data synthesis", () => {
     expect(manifest.rowScope).toBe("all");
     expect(manifest.fields.foo).toEqual(["read", "write"]);
     expect(manifest.fields.bar).toEqual(["read", "write"]);
-    expect(manifest.actions).toEqual(["read", "write"]);
+    expect(manifest.actions).toEqual(["read", "write", "delete"]);
   });
 
   it("system_data UUID does not gain IAM surface write", () => {

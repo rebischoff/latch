@@ -21,9 +21,21 @@ export const routes = {
     list: "/customers",
     detail: (id: string) => `/customers/${id}`,
   },
+  propertyOwners: {
+    list: "/property-owners",
+    detail: (id: string) => `/property-owners/${id}`,
+  },
   vendors: {
     list: "/vendors",
     detail: (id: string) => `/vendors/${id}`,
+  },
+  sites: {
+    list: "/sites",
+    detail: (id: string) => `/sites/${id}`,
+  },
+  contactRelations: "/contact-relations",
+  estimates: {
+    demo: "/estimates/demo",
   },
 } as const;
 

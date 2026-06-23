@@ -1,10 +1,9 @@
-import { surfaceAllows } from "@latch/contracts";
-import { notFound } from "next/navigation";
+import { HydrationBoundary } from "@tanstack/react-query";
 
 import { ContactDetailForm } from "@/components/contacts/ContactDetailForm";
-import { resolveContext } from "@/lib/latch";
 import { routes } from "@/lib/nav-routes";
 import { requireAuth } from "@/lib/require-auth";
+import { prefetchSurfaceDetail } from "@/lib/surfaces/prefetch-surface-query";
 
 type ContactDetailPageProps = {
   params: Promise<{ id: string }>;
@@ -14,16 +13,13 @@ const ContactDetailPage = async ({ params }: ContactDetailPageProps) => {
   const { id } = await params;
   await requireAuth(routes.contacts.detail(id));
 
-  const ctx = await resolveContext({
-    surfaceId: "contact_detail",
-    entityId: id,
-  });
+  const { state, manifest } = await prefetchSurfaceDetail("contact_detail", id);
 
-  if (!surfaceAllows(ctx.manifest, "read")) {
-    notFound();
-  }
-
-  return <ContactDetailForm contactId={id} manifest={ctx.manifest} />;
+  return (
+    <HydrationBoundary state={state}>
+      <ContactDetailForm contactId={id} manifest={manifest} />
+    </HydrationBoundary>
+  );
 };
 
 export default ContactDetailPage;

@@ -114,25 +114,45 @@ New rows omit `id` (server generates). Unknown top-level keys → **400**.
 
 ## UI: React Hook Form
 
-```tsx
-// Inside ContactDetailForm — manifest from CapabilitiesProvider
-const { fields, append, remove } = useFieldArray({ control, name: "phones" });
+Scalar fields use `SurfaceFormLayout` + `*Input` controllers (`FormFieldItem`). Collection Fields use **`FieldArrayTable`** — antd `Table` with column headers, RHF `useFieldArray`, and add/remove in the table footer.
 
-<FieldControl manifest={manifest} field="phones">
-  {fields.map((field, index) => (
-    <RhfInput key={field.id} name={`phones.${index}.number`} … />
-  ))}
-  <Can manifest={manifest} field="phones" action="write">
-    <Button onClick={() => append({ label: "", number: "", is_primary: false })}>
-      Add phone
-    </Button>
-  </Can>
-</FieldControl>
+```tsx
+// Scalar — inside SurfaceFormLayout
+<TextInput field="display_name" name="display_name" label="Display name" />
+
+// Collection — section title + table (not FormFieldItem per cell)
+<FormSection title="Phones">
+  <FieldArrayTable
+    field="phones"
+    name="phones"
+    createRow={() => ({ label: "", number: "", is_primary: false })}
+    addLabel="Add phone"
+    columns={[
+      {
+        key: "label",
+        title: "Label",
+        render: ({ index, writable, loading, disabled }) => (
+          <Controller
+            name={`phones.${index}.label`}
+            render={({ field }) =>
+              writable ? <Input {...field} disabled={disabled} /> : <Typography.Text>{field.value}</Typography.Text>
+            }
+          />
+        ),
+      },
+      // … number, is_primary columns
+    ]}
+  />
+</FormSection>
 ```
 
-**Read-only:** `phones` readable but not writable → render `Descriptions` / static list, hide add/remove.
+**Read-only:** `useFieldMode(field)` → `"read"` renders read cells; no footer add button or delete column.
 
-**Validation:** element schema from codegen patch schema; resolver surfaces per-row errors.
+**Write:** `"write"` → editable cells; `<Can field="phones" action="write">` on add/delete (inside `FieldArrayTable`).
+
+**Validation:** element schema from patch schema; resolver surfaces per-row errors (cell `status` / table row — follow-on).
+
+**Migrate from:** `PhoneEmailFields` row/`RhfInput` pattern → `FieldArrayTable` when contacts move to the shared stack.
 
 ## Site collections (`site_detail` — Slice 2)
 
@@ -149,6 +169,20 @@ No address collection on `site_detail` — sites are logical places; postal addr
 `party_address` on `{role}_detail` lenses (wave 2) — same replace-array pattern; two-table spine + copy-on-write — [`surface-specs/party-addresses.md`](./surface-specs/party-addresses.md).
 
 Installed systems at a site deferred to catalog slice (items/parts linkage), not `site_detail` collections.
+
+## Catalog tables (`{table}_table` Surfaces)
+
+Same replace-array algorithm as child collections, scoped to the **whole catalog table** ([decision](./decisions/general.md#decision-replace-array-sync-algorithm-2026-06-22)):
+
+| Surface | Route PATCH body | Order field |
+|---------|------------------|-------------|
+| `site_contact_relation_table` | `{ rows: [{ id?, display_name }] }` | `sort_order` — 1-based from array index |
+
+**UI:** `CatalogTableSurface` + `FieldArrayTable` (Save/Revert toolbar, footer add, staged delete, optional drag sort).
+
+**Permissions:** Surface **`write`** for add/edit/Save; Surface **`delete`** for row remove (not Field write). See [catalog UX decision](./decisions/general.md#decision-catalog-table-ux--draft-saverevert-2026-06-22).
+
+**First instance:** [`site-contact-relation.md`](./surface-specs/site-contact-relation.md).
 
 ## Line items (estimates, jobs, invoices)
 

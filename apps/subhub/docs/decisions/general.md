@@ -166,11 +166,12 @@
 | Pattern | Use when | Route shape | UI |
 |---------|----------|-------------|-----|
 | **Master-detail** | Business anchors with many rows and rich detail forms (`party`, `site`, `job`) | `/contacts`, `/contacts/[id]` | List sider + detail pane |
-| **Catalog table** | Short admin-editable catalogs referenced by FK pickers | `/sites/contact-relations` (example) | Single page: editable `Table` (add / edit / delete rows) |
+| **Catalog table** | Short admin-editable catalogs referenced by FK pickers | `/contact-relations` (example) | Single page: editable `Table` (add / edit / delete rows) |
 
 **Rules:**
 
 - Surface id: `{table}_table` (e.g. `site_contact_relation_table`).
+- **Page route:** flat top-level path (e.g. `/contact-relations`) — sidebar **group** prefix is nav-only, not in the URL ([`nav-routes.ts`](../../lib/nav-routes.ts)). **API** may stay domain-nested (e.g. `/api/sites/contact-relations`).
 - **Always ship the catalog table page** when the catalog table is introduced — users must be able to edit rows without waiting for progressive setup or dev seeds. Setup wizards may **suggest** initial rows; the table page is the ongoing admin path.
 - Nav: link in the same sidebar **group** as the consuming domain (e.g. Sites → “Contact relations”) when manifest grants read; omit when empty group rules apply.
 - API: explicit routes (e.g. `api/sites/contact-relations/route.ts`, `…/[id]/route.ts`) — same factory pattern as other Surfaces, not catch-all.
@@ -179,6 +180,56 @@
 **First instance:** `site_contact_relation_table` in wave 1 — fields `display_name`, `sort_order` ([`surfaces.md`](../surfaces.md)).
 
 **Rationale:** Master-detail splits a sparse catalog across list + detail panes for no gain. An editable table matches how admins think about lookup tables and guarantees an edit path when DDL starts empty or progressive setup is skipped.
+
+### Decision: catalog table UX — draft Save/Revert (2026-06-22)
+
+**Choice:** Catalog `{table}_table` Surfaces use the same draft-table interaction as child collections on detail forms:
+
+- **Toolbar:** Save + Revert only (no per-row Save, no toolbar New).
+- **Add:** dashed footer on the table (`FieldArrayTable` pattern).
+- **Delete:** staged in the draft (remove row from field array); persisted on Save.
+- **Reorder:** when an order field (e.g. `sort_order`) is writable, drag-sort via `@dnd-kit`; order field is not shown as a manual numeric column.
+- **`sort_order` on catalog tables:** **1-based integers** derived from array position on Save (`index + 1`).
+
+**Permissions (catalog `{table}_table` — not per row):**
+
+| UI / server | Grant |
+|-------------|--------|
+| View table / columns | Surface **`read`** + Field **`read`** per column |
+| Edit cells, Save, Revert, footer add | Surface **`write`** + Field **`write`** on editable columns |
+| Remove row (draft) | Surface **`delete`** |
+| Drag reorder | Surface **`write`** + Field **`write`** on order field (e.g. `sort_order`) |
+| Replace-array deletes omitted ids | Surface **`delete`** (DAL rejects Save without it) |
+
+Child collections on detail forms keep **Field `write`** for add/remove (`FieldArrayTable` defaults). Catalog surfaces pass explicit Surface **`write`** / **`delete`** flags.
+
+**First instance:** [`site_contact_relation_table`](../surface-specs/site-contact-relation.md).
+
+**Rationale:** Small catalogs are edited as a set; operators expect one commit boundary. Matches phones/emails UX already proven in the form playground.
+
+### Decision: replace-array sync algorithm (2026-06-22)
+
+**Choice:** v1 sync for **child collections** (parent PATCH) and **catalog tables** (collection PATCH `{ rows: [...] }`) shares one algorithm, always **all-or-nothing** in a single DB transaction:
+
+1. Validate all payload elements (strict Zod + domain rules).
+2. **Pre-check deletes** (catalog: referential blockers such as `InUseError` before any mutation).
+3. `DELETE` rows in scope not present in payload `keepIds`.
+4. `UPSERT` each payload row (`id` omitted → insert with new uuid; `id` present → update).
+5. Assign order fields from array position when the Surface is orderable (catalog: 1-based `sort_order`).
+6. **Audit:** one row per insert / update / delete inside the same transaction.
+
+| Variant | Scope | HTTP trigger |
+|---------|-------|----------------|
+| **Child collection** | `WHERE parent_fk = $parentId` | Parent `PATCH` field key (e.g. `phones`, `contacts`) |
+| **Catalog table** | Whole table (small set) | `PATCH` on list route `{ rows: [...] }` |
+
+Per-row `POST` / `PATCH` / `DELETE` on catalog routes may remain for scripts and progressive setup; **not** the catalog page Save path.
+
+**Not this pattern:** `@latch/dal` `bulkUpdate` / `bulkDelete` (same patch on many anchor rows by id list — see [`bulk-operations.md`](../../../packages/dal/docs/bulk-operations.md)).
+
+**Reference implementation:** `replaceSiteContactRelations` in SubHub; child-collection helpers (`replacePartyCollection`, `replaceSiteContactsTx`) follow the same steps scoped by parent FK.
+
+**Rationale:** Portals and admin app share manifests and DAL — one documented algorithm avoids N ad-hoc delete/upsert implementations.
 
 ### Decision: UI dependencies (2026-06-12)
 

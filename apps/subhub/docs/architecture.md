@@ -289,8 +289,8 @@ apps/subhub/
         layout.tsx               # master-detail
         page.tsx
         [id]/page.tsx
-        contact-relations/
-          page.tsx               # catalog table — site_contact_relation_table (not list/detail)
+      contact-relations/
+        page.tsx               # catalog table — site_contact_relation_table (flat route, not under /sites)
       iam/users/...
       iam/roles/...
     api/

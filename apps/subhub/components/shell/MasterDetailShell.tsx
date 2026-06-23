@@ -16,18 +16,36 @@ export const MasterDetailShell = ({ list, children }: MasterDetailShellProps) =>
   const { token } = theme.useToken();
 
   return (
-    <Layout style={{ minHeight: 480, background: "transparent" }}>
+    <Layout
+      style={{
+        flex: 1,
+        minHeight: 0,
+        height: "100%",
+        overflow: "hidden",
+        background: "transparent",
+      }}
+    >
       <Sider
         width={LIST_SIDER_WIDTH}
         theme="light"
         style={{
           borderRight: `${token.lineWidth}px solid ${token.colorBorderSecondary}`,
           background: "transparent",
+          height: "100%",
+          overflow: "auto",
         }}
       >
         {list}
       </Sider>
-      <Content style={{ padding: token.paddingLG, minHeight: 480 }}>
+      <Content
+        style={{
+          flex: 1,
+          minHeight: 0,
+          height: "100%",
+          overflow: "auto",
+          padding: token.paddingLG,
+        }}
+      >
         {children}
       </Content>
     </Layout>

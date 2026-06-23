@@ -255,7 +255,7 @@ Hub lists omit site rows when principal lacks `site_detail` `read` ([customer](.
 
 **Suggested relation names** (progressive setup / dev seed): Property owner, Property manager, Site superintendent, Other — **not** Bill to / billing roles ([site decision](../decisions/site.md#decision-site-contacts--site_contact_relation-catalog-2026-06-15)).
 
-**Empty relation catalog:** disable **Add contact**; show CTA → progressive setup or `/sites/contact-relations` ([cross-cutting](../decisions/cross-cutting.md#decision-progressive-setup--master-catalogs-2026-06-16)). Local QA: [`020_site_contact_relation_dev_seed.sql`](../../migrations/020_site_contact_relation_dev_seed.sql).
+**Empty relation catalog:** disable **Add contact**; show CTA → progressive setup or `/contact-relations` ([cross-cutting](../decisions/cross-cutting.md#decision-progressive-setup--master-catalogs-2026-06-16)). Local QA: [`020_site_contact_relation_dev_seed.sql`](../../migrations/020_site_contact_relation_dev_seed.sql).
 
 **Duplicate row:** unique `(site_id, party_id, relation_id)` — inline validation error before save.
 
@@ -297,4 +297,4 @@ Hub lists omit site rows when principal lacks `site_detail` `read` ([customer](.
 - [x] Locked answers forks 1–9 (2026-06-19) reflected in decisions + catalog
 - [x] A–K complete
 - [x] [`site-contact-relation.md`](./site-contact-relation.md) catalog spec (#11)
-- [ ] Implementation — [task 20](../tasks/20-ui-discovery.md) steps 1–2 (migration + sites UI)
+- [x] Implementation — [task 20](../tasks/20-ui-discovery.md) steps 1–2 (migration + sites UI) ✅ (2026-06-22)

@@ -12,7 +12,7 @@
 |---|--------|--------|
 | 1 | Surface shape | **Catalog table page** — single route, editable `Table`; not list+detail |
 | 2 | Fields | **`display_name`** (unique), **`sort_order`** — no `code` column; FKs use `id` |
-| 3 | Write model | **Per-row** REST — `POST` create, `PATCH` / `DELETE` by `id` — not whole-table replace |
+| 3 | Write model | **Draft Save/Revert** UI; server **replace-array** sync in one transaction via `PATCH { rows }` on collection route |
 | 4 | Delete | **`ConflictError`** when any `site_contact.relation_id` references row (DB `RESTRICT`) |
 | 5 | Empty catalog | DDL empty at migrate; **progressive setup** suggests four defaults; **this page** always ships for ongoing edit |
 | 6 | Suggested rows | Property owner, Property manager, Site superintendent, Other — **not** Bill to / billing roles |
@@ -26,8 +26,8 @@
 |-----|-------|
 | `surface_id` | `site_contact_relation_table` |
 | Pair | *(none — catalog table Surface)* |
-| Route | `/sites/contact-relations` — `sites/contact-relations/page.tsx` |
-| API | `GET` / `POST /api/sites/contact-relations` · `PATCH` / `DELETE /api/sites/contact-relations/[id]` |
+| Route | `/contact-relations` — `contact-relations/page.tsx` (flat page path; nav group **Sites**) |
+| API | `GET` / `PATCH /api/sites/contact-relations` `{ rows }` · optional per-row `POST` / `PATCH` / `DELETE` for scripts/setup |
 | Nav group | Sites |
 | Nav label | Contact relations |
 | Anchor table | `site_contact_relation` |
@@ -66,8 +66,8 @@
 | Surface | Action | Granted when | Re-auth |
 |---------|--------|--------------|---------|
 | `site_contact_relation_table` | `read` | grant on Surface | Each GET (table + picker label fetch) |
-| `site_contact_relation_table` | `write` | grant on Surface + Field | Each POST / PATCH |
-| `site_contact_relation_table` | `delete` | grant on Surface | Each DELETE |
+| `site_contact_relation_table` | `write` | grant on Surface + Field | Each replace PATCH (upsert / reorder); footer add |
+| `site_contact_relation_table` | `delete` | grant on Surface | Staged row removal + omitted ids on replace PATCH |
 
 **Picker on `site_detail`:** principal needs **`read`** on `site_contact_relation_table` to populate relation dropdown labels. Adding a `site_contact` row requires `site_detail` `write`, not catalog `write`.
 
@@ -87,9 +87,12 @@
 
 | Operation | Body keys | Semantics |
 |-----------|-----------|-----------|
-| `create` | `display_name`, optional `sort_order` | Insert row; reject duplicate `display_name` |
-| `patch` | `display_name`, `sort_order` | Update row; `id` immutable; reject duplicate `display_name` on other rows |
-| `delete` | — | Pre-check `site_contact` referencing `relation_id` → `ConflictError`; else hard delete |
+| `replace` | `rows[]` — `{ id?`, `display_name }` per element | **Replace-array sync** in one transaction — see [replace-array decision](../decisions/general.md#decision-replace-array-sync-algorithm-2026-06-22) |
+| `create` *(optional)* | `display_name`, optional `sort_order` | Insert row; for progressive setup / scripts — not catalog page Save |
+| `patch` *(optional)* | `display_name`, `sort_order` | Single-row update — not catalog page Save |
+| `delete` *(optional)* | — | Single-row delete — not catalog page Save |
+
+**Replace-array steps:** validate → pre-check delete blockers → delete omitted ids → upsert payload rows; `sort_order = index + 1` (1-based) from array order.
 
 **Delete blocker payload (minimum):**
 
@@ -123,16 +126,18 @@ Single full-width page — no master-detail sider ([routing-and-libraries.md](..
 
 ```text
 ┌─────────────────────────────────────────────────────────┐
-│ SurfaceToolbar — New row | Save (row) …                 │
+│ SurfaceToolbar — Save | Revert                          │
 ├─────────────────────────────────────────────────────────┤
-│ Editable Table                                          │
-│  display_name | sort_order | [Delete]                 │
+│ Editable Table (FieldArrayTable + optional drag sort)   │
+│  [≡] display_name | [Delete]                           │
+│  ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─   │
+│            [+ Add row]                                  │
 └─────────────────────────────────────────────────────────┘
 ```
 
-**Inline edit:** Ant Design `Table` with editable cells or row edit mode; **Save** commits `PATCH` for dirty row; **New** appends via `POST`.
+**Draft edit:** RHF field array; **Save** commits `PATCH { rows }` (replace-array); **Revert** resets to last load. Drag reorder when `sort_order` writable; no manual sort column.
 
-**Shared component:** `CatalogTableSurface` parameterized by `surfaceId` — first instance is this Surface.
+**Shared component:** `CatalogTableSurface` + `FieldArrayTable` — first instance is this Surface.
 
 ---
 
@@ -140,15 +145,14 @@ Single full-width page — no master-detail sider ([routing-and-libraries.md](..
 
 | Priority | Action | Handler |
 |----------|--------|---------|
-| 1 | New row | `POST` with defaults (`sort_order` = next gap or max+10) |
-| 2 | Save row | `PATCH` dirty row |
-| 3 | Delete row | confirm → `DELETE`; map `ConflictError` to “used on N site contacts” |
+| 1 | Save | `PATCH { rows }` — replace-array; map `ConflictError` / duplicate name errors |
+| 2 | Revert | Reset form to last loaded list |
 
 ### Linked Surfaces (navigation only v1)
 
 | From | To | When |
 |------|-----|------|
-| `site_detail` (empty catalog CTA) | `/sites/contact-relations` | Add contact blocked — progressive setup or admin path |
+| `site_detail` (empty catalog CTA) | `/contact-relations` | Add contact blocked — progressive setup or admin path |
 | `site_contact_relation_table` | `/sites` | Optional footer link — not required v1 |
 
 ---
@@ -166,7 +170,7 @@ Single full-width page — no master-detail sider ([routing-and-libraries.md](..
 | Event | Transition | Notes |
 |-------|------------|-------|
 | First app use / empty catalog | Progressive setup | Suggest four default rows; user confirms/edits; inserts via same DAL as table page |
-| Admin add | POST | Any time from `/sites/contact-relations` |
+| Admin add | POST | Any time from `/contact-relations` |
 | Rename | PATCH | Safe while referenced |
 | Delete unused | DELETE | Hard delete |
 | Delete in use | DELETE | `ConflictError` — remove or reassign `site_contact` rows first |
@@ -191,4 +195,4 @@ Single full-width page — no master-detail sider ([routing-and-libraries.md](..
 
 - [x] Locked answers (2026-06-19) reflected in decisions + catalog
 - [x] A–K complete; first catalog-table Surface template for wave 1
-- [ ] Implementation — [task 20](../tasks/20-ui-discovery.md) steps 1–2 (with `site_detail` contacts)
+- [x] Implementation — [task 20](../tasks/20-ui-discovery.md) step 2.2 ✅; step 2.9 UI ✅ (2026-06-22)

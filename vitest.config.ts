@@ -24,12 +24,14 @@ export default defineConfig({
       "@latch/codegen": latchAlias("codegen"),
       "@latch/app-kit": latchAlias("app-kit"),
       "@latch/adapter-pg-store": latchAlias("adapter-pg-store"),
+      "@": path.join(root, "apps/subhub"),
     },
   },
   test: {
     include: [
       "packages/**/*.test.ts",
       "fixtures/**/*.test.ts",
+      "apps/subhub/**/*.test.ts",
     ],
     /** Tests that spy on `PolicyService.resolve` expect no cache unless opted in. */
     env: {

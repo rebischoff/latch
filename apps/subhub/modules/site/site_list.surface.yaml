@@ -1,0 +1,22 @@
+# Sites — list pane for site_detail
+id: site_list
+displayName: Site list
+anchorTable: site
+
+fieldActions:
+  - read
+  - write
+
+surfaceActions:
+  - read
+
+tables:
+  - site
+
+fields:
+  - id: summary
+    columns:
+      - column: site.id
+        type: string
+      - column: site.name
+        type: string

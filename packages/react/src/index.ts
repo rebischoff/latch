@@ -1,6 +1,7 @@
 export {
   Can,
   CapabilitiesProvider,
+  useManifest,
   type CanProps,
   type CapabilitiesProviderProps,
 } from "./capabilities";

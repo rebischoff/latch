@@ -1,0 +1,39 @@
+# Site profile + portfolio scalars + standing contacts collection
+id: site_detail
+displayName: Site detail
+anchorTable: site
+
+fieldActions:
+  - read
+  - write
+
+surfaceActions:
+  - read
+  - write
+  - delete
+
+tables:
+  - site
+  - site_contact
+  - site_contact_relation
+
+fields:
+  - id: profile
+    columns:
+      - column: site.id
+        type: string
+      - column: site.name
+        type: string
+  - id: customer_party
+    columns:
+      - column: site.customer_party_id
+        type: string
+        nullable: true
+  - id: property_owner_party
+    columns:
+      - column: site.property_owner_party_id
+        type: string
+        nullable: true
+  - id: contacts
+    # logical — DAL maps to site_contact; see docs/child-collections.md
+    columns: []

@@ -370,7 +370,7 @@ Suggested first-use relation rows (display names, not DDL seed): Property owner,
 | `party_address.purpose` CHECK | `billing`, `remit_to`, `hq`, `mailing`, `other` (task 17) | — |
 | `site_section` / `site_location` on `site_detail` | — | After job slice surfaces — DDL in DBML (2026-06-17) |
 
-**Tasks 18–19 headline (Slice 2 exit):** `/sites` master-detail like party type lists. `site_list`: `name` (flat list — no parent column). `site_detail`: `name` CRUD + `contacts` child collection (`party_id`, `relation_id` from catalog per [child-collections.md](../child-collections.md)). **`site_contact_relation_table`:** single-page editable catalog at `/sites/contact-relations` ([catalog table decision](./general.md#decision-catalog-tables--editable-table-page-not-master-detail-2026-06-16)) — not list/detail. No address block on site.
+**Tasks 18–19 headline (Slice 2 exit):** `/sites` master-detail like party type lists. `site_list`: `name` (flat list — no parent column). `site_detail`: `name` CRUD + `contacts` child collection (`party_id`, `relation_id` from catalog per [child-collections.md](../child-collections.md)). **`site_contact_relation_table`:** single-page editable catalog at `/contact-relations` ([catalog table decision](./general.md#decision-catalog-tables--editable-table-page-not-master-detail-2026-06-16)) — not list/detail. No address block on site.
 
 **Rationale:** Ship minimal sites UI and standing-contact wiring while deferring hierarchy, party addresses, and catalog DDL seeds until the broader schema (estimates, jobs) clarifies surface/field shapes.
 
