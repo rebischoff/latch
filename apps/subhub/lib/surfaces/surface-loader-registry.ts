@@ -2,6 +2,7 @@ import type { PermissionContext } from "@latch/contracts";
 import type { SurfaceDal } from "@latch/dal";
 
 import { ensureContactsDal } from "../contacts/dal";
+import { ensureEstimatesDal } from "../estimates/dal";
 import { ensureIamDal } from "../iam/dal";
 import { ensureSitesDal } from "../sites/dal";
 import type { SurfaceListRow } from "../surface-api";
@@ -15,14 +16,17 @@ export type SurfaceListId =
   | "vendor_list"
   | "manufacturer_list"
   | "site_list"
-  | "site_contact_relation_table";
+  | "site_contact_relation_table"
+  | "job_party_relation_table"
+  | "estimate_list";
 
 /** Detail surfaces with a shared loader (see surface-form-prefetch.md inventory). */
 export type SurfaceDetailId =
   | "contact_detail"
   | "site_detail"
   | "user_roles_detail"
-  | "role_detail";
+  | "role_detail"
+  | "estimate_detail";
 
 type ListLoader = {
   ensureDal: () => Promise<void>;
@@ -107,6 +111,24 @@ const listLoaders: Record<SurfaceListId, ListLoader> = {
       return dal.siteContactRelationTable.listAll(ctx);
     },
   },
+  job_party_relation_table: {
+    ensureDal: async () => {
+      await ensureEstimatesDal();
+    },
+    list: async (ctx) => {
+      const dal = await ensureEstimatesDal();
+      return dal.jobPartyRelationTable.listAll(ctx);
+    },
+  },
+  estimate_list: {
+    ensureDal: async () => {
+      await ensureEstimatesDal();
+    },
+    list: async (ctx, query) => {
+      const dal = await ensureEstimatesDal();
+      return dal.estimateList.list(ctx, query);
+    },
+  },
 };
 
 const detailLoaders: Record<SurfaceDetailId, DetailLoader> = {
@@ -144,6 +166,15 @@ const detailLoaders: Record<SurfaceDetailId, DetailLoader> = {
     getDal: async () => {
       const dal = await ensureIamDal();
       return dal.roleDetail;
+    },
+  },
+  estimate_detail: {
+    ensureDal: async () => {
+      await ensureEstimatesDal();
+    },
+    getDal: async () => {
+      const dal = await ensureEstimatesDal();
+      return dal.estimateDetail;
     },
   },
 };

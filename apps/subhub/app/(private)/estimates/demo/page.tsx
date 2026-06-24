@@ -6,27 +6,18 @@ import {
 } from "@/components/estimates/estimate-spike-fixtures";
 import { EstimateLineEditorSpike } from "@/components/estimates/EstimateLineEditorSpike";
 import { PageScroll } from "@/components/shell/PageScroll";
+import { routes } from "@/lib/nav-routes";
 import { requireAuth } from "@/lib/require-auth";
-
-type EstimateSpikePageProps = {
-  params: Promise<{ id: string }>;
-};
 
 const isSpikeEnabled = (): boolean =>
   process.env.NODE_ENV === "development" || process.env.LATCH_DEV_PLAYGROUND === "1";
 
-const EstimateSpikePage = async ({ params }: EstimateSpikePageProps) => {
+const EstimateSpikePage = async () => {
   if (!isSpikeEnabled()) {
     notFound();
   }
 
-  const { id } = await params;
-
-  if (id !== DEMO_ESTIMATE.id) {
-    notFound();
-  }
-
-  await requireAuth(`/estimates/${id}`);
+  await requireAuth(routes.estimates.demo);
 
   return (
     <PageScroll>

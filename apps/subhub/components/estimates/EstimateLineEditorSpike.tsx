@@ -655,11 +655,11 @@ export const EstimateLineEditorSpike = ({
       <form onSubmit={submit}>
         <div style={{ maxWidth: SURFACE_FORM_MAX_WIDTH }}>
           <Alert
-            type="info"
+            type="warning"
             showIcon
             style={{ marginBottom: 16 }}
-            title="Estimate line-editor spike (fixture only)"
-            description="Task 20 step 3 — fixture DTO only (no DAL/API). Toggle flat vs grouped; edit lines; Save logs to console. Spike notes: apps/subhub/docs/spikes/estimate-line-editor.md"
+            title="Superseded fixture spike — use /estimates"
+            description="Task 20 step 3 fixture DTO (no DAL/API). Production estimate editor shipped in wave 4a — see /estimates. Kept dev-only as the grouped-by-place reference for wave 4c. Spike notes: apps/subhub/docs/spikes/estimate-line-editor.md"
           />
 
           <FormSection title="Quote">

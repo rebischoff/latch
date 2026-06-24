@@ -34,7 +34,10 @@ export const routes = {
     detail: (id: string) => `/sites/${id}`,
   },
   contactRelations: "/contact-relations",
+  partyRelations: "/party-relations",
   estimates: {
+    list: "/estimates",
+    detail: (id: string) => `/estimates/${id}`,
     demo: "/estimates/demo",
   },
 } as const;

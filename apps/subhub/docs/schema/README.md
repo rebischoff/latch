@@ -17,9 +17,9 @@ Collaborative **design draft** for the database. During planning, `current.dbml`
 |-------|--------------------------|-------------|
 | Platform | `latch_*` | `001`–`015` |
 | 1 Party | `party`, phones/emails, roles, `employee` + draft kind extensions, `note` | `016`–`017` (interim shape) |
-| 2 Sites | `address`, `site`, `site_section`, `site_location`, `party_address`, `site_contact_*` | pending wave 1 |
+| 2 Sites | `address`, `site`, `site_section`, `site_location`, `party_address`, `site_contact_*` | `018`–`020` |
 | 3 Catalog | `category`, `labor_class`, `manufacturer_part`, `vendor_part`, `item`, `item_part_link` | pending |
-| 4 Estimates | `job_party_relation`, `estimate`, `estimate_party`, `estimate_section`, `estimate_line` | pending |
+| 4 Estimates | `job_party_relation`, `estimate`, `estimate_party`, `estimate_section`, `estimate_line` | `021`–`022` |
 | 5 Jobs | `job`, `job_party`, `job_line`, `job_line_part`, `job_work_item`, `change_order_*` | pending |
 | 6a Procurement | `requested_order_*`, `purchase_order`, `purchase_order_line`, `purchase_order_line_shipment`, `material_receipt_*`, `job_material_movement` | pending |
 | 6b Billing | `billable_line`, `invoice_*`, `schedule_of_value`, `sov_line`, `sov_allocation` | pending |

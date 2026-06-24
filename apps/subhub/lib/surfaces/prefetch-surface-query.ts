@@ -3,8 +3,13 @@ import { surfaceAllows } from "@latch/contracts";
 import { dehydrate, type DehydratedState } from "@tanstack/react-query";
 import { notFound } from "next/navigation";
 
-import { surfaceDetailKey, surfaceListKey } from "../hooks/surface-query-keys";
+import {
+  estimateSitePickerKey,
+  surfaceDetailKey,
+  surfaceListKey,
+} from "../hooks/surface-query-keys";
 import { resolveContext } from "../latch";
+import { fetchEstimateSitePicker } from "../surface-api";
 import { subhubRegistry } from "../policy-registry";
 import { getQueryClient } from "../query-client";
 import type { SurfaceQueryResult, SurfaceDetailData } from "../surface-api";
@@ -78,6 +83,24 @@ export const prefetchSurfaceDetail = async (
 export type SiteHubLinkAccess = {
   customer: boolean;
   propertyOwner: boolean;
+};
+
+export const prefetchEstimateSitePicker = async (): Promise<void> => {
+  const queryClient = getQueryClient();
+  await queryClient.prefetchQuery({
+    queryKey: estimateSitePickerKey,
+    queryFn: () => fetchEstimateSitePicker(),
+  });
+};
+
+/** Whether the principal may navigate to `site_detail` from estimate profile. */
+export const resolveSiteDetailLinkAccess = async (): Promise<boolean> => {
+  try {
+    const { manifest } = await resolveContext({ surfaceId: "site_detail" });
+    return surfaceAllows(manifest, "read");
+  } catch {
+    return false;
+  }
 };
 
 /** Whether the principal may navigate to a hub detail route (manifest-gated). */

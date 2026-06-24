@@ -28,6 +28,8 @@ export const FIELD_ACTIONS = [
   "restore",
   "approve",
   "hard_delete",
+  "win",
+  "lose",
 ] as const;
 
 export type PolicyFieldAction = (typeof FIELD_ACTIONS)[number];

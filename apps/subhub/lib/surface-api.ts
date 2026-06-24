@@ -69,6 +69,15 @@ export const SURFACE_API: Partial<Record<SurfaceId, SurfaceApiConfig>> = {
     listPath: "/api/sites/contact-relations",
     detailPath: "/api/sites/contact-relations",
   },
+  job_party_relation_table: {
+    listPath: "/api/estimates/party-relations",
+    detailPath: "/api/estimates/party-relations",
+  },
+  estimate_list: { listPath: "/api/estimates" },
+  estimate_detail: {
+    detailPath: "/api/estimates",
+    listSurfaceId: "estimate_list",
+  },
 };
 
 export class SurfaceApiError extends Error {
@@ -101,6 +110,23 @@ const parseResponse = async <T>(response: Response): Promise<ApiSuccessBody<T>> 
   }
 
   return (await response.json()) as ApiSuccessBody<T>;
+};
+
+export type EstimateSitePickerRow = {
+  id: string;
+  name: string;
+};
+
+export type EstimateSitePickerData = {
+  rows: EstimateSitePickerRow[];
+  total: number;
+};
+
+export const fetchEstimateSitePicker = async (): Promise<
+  ApiSuccessBody<EstimateSitePickerData>
+> => {
+  const response = await fetch("/api/estimates/pickers/sites");
+  return parseResponse<EstimateSitePickerData>(response);
 };
 
 export const fetchSitePartyPicker = async (

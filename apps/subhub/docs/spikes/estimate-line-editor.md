@@ -1,6 +1,6 @@
 # Spike — estimate line editor
 
-> **Status:** Runnable (2026-06-22). **Task:** [20-ui-discovery](../tasks/20-ui-discovery.md) step 3. **Next:** [Step 4 — Planning session](../tasks/20-ui-discovery.md#step-4--planning-session-stop-gate).
+> **Status:** Runnable (2026-06-22); spec locked (2026-06-23). **Task:** [20-ui-discovery](../tasks/20-ui-discovery.md) step 3 ✅. **Implement spec:** [`estimate.md`](../surface-specs/estimate.md).
 >
 > **Route:** [`/estimates/demo`](http://localhost:3003/estimates/demo) (dev or `LATCH_DEV_PLAYGROUND=1` only; `id` must be `demo`).
 
@@ -39,11 +39,11 @@ Clickable `estimate_detail` prototype using **fixture DTO** — answer line-edit
 
 ## Open forks (for Step 4 planning session)
 
-| Fork | Spike observation | Recommendation TBD |
-|------|-------------------|-------------------|
-| Default editor mode | Flat is simpler; grouped needs `site_location` registry on site | Lock in step 4 — likely flat until wave 2b geography |
-| Kit UX | Header + visible components works; rolled-up single line not prototyped | Decide kit_header/components vs single line in planning session |
-| Commercial `quote_sections` | Not in spike | Defer — orthogonal to site geography |
+| Fork | Spike observation | Status |
+|------|-------------------|--------|
+| Default editor mode | Flat is simpler; grouped needs `site_location` registry on site | **Locked** — flat default; grouped toggle when wave 2b geography ships ([decision](../decisions/estimate.md#decision-estimate-line-editor--expand-on-add-and-grouped-table-ui-2026-06-23)) |
+| Kit UX | Header + visible components works; rolled-up single line not prototyped | **Locked** — expand on add; kit_header + kit_component; same columns ([decision](../decisions/estimate.md#decision-estimate-line-editor--expand-on-add-and-grouped-table-ui-2026-06-23)) |
+| Commercial `quote_sections` | Not in spike | **Deferred v1** — [`estimate.md`](../surface-specs/estimate.md) locked answer #5 |
 | Drag reorder | Not in spike (catalog table has it) | Add when implementing production `line_items` |
 | `item_id` picker | Part select only; item labels static | Wire both in wave 3 catalog |
 
@@ -53,7 +53,7 @@ Clickable `estimate_detail` prototype using **fixture DTO** — answer line-edit
 
 ## Decisions captured
 
-Planning session (step 4) will add dated blocks to [`decisions/estimate.md`](../decisions/estimate.md). This spike does **not** lock production choices.
+Planning session (step 4) adds dated blocks to [`decisions/estimate.md`](../decisions/estimate.md). Line editor expand-on-add, grouped Table UI, and kit shape are **locked** — [2026-06-23 decision](../decisions/estimate.md#decision-estimate-line-editor--expand-on-add-and-grouped-table-ui-2026-06-23).
 
 **Provisional notes from build:**
 

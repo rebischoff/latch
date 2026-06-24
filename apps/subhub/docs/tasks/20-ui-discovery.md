@@ -1,6 +1,6 @@
 # 20 — UI discovery (CRM slice + estimate spike)
 
-> **Status:** Active (2026-06-20). **Next:** [Step 2.10 — Step 2 stop gate](#step-210--step-2-stop-gate).
+> **Status:** Complete (2026-06-23). Next: [Task 22 — estimate wave 4a](./22-estimate-wave-4a.md).
 >
 > **Supersedes for implementation order:** task [19](./19-surface-implement-specs.md) “no code until all specs” gate — see [planning model](../decisions/general.md#decision-planning-model--ui-discovery-before-ops-specs-2026-06-20).
 
@@ -362,26 +362,28 @@ Add entries to `lib/surface-api.ts` for React Query hooks.
 
 ## Step 4 — Planning session (stop gate)
 
+> **Status:** Complete (2026-06-23). **Next:** [Task 22 — estimate wave 4a](./22-estimate-wave-4a.md).
+
 **When:** Step 3 spike reviewed (solo or short review). **Do not** start wave 3 catalog code or full estimate migration until this session completes.
 
 **Agenda — lock or defer each:**
 
-1. **Line editor** — flat only, grouped only, or both (toggle)? Default for new quotes?
-2. **Geography** — promote wave 2b (`sections` / `locations` on `site_detail`) before estimate ship?
-3. **Kits** — kit_header/components on quote vs single rolled-up line?
-4. **Next spike** — `job_detail` tabs (Scope / Field / Billing) before or after `estimate.md` spec?
-5. **Task 19 resume order** — recommended: `estimate.md` → `job.md` → `item.md` (minimal) → remaining catalog tables → procurement/billing specs.
+1. **Line editor** — flat only, grouped only, or both (toggle)? Default for new quotes? → **Both; flat default** ([decision](../decisions/estimate.md#decision-estimate-line-editor--expand-on-add-and-grouped-table-ui-2026-06-23))
+2. **Geography** — promote wave 2b (`sections` / `locations` on `site_detail`) before estimate ship? → **Flat estimates first; grouped after 2b** ([decision](../decisions/estimate.md#decision-estimate-wave-4--implementation-order-2026-06-23))
+3. **Kits** — kit_header/components on quote vs single rolled-up line? → **Expand on add; visible components** ([decision](../decisions/estimate.md#decision-estimate-line-editor--expand-on-add-and-grouped-table-ui-2026-06-23))
+4. **Next spike** — `job_detail` tabs (Scope / Field / Billing) before or after `estimate.md` spec? → **After estimate UI starts, before `job.md`**
+5. **Task 19 resume order** — **`estimate.md`** ✅ → **`job.md`** → minimal **`item.md`** → remaining catalog → procurement/billing
 
 **Outputs (required):**
 
 | Output | Location |
 |--------|----------|
-| Dated **Decision** blocks | [`decisions/estimate.md`](../decisions/estimate.md), [`decisions/job.md`](../decisions/job.md) as needed |
-| Implement spec(s) from spike | [`surface-specs/estimate.md`](../surface-specs/estimate.md) (+ optional `job.md` stub) |
-| Spike artifact | [`spikes/estimate-line-editor.md`](../spikes/estimate-line-editor.md) |
-| STATUS + task index | [`../../STATUS.md`](../../STATUS.md), [01-task-index.md](./01-task-index.md) — repoint **Right now** |
+| Dated **Decision** blocks | [`decisions/estimate.md`](../decisions/estimate.md) ✅ |
+| Implement spec(s) from spike | [`surface-specs/estimate.md`](../surface-specs/estimate.md) ✅ |
+| Spike artifact | [`spikes/estimate-line-editor.md`](../spikes/estimate-line-editor.md) ✅ |
+| STATUS + task index | [`../../STATUS.md`](../../STATUS.md), [01-task-index.md](./01-task-index.md) ✅ |
 
-**Exit:** Next implementation wave named explicitly (e.g. “wave 2b geography + estimate migration” or “resume task 19 rows #15–18”).
+**Exit:** Next implementation wave named explicitly — **wave 4a: estimate migration + flat production UI** ([`estimate.md`](../surface-specs/estimate.md) § Implementation waves).
 
 ---
 
@@ -390,9 +392,9 @@ Add entries to `lib/surface-api.ts` for React Query hooks.
 - [x] `018`–`020` migrations applied in dev
 - [x] `site_list` / `site_detail` + relation catalog **shipped** (YAML, DAL, UI)
 - [x] Estimate line-editor spike **runnable** + spike notes doc exists
-- [ ] Planning session completed; decisions + `estimate.md` spec started or ✅
-- [ ] [`../../STATUS.md`](../../STATUS.md) points at named next wave (not “task 19 row 15” blindly)
-- [ ] Task [19](./19-surface-implement-specs.md) status reflects checkpoint + resume plan
+- [x] Planning session completed; decisions + `estimate.md` spec ✅ (2026-06-23)
+- [x] [`../../STATUS.md`](../../STATUS.md) points at named next wave — **wave 4a estimate (flat)**
+- [x] Task [19](./19-surface-implement-specs.md) status reflects checkpoint + resume plan
 
 ## Out of scope
 

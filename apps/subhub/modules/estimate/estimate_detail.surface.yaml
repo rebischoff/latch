@@ -1,0 +1,52 @@
+# Estimate profile + stakeholders + flat line items
+id: estimate_detail
+displayName: Estimate detail
+anchorTable: estimate
+
+fieldActions:
+  - read
+  - write
+
+surfaceActions:
+  - read
+  - write
+  - delete
+  - win
+  - lose
+
+tables:
+  - estimate
+  - estimate_line
+  - estimate_party
+  - job_party_relation
+  - site
+
+fields:
+  - id: profile
+    columns:
+      - column: estimate.id
+        type: string
+      - column: estimate.title
+        type: string
+      - column: estimate.site_id
+        type: string
+      - column: estimate.status
+        type: string
+      - column: estimate.estimate_date
+        type: string
+        nullable: true
+      - column: estimate.valid_until
+        type: string
+        nullable: true
+      - column: estimate.source_estimate_id
+        type: string
+        nullable: true
+      - column: estimate.category_id
+        type: string
+        nullable: true
+  - id: stakeholders
+    # logical — DAL maps to estimate_party; see docs/child-collections.md
+    columns: []
+  - id: line_items
+    # logical — DAL maps to estimate_line; see docs/child-collections.md
+    columns: []

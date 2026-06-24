@@ -1,0 +1,30 @@
+# Estimates — list pane for estimate_detail
+id: estimate_list
+displayName: Estimate list
+anchorTable: estimate
+
+fieldActions:
+  - read
+  - write
+
+surfaceActions:
+  - read
+
+tables:
+  - estimate
+  - site
+
+fields:
+  - id: summary
+    columns:
+      - column: estimate.id
+        type: string
+      - column: estimate.title
+        type: string
+      - column: estimate.status
+        type: string
+      - column: estimate.estimate_date
+        type: string
+        nullable: true
+      - column: site.name
+        type: string

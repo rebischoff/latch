@@ -434,11 +434,14 @@ Applies to **customer, vendor, manufacturer, property_owner** detail lenses — 
 
 | | |
 |--|--|
-| **Status** | draft |
+| **Status** | shipped (wave 4a) |
 | **Wave** | 4 |
-| **Route** | `/estimates/party-relations` *(path TBD)* |
+| **Route** | `/party-relations` |
+| **API** | `/api/estimates/party-relations` |
 | **Nav group** | Sales |
+| **Nav label** | Party relations |
 | **Anchor** | `job_party_relation` |
+| **Spec** | [`surface-specs/job-party-relation.md`](./surface-specs/job-party-relation.md) |
 
 **Table columns:** `display_name`, `sort_order`
 

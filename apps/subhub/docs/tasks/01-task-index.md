@@ -22,7 +22,7 @@ Orient the SubHub delivery slices and task chain. Global status: [`../../STATUS.
   → 13-contact-ui → 14-contact-child-collections
   → 15-entity-flow → 16-slice2-planning-gate → 17-schema-design-pass
   → 18-surface-catalog → 19-surface-implement-specs (checkpoint)
-  → 20-ui-discovery → resume 19 → implementation waves
+  → 20-ui-discovery → resume 19 → 22-estimate-wave-4a → 23-job-wave-5a → implementation waves
   → 21-bundler-import-convention (parallel — Turbopack / import paths)
 ```
 
@@ -102,13 +102,15 @@ flowchart TD
 
 ## Surface implement specs
 
-**Checkpoint (2026-06-20):** CRM hub + sites specs complete — **13/27** rows. Task **paused**; ops/catalog rows resume after [task 20](#task-20--ui-discovery) planning session.
+| **Checkpoint (2026-06-23):** Estimates wave 4a complete. **Active:** [23-job-wave-5a.md](./23-job-wave-5a.md).
 
 | # | Task | Delivers |
 |---|------|----------|
-| 19 | [19-surface-implement-specs.md](./19-surface-implement-specs.md) | Implement specs — **resume** at `estimate.md` after discovery |
-| 20 | [20-ui-discovery.md](./20-ui-discovery.md) | Migration + sites UI + estimate spike + planning session — **active** |
-| 21 | [21-bundler-import-convention.md](./21-bundler-import-convention.md) | Extensionless imports; Turbopack-first dev — **complete** (2026-06-20; [decision](../../../../packages/_docs/foundations/typescript-monorepo.md)) |
+| 19 | [19-surface-implement-specs.md](./19-surface-implement-specs.md) | Implement specs — **`estimate.md`** ✅ |
+| 20 | [20-ui-discovery.md](./20-ui-discovery.md) | Migration + sites UI + estimate spike + planning — **complete** (2026-06-23) |
+| 21 | [21-bundler-import-convention.md](./21-bundler-import-convention.md) | Extensionless imports; Turbopack-first dev — **complete** (2026-06-20) |
+| 22 | [22-estimate-wave-4a.md](./22-estimate-wave-4a.md) | Wave 4a — estimate migration, DAL, flat production UI — **complete** |
+| 23 | [23-job-wave-5a.md](./23-job-wave-5a.md) | Wave 5a — job shell, Overview + stub tabs — **active** |
 
 ---
 
@@ -136,8 +138,8 @@ flowchart TD
 |------|----------|------------|
 | **1** ✅ | `018`–`020` SQL | [deferred/site-migration.md](./deferred/site-migration.md) |
 | **2** ✅ | Sites YAML, DAL, UI | [site.md](../surface-specs/site.md), [site-contact-relation.md](../surface-specs/site-contact-relation.md) |
-| **3** | Estimate line-editor spike | [spikes/estimate-line-editor.md](../spikes/estimate-line-editor.md) |
-| **4** | Planning session | `decisions/` + [estimate.md](../surface-specs/estimate.md); repoint STATUS |
+| **3** ✅ | Estimate line-editor spike | [spikes/estimate-line-editor.md](../spikes/estimate-line-editor.md) |
+| **4** ✅ | Planning session | [estimate.md](../surface-specs/estimate.md); wave **4a** named in STATUS |
 
 ```mermaid
 flowchart LR
@@ -186,13 +188,54 @@ flowchart LR
 | *TBD* | | `addresses` on `{role}_detail` lenses |
 | *TBD* | | `sections`, `locations` on `site_detail` |
 
-### Waves 3–7
+### Wave 4 — Estimates (flat) — **task 22** — **active**
+
+**Exit criteria:** CRUD draft estimates with flat `line_items` + stakeholders; job party relation catalog. Spec: [`estimate.md`](../surface-specs/estimate.md). **Deferred in 4a:** grouped editor, `quote_sections`, `win`/`lose`.
+
+| # | Task | Delivers |
+|---|------|----------|
+| 22.1 | [22-estimate-wave-4a.md](./22-estimate-wave-4a.md) step 1 | `021` estimate DDL migration |
+| 22.2 | step 2 | `estimate_*` + `job_party_relation_table` YAML + codegen |
+| 22.3 | step 3 | Job party relation catalog DAL + API |
+| 22.4–22.6 | steps 4–6 | Estimate DAL + API |
+| 22.7–22.9 | steps 7–9 | Nav + list/detail UI + flat line editor |
+| 22.10 | step 10 | Stop gate |
+
+```mermaid
+flowchart LR
+  t22[22 estimate wave 4a]
+  mig[step 1 migration]
+  yaml[step 2 YAML]
+  dal[steps 3-6 DAL/API]
+  ui[steps 7-9 UI]
+  gate[step 10]
+  t22 --> mig --> yaml --> dal --> ui --> gate
+```
+
+**Follow-on (not 4a):** wave **4b** `win`/`lose` (after job 5a + line editor); wave **4c** grouped editor (needs wave 2b geography); wave **4d′** shared line editor retrofit (after wave **3** + **3e** spike) — [job wave 5 decision](../decisions/job.md#decision-job-wave-5--implementation-order-2026-06-23).
+
+### Wave 5a — Jobs shell — **task 23** — **active**
+
+**Exit criteria:** CRUD jobs with profile + stakeholders; tabbed `/jobs` shell; DAL `line_items` for win-copy; **no Scope line grid**. Spec: [`job.md`](../surface-specs/job.md). **Decision:** [job wave 5](../decisions/job.md#decision-job-wave-5--implementation-order-2026-06-23).
+
+| # | Task | Delivers |
+|---|------|----------|
+| 23.1 | [23-job-wave-5a.md](./23-job-wave-5a.md) step 1 | `023` job DDL migration |
+| 23.2 | step 2 | `job_*` YAML + codegen |
+| 23.3 | step 3 | `job_party` InUseError on relation catalog |
+| 23.4–23.6 | steps 4–6 | Job DAL + API |
+| 23.7–23.9 | steps 7–9 | Nav + list/detail UI + stakeholders + tabs |
+| 23.10 | step 10 | Stop gate |
+
+**Follow-on:** wave **3** catalog → **3e** line editor → **4d′** Scope UI → **5b** win/lose → **5c** field + complete → **5d** COs.
+
+### Waves 3–7 (remaining)
 
 | Wave | Exit criteria | Surfaces (headline) |
 |------|---------------|---------------------|
-| 3 Catalog | Parts, items, vendor pricing | `part_*`, `item_*`, `category_table`, `labor_class_table`, `phase_table` |
-| 4 Estimates | Quote + snapshot lines | `estimate_*`, `job_party_relation_table` |
-| 5 Jobs | Sold scope, field status, COs | `job_*`, `change_order_*` |
+| 3 Catalog | Parts, items, vendor pricing — **before shared line editor** | `part_*`, `item_*`, `category_table`, `labor_class_table`, `phase_table` |
+| 3e Line editor | Shared line-item component spike | estimate + job Scope; later PO/invoice |
+| 5 Jobs | Shell → Scope → field → COs | `job_*` wave **5a**–**5d** ([decision](../decisions/job.md#decision-job-wave-5--implementation-order-2026-06-23)) |
 | 6a Procurement | Requisition → PO → receipts | `requested_order_*`, `purchase_order_*`, `material_receipt_*` |
 | 6b Billing | Billable staging → invoice | `invoice_*`, `billable_items` + `sov_milestones` on `job_detail` |
 | 7 Reports | Job progress aggregates | Custom SQL pages |
@@ -227,21 +270,22 @@ Field detail: [`surfaces.md`](../surfaces.md). DBML: [`current.dbml`](../schema/
 
 ## Slice 04 — Estimates
 
-**Exit criteria:** Estimate with snapshot line items.
+**Exit criteria:** Estimate with snapshot line items — **wave 4a** via task 22.
 
 | # | Task | Delivers |
 |---|------|----------|
-| 24–26 | *TBD* | `estimate`, `estimate_line`, UI — **DBML drafted** |
+| 22 | [22-estimate-wave-4a.md](./22-estimate-wave-4a.md) | Migration, YAML, DAL, API, flat `/estimates` UI — **active** |
 
 ---
 
 ## Slice 05 — Jobs & change orders
 
-**Exit criteria:** Job from estimate with exploded lines; progress tracking.
+**Exit criteria:** Job shell (5a) → win copy (5b) → field status (5c) → change orders (5d). **Planning locked** 2026-06-23.
 
 | # | Task | Delivers |
 |---|------|----------|
-| 27–30 | *TBD* | `job`, `job_line`, `change_order`, UI — **DBML drafted** |
+| 23 | [23-job-wave-5a.md](./23-job-wave-5a.md) | Job wave **5a** shell — migration, YAML, DAL, API, Overview UI — **active** |
+| 24+ | *TBD* | 5b win/lose, 5c field, 5d change orders |
 
 ---
 

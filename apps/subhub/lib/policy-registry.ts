@@ -12,6 +12,9 @@ import { roleListSurfacePolicyDef } from "../modules/iam/generated/role_list.sch
 import { userDetailSurfacePolicyDef } from "../modules/iam/generated/user_detail.schema.generated";
 import { userListSurfacePolicyDef } from "../modules/iam/generated/user_list.schema.generated";
 import { userRolesDetailSurfacePolicyDef } from "../modules/iam/generated/user_roles_detail.schema.generated";
+import { estimateDetailSurfacePolicyDef } from "../modules/estimate/generated/estimate_detail.schema.generated";
+import { estimateListSurfacePolicyDef } from "../modules/estimate/generated/estimate_list.schema.generated";
+import { jobPartyRelationTableSurfacePolicyDef } from "../modules/estimate/generated/job_party_relation_table.schema.generated";
 import { siteContactRelationTableSurfacePolicyDef } from "../modules/site/generated/site_contact_relation_table.schema.generated";
 import { siteDetailSurfacePolicyDef } from "../modules/site/generated/site_detail.schema.generated";
 import { siteListSurfacePolicyDef } from "../modules/site/generated/site_list.schema.generated";
@@ -32,4 +35,7 @@ export const subhubRegistry = definePolicyRegistry(
   siteListSurfacePolicyDef,
   siteDetailSurfacePolicyDef,
   siteContactRelationTableSurfacePolicyDef,
+  estimateListSurfacePolicyDef,
+  estimateDetailSurfacePolicyDef,
+  jobPartyRelationTableSurfacePolicyDef,
 );

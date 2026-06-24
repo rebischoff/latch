@@ -751,6 +751,7 @@ Table estimate_party {
   estimate_id text [not null]
   party_id text [not null]
   relation_id text [not null, note: 'FK → job_party_relation']
+  sort_order int [not null, default: 0]
 
   indexes {
     (estimate_id, party_id, relation_id) [pk]

@@ -1,6 +1,6 @@
 # 19 — Surface implement specs (v1)
 
-> **Status:** Paused at **checkpoint** (2026-06-20). Progress **13/27** ([`00-scan`](../surface-specs/00-scan.md) rows **#1–14** ✅). **Active work:** [20-ui-discovery.md](./20-ui-discovery.md). **Resume here** after task 20 planning session — start with **`estimate.md`** (row #20), not `item.md`.
+> **Status:** Resumed (2026-06-23). Progress **16/27** ([`00-scan`](../surface-specs/00-scan.md) rows **#1–14**, **#19–21** ✅). **Active work:** [23-job-wave-5a.md](./23-job-wave-5a.md); catalog specs **#15–18** parallel.
 
 ## Goal
 

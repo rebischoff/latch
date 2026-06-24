@@ -1,7 +1,8 @@
 # Surface implement specs — index
 
-> **Active task:** [20-ui-discovery.md](../tasks/20-ui-discovery.md) (implementation + spikes).  
-> **Spec task:** [19-surface-implement-specs.md](../tasks/19-surface-implement-specs.md) — **paused** at checkpoint **13/27**; resume at **`estimate.md`** after discovery planning session.  
+> **Active task:** [22-estimate-wave-4a.md](../tasks/22-estimate-wave-4a.md) — wave 4a estimate implementation.  
+> **Discovery:** [20-ui-discovery.md](../tasks/20-ui-discovery.md) — **complete** (2026-06-23).  
+> **Spec task:** [19-surface-implement-specs.md](../tasks/19-surface-implement-specs.md) — **16/27**; **`job-party-relation.md`** ✅; next catalog specs (#15–18).  
 > **Field map (catalog tier):** [`surfaces.md`](../surfaces.md) — task 18.
 
 ## What this is
@@ -11,9 +12,9 @@
 | Data model | [`schema/current.dbml`](../schema/current.dbml) | Complete for v1 |
 | Field catalog | [`surfaces.md`](../surfaces.md) | Complete (task 18) |
 | **Implement specs — checkpoint** | Rows **#1–14** | ✅ CRM hub + sites + part |
-| **UI discovery** | [task 20](../tasks/20-ui-discovery.md), [`spikes/`](../spikes/README.md) | **Active** |
-| **Implement specs — remaining** | Rows **#15–28** | ⬜ after discovery |
-| Production code | migrations, YAML, DAL, UI | **Sites slice + spikes** (task 20) |
+| **UI discovery** | [task 20](../tasks/20-ui-discovery.md), [`spikes/`](../spikes/README.md) | **Complete** (2026-06-23) |
+| **Implement specs — remaining** | Rows **#15–18**, **#22–28** | ⬜ in progress |
+| Production code | migrations, YAML, DAL, UI | **Sites slice** ✅ · **Estimate wave 4a** next |
 
 One file per Surface group (see [00-scan.md](./00-scan.md)). Template: [`_template.md`](./_template.md).
 
@@ -21,8 +22,8 @@ One file per Surface group (see [00-scan.md](./00-scan.md)). Template: [`_templa
 
 Task 19 **resume order** (after task 20 step 4):
 
-1. **`estimate.md`** (row #20) — from spike + planning session
-2. **`job.md`**, **`job-billing-fields.md`** — especially if job tab spike runs next
+1. **`job-billing-fields.md`** (row #27) — when billing wave approaches
+2. **`item.md`** (row #15) — catalog pickers for 4d′ / Scope
 3. **`item.md`** (row #15) — when catalog pickers need depth
 4. Remaining catalog tables (#16–18), procurement (#22–25), invoice (#26), notes (#28)
 

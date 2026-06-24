@@ -5,3 +5,5 @@ export const surfaceListKey = (surfaceId: SurfaceId) =>
 
 export const surfaceDetailKey = (surfaceId: SurfaceId, id: string) =>
   ["surface", surfaceId, "detail", id] as const;
+
+export const estimateSitePickerKey = ["estimate", "site-picker"] as const;

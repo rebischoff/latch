@@ -47,6 +47,9 @@ _None._
 | billing — earned staging, progress, SOV, retainage | [billing.md](./billing.md) | 2026-06-17 | active |
 | SOV UI — nested on `job_detail` Billing tab | [billing.md](./billing.md) | 2026-06-17 | active |
 | labor phases — catalog only in v1 | [catalog.md](./catalog.md) | 2026-06-17 | active |
+| job wave 5 — implementation order (catalog-first) | [job.md](./job.md) | 2026-06-23 | active |
+| estimate wave 4 — implementation order | [estimate.md](./estimate.md) | 2026-06-23 | active (amended 2026-06-23) |
+| estimate line editor — expand on add and grouped Table UI | [estimate.md](./estimate.md) | 2026-06-23 | active |
 | estimate / job line grouping — site geography | [estimate.md](./estimate.md) | 2026-06-17 | active |
 | Surface catalog before migrations | [general.md](./general.md) | 2026-06-17 | active |
 | field status — `job_work_item` | [job.md](./job.md) | 2026-06-17 | active |

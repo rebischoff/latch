@@ -3,6 +3,7 @@
 import {
   ContactsOutlined,
   EnvironmentOutlined,
+  FileTextOutlined,
   HomeOutlined,
   LinkOutlined,
   SettingOutlined,
@@ -29,6 +30,7 @@ const NAV_ICONS: Record<NavIcon, ReactNode> = {
   vendor: <ShopOutlined />,
   site: <EnvironmentOutlined />,
   relation: <LinkOutlined />,
+  estimate: <FileTextOutlined />,
   menu: null,
   login: null,
   logout: null,

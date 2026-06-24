@@ -2,7 +2,7 @@
 
 > **Wave:** 1 · **Status:** target spec (2026-06-19) · **Consumer:** [`site.md`](./site.md) `contacts` relation picker · **Catalog:** [`surfaces.md`](../surfaces.md#site_contact_relation_table) · **DBML:** `site_contact_relation`, `site_contact` *(delete blocker)* · **Decisions:** [site contacts catalog](../decisions/site.md#decision-site-contacts--site_contact_relation-catalog-2026-06-15), [catalog table page](../decisions/general.md#decision-catalog-tables--editable-table-page-not-master-detail-2026-06-16), [progressive setup](../decisions/cross-cutting.md#decision-progressive-setup--master-catalogs-2026-06-16), [delete blockers](../decisions/cross-cutting.md#decision-delete-blocked-by-referential-use--structured-errors-2026-06-18)
 
-**Related:** Distinct from **`party_contact_relation_table`** *(spec TBD)* — org roster on customer/vendor hubs. **`job_party_relation_table`** — per-engagement roles (wave 4).
+**Related:** Distinct from **`party_contact_relation_table`** *(spec TBD)* — org roster on customer/vendor hubs. **[`job-party-relation.md`](./job-party-relation.md)** — per-engagement roles (wave 4).
 
 ---
 

@@ -21,6 +21,7 @@ const PG_TYPE_TO_YAML: Record<string, ColumnType> = {
   bool: "boolean",
   timestamptz: "timestamp",
   timestamp: "timestamp",
+  date: "string",
 };
 
 const normalizePgType = (raw: string): string => {

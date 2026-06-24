@@ -11,7 +11,9 @@ export type FieldAction =
   | "delete"
   | "restore"
   | "approve"
-  | "hard_delete";
+  | "hard_delete"
+  | "win"
+  | "lose";
 
 export type SurfaceId = string;
 export type FieldId = string;
