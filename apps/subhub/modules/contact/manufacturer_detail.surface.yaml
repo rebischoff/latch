@@ -1,0 +1,51 @@
+# Manufacturer — party lens with kind-specific profile + child collections
+id: manufacturer_detail
+displayName: Manufacturer detail
+anchorTable: party
+
+fieldActions:
+  - read
+  - write
+
+surfaceActions:
+  - read
+  - write
+  - delete
+  - add_role
+  - remove_role
+
+tables:
+  - party
+  - party_person
+  - party_organization
+  - party_phone
+  - party_email
+  - party_role
+
+fields:
+  - id: profile
+    columns:
+      - column: party.id
+        type: string
+      - column: party.kind
+        type: string
+      - column: party.display_name
+        type: string
+      - column: party.legal_name
+        type: string
+        nullable: true
+      - column: party_person.first_name
+        type: string
+        nullable: true
+      - column: party_person.last_name
+        type: string
+        nullable: true
+      - column: party_organization.dba_name
+        type: string
+        nullable: true
+  - id: phones
+    # logical — DAL maps to party_phone; see docs/child-collections.md
+    columns: []
+  - id: emails
+    # logical — DAL maps to party_email; see docs/child-collections.md
+    columns: []

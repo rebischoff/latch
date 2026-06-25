@@ -1,3 +1,4 @@
+import type { PermissionContext } from "@latch/contracts";
 import { createSurfaceDal, type SurfaceDal } from "@latch/dal";
 import type { Pool } from "pg";
 
@@ -10,11 +11,32 @@ import {
   contactDetailDescriptor,
   contactListDescriptor,
   customerListDescriptor,
+  manufacturerDetailDescriptor,
   manufacturerListDescriptor,
   vendorListDescriptor,
 } from "./descriptors";
 import { createContactDetailStore, createPartyListStore } from "./repository";
+import { extendManufacturerDetailDal } from "./stores/manufacturer-detail-create";
+import { createManufacturerDetailStore } from "./stores/manufacturer-detail-store";
 import { ensureAuditBootstrap, getPool, getPrincipal } from "../latch";
+
+export type ManufacturerDetailDal = SurfaceDal & {
+  create: (
+    ctx: PermissionContext,
+    id: string,
+    body: unknown,
+  ) => Promise<Record<string, unknown>>;
+  addRole: (
+    ctx: PermissionContext,
+    id: string,
+    body: unknown,
+  ) => Promise<Record<string, unknown>>;
+  removeRole: (
+    ctx: PermissionContext,
+    id: string,
+    body: unknown,
+  ) => Promise<Record<string, unknown>>;
+};
 
 export type ContactsDal = {
   contactList: SurfaceDal;
@@ -22,6 +44,7 @@ export type ContactsDal = {
   customerList: SurfaceDal;
   vendorList: SurfaceDal;
   manufacturerList: SurfaceDal;
+  manufacturerDetail: ManufacturerDetailDal;
 };
 
 export type CreateContactsDalOptions = {
@@ -54,6 +77,16 @@ export const createContactsDal = (
     "manufacturer",
   );
   const contactDetailStore = createContactDetailStore(pool, getActorId);
+  const manufacturerDetailStore = createManufacturerDetailStore(pool, getActorId);
+  const manufacturerDetailBaseDal = createSurfaceDal(
+    manufacturerDetailDescriptor,
+    manufacturerDetailStore,
+  );
+  const manufacturerDetail = extendManufacturerDetailDal(
+    pool,
+    getActorId,
+    manufacturerDetailBaseDal,
+  );
 
   return {
     contactList: createSurfaceDal(contactListDescriptor, contactListStore),
@@ -64,6 +97,7 @@ export const createContactsDal = (
       manufacturerListDescriptor,
       manufacturerListStore,
     ),
+    manufacturerDetail,
   };
 };
 

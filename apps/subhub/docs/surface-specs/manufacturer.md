@@ -204,4 +204,4 @@ No `related_parts` list or inline MPN table on `manufacturer_detail`.
 
 - [x] Locked answers (2026-06-18) reflected in decisions + catalog
 - [x] A–K complete; minimal lens — no hub Fields, no related UI
-- [ ] Implementation deferred until task 19 exit + party lens migration
+- [ ] Implementation — [task 25](../tasks/25-manufacturer-detail.md) (detail + picker return); list shipped

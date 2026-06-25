@@ -13,7 +13,10 @@ export type FieldAction =
   | "approve"
   | "hard_delete"
   | "win"
-  | "lose";
+  | "lose"
+  | "complete"
+  | "add_role"
+  | "remove_role";
 
 export type SurfaceId = string;
 export type FieldId = string;

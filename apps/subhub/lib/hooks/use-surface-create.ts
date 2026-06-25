@@ -10,7 +10,7 @@ import {
   type SurfaceQueryResult,
 } from "@/lib/surface-api";
 
-import { surfaceDetailKey, surfaceListKey } from "./surface-query-keys";
+import { surfaceDetailKey } from "./surface-query-keys";
 
 export const useSurfaceCreate = (surfaceId: SurfaceId, id: string) => {
   const queryClient = useQueryClient();
@@ -26,7 +26,9 @@ export const useSurfaceCreate = (surfaceId: SurfaceId, id: string) => {
     onSuccess: (result) => {
       queryClient.setQueryData(surfaceDetailKey(surfaceId, id), result);
       const listSurfaceId = SURFACE_API[surfaceId]?.listSurfaceId ?? surfaceId;
-      queryClient.invalidateQueries({ queryKey: surfaceListKey(listSurfaceId) });
+      queryClient.invalidateQueries({
+        queryKey: ["surface", listSurfaceId, "list"],
+      });
     },
   });
 };

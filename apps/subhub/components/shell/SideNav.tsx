@@ -1,10 +1,13 @@
 "use client";
 
 import {
+  BuildOutlined,
   ContactsOutlined,
   EnvironmentOutlined,
   FileTextOutlined,
   HomeOutlined,
+  ProjectOutlined,
+  TagOutlined,
   LinkOutlined,
   SettingOutlined,
   ShopOutlined,
@@ -28,9 +31,12 @@ const NAV_ICONS: Record<NavIcon, ReactNode> = {
   contacts: <ContactsOutlined />,
   customer: <UsergroupAddOutlined />,
   vendor: <ShopOutlined />,
+  manufacturer: <BuildOutlined />,
   site: <EnvironmentOutlined />,
   relation: <LinkOutlined />,
   estimate: <FileTextOutlined />,
+  job: <ProjectOutlined />,
+  part: <TagOutlined />,
   menu: null,
   login: null,
   logout: null,

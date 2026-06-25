@@ -1,0 +1,40 @@
+# Job profile + stakeholders (Overview tab — wave 5a)
+id: job_detail
+displayName: Job detail
+anchorTable: job
+
+fieldActions:
+  - read
+  - write
+
+surfaceActions:
+  - read
+  - write
+  - complete
+
+tables:
+  - job
+  - job_party
+  - job_party_relation
+  - site
+  - estimate
+
+fields:
+  - id: profile
+    columns:
+      - column: job.id
+        type: string
+      - column: job.title
+        type: string
+      - column: job.site_id
+        type: string
+      - column: job.job_kind
+        type: string
+      - column: job.status
+        type: string
+      - column: job.estimate_id
+        type: string
+        nullable: true
+  - id: stakeholders
+    # logical — DAL maps to job_party; see docs/child-collections.md
+    columns: []

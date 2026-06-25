@@ -60,6 +60,10 @@ export const SURFACE_API: Partial<Record<SurfaceId, SurfaceApiConfig>> = {
   customer_list: { listPath: "/api/customers" },
   vendor_list: { listPath: "/api/vendors" },
   manufacturer_list: { listPath: "/api/manufacturers" },
+  manufacturer_detail: {
+    detailPath: "/api/manufacturers",
+    listSurfaceId: "manufacturer_list",
+  },
   site_list: { listPath: "/api/sites" },
   site_detail: {
     detailPath: "/api/sites",
@@ -77,6 +81,16 @@ export const SURFACE_API: Partial<Record<SurfaceId, SurfaceApiConfig>> = {
   estimate_detail: {
     detailPath: "/api/estimates",
     listSurfaceId: "estimate_list",
+  },
+  job_list: { listPath: "/api/jobs" },
+  job_detail: {
+    detailPath: "/api/jobs",
+    listSurfaceId: "job_list",
+  },
+  part_list: { listPath: "/api/parts" },
+  part_detail: {
+    detailPath: "/api/parts",
+    listSurfaceId: "part_list",
   },
 };
 
@@ -129,6 +143,13 @@ export const fetchEstimateSitePicker = async (): Promise<
   return parseResponse<EstimateSitePickerData>(response);
 };
 
+export const fetchJobSitePicker = async (): Promise<
+  ApiSuccessBody<EstimateSitePickerData>
+> => {
+  const response = await fetch("/api/jobs/pickers/sites");
+  return parseResponse<EstimateSitePickerData>(response);
+};
+
 export const fetchSitePartyPicker = async (
   role: SitePartyPickerRole,
 ): Promise<ApiSuccessBody<SitePartyPickerData>> => {
@@ -154,13 +175,24 @@ export const createSiteContactPerson = async (
 
 export const fetchSurfaceList = async (
   surfaceId: SurfaceId,
+  query?: Record<string, string | number | undefined>,
 ): Promise<ApiSuccessBody<SurfaceListData>> => {
   const path = SURFACE_API[surfaceId]?.listPath;
   if (!path) {
     throw new Error(`No list API path for surface: ${surfaceId}`);
   }
 
-  const response = await fetch(path);
+  const params = new URLSearchParams();
+  if (query) {
+    for (const [key, value] of Object.entries(query)) {
+      if (value !== undefined && value !== "") {
+        params.set(key, String(value));
+      }
+    }
+  }
+
+  const qs = params.toString();
+  const response = await fetch(qs ? `${path}?${qs}` : path);
   return parseResponse<SurfaceListData>(response);
 };
 
@@ -248,6 +280,42 @@ export const patchSurfaceDetail = async (
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
+    }),
+  );
+};
+
+export const postManufacturerAddRole = async (
+  id: string,
+  role: string,
+): Promise<ApiSuccessBody<SurfaceDetailData>> => {
+  const path = SURFACE_API.manufacturer_detail?.detailPath;
+  if (!path) {
+    throw new Error("No detail API path for manufacturer_detail");
+  }
+
+  return parseResponse<SurfaceDetailData>(
+    await fetch(`${path}/${id}/add-role`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role }),
+    }),
+  );
+};
+
+export const postManufacturerRemoveRole = async (
+  id: string,
+  role: string,
+): Promise<ApiSuccessBody<{ id: string }>> => {
+  const path = SURFACE_API.manufacturer_detail?.detailPath;
+  if (!path) {
+    throw new Error("No detail API path for manufacturer_detail");
+  }
+
+  return parseResponse<{ id: string }>(
+    await fetch(`${path}/${id}/remove-role`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role }),
     }),
   );
 };

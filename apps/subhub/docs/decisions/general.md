@@ -148,15 +148,113 @@
 **Choice:**
 
 1. **List toolbar** — every **list+detail** Surface exposes **New** / **Create** on `SurfaceToolbar` when manifest grants `create` on `*_list`. Flow: **New on list → navigate to create detail → POST** (master-detail layout). Gated by `<Can>`; omit when principal lacks permission. Catalog **table** Surfaces (`*_table`) use their own per-row POST pattern instead.
-2. **Picker add-new** — when another Surface references records via **Select / lookup**, the control normally offers **Add new …** when the principal has `create` on the target `*_list`. Action opens the target create flow (navigate to canonical route; consumer may pass **return context** to restore the originating form with the new id selected). If `create` is not granted, picker is select-only.
+2. **Picker add-new** — when another Surface references records via **Select / lookup**, the control offers **`… Add {entity}`** as the **last dropdown option** when the principal has `create` on the target `*_detail` (create path) **and** the origin field is writable. Action opens the target create flow (navigate to canonical route; consumer passes **return context** to restore the originating form with the new id selected). If `create` is not granted, omit the option entirely (select-only). See [linked picker control](#decision-linked-picker-control-linkedselectinput--2026-06-24).
 
-**Examples:** `part_list` **New part**; `part_detail` manufacturer picker → **Add new manufacturer**; estimate line part picker → **Add new part** (consumer specs #20+).
+**Examples:** `part_list` **New part**; `part_detail` manufacturer picker → **`… Add manufacturer`** in dropdown; estimate line part picker → **Add new part** (consumer specs #20+).
 
 **Contrast:** Hub **quick-create** (e.g. site contact person inline) stays a minimal POST on the **same** Surface — not a substitute for full list+detail create.
 
 **Rationale:** Operators need a consistent create path from the catalog screen and from foreign forms without hunting nav. Permission boundary stays on manifest `create`, not UI-only hiding.
 
 **First catalog instance:** [`part.md`](../surface-specs/part.md).
+
+**Amended (2026-06-24):** Concrete return-context URL protocol — see [picker return context](#decision-picker-return-context--url-protocol-2026-06-24). First implementation: [task 25](../tasks/25-manufacturer-detail.md) (part form → manufacturer).
+
+**Amended (2026-06-24):** Picker chrome — dropdown add-new + open icon via [`LinkedSelectInput`](#decision-linked-picker-control-linkedselectinput--2026-06-24); [task 25 step 11](../tasks/25-manufacturer-detail.md#step-11--linked-picker-control-linkedselectinput).
+
+
+### Decision: picker return context — URL protocol (2026-06-24)
+
+**Status:** Locked in [task 25](../tasks/25-manufacturer-detail.md).
+
+**Choice:** Cross-Surface **picker add-new** uses **navigation** to the target’s canonical create route (not a modal hosting a full foreign Surface — see [cross-Surface nav](#decision-cross-surface-related-records--navigation-only-v1-2026-06-18)). Origin passes **return context** in query params; target redirects back on **Save** or **Cancel**.
+
+| Query param | Role |
+|-------------|------|
+| `create=1` | Detail pane is create mode (existing convention) |
+| `returnTo` | URL-encoded path back to origin — **include** origin’s own query string (e.g. `/parts/[id]?create=1`) |
+| `returnField` | Optional RHF field path to set on return (e.g. `profile.manufacturer_party_id`) |
+| `selectedId` | Set by create flow on **successful Save** when redirecting to `returnTo` |
+
+**Save:** POST create → redirect to `returnTo` with `selectedId=<new record id>`.
+
+**Cancel:** Redirect to `returnTo` only (no `selectedId`). Create mode shows toolbar **Cancel** (not **Revert**); edit mode keeps **Revert**.
+
+**Origin consumer:** On mount, if `selectedId` is present, set `returnField` and invalidate the relevant picker query.
+
+**Amended (2026-06-24):** `SurfaceFormRoot` integration — see [picker return on SurfaceFormRoot forms](#decision-picker-return-on-surfaceformroot-forms--merge-selectedid-into-defaults-2026-06-24). `setValue` alone is **not** sufficient when the origin uses `SurfaceFormRoot` reset-on-DTO.
+
+**Chained creates:** Each hop uses the immediate parent as `returnTo`; deeper stacks reuse the same protocol one level at a time (no modal stacking).
+
+**Contrast:** [Same-Surface quick-create](#decision-listdetail-surface-create--toolbar-and-picker-add-new-2026-06-19) (e.g. site standing contact person) stays a **minimal modal POST** on the current Surface — not this protocol.
+
+**Rationale:** Full foreign Surfaces keep their own manifest, toolbar, and policy boundary. URL-based return context is refresh-safe, deep-linkable, and avoids nested-modal picker chains. Shared helpers (`lib/picker-return-context.ts`) keep pickers consistent.
+
+**First instance:** `part_detail` manufacturer picker → `/manufacturers/[id]?create=1&returnTo=…&returnField=profile.manufacturer_party_id` ([`25-manufacturer-detail.md`](../tasks/25-manufacturer-detail.md)).
+
+
+### Decision: picker return on `SurfaceFormRoot` forms — merge `selectedId` into defaults (2026-06-24)
+
+**Status:** Locked. Required for every origin form that uses [`SurfaceFormRoot`](../../components/surface/SurfaceFormRoot.tsx) + [`useApplyPickerReturn`](../../lib/hooks/use-apply-picker-return.ts).
+
+**Choice:** Picker-return consumers on `SurfaceFormRoot` forms apply `selectedId` in **two** places:
+
+1. **Merge into `defaultValues`** (required) — so `SurfaceFormRoot`’s `form.reset(defaultValues)` does not wipe the picker field after return.
+2. **`useApplyPickerReturn`** (required) — `setValue` + strip `selectedId` from URL + invalidate picker query.
+
+`setValue` in the hook alone is **insufficient**: `SurfaceFormRoot` resets the form whenever `defaultValues` / `resetKey` change; that reset typically runs **after** the hook’s first `setValue`, clearing the field. Stripping `selectedId` from the URL then prevents a second apply.
+
+**Procedure (origin Surface detail form):**
+
+| Step | What |
+|------|------|
+| 1 | **Add-new option** — `buildPickerCreateUrl({ target, returnTo, returnField })` where `returnTo` is current `pathname` + full query string (e.g. `/parts/[id]?create=1`). Gate on target `*_detail` `write` (create path) **and** origin field writable. Rendered as last dropdown option in [`LinkedSelectInput`](#decision-linked-picker-control-linkedselectinput--2026-06-24) (`… Add {entity}`), not a separate link below the control. |
+| 2 | **Persist `selectedId`** — `useRef<string \| null>(null)`; on each render, if `parseReturnContext(searchParams).selectedId` is set, copy into ref. Ref survives URL strip. |
+| 3 | **Merge defaults** — In `defaultValues` `useMemo`, if ref holds an id, shallow-merge into the nested field at `returnField` (e.g. `profile.manufacturer_party_id`). Include `pickerReturn.selectedId` in deps so the first landing with `selectedId` recomputes. |
+| 4 | **Hook** — `useApplyPickerReturn({ setValue, returnField, pickerQueryKey })` after `useForm`. |
+| 5 | **Picker options** — Resolve Select labels from **watched** form value + picker rows (not server `profile` alone), so the new id displays once the picker refetch completes. |
+| 6 | **Target save** — `redirectAfterCreate(returnTo, newId)` on create success; **Cancel** uses `redirectOnCancel(returnTo)`. |
+
+**Reference implementation:** [`PartDetailForm.tsx`](../../components/parts/PartDetailForm.tsx) — manufacturer picker (task 25).
+
+**Rationale:** `SurfaceFormRoot` reset-on-DTO is the standard detail-form contract ([`surface-form-playground.md`](../spikes/surface-form-playground.md)). Picker return is a transient URL signal, not part of the server DTO — defaults must carry it across reset cycles.
+
+**Do not:** Rely on `setValue` only; depend on `selectedId` staying in the URL after first paint; read picker value only from server `detail` on create mode.
+
+
+### Decision: linked picker control (`LinkedSelectInput`) (2026-06-24)
+
+**Status:** Implemented (2026-06-24) in [task 25 step 11](../tasks/25-manufacturer-detail.md#step-11--linked-picker-control-linkedselectinput).
+
+**Choice:** Foreign-record lookup fields use a shared **`LinkedSelectInput`** (`components/form/LinkedSelectInput.tsx`) — sibling to `SelectInput`, not a replacement.
+
+| Affordance | Rule |
+|------------|------|
+| **Select** | Standard searchable dropdown; consumer supplies options + RHF `name` / manifest `field`. |
+| **Add-new** | Last option: **`… Add {entity}`** (ellipsis). Sentinel value; `onChange` navigates to `addNewHref` without setting the field. Pinned at bottom; never filtered by search. **Omit** when `canAddNew` is false. |
+| **Open** | Icon button immediately after Select (`Space.Compact`). `linkHref(selectedId)` — same tab in v1. **Hidden** when `canLink` false (no read on target Surface). **Disabled** when no value. Shown in read-only field mode when `canLink` and value present. |
+
+**Consumer owns:** picker query hook, options merge (orphan id + display name), `buildPickerCreateUrl`, `useApplyPickerReturn`, `defaultValues` merge for `selectedId`. Component owns layout, sentinel intercept, open navigation, dirty confirm hook integration.
+
+**First instances:** `part_detail` manufacturer profile field; `part_detail` vendor grid cell (open icon only until vendor add-new ships).
+
+**Rationale:** One compact control replaces separate **Add new …** link + **Open:** row under every picker. Permission boundaries unchanged — UI gates mirror manifest grants.
+
+
+### Decision: picker navigate away — dirty form confirm (v1) (2026-06-24)
+
+**Status:** Implemented (2026-06-24) in [task 25 step 11](../tasks/25-manufacturer-detail.md#step-11--linked-picker-control-linkedselectinput).
+
+**Choice:** Same-tab navigation from a picker (**add-new** or **open** icon) on a dirty `SurfaceFormRoot` form shows a confirm dialog before leaving: *"Leave without saving? Unsaved changes will be lost."* User may proceed (navigate) or cancel (stay).
+
+| v1 | v2 (deferred) |
+|----|----------------|
+| Confirm only — no `localStorage` / `sessionStorage` draft | Open target in **new tab** so origin form stays mounted |
+| Picker return still restores **only** `selectedId` — not full form draft | Optional session draft if new-tab is insufficient |
+
+**Scope:** Applies to `LinkedSelectInput` navigate paths and equivalent manual links on picker fields.
+
+**Rationale:** Same-tab navigation destroys in-memory RHF state. Confirm makes the tradeoff explicit without building draft persistence in v1. New tab is the preferred long-term fix for add/open without data loss.
 
 
 ### Decision: catalog tables — editable table page, not master-detail (2026-06-16)

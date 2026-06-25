@@ -1,0 +1,25 @@
+# Jobs — list pane for job_detail
+id: job_list
+displayName: Job list
+anchorTable: job
+
+fieldActions:
+  - read
+  - write
+
+surfaceActions:
+  - read
+
+tables:
+  - job
+  - site
+
+fields:
+  - id: summary
+    columns:
+      - column: job.id
+        type: string
+      - column: job.title
+        type: string
+      - column: site.name
+        type: string

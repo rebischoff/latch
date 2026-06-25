@@ -1,0 +1,29 @@
+# Parts — list pane for part_detail
+id: part_list
+displayName: Part list
+anchorTable: manufacturer_part
+
+fieldActions:
+  - read
+  - write
+
+surfaceActions:
+  - read
+
+tables:
+  - manufacturer_part
+  - party
+
+fields:
+  - id: summary
+    columns:
+      - column: manufacturer_part.id
+        type: string
+      - column: manufacturer_part.mpn
+        type: string
+      - column: manufacturer_part.description
+        type: string
+      - column: manufacturer_part.manufacturer_party_id
+        type: string
+      - column: party.display_name
+        type: string

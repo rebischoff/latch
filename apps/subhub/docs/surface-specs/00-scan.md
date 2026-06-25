@@ -36,7 +36,7 @@ General scan before one-by-one implement specs. **Legend:** ✅ spec complete ·
 | 11 | [site-contact-relation.md](./site-contact-relation.md) | `site_contact_relation_table` | 1 | ✅ target (2026-06-19) |
 | 12 | [party-addresses.md](./party-addresses.md) | `addresses` on `{role}_detail` | 2 | ✅ target (2026-06-19) |
 | 13 | [site-geography.md](./site-geography.md) | `sections` · `locations` on `site_detail` | 2b | ✅ target (2026-06-19) |
-| 14 | [part.md](./part.md) | `part_list` · `part_detail` | 3 | ✅ target (2026-06-19) |
+| 14 | [part.md](./part.md) | `part_list` · `part_detail` | 3 | ✅ target (2026-06-19); code shipped (3a) |
 | 15 | [item.md](./item.md) | `item_list` · `item_detail` | 3 | ⏸ after discovery |
 | 16 | [category.md](./category.md) | `category_table` | 3 | ⏸ after discovery |
 | 17 | [labor-class.md](./labor-class.md) | `labor_class_table` | 3 | ⏸ after discovery |

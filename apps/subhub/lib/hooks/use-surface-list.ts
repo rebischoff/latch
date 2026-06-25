@@ -11,11 +11,15 @@ import {
 
 import { surfaceListKey } from "./surface-query-keys";
 
-export const useSurfaceList = (surfaceId: SurfaceId) =>
+type SurfaceListQuery = {
+  q?: string;
+};
+
+export const useSurfaceList = (surfaceId: SurfaceId, query?: SurfaceListQuery) =>
   useQuery<SurfaceQueryResult<SurfaceListData>>({
-    queryKey: surfaceListKey(surfaceId),
+    queryKey: surfaceListKey(surfaceId, query?.q),
     queryFn: async () => {
-      const response = await fetchSurfaceList(surfaceId);
+      const response = await fetchSurfaceList(surfaceId, query);
       return { data: response.data, manifest: response.manifest };
     },
     staleTime: 30_000,

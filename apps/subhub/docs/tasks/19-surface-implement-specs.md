@@ -1,6 +1,6 @@
 # 19 — Surface implement specs (v1)
 
-> **Status:** Resumed (2026-06-23). Progress **16/27** ([`00-scan`](../surface-specs/00-scan.md) rows **#1–14**, **#19–21** ✅). **Active work:** [23-job-wave-5a.md](./23-job-wave-5a.md); catalog specs **#15–18** parallel.
+> **Status:** Resumed (2026-06-23). Progress **16/27** ([`00-scan`](../surface-specs/00-scan.md) rows **#1–14**, **#19–21** ✅). **Active work:** catalog specs **#15–18** (`part`, `item`, `category_table`, `labor_class_table`) — [23-job-wave-5a.md](./23-job-wave-5a.md) complete.
 
 ## Goal
 

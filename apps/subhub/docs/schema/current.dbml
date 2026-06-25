@@ -847,6 +847,7 @@ Table job_party {
   job_id text [not null]
   party_id text [not null]
   relation_id text [not null, note: 'FK → job_party_relation']
+  sort_order int [not null, default: 0]
 
   indexes {
     (job_id, party_id, relation_id) [pk]

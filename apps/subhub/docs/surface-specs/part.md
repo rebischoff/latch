@@ -1,6 +1,6 @@
 # Catalog — `part_list` · `part_detail`
 
-> **Wave:** 3 · **Status:** target spec (2026-06-19) · **Catalog:** [`surfaces.md`](../surfaces.md#part_list--part_detail) · **DBML:** `manufacturer_part`, `vendor_part` · **Decisions:** [catalog parts](../decisions/catalog.md#decision-part_detail--mpn-catalog-and-vendor-pricing-2026-06-19), [catalog simplified](../decisions/catalog.md#decision-catalog--simplified-parts-items-categories-2026-06-16), [list+detail create](../decisions/general.md#decision-listdetail-surface-create--toolbar-and-picker-add-new-2026-06-19), [delete blockers](../decisions/cross-cutting.md#decision-delete-blocked-by-referential-use--structured-errors-2026-06-18), [cross-Surface nav](../decisions/general.md#decision-cross-surface-related-records--navigation-only-v1-2026-06-18)
+> **Wave:** 3 · **Status:** target spec (2026-06-19) · **Implementation:** [`24-part-wave-3a.md`](../tasks/24-part-wave-3a.md) wave 3a — **complete** (2026-06-24) · **Catalog:** [`surfaces.md`](../surfaces.md#part_list--part_detail) · **DBML:** `manufacturer_part`, `vendor_part` · **Decisions:** [catalog parts](../decisions/catalog.md#decision-part_detail--mpn-catalog-and-vendor-pricing-2026-06-19), [catalog simplified](../decisions/catalog.md#decision-catalog--simplified-parts-items-categories-2026-06-16), [list+detail create](../decisions/general.md#decision-listdetail-surface-create--toolbar-and-picker-add-new-2026-06-19), [delete blockers](../decisions/cross-cutting.md#decision-delete-blocked-by-referential-use--structured-errors-2026-06-18), [cross-Surface nav](../decisions/general.md#decision-cross-surface-related-records--navigation-only-v1-2026-06-18)
 
 **Related:** [`manufacturer.md`](./manufacturer.md) — manufacturer is a picker anchor only; no parts hub. [`vendor.md`](./vendor.md) — primary `vendor_part` edit on this Surface. [`item.md`](./item.md) *(spec #15)* — `part_links` reverse nav. **Deferred:** `specs`, part requirements, `cut_sheet_url` / submittals — estimate/job slice (#20–21).
 
@@ -221,13 +221,13 @@ Master-detail per [routing-and-libraries.md](../routing-and-libraries.md): list 
 
 | Field | Add | Pickers | Empty state |
 |-------|-----|---------|-------------|
-| `vendor_pricing` | **Add vendor price** | **Vendor** — vendor-tagged `party` only; **Add new vendor** when `vendor_list` `create` | "No vendor pricing" |
+| `vendor_pricing` | **Add vendor price** | **Vendor** — vendor-tagged `party` only; [`LinkedSelectInput`](../../components/form/LinkedSelectInput.tsx) inline layout (`[ Select ] [ open icon ]`) when `vendor_detail` `read`; read-only row: label + icon (not inline link text); **Add new vendor** deferred | "No vendor pricing" |
 
 ### `profile` pickers
 
-| Control | Picker | Add new |
-|---------|--------|---------|
-| Manufacturer | manufacturer-tagged parties | **Add new manufacturer** when `manufacturer_list` `create` → `/manufacturers` create (return context when launched from part create) |
+| Control | Picker | Add new | Open |
+|---------|--------|---------|------|
+| Manufacturer | manufacturer-tagged parties | **`… Add manufacturer`** last dropdown option when `manufacturer_detail` `write` + `profile` writable → `/manufacturers` create ([return context](../decisions/general.md#decision-picker-return-context--url-protocol-2026-06-24), [linked picker](../decisions/general.md#decision-linked-picker-control-linkedselectinput--2026-06-24), [task 25 step 11](../tasks/25-manufacturer-detail.md#step-11--linked-picker-control-linkedselectinput)) | Icon after select when `manufacturer_detail` `read`; dirty confirm before navigate ([decision](../decisions/general.md#decision-picker-navigate-away--dirty-form-confirm-v1-2026-06-24)) |
 
 **Preferred column:** single-select behavior — checking **Preferred** clears other rows (matches DAL).
 
@@ -255,7 +255,7 @@ Master-detail per [routing-and-libraries.md](../routing-and-libraries.md): list 
 | **Delete with only vendor pricing** | Allow — confirm modal |
 | **Codegen L1/L2** | Hand-written descriptor + repository for `vendor_pricing` until collection codegen |
 | **`vendor_pricing` on `vendor_detail`** | Deferred optional read-only rollup — primary edit here ([`vendor.md`](./vendor.md)) |
-| **Picker return context** | After **Add new part** from foreign Surface, return to originating form with new `part_id` selected — consumer specs implement `?returnTo=` or equivalent |
+| **Picker return context** | [`25-manufacturer-detail.md`](../tasks/25-manufacturer-detail.md) + [return-context decision](../decisions/general.md#decision-picker-return-context--url-protocol-2026-06-24) — part → manufacturer first; other foreign pickers reuse protocol |
 
 ---
 
@@ -264,4 +264,11 @@ Master-detail per [routing-and-libraries.md](../routing-and-libraries.md): list 
 - [x] Locked answers (2026-06-19) reflected in decisions + catalog
 - [x] A–K complete; DBML tables covered
 - [x] Cross-links in [`00-scan.md`](./00-scan.md) progress table
-- [ ] Implementation deferred until task 19 exit + catalog migration wave
+- [x] Implementation task — [`24-part-wave-3a.md`](../tasks/24-part-wave-3a.md)
+- [x] DDL migration `024` — `manufacturer_part` + `vendor_part`
+- [x] YAML + `codegen:check` for `part_list` / `part_detail`
+- [x] DAL read/write + API routes
+- [x] Production UI — profile + vendor pricing grid at `/parts`
+- [x] Manufacturer delete blocker (`manufacturer_part` InUseError)
+- [ ] `estimate_line` / `job_line` FK ALTERs (wave **3e** / **4d′**)
+- [ ] List manufacturer filter, related panels, picker return context (deferred)

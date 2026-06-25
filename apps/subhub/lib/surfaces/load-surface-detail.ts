@@ -14,10 +14,13 @@ import {
 
 const isSurfaceDetailId = (surfaceId: SurfaceId): surfaceId is SurfaceDetailId =>
   surfaceId === "contact_detail" ||
+  surfaceId === "manufacturer_detail" ||
   surfaceId === "site_detail" ||
   surfaceId === "user_roles_detail" ||
   surfaceId === "role_detail" ||
-  surfaceId === "estimate_detail";
+  surfaceId === "estimate_detail" ||
+  surfaceId === "job_detail" ||
+  surfaceId === "part_detail";
 
 export const loadSurfaceDetailQuery = async (
   surfaceId: SurfaceDetailId,

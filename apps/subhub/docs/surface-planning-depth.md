@@ -1,6 +1,6 @@
 # Surface planning depth
 
-> **Status:** Active (2026-06-23). **Planning:** [job wave 5](../decisions/job.md#decision-job-wave-5--implementation-order-2026-06-23) locked. **Next:** `job.md` spec + task 23 (5a shell).  
+> **Status:** Active (2026-06-24). **Planning:** [job wave 5](../decisions/job.md#decision-job-wave-5--implementation-order-2026-06-23) locked. **Next:** wave **3** catalog (`part` + `item`) — task 23 (5a shell) complete.  
 > **Implement specs:** [19-surface-implement-specs.md](./tasks/19-surface-implement-specs.md) — **14/27** (`estimate.md` ✅).  
 > **Discovery:** [20-ui-discovery.md](./tasks/20-ui-discovery.md) — **complete**.
 

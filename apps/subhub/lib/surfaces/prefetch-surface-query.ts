@@ -5,11 +5,14 @@ import { notFound } from "next/navigation";
 
 import {
   estimateSitePickerKey,
+  jobSitePickerKey,
+  manufacturerPickerKey,
   surfaceDetailKey,
   surfaceListKey,
+  vendorPickerKey,
 } from "../hooks/surface-query-keys";
 import { resolveContext } from "../latch";
-import { fetchEstimateSitePicker } from "../surface-api";
+import { fetchEstimateSitePicker, fetchJobSitePicker, fetchSurfaceList } from "../surface-api";
 import { subhubRegistry } from "../policy-registry";
 import { getQueryClient } from "../query-client";
 import type { SurfaceQueryResult, SurfaceDetailData } from "../surface-api";
@@ -93,10 +96,88 @@ export const prefetchEstimateSitePicker = async (): Promise<void> => {
   });
 };
 
+export const prefetchJobSitePicker = async (): Promise<void> => {
+  const queryClient = getQueryClient();
+  await queryClient.prefetchQuery({
+    queryKey: jobSitePickerKey,
+    queryFn: () => fetchJobSitePicker(),
+  });
+};
+
+export const prefetchManufacturerPicker = async (): Promise<void> => {
+  const queryClient = getQueryClient();
+  await queryClient.prefetchQuery({
+    queryKey: manufacturerPickerKey,
+    queryFn: () => fetchSurfaceList("manufacturer_list"),
+  });
+};
+
+export const prefetchVendorPicker = async (): Promise<void> => {
+  const queryClient = getQueryClient();
+  await queryClient.prefetchQuery({
+    queryKey: vendorPickerKey,
+    queryFn: () => fetchSurfaceList("vendor_list"),
+  });
+};
+
+export type PartLinkAccess = {
+  manufacturer: boolean;
+  vendor: boolean;
+  canCreateManufacturer: boolean;
+};
+
+/** Whether the principal may navigate to party hub routes from part detail. */
+export const resolvePartLinkAccess = async (): Promise<PartLinkAccess> => {
+  const checkRead = async (surfaceId: SurfaceId): Promise<boolean> => {
+    if (!(surfaceId in subhubRegistry)) {
+      return false;
+    }
+
+    try {
+      const { manifest } = await resolveContext({ surfaceId });
+      return surfaceAllows(manifest, "read");
+    } catch {
+      return false;
+    }
+  };
+
+  const checkManufacturerCreate = async (): Promise<boolean> => {
+    if (!("manufacturer_detail" in subhubRegistry)) {
+      return false;
+    }
+
+    try {
+      const { manifest } = await resolveContext({
+        surfaceId: "manufacturer_detail",
+        entityId: "new",
+      });
+      return surfaceAllows(manifest, "write");
+    } catch {
+      return false;
+    }
+  };
+
+  return {
+    manufacturer: await checkRead("manufacturer_detail"),
+    vendor: await checkRead("vendor_detail"),
+    canCreateManufacturer: await checkManufacturerCreate(),
+  };
+};
+
 /** Whether the principal may navigate to `site_detail` from estimate profile. */
 export const resolveSiteDetailLinkAccess = async (): Promise<boolean> => {
   try {
     const { manifest } = await resolveContext({ surfaceId: "site_detail" });
+    return surfaceAllows(manifest, "read");
+  } catch {
+    return false;
+  }
+};
+
+/** Whether the principal may navigate to `estimate_detail` from job profile. */
+export const resolveEstimateDetailLinkAccess = async (): Promise<boolean> => {
+  try {
+    const { manifest } = await resolveContext({ surfaceId: "estimate_detail" });
     return surfaceAllows(manifest, "read");
   } catch {
     return false;

@@ -29,6 +29,10 @@ export const routes = {
     list: "/vendors",
     detail: (id: string) => `/vendors/${id}`,
   },
+  manufacturers: {
+    list: "/manufacturers",
+    detail: (id: string) => `/manufacturers/${id}`,
+  },
   sites: {
     list: "/sites",
     detail: (id: string) => `/sites/${id}`,
@@ -39,6 +43,14 @@ export const routes = {
     list: "/estimates",
     detail: (id: string) => `/estimates/${id}`,
     demo: "/estimates/demo",
+  },
+  jobs: {
+    list: "/jobs",
+    detail: (id: string) => `/jobs/${id}`,
+  },
+  parts: {
+    list: "/parts",
+    detail: (id: string) => `/parts/${id}`,
   },
 } as const;
 

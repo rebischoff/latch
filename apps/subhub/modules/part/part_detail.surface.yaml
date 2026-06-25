@@ -1,0 +1,40 @@
+# Part profile + vendor pricing (wave 3a)
+id: part_detail
+displayName: Part detail
+anchorTable: manufacturer_part
+
+fieldActions:
+  - read
+  - write
+
+surfaceActions:
+  - read
+  - write
+  - delete
+
+tables:
+  - manufacturer_part
+  - vendor_part
+  - party
+
+fields:
+  - id: profile
+    columns:
+      - column: manufacturer_part.id
+        type: string
+      - column: manufacturer_part.manufacturer_party_id
+        type: string
+      - column: manufacturer_part.mpn
+        type: string
+      - column: manufacturer_part.description
+        type: string
+      - column: manufacturer_part.unit
+        type: string
+      - column: manufacturer_part.purchase_unit
+        type: string
+        nullable: true
+      - column: manufacturer_part.units_per_purchase
+        type: number
+  - id: vendor_pricing
+    # logical — DAL maps to vendor_part; see docs/child-collections.md
+    columns: []

@@ -3,6 +3,11 @@ import type { ListQuery, ListResult, StoreAdapter } from "@latch/dal";
 import { withPermissionDb } from "@latch/pg-session";
 import type { Pool, PoolClient } from "pg";
 
+import { InUseError, type DeleteBlocker } from "../errors";
+import {
+  isForeignKeyViolation,
+  tableExists,
+} from "../sites/repository/sql-utils";
 import type {
   ContactDetailRelated,
   ContactDetailRow,
@@ -19,6 +24,12 @@ export type PartyRoleFilter =
   | "manufacturer"
   | "property_owner";
 
+export {
+  loadManufacturerDetail,
+  loadManufacturerDetailRelated,
+  loadPartyOtherRoles,
+} from "./repository/manufacturer";
+
 export type PartyListRow = {
   id: string;
   display_name: string;
@@ -27,7 +38,7 @@ export type PartyListRow = {
 
 const PARTY_LIST_COLUMNS = "p.id, p.display_name, p.kind";
 
-const partyHasRole = async (
+export const partyHasRole = async (
   pool: Pool,
   partyId: string,
   role: PartyRoleFilter,
@@ -259,6 +270,46 @@ const replacePartyCollection = async (
   }
 };
 
+export const replacePartyPhonesTx = async (
+  client: PoolClient,
+  partyId: string,
+  rows: PartyPhonePatchRow[],
+): Promise<void> => {
+  await replacePartyCollection(
+    client,
+    "party_phone",
+    partyId,
+    rows.map((row, index) => ({
+      id: row.id,
+      label: row.label,
+      is_primary: row.is_primary,
+      sort_order: index,
+      value: row.number,
+    })),
+    "number",
+  );
+};
+
+export const replacePartyEmailsTx = async (
+  client: PoolClient,
+  partyId: string,
+  rows: PartyEmailPatchRow[],
+): Promise<void> => {
+  await replacePartyCollection(
+    client,
+    "party_email",
+    partyId,
+    rows.map((row, index) => ({
+      id: row.id,
+      label: row.label,
+      is_primary: row.is_primary,
+      sort_order: index,
+      value: row.address,
+    })),
+    "address",
+  );
+};
+
 export const replacePartyPhones = async (
   pool: Pool,
   actorId: string,
@@ -266,19 +317,7 @@ export const replacePartyPhones = async (
   rows: PartyPhonePatchRow[],
 ): Promise<void> => {
   await withPermissionDb(pool, actorId, async (client) => {
-    await replacePartyCollection(
-      client,
-      "party_phone",
-      partyId,
-      rows.map((row, index) => ({
-        id: row.id,
-        label: row.label,
-        is_primary: row.is_primary,
-        sort_order: index,
-        value: row.number,
-      })),
-      "number",
-    );
+    await replacePartyPhonesTx(client, partyId, rows);
   });
 };
 
@@ -289,19 +328,7 @@ export const replacePartyEmails = async (
   rows: PartyEmailPatchRow[],
 ): Promise<void> => {
   await withPermissionDb(pool, actorId, async (client) => {
-    await replacePartyCollection(
-      client,
-      "party_email",
-      partyId,
-      rows.map((row, index) => ({
-        id: row.id,
-        label: row.label,
-        is_primary: row.is_primary,
-        sort_order: index,
-        value: row.address,
-      })),
-      "address",
-    );
+    await replacePartyEmailsTx(client, partyId, rows);
   });
 };
 
@@ -347,6 +374,59 @@ export const updateParty = async (
   });
 };
 
+const MANUFACTURER_PART_MPN_SAMPLE_LIMIT = 5;
+
+export const countManufacturerPartsForParty = async (
+  pool: Pool | PoolClient,
+  partyId: string,
+): Promise<number> => {
+  const result = await pool.query<{ count: number }>(
+    `SELECT COUNT(*)::int AS count
+     FROM manufacturer_part
+     WHERE manufacturer_party_id = $1`,
+    [partyId],
+  );
+  return result.rows[0]?.count ?? 0;
+};
+
+const loadManufacturerPartMpnSamples = async (
+  pool: Pool | PoolClient,
+  partyId: string,
+  limit: number,
+): Promise<string[]> => {
+  const result = await pool.query<{ mpn: string }>(
+    `SELECT mpn
+     FROM manufacturer_part
+     WHERE manufacturer_party_id = $1
+     ORDER BY mpn ASC, id ASC
+     LIMIT $2`,
+    [partyId, limit],
+  );
+  return result.rows.map((row) => row.mpn);
+};
+
+export const loadManufacturerDeleteBlockers = async (
+  pool: Pool | PoolClient,
+  partyId: string,
+): Promise<DeleteBlocker[]> => {
+  if (!(await tableExists(pool, "manufacturer_part"))) {
+    return [];
+  }
+
+  const count = await countManufacturerPartsForParty(pool, partyId);
+  if (count === 0) {
+    return [];
+  }
+
+  const samples = await loadManufacturerPartMpnSamples(
+    pool,
+    partyId,
+    MANUFACTURER_PART_MPN_SAMPLE_LIMIT,
+  );
+
+  return [{ type: "manufacturer_part", count, samples }];
+};
+
 export const deleteParty = async (
   pool: Pool,
   actorId: string,
@@ -355,6 +435,32 @@ export const deleteParty = async (
   await withPermissionDb(pool, actorId, async (client) => {
     await client.query(`DELETE FROM party WHERE id = $1`, [id]);
   });
+};
+
+/** Hard delete manufacturer party — blocked when MPN catalog rows reference party. */
+export const deleteManufacturerParty = async (
+  pool: Pool,
+  actorId: string,
+  id: string,
+): Promise<void> => {
+  const blockers = await loadManufacturerDeleteBlockers(pool, id);
+  if (blockers.length > 0) {
+    throw new InUseError("manufacturer", blockers);
+  }
+
+  try {
+    await withPermissionDb(pool, actorId, async (client) => {
+      await client.query(`DELETE FROM party WHERE id = $1`, [id]);
+    });
+  } catch (error) {
+    if (isForeignKeyViolation(error)) {
+      const refreshed = await loadManufacturerDeleteBlockers(pool, id);
+      if (refreshed.length > 0) {
+        throw new InUseError("manufacturer", refreshed);
+      }
+    }
+    throw error;
+  }
 };
 
 export type CreatePersonPartyInput = {
@@ -440,6 +546,10 @@ export const createPartyListStore = <TRow extends PartyListRow>(
 
   delete: async (id: string): Promise<void> => {
     const actorId = await getActorId();
+    if (partyRole === "manufacturer") {
+      await deleteManufacturerParty(pool, actorId, id);
+      return;
+    }
     await deleteParty(pool, actorId, id);
   },
 

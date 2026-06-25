@@ -22,7 +22,7 @@ Orient the SubHub delivery slices and task chain. Global status: [`../../STATUS.
   → 13-contact-ui → 14-contact-child-collections
   → 15-entity-flow → 16-slice2-planning-gate → 17-schema-design-pass
   → 18-surface-catalog → 19-surface-implement-specs (checkpoint)
-  → 20-ui-discovery → resume 19 → 22-estimate-wave-4a → 23-job-wave-5a → implementation waves
+  → 20-ui-discovery → resume 19 → 22-estimate-wave-4a → 23-job-wave-5a → 24-part-wave-3a → 25-manufacturer-detail → implementation waves
   → 21-bundler-import-convention (parallel — Turbopack / import paths)
 ```
 
@@ -102,15 +102,16 @@ flowchart TD
 
 ## Surface implement specs
 
-| **Checkpoint (2026-06-23):** Estimates wave 4a complete. **Active:** [23-job-wave-5a.md](./23-job-wave-5a.md).
+| **Checkpoint (2026-06-24):** Part wave 3a complete. **Next:** wave **3b** `item_*` — task TBD; spec [`item.md`](../surface-specs/item.md) (#15).
 
 | # | Task | Delivers |
 |---|------|----------|
-| 19 | [19-surface-implement-specs.md](./19-surface-implement-specs.md) | Implement specs — **`estimate.md`** ✅ |
+| 19 | [19-surface-implement-specs.md](./19-surface-implement-specs.md) | Implement specs — **`part.md`** ✅ (row #14); rows **#15–18** before 3b/3c |
 | 20 | [20-ui-discovery.md](./20-ui-discovery.md) | Migration + sites UI + estimate spike + planning — **complete** (2026-06-23) |
 | 21 | [21-bundler-import-convention.md](./21-bundler-import-convention.md) | Extensionless imports; Turbopack-first dev — **complete** (2026-06-20) |
 | 22 | [22-estimate-wave-4a.md](./22-estimate-wave-4a.md) | Wave 4a — estimate migration, DAL, flat production UI — **complete** |
-| 23 | [23-job-wave-5a.md](./23-job-wave-5a.md) | Wave 5a — job shell, Overview + stub tabs — **active** |
+| 23 | [23-job-wave-5a.md](./23-job-wave-5a.md) | Wave 5a — job shell, Overview + stub tabs — **complete** |
+| 24 | [24-part-wave-3a.md](./24-part-wave-3a.md) | Wave 3a — part MPN catalog + vendor pricing — **complete** |
 
 ---
 
@@ -188,7 +189,7 @@ flowchart LR
 | *TBD* | | `addresses` on `{role}_detail` lenses |
 | *TBD* | | `sections`, `locations` on `site_detail` |
 
-### Wave 4 — Estimates (flat) — **task 22** — **active**
+### Wave 4 — Estimates (flat) — **task 22** — **complete**
 
 **Exit criteria:** CRUD draft estimates with flat `line_items` + stakeholders; job party relation catalog. Spec: [`estimate.md`](../surface-specs/estimate.md). **Deferred in 4a:** grouped editor, `quote_sections`, `win`/`lose`.
 
@@ -214,7 +215,7 @@ flowchart LR
 
 **Follow-on (not 4a):** wave **4b** `win`/`lose` (after job 5a + line editor); wave **4c** grouped editor (needs wave 2b geography); wave **4d′** shared line editor retrofit (after wave **3** + **3e** spike) — [job wave 5 decision](../decisions/job.md#decision-job-wave-5--implementation-order-2026-06-23).
 
-### Wave 5a — Jobs shell — **task 23** — **active**
+### Wave 5a — Jobs shell — **task 23** — **complete**
 
 **Exit criteria:** CRUD jobs with profile + stakeholders; tabbed `/jobs` shell; DAL `line_items` for win-copy; **no Scope line grid**. Spec: [`job.md`](../surface-specs/job.md). **Decision:** [job wave 5](../decisions/job.md#decision-job-wave-5--implementation-order-2026-06-23).
 
@@ -229,11 +230,44 @@ flowchart LR
 
 **Follow-on:** wave **3** catalog → **3e** line editor → **4d′** Scope UI → **5b** win/lose → **5c** field + complete → **5d** COs.
 
-### Waves 3–7 (remaining)
+### Wave 3a — Parts catalog — **task 24** — **complete**
+
+**Exit criteria:** CRUD parts with MPN profile + vendor pricing replace-array; manufacturer delete blocker. Spec: [`part.md`](../surface-specs/part.md). **Decision:** [catalog-first line UI](../decisions/job.md#decision-job-wave-5--implementation-order-2026-06-23).
+
+| # | Task | Delivers |
+|---|------|----------|
+| 24.1 | [24-part-wave-3a.md](./24-part-wave-3a.md) step 1 | `024` part DDL migration |
+| 24.2 | step 2 | `part_*` YAML + codegen |
+| 24.3 | step 3 | `manufacturer_part` InUseError on manufacturer delete |
+| 24.4–24.6 | steps 4–6 | Part DAL + API |
+| 24.7–24.9 | steps 7–9 | Nav + list/detail UI + vendor pricing grid |
+| 24.10 | step 10 | Stop gate |
+
+**Follow-on:** task **25** manufacturer detail → wave **3b** `item_*` → **3c** catalog tables → **3e** line editor → **4d′** Scope UI.
+
+### Task 25 — Manufacturer detail — **active**
+
+**Exit criteria:** CRUD `manufacturer_detail` (kind-specific profile, phones/emails); `add_role` / `remove_role`; picker return-context from `part_detail`; `/manufacturers` master-detail; `LinkedSelectInput` on part manufacturer picker. Spec: [`manufacturer.md`](../surface-specs/manufacturer.md). **Decision:** [picker return context](../decisions/general.md#decision-picker-return-context--url-protocol-2026-06-24), [linked picker](../decisions/general.md#decision-linked-picker-control-linkedselectinput--2026-06-24).
+
+| # | Task | Delivers |
+|---|------|----------|
+| 25.1 | [25-manufacturer-detail.md](./25-manufacturer-detail.md) step 1 | `manufacturer_detail` YAML + codegen |
+| 25.2 | step 2 | Picker return-context helper |
+| 25.3–25.4 | steps 3–4 | Manufacturer DAL read/write + role actions |
+| 25.5–25.6 | steps 5–6 | API + surface plumbing |
+| 25.7–25.8 | steps 7–8 | Nav + `PartyDetailForm` + list UI |
+| 25.9 | step 9 | Part form picker integration (return context; interim link UI) |
+| 25.10 | step 10 | Stop gate |
+| 25.11 | step 11 | `LinkedSelectInput` + dirty navigate confirm — [spec](./25-manufacturer-detail.md#step-11--linked-picker-control-linkedselectinput) |
+
+### Waves 3b–7 (remaining)
 
 | Wave | Exit criteria | Surfaces (headline) |
 |------|---------------|---------------------|
-| 3 Catalog | Parts, items, vendor pricing — **before shared line editor** | `part_*`, `item_*`, `category_table`, `labor_class_table`, `phase_table` |
+| 3a Parts | MPN + vendor pricing | `part_*` — **task 24 complete** |
+| — Manufacturer detail | Party lens + picker return | `manufacturer_detail` — **task 25 active** |
+| 3b Items | Items composed of parts | `item_*` — **after task 25** |
+| 3c Catalog tables | Progressive setup | `category_table`, `labor_class_table`, `phase_table` |
 | 3e Line editor | Shared line-item component spike | estimate + job Scope; later PO/invoice |
 | 5 Jobs | Shell → Scope → field → COs | `job_*` wave **5a**–**5d** ([decision](../decisions/job.md#decision-job-wave-5--implementation-order-2026-06-23)) |
 | 6a Procurement | Requisition → PO → receipts | `requested_order_*`, `purchase_order_*`, `material_receipt_*` |
@@ -260,11 +294,13 @@ Field detail: [`surfaces.md`](../surfaces.md). DBML: [`current.dbml`](../schema/
 
 ## Slice 03 — Catalog
 
-**Exit criteria:** Parts with vendor pricing; items composed of parts.
+**Exit criteria:** Parts with vendor pricing (3a); items composed of parts (3b).
 
 | # | Task | Delivers |
 |---|------|----------|
-| 21–23 | *TBD* | `manufacturer_part`, `item`, surfaces, UI — **DBML drafted** ([`schema/current.dbml`](../schema/current.dbml)) |
+| 24 | [24-part-wave-3a.md](./24-part-wave-3a.md) | Wave **3a** — `manufacturer_part`, `vendor_part`, `part_*` surfaces — **complete** |
+| 25 | [25-manufacturer-detail.md](./25-manufacturer-detail.md) | `manufacturer_detail` + picker return — **active** |
+| 26+ | *TBD* | 3b `item_*`, 3c catalog tables — **DBML drafted** ([`schema/current.dbml`](../schema/current.dbml)) |
 
 ---
 
@@ -274,7 +310,7 @@ Field detail: [`surfaces.md`](../surfaces.md). DBML: [`current.dbml`](../schema/
 
 | # | Task | Delivers |
 |---|------|----------|
-| 22 | [22-estimate-wave-4a.md](./22-estimate-wave-4a.md) | Migration, YAML, DAL, API, flat `/estimates` UI — **active** |
+| 22 | [22-estimate-wave-4a.md](./22-estimate-wave-4a.md) | Migration, YAML, DAL, API, flat `/estimates` UI — **complete** |
 
 ---
 
@@ -284,7 +320,7 @@ Field detail: [`surfaces.md`](../surfaces.md). DBML: [`current.dbml`](../schema/
 
 | # | Task | Delivers |
 |---|------|----------|
-| 23 | [23-job-wave-5a.md](./23-job-wave-5a.md) | Job wave **5a** shell — migration, YAML, DAL, API, Overview UI — **active** |
+| 23 | [23-job-wave-5a.md](./23-job-wave-5a.md) | Job wave **5a** shell — migration, YAML, DAL, API, Overview UI — **complete** |
 | 24+ | *TBD* | 5b win/lose, 5c field, 5d change orders |
 
 ---

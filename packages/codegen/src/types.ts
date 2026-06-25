@@ -30,6 +30,9 @@ export const FIELD_ACTIONS = [
   "hard_delete",
   "win",
   "lose",
+  "complete",
+  "add_role",
+  "remove_role",
 ] as const;
 
 export type PolicyFieldAction = (typeof FIELD_ACTIONS)[number];

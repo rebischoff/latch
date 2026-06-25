@@ -9,9 +9,12 @@ export type NavIcon =
   | "contacts"
   | "customer"
   | "vendor"
+  | "manufacturer"
   | "site"
   | "relation"
   | "estimate"
+  | "job"
+  | "part"
   | "menu"
   | "login"
   | "logout";
@@ -148,6 +151,14 @@ export const SURFACE_NAV_CATALOG: SurfaceNavEntry[] = [
     icon: "vendor",
   },
   {
+    surfaceId: "manufacturer_list",
+    href: "/manufacturers",
+    navKey: "/manufacturers",
+    label: "Manufacturers",
+    group: "Contacts",
+    icon: "manufacturer",
+  },
+  {
     surfaceId: "site_list",
     href: "/sites",
     navKey: "/sites",
@@ -170,5 +181,21 @@ export const SURFACE_NAV_CATALOG: SurfaceNavEntry[] = [
     label: "Estimates",
     group: "Sales",
     icon: "estimate",
+  },
+  {
+    surfaceId: "job_list",
+    href: "/jobs",
+    navKey: "/jobs",
+    label: "Jobs",
+    group: "Operations",
+    icon: "job",
+  },
+  {
+    surfaceId: "part_list",
+    href: "/parts",
+    navKey: "/parts",
+    label: "Parts",
+    group: "Catalog",
+    icon: "part",
   },
 ];

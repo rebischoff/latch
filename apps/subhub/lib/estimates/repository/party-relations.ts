@@ -4,7 +4,10 @@ import type { Pool, PoolClient } from "pg";
 
 import { InUseError } from "../../errors";
 import type { JobPartyRelationTableRow } from "../descriptors/party-relation-table";
-import { isUniqueViolation } from "../../sites/repository/sql-utils";
+import {
+  isUniqueViolation,
+  tableExists,
+} from "../../sites/repository/sql-utils";
 
 export const countEstimatePartiesUsingRelation = async (
   pool: Pool | PoolClient,
@@ -17,6 +20,43 @@ export const countEstimatePartiesUsingRelation = async (
     [relationId],
   );
   return result.rows[0]?.count ?? 0;
+};
+
+export const countJobPartiesUsingRelation = async (
+  pool: Pool | PoolClient,
+  relationId: string,
+): Promise<number> => {
+  const result = await pool.query<{ count: number }>(
+    `SELECT COUNT(*)::int AS count
+     FROM job_party
+     WHERE relation_id = $1`,
+    [relationId],
+  );
+  return result.rows[0]?.count ?? 0;
+};
+
+export const loadJobPartyRelationDeleteBlockers = async (
+  pool: Pool | PoolClient,
+  relationId: string,
+): Promise<Array<{ type: string; count: number }>> => {
+  const blockers: Array<{ type: string; count: number }> = [];
+
+  const estimateCount = await countEstimatePartiesUsingRelation(
+    pool,
+    relationId,
+  );
+  if (estimateCount > 0) {
+    blockers.push({ type: "estimate_party", count: estimateCount });
+  }
+
+  if (await tableExists(pool, "job_party")) {
+    const jobCount = await countJobPartiesUsingRelation(pool, relationId);
+    if (jobCount > 0) {
+      blockers.push({ type: "job_party", count: jobCount });
+    }
+  }
+
+  return blockers;
 };
 
 const assertUniqueDisplayName = async (
@@ -128,11 +168,9 @@ const replaceJobPartyRelationsTx = async (
     .filter((id) => !keepIds.includes(id));
 
   for (const id of deleteIds) {
-    const usageCount = await countEstimatePartiesUsingRelation(client, id);
-    if (usageCount > 0) {
-      throw new InUseError("job_party_relation", [
-        { type: "estimate_party", count: usageCount },
-      ]);
+    const blockers = await loadJobPartyRelationDeleteBlockers(client, id);
+    if (blockers.length > 0) {
+      throw new InUseError("job_party_relation", blockers);
     }
   }
 
@@ -248,11 +286,9 @@ export const deleteJobPartyRelation = async (
   actorId: string,
   id: string,
 ): Promise<void> => {
-  const usageCount = await countEstimatePartiesUsingRelation(pool, id);
-  if (usageCount > 0) {
-    throw new InUseError("job_party_relation", [
-      { type: "estimate_party", count: usageCount },
-    ]);
+  const blockers = await loadJobPartyRelationDeleteBlockers(pool, id);
+  if (blockers.length > 0) {
+    throw new InUseError("job_party_relation", blockers);
   }
 
   await withPermissionDb(pool, actorId, async (client) => {

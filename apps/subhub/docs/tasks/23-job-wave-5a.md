@@ -1,6 +1,6 @@
 # 23 — Job wave 5a (shell + Overview)
 
-> **Status:** Active (2026-06-23). **Next:** [Step 1 — Job DDL migration](#step-1--job-ddl-migration).
+> **Status:** Complete (2026-06-24). **Next:** [24-part-wave-3a.md](./24-part-wave-3a.md) — wave **3a** parts catalog.
 >
 > **Spec:** [`job.md`](../surface-specs/job.md) · **Decisions:** [wave 5 order](../decisions/job.md#decision-job-wave-5--implementation-order-2026-06-23), [tabbed layout](../decisions/job.md#decision-job_detail-layout--tabbed-2026-06-17) · **Stakeholder pattern:** [`EstimateStakeholderFields`](../../components/estimates/EstimateStakeholderFields.tsx), [`job-party-relation.md`](../surface-specs/job-party-relation.md)
 
@@ -78,6 +78,8 @@ flowchart TD
 
 ## Step 1 — Job DDL migration
 
+> **Status:** Complete (2026-06-24). **Next:** [Step 2 — Surface YAML + codegen + policy registry](#step-2--surface-yaml--codegen--policy-registry).
+
 **What:** Add Slice 5 core tables per [`current.dbml`](../schema/current.dbml) and [DDL scope](#decision-5a-ddl-scope-locked-in-this-task) above.
 
 | Table | Notes |
@@ -99,6 +101,8 @@ flowchart TD
 
 ## Step 2 — Surface YAML + codegen + policy registry
 
+> **Status:** Complete (2026-06-24). **Next:** [Step 3 — `job_party_relation` delete blocker extension](#step-3--job_party_relation-delete-blocker-extension).
+
 **What:** Declare Surfaces in YAML — same pattern as [task 22 step 2](./22-estimate-wave-4a.md#step-2--surface-yaml--codegen--policy-registry).
 
 | Deliverable | Spec ref |
@@ -114,6 +118,8 @@ flowchart TD
 
 ## Step 3 — `job_party_relation` delete blocker extension
 
+> **Status:** Complete (2026-06-24). **Next:** [Step 4 — Job DAL — read path](#step-4--job-dal--read-path).
+
 **What:** Extend existing catalog DAL so delete/replace-omit checks **`job_party`** references (in addition to `estimate_party`).
 
 | Layer | Work |
@@ -126,6 +132,8 @@ flowchart TD
 ---
 
 ## Step 4 — Job DAL — read path
+
+> **Status:** Complete (2026-06-24). **Next:** [Step 5 — Job DAL — write path](#step-5--job-dal--write-path).
 
 **What:** Read jobs through DAL with manifest-narrowed projection.
 
@@ -146,6 +154,8 @@ flowchart TD
 
 ## Step 5 — Job DAL — write path
 
+> **Status:** Complete (2026-06-24). **Next:** [Step 6 — Job API routes + `surface-api` wiring](#step-6--job-api-routes--surface-api-wiring).
+
 **What:** Mutations per [`job.md`](../surface-specs/job.md) §E–F.
 
 | Operation | Rules |
@@ -165,6 +175,8 @@ flowchart TD
 
 ## Step 6 — Job API routes + `surface-api` wiring
 
+> **Status:** Complete (2026-06-24). **Next:** [Step 7 — Nav + routes](#step-7--nav--routes).
+
 | Route | Surface |
 |-------|---------|
 | `GET /api/jobs` | `job_list` |
@@ -179,6 +191,8 @@ Register surface loaders in shared surface-api pattern ([task 22 step 6](./22-es
 
 ## Step 7 — Nav + routes
 
+> **Status:** Complete (2026-06-24). **Next:** [Step 8 — Job UI shell](#step-8--job-ui-shell).
+
 | Item | Work |
 |------|------|
 | `lib/nav-routes.ts` | `routes.jobs.list`, `routes.jobs.detail(id)` |
@@ -191,6 +205,8 @@ Register surface loaders in shared surface-api pattern ([task 22 step 6](./22-es
 ---
 
 ## Step 8 — Job UI shell
+
+> **Status:** Complete (2026-06-24). **Next:** [Step 9 — Stakeholders + tabbed shell](#step-9--stakeholders--tabbed-shell).
 
 **What:** Master-detail shell without stakeholders or tabs polish yet.
 
@@ -208,6 +224,8 @@ Register surface loaders in shared surface-api pattern ([task 22 step 6](./22-es
 
 ## Step 9 — Stakeholders + tabbed shell
 
+> **Status:** Complete (2026-06-24). **Next:** [Step 10 — Stop gate](#step-10--stop-gate).
+
 **What:** Overview stakeholders + Ant Design `Tabs` with stub panes.
 
 | Area | Work |
@@ -221,6 +239,8 @@ Register surface loaders in shared surface-api pattern ([task 22 step 6](./22-es
 ---
 
 ## Step 10 — Stop gate
+
+> **Status:** Complete (2026-06-24). **Next:** [24-part-wave-3a.md](./24-part-wave-3a.md).
 
 **What:** Confirm 5a exit criteria and spec verify rows.
 
@@ -240,17 +260,17 @@ Register surface loaders in shared surface-api pattern ([task 22 step 6](./22-es
 
 **Verify (exit):**
 
-- [ ] `023` migration applied in dev; `job_party.sort_order` in DBML
-- [ ] `job_list` / `job_detail` YAML + registry; `codegen:check` passes
-- [ ] `job_party_relation` delete blocked when `job_party` references row
-- [ ] Job DAL list/get/create/patch (profile + stakeholders)
-- [ ] Internal `line_items` DAL methods exist (not in client PATCH manifest)
-- [ ] API routes wired via surface-api
-- [ ] Operations nav — `/jobs`, `/jobs/[id]`
-- [ ] Tabbed shell — Overview live; Scope/Field/Billing stubbed
-- [ ] `stakeholders` replace-array on Save
-- [ ] [`job.md`](../surface-specs/job.md) verify rows for 5a checked
-- [ ] [`../../STATUS.md`](../../STATUS.md) repointed — wave **3** catalog next
+- [x] `023` migration applied in dev; `job_party.sort_order` in DBML
+- [x] `job_list` / `job_detail` YAML + registry; `codegen:check` passes
+- [x] `job_party_relation` delete blocked when `job_party` references row
+- [x] Job DAL list/get/create/patch (profile + stakeholders)
+- [x] Internal `line_items` DAL methods exist (not in client PATCH manifest)
+- [x] API routes wired via surface-api
+- [x] Operations nav — `/jobs`, `/jobs/[id]`
+- [x] Tabbed shell — Overview live; Scope/Field/Billing stubbed
+- [x] `stakeholders` replace-array on Save
+- [x] [`job.md`](../surface-specs/job.md) verify rows for 5a checked
+- [x] [`../../STATUS.md`](../../STATUS.md) repointed — [24-part-wave-3a.md](./24-part-wave-3a.md) active
 
 ---
 

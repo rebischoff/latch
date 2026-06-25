@@ -1,6 +1,6 @@
 # Jobs — `job_list` · `job_detail`
 
-> **Wave:** 5 · **Status:** target spec (2026-06-23) · **Implementation:** [`23-job-wave-5a.md`](../tasks/23-job-wave-5a.md) wave 5a — **active** · **Prerequisite:** [`site.md`](./site.md) wave 1 shipped; Scope line UI requires wave **3** (`part` + minimal `item`) + shared line editor (**3e**) — [`estimate.md`](./estimate.md) wave **4d′** · **Catalog:** [`surfaces.md`](../surfaces.md#job_list--job_detail) · **DBML:** `job`, `job_party`, `job_line`, `job_line_part`, `job_work_item`, `job_party_relation` · **Decisions:** [wave 5 order](../decisions/job.md#decision-job-wave-5--implementation-order-2026-06-23), [tabbed layout](../decisions/job.md#decision-job_detail-layout--tabbed-2026-06-17), [engagements `job_kind`](../decisions/job.md#decision-engagements--job_kind-2026-06-17), [field status](../decisions/job.md#decision-field-status--job_work_item-2026-06-17), [change orders ledger](../decisions/job.md#decision-change-orders--unified-job_line-ledger-2026-06-17), [line grouping](../decisions/estimate.md#decision-estimate--job-line-grouping--site-geography-2026-06-17)
+> **Wave:** 5 · **Status:** target spec (2026-06-23) · **Implementation:** [`23-job-wave-5a.md`](../tasks/23-job-wave-5a.md) wave 5a — **complete** (2026-06-24) · **Prerequisite:** [`site.md`](./site.md) wave 1 shipped; Scope line UI requires wave **3** (`part` + minimal `item`) + shared line editor (**3e**) — [`estimate.md`](./estimate.md) wave **4d′** · **Catalog:** [`surfaces.md`](../surfaces.md#job_list--job_detail) · **DBML:** `job`, `job_party`, `job_line`, `job_line_part`, `job_work_item`, `job_party_relation` · **Decisions:** [wave 5 order](../decisions/job.md#decision-job-wave-5--implementation-order-2026-06-23), [tabbed layout](../decisions/job.md#decision-job_detail-layout--tabbed-2026-06-17), [engagements `job_kind`](../decisions/job.md#decision-engagements--job_kind-2026-06-17), [field status](../decisions/job.md#decision-field-status--job_work_item-2026-06-17), [change orders ledger](../decisions/job.md#decision-change-orders--unified-job_line-ledger-2026-06-17), [line grouping](../decisions/estimate.md#decision-estimate--job-line-grouping--site-geography-2026-06-17)
 
 **Related:** Site anchor via `profile.site_id` → [`site_detail`](./site.md). Stakeholder catalog: [`job-party-relation.md`](./job-party-relation.md) (parallel to [`site-contact-relation.md`](./site-contact-relation.md); page at `/party-relations`). Win → job copy in wave **5b** → [`estimate.md`](./estimate.md). Billing Fields → [`job-billing-fields.md`](./job-billing-fields.md) (#27).
 
@@ -377,9 +377,9 @@ One Surface; Ant Design `Tabs` — policy unchanged across tabs ([layout decisio
 - [x] A–K complete
 - [x] Planning session folded into [`decisions/job.md`](../decisions/job.md)
 - [x] Implementation task — [`23-job-wave-5a.md`](../tasks/23-job-wave-5a.md)
-- [ ] DDL migration for job tables
-- [ ] YAML + `codegen:check` for `job_list` / `job_detail`
-- [ ] DAL read/write + API routes
-- [ ] Production UI — Overview + stub tabs at `/jobs`
+- [x] DDL migration for job tables
+- [x] YAML + `codegen:check` for `job_list` / `job_detail`
+- [x] DAL read/write + API routes
+- [x] Production UI — Overview + stub tabs at `/jobs`
 - [ ] Scope line grid (after 4d′)
 - [ ] `win` → job copy (5b)

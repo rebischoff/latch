@@ -4,6 +4,8 @@ import type { SurfaceDal } from "@latch/dal";
 import { ensureContactsDal } from "../contacts/dal";
 import { ensureEstimatesDal } from "../estimates/dal";
 import { ensureIamDal } from "../iam/dal";
+import { ensureJobsDal } from "../jobs/dal";
+import { ensurePartsDal } from "../parts/dal";
 import { ensureSitesDal } from "../sites/dal";
 import type { SurfaceListRow } from "../surface-api";
 
@@ -18,15 +20,20 @@ export type SurfaceListId =
   | "site_list"
   | "site_contact_relation_table"
   | "job_party_relation_table"
-  | "estimate_list";
+  | "estimate_list"
+  | "job_list"
+  | "part_list";
 
 /** Detail surfaces with a shared loader (see surface-form-prefetch.md inventory). */
 export type SurfaceDetailId =
   | "contact_detail"
+  | "manufacturer_detail"
   | "site_detail"
   | "user_roles_detail"
   | "role_detail"
-  | "estimate_detail";
+  | "estimate_detail"
+  | "job_detail"
+  | "part_detail";
 
 type ListLoader = {
   ensureDal: () => Promise<void>;
@@ -129,6 +136,24 @@ const listLoaders: Record<SurfaceListId, ListLoader> = {
       return dal.estimateList.list(ctx, query);
     },
   },
+  job_list: {
+    ensureDal: async () => {
+      await ensureJobsDal();
+    },
+    list: async (ctx, query) => {
+      const dal = await ensureJobsDal();
+      return dal.jobList.list(ctx, query);
+    },
+  },
+  part_list: {
+    ensureDal: async () => {
+      await ensurePartsDal();
+    },
+    list: async (ctx, query) => {
+      const dal = await ensurePartsDal();
+      return dal.partList.list(ctx, query);
+    },
+  },
 };
 
 const detailLoaders: Record<SurfaceDetailId, DetailLoader> = {
@@ -139,6 +164,15 @@ const detailLoaders: Record<SurfaceDetailId, DetailLoader> = {
     getDal: async () => {
       const dal = await ensureContactsDal();
       return dal.contactDetail;
+    },
+  },
+  manufacturer_detail: {
+    ensureDal: async () => {
+      await ensureContactsDal();
+    },
+    getDal: async () => {
+      const dal = await ensureContactsDal();
+      return dal.manufacturerDetail;
     },
   },
   site_detail: {
@@ -175,6 +209,24 @@ const detailLoaders: Record<SurfaceDetailId, DetailLoader> = {
     getDal: async () => {
       const dal = await ensureEstimatesDal();
       return dal.estimateDetail;
+    },
+  },
+  job_detail: {
+    ensureDal: async () => {
+      await ensureJobsDal();
+    },
+    getDal: async () => {
+      const dal = await ensureJobsDal();
+      return dal.jobDetail;
+    },
+  },
+  part_detail: {
+    ensureDal: async () => {
+      await ensurePartsDal();
+    },
+    getDal: async () => {
+      const dal = await ensurePartsDal();
+      return dal.partDetail;
     },
   },
 };

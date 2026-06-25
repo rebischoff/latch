@@ -11,7 +11,7 @@ import {
   type SurfaceQueryResult,
 } from "@/lib/surface-api";
 
-import { surfaceDetailKey, surfaceListKey } from "./surface-query-keys";
+import { surfaceDetailKey } from "./surface-query-keys";
 
 export const useSurfacePatch = (surfaceId: SurfaceId, id: string) => {
   const queryClient = useQueryClient();
@@ -27,7 +27,9 @@ export const useSurfacePatch = (surfaceId: SurfaceId, id: string) => {
     onSuccess: (result) => {
       queryClient.setQueryData(surfaceDetailKey(surfaceId, id), result);
       const listSurfaceId = SURFACE_API[surfaceId]?.listSurfaceId ?? surfaceId;
-      queryClient.invalidateQueries({ queryKey: surfaceListKey(listSurfaceId) });
+      queryClient.invalidateQueries({
+        queryKey: ["surface", listSurfaceId, "list"],
+      });
     },
   });
 };
@@ -41,7 +43,9 @@ export const useSurfaceDelete = (surfaceId: SurfaceId, id: string) => {
     },
     onSuccess: () => {
       const listSurfaceId = SURFACE_API[surfaceId]?.listSurfaceId ?? surfaceId;
-      queryClient.invalidateQueries({ queryKey: surfaceListKey(listSurfaceId) });
+      queryClient.invalidateQueries({
+        queryKey: ["surface", listSurfaceId, "list"],
+      });
       queryClient.removeQueries({ queryKey: surfaceDetailKey(surfaceId, id) });
     },
   });
