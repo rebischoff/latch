@@ -3,7 +3,7 @@
 import { ExportOutlined } from "@ant-design/icons";
 import { type FieldId } from "@latch/contracts";
 import { Button, Select, Skeleton, Space, Typography } from "antd";
-import type { SelectProps } from "antd";
+import type { DefaultOptionType, SelectProps } from "antd/es/select";
 import {
   Controller,
   useFormContext,
@@ -55,7 +55,7 @@ const buildDisplayOptions = (
   ];
 };
 
-const filterLinkedOptions = (input: string, option?: { value?: string | number; label?: unknown }) => {
+const filterLinkedOptions = (input: string, option?: DefaultOptionType) => {
   if (option?.value === PICKER_ADD_NEW_VALUE) {
     return true;
   }
