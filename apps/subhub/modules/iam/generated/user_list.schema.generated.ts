@@ -42,6 +42,6 @@ export const userListSurfacePolicyDef = defineSurfacePolicy({
   surface: "user_list",
   fieldIds: Object.values(UserListFieldIds),
   fieldActions: ["read", "write"],
-  surfaceActions: ["read"],
+  surfaceActions: ["read", "create"],
   kind: "iam",
 });

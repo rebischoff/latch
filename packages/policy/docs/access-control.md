@@ -110,7 +110,9 @@ Canonical detail: [`../phases/03-identity-iam/decisions.md`](../../docs/phases/0
 
 **Rationale:** New business Surfaces gain `data_master` access when registered + app-role policies are added — no hand-edited `data_master` YAML. Regression-tested in Phase 03 task **21**.
 
-Implementation: `PolicyService.resolve` synthesizes `read`/`write` on all `fieldIds` (+ surface `read`/`write` actions) when the principal holds a role of `role_class = 'system_data'` (via `Principal.roleClasses`) and the registry entry has `kind: "business"`. IAM entries use `kind: "iam"` (e.g. `user_roles_detail`). `synthesizeDataMasterBinding` in `@latch/policy` (keyed on `role_class` since [01b](./tasks/01b-p11-catalog-realignment.md); no fixed role-id constant).
+Implementation: `PolicyService.resolve` synthesizes `read`/`write` on all `fieldIds` when the principal holds `role_class = 'system_data'` and the registry entry has `kind: "business"`. Surface actions: builtin `read`, `write`, `delete` **plus** any **custom** `surfaceActions` declared on the surface registry entry (e.g. `add_as_db_user` on `employee_detail`) — same union rule as IAM synthesis. IAM entries use `kind: "iam"` (e.g. `user_roles_detail`). `synthesizeDataMasterBinding` in `@latch/policy` (keyed on `role_class` since [01b](./tasks/01b-p11-catalog-realignment.md); no fixed role-id constant).
+
+**Amended (2026-06-25):** Custom business `surfaceActions` must be included in `system_data` synthesis so manifest grants match surface YAML (provision decision in SubHub [`party.md`](../../apps/subhub/docs/decisions/party.md#decision-provision-app-user-from-person-surface-2026-06-25)).
 
 ### Decision: iam_master wildcard (2026-06-08)
 

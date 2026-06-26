@@ -4,9 +4,11 @@ import { SURFACE_NAV_CATALOG } from "./nav";
 export const routes = {
   home: "/",
   login: "/login",
+  changePasswordRequired: "/change-password-required",
   settings: "/settings",
   users: {
     list: "/users",
+    new: "/users/new",
     detail: (id: string) => `/users/${id}`,
   },
   roles: {
@@ -32,25 +34,35 @@ export const routes = {
   },
   manufacturers: {
     list: "/manufacturers",
+    new: "/manufacturers/new",
     detail: (id: string) => `/manufacturers/${id}`,
+  },
+  employees: {
+    list: "/employees",
+    new: "/employees/new",
+    detail: (id: string) => `/employees/${id}`,
   },
   sites: {
     list: "/sites",
+    new: "/sites/new",
     detail: (id: string) => `/sites/${id}`,
   },
   contactRelations: "/contact-relations",
   partyRelations: "/party-relations",
   estimates: {
     list: "/estimates",
+    new: "/estimates/new",
     detail: (id: string) => `/estimates/${id}`,
     demo: "/estimates/demo",
   },
   jobs: {
     list: "/jobs",
+    new: "/jobs/new",
     detail: (id: string) => `/jobs/${id}`,
   },
   parts: {
     list: "/parts",
+    new: "/parts/new",
     detail: (id: string) => `/parts/${id}`,
   },
 } as const;

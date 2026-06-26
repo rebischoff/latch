@@ -7,7 +7,6 @@ import { PartyDetailForm } from "@/components/parties/PartyDetailForm";
 type ManufacturerDetailFormProps = {
   manufacturerId: string;
   manifest: Manifest;
-  isCreate?: boolean;
   returnTo?: string | null;
   returnField?: string | null;
 };
@@ -15,7 +14,6 @@ type ManufacturerDetailFormProps = {
 export const ManufacturerDetailForm = ({
   manufacturerId,
   manifest,
-  isCreate,
   returnTo,
   returnField,
 }: ManufacturerDetailFormProps) => (
@@ -23,7 +21,6 @@ export const ManufacturerDetailForm = ({
     entityId={manufacturerId}
     surfaceId="manufacturer_detail"
     manifest={manifest}
-    isCreate={isCreate}
     returnTo={returnTo}
     returnField={returnField}
   />

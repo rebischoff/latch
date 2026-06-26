@@ -15,6 +15,7 @@ import {
 const isSurfaceDetailId = (surfaceId: SurfaceId): surfaceId is SurfaceDetailId =>
   surfaceId === "contact_detail" ||
   surfaceId === "manufacturer_detail" ||
+  surfaceId === "employee_detail" ||
   surfaceId === "site_detail" ||
   surfaceId === "user_roles_detail" ||
   surfaceId === "role_detail" ||

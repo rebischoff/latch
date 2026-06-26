@@ -35,7 +35,7 @@ import { SurfaceFormLayout } from "@/components/surface/SurfaceFormLayout";
 import { SurfaceFormRoot } from "@/components/surface/SurfaceFormRoot";
 import { useFieldMode } from "@/components/surface/useFieldMode";
 import { useEstimateSitePicker } from "@/lib/hooks/use-estimate-site-picker";
-import { useSurfaceCreate } from "@/lib/hooks/use-surface-create";
+import { useSurfaceListCreate } from "@/lib/hooks/use-surface-list-create";
 import { useSurfaceDetail } from "@/lib/hooks/use-surface-detail";
 import { useSurfaceDelete, useSurfacePatch } from "@/lib/hooks/use-surface-patch";
 import {
@@ -59,7 +59,6 @@ const statusLabel = (status: string): string =>
 type EstimateDetailFormProps = {
   estimateId: string;
   manifest: Manifest;
-  isCreate?: boolean;
   canNavigateSite: boolean;
 };
 
@@ -175,9 +174,9 @@ const ProfileStatus = ({ status }: { status: string }) => {
 export const EstimateDetailForm = ({
   estimateId,
   manifest,
-  isCreate = false,
   canNavigateSite,
 }: EstimateDetailFormProps) => {
+  const isCreate = estimateId === "new";
   const router = useRouter();
   const { message, modal } = App.useApp();
   const { data: detail, isLoading, isFetching, error } = useSurfaceDetail(
@@ -186,7 +185,7 @@ export const EstimateDetailForm = ({
   );
   const { data: sitePicker, isLoading: sitePickerLoading } = useEstimateSitePicker();
   const patch = useSurfacePatch("estimate_detail", estimateId);
-  const create = useSurfaceCreate("estimate_detail", estimateId);
+  const create = useSurfaceListCreate("estimate_list", "estimate_detail");
   const remove = useSurfaceDelete("estimate_detail", estimateId);
 
   const activeManifest = detail?.manifest ?? manifest;
@@ -293,9 +292,10 @@ export const EstimateDetailForm = ({
 
     try {
       if (isCreate) {
-        await create.mutateAsync(body);
+        const result = await create.mutateAsync(body);
+        const newId = String(result.data.id);
         message.success("Estimate created");
-        router.replace(routes.estimates.detail(estimateId));
+        router.replace(routes.estimates.detail(newId));
         router.refresh();
         return;
       }

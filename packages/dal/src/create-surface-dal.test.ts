@@ -489,6 +489,32 @@ describe("createSurfaceDal list + bulk (fixture descriptor)", () => {
     expect(rows[0]?.id).toBe(WIDGET_ALPHA);
   });
 
+  it("list forwards surface-specific query fields to the store", async () => {
+    let lastQuery: ListQuery | undefined;
+    const store = new WidgetMemoryStore();
+    store.seed();
+    const trackingStore: StoreAdapter<WidgetRow, WidgetChild[]> = {
+      ...store,
+      list: async (query) => {
+        lastQuery = query;
+        return store.list(query);
+      },
+    };
+    const listDescriptor: SurfaceDescriptor<WidgetRow, WidgetChild[]> = {
+      ...widgetListDescriptor,
+      listQuerySchema: WidgetListQuerySchema.extend({
+        q: z.string().optional(),
+      }),
+    };
+    const dal = createSurfaceDal(listDescriptor, trackingStore);
+
+    await dal.list!(buildCtx(listWriteManifest, PRINCIPAL_A), { q: "alpha" });
+
+    expect(lastQuery?.q).toBe("alpha");
+    expect(lastQuery?.limit).toBe(10);
+    expect(lastQuery?.offset).toBe(0);
+  });
+
   it("get on out-of-scope row throws NotFoundError when rowScope is scope", async () => {
     const store = new WidgetMemoryStore();
     store.seed();

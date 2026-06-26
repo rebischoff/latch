@@ -34,9 +34,20 @@
 | All tables (DAL) | `party_person`, `latch_users`, `latch_user_roles` |
 | Shipped vs target | **Shipped:** `id` = `latch_users.id`. **Target:** `id` = `party_id` of linked person. |
 
+### `user_create` (route alias — `/users/new`)
+
+| Key | Value |
+|-----|-------|
+| Route | `/users/new` — manifest prefetch via `user_roles_detail` create mode |
+| API | `POST /api/iam/users` |
+| Query | `linkPartyId`, `returnTo` — [provision return context](../decisions/general.md#decision-provision-user-return-context-2026-06-25) |
+| Entry | Person surface **Add User** only in v1; missing/invalid `linkPartyId` → redirect `/users` |
+
 **Bootstrap exception:** `/setup` master may exist as `latch_users` without `party_person` link — optional union row in IAM list or exclude until linked.
 
-**Not on this Surface:** create user, delete user, unlink login, set login email — those live on **`employee_detail`** / `{role}_detail` via **`add_as_db_user`** and `emails` collection sync.
+**Provision (v1):** Person surface **`add_as_db_user`** → **`/users/new`** with `linkPartyId` + `returnTo` ([provision decision](../decisions/party.md#decision-provision-app-user-from-person-surface-2026-06-25)). **`user_list` has no list New** — create only via person **Add User** or future orphan path (deferred).
+
+**Not on list/detail (existing users):** delete user, unlink login, set login email — login email via person `emails` + `is_login_email` sync.
 
 ---
 
@@ -102,12 +113,15 @@
 | Surface | Action | Granted when | Re-auth |
 |---------|--------|--------------|---------|
 | `user_list` | `read` | IAM grant | Each GET list |
+| `user_list` | `create` | IAM grant | Each POST create (`/users/new`) |
 | `user_roles_detail` | `read` | IAM grant | Each GET |
 | `user_roles_detail` | `write` | IAM grant on `role_assignments` | Each PATCH |
 | `user_roles_detail` | `change_password` | Self only (`principal` matches linked `latch_users.id`) | Each action |
 | `user_roles_detail` | `reset_password` | IAM grant and **not** self | Each action |
 
-**No** `create` / `delete` on `user_list` / `user_roles_detail` in v1 target.
+**Provision POST** also requires **`add_as_db_user`** on the covering person surface when `linkPartyId` is present (server-resolved lens) — see [provision decision](../decisions/party.md#decision-provision-app-user-from-person-surface-2026-06-25).
+
+**No** `delete` on `user_list` / `user_roles_detail` in v1.
 
 ---
 
@@ -127,12 +141,14 @@
 
 | Surface | Operation | Body keys | Notes |
 |---------|-----------|-----------|-------|
-| `user_list` | — | — | List-only |
+| `user_list` | `create` | `{ linkPartyId, login_name, password?, role_assignments? }` strict | Creates `latch_users`, sets `party_person.latch_user_id`; optional `must_change_password` when password set; `role_assignments` may be `[]` |
 | `user_roles_detail` | `patch` | `{ role_assignments: … }` strict | Roles only on IAM pane |
 | `user_roles_detail` | `change_password` | `{ current_password, new_password }` | Self only |
-| `user_roles_detail` | `reset_password` | `{ new_password }` | Admin; not self |
+| `user_roles_detail` | `reset_password` | `{ new_password }` | Admin; not self; sets `must_change_password = true` |
 
-**Provision login (not this Surface):** `add_as_db_user` on person detail — creates `latch_users`, sets `party_person.latch_user_id`, sets `party_email.is_login_email`, copies `address` → `latch_users.login_email`.
+**Provision login:** person surface **Add User** → `/users/new` → POST above. Optional copy to `login_email` when designated `party_email.is_login_email` exists at create time.
+
+**Forced password change (platform):** `latch_users.must_change_password` — set `true` when admin sets password on create or reset; cleared when user completes `/change-password-required` after login.
 
 **Login email sync (person Surfaces — `emails` collection):**
 
@@ -163,6 +179,14 @@
 - **Profile:** read-only (avatar, display name, login identifiers).
 - **Roles:** editable assignments.
 - **Password:** toolbar actions when manifest grants.
+
+### `/users/new` (provision create)
+
+- Read-only banner: person `display_name` from `linkPartyId` prefetch.
+- **login_name** (required).
+- **password** + confirm (optional — if blank, user cannot sign in until admin **Reset password**).
+- **role_assignments** multi-select (optional; empty allowed).
+- Toolbar: **Save** + **Cancel** → `returnTo`.
 
 ---
 
@@ -199,9 +223,11 @@ Login email UX lives on person **`emails`** collection (`is_login_email` checkbo
 
 | Event | Behavior |
 |-------|----------|
-| **Create app user** | `add_as_db_user` on person Surface |
+| **Create app user** | Person surface **Add User** → `/users/new` → POST |
 | **Set login email** | `emails` collection on person Surface — sync to `latch_users.login_email` |
-| **First master** | `/setup` — `login_email` optional until person linked |
+| **First master** | `/setup` — `login_email` optional; `must_change_password = false` |
+| **Admin temp password** | Create or **Reset password** → `must_change_password = true` |
+| **First login** | Redirect → `/change-password-required` until flag cleared |
 | **Employee terminated** | IAM adjusts roles; `login_email` row may persist |
 
 ---
@@ -229,18 +255,22 @@ flowchart LR
     UL[GET /api/iam/users]
     Pane[UserListPane]
   end
+  subgraph create [/users/new]
+    NU[POST /api/iam/users]
+    Form[UserCreateForm]
+  end
   subgraph detail [user_roles_detail]
-    API[GET/PATCH /api/iam/users/partyId]
-    Form[UserDetailForm]
+    API[GET/PATCH /api/iam/users/id]
+    FormEdit[UserDetailForm]
   end
-  subgraph provision [employee_detail]
-    Add[add_as_db_user]
-    Emails[emails sync]
+  subgraph person [employee_detail]
+    Add[Add User]
   end
-  Add -->|latch_users.login_email| list
-  Emails -->|sync| list
-  Pane --> Form
-  Form --> API
+  Add --> Form
+  Form --> NU
+  NU -->|replace returnTo| person
+  Pane --> FormEdit
+  FormEdit --> API
 ```
 
 ---
@@ -249,7 +279,8 @@ flowchart LR
 
 - YAML/DAL anchor `latch_users`; `login_name`, `login_email` already on platform table.
 - `employee.latch_user_id` + `account_link` in shipped YAML — retire with identity wave.
-- No `party_email.is_login_email` or sync logic in shipped DAL yet.
+- `party_email.is_login_email` + sync DAL — shipped task 28 (email PATCH syncs `latch_users.login_email` when linked).
+- `/users/new`, `user_list` `create`, `must_change_password`, forced-change gate — shipped task 28 ([task 28](../tasks/28-employee-detail.md)).
 
 ---
 
@@ -258,4 +289,4 @@ flowchart LR
 - [x] A–K filled for **target** model (2026-06-18; `role_assignments` depth merged 2026-06-18)
 - [x] DBML: no `email_id`; `login_email` + `party_email.is_login_email`
 - [x] Shipped interim documented; implementation deferred post–task 19
-- [ ] Identity wave: `is_login_email`, sync DAL, YAML, UI — **deferred**
+- [x] `/users/new` + provision return context + `must_change_password` gate — shipped task 28 (2026-06-25)

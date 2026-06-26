@@ -19,7 +19,7 @@ type CollectionRow = {
 };
 
 type PhoneRow = CollectionRow & { number: string };
-type EmailRow = CollectionRow & { address: string };
+type EmailRow = CollectionRow & { address: string; is_login_email?: boolean };
 
 export type ContactChildCollectionValues = {
   phones: PhoneRow[];
@@ -38,6 +38,7 @@ export type ContactDetailFormValues = ContactChildCollectionValues & {
 type PhoneEmailFieldsProps = {
   control: Control<ContactDetailFormValues>;
   manifest: Manifest;
+  showLoginEmail?: boolean;
 };
 
 const ReadOnlyCollection = ({
@@ -164,6 +165,7 @@ const PhoneFieldsSection = ({
 const EmailFieldsSection = ({
   control,
   manifest,
+  showLoginEmail = false,
 }: PhoneEmailFieldsProps) => {
   const { fields, append, remove } = useFieldArray({ control, name: "emails" });
   const writable = fieldAllows(manifest, "emails", "write");
@@ -207,7 +209,7 @@ const EmailFieldsSection = ({
               label="Address"
             />
           </Col>
-          <Col xs={12} sm={5}>
+          <Col xs={12} sm={showLoginEmail ? 4 : 5}>
             <Controller
               control={control}
               name={`emails.${index}.is_primary`}
@@ -225,7 +227,27 @@ const EmailFieldsSection = ({
               )}
             />
           </Col>
-          <Col xs={12} sm={3} style={{ paddingTop: 22 }}>
+          {showLoginEmail ? (
+            <Col xs={12} sm={4}>
+              <Controller
+                control={control}
+                name={`emails.${index}.is_login_email`}
+                render={({ field: checkboxField }) => (
+                  <div style={{ paddingTop: 22 }}>
+                    <Checkbox
+                      checked={Boolean(checkboxField.value)}
+                      onChange={(event) =>
+                        checkboxField.onChange(event.target.checked)
+                      }
+                    >
+                      Login email
+                    </Checkbox>
+                  </div>
+                )}
+              />
+            </Col>
+          ) : null}
+          <Col xs={12} sm={showLoginEmail ? 2 : 3} style={{ paddingTop: 22 }}>
             <Can field="emails" action="write">
               <Button
                 type="text"
@@ -242,7 +264,14 @@ const EmailFieldsSection = ({
         <Button
           type="dashed"
           icon={<PlusOutlined />}
-          onClick={() => append({ label: "", address: "", is_primary: false })}
+          onClick={() =>
+            append({
+              label: "",
+              address: "",
+              is_primary: false,
+              ...(showLoginEmail ? { is_login_email: false } : {}),
+            })
+          }
         >
           Add email
         </Button>
@@ -254,6 +283,7 @@ const EmailFieldsSection = ({
 export const PhoneEmailFields = ({
   control,
   manifest,
+  showLoginEmail = false,
 }: PhoneEmailFieldsProps) => (
   <Row gutter={[16, 24]} style={{ marginTop: 8 }}>
     <Col xs={24} lg={12}>
@@ -263,7 +293,11 @@ export const PhoneEmailFields = ({
     </Col>
     <Col xs={24} lg={12}>
       <FieldControl manifest={manifest} field="emails">
-        <EmailFieldsSection control={control} manifest={manifest} />
+        <EmailFieldsSection
+          control={control}
+          manifest={manifest}
+          showLoginEmail={showLoginEmail}
+        />
       </FieldControl>
     </Col>
   </Row>

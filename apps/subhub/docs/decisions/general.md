@@ -164,6 +164,8 @@
 
 **Amended (2026-06-25):** Create route and id assignment — [Surface create route — `/new` + DB-assigned id](#decision-surface-create-route--new--db-assigned-id-2026-06-25). First implementation: [task 26](../tasks/26-iam-role-crud.md) (`/roles/new`). Retrofit of shipped client-UUID create: [task 27](../tasks/27-create-route-retrofit.md).
 
+**Amended (2026-06-25):** **Toolbar label** — standalone create action is **`New`** only (not `New {entity}`; surface context is in nav / pane title). **Placement** — register on **detail** toolbar at `<surface>/[id]`; also on **list-only** route `<surface>` when the detail pane is the empty placeholder. **Business Surfaces** gate on `*_detail` `write` (not `*_list` `create` — `system_data` synthesis omits list `create`). **IAM Surfaces** gate on `*_list` `create`.
+
 
 ### Decision: Surface create route — `/new` + DB-assigned id (2026-06-25)
 
@@ -231,6 +233,40 @@
 **First instance (shipped interim):** `part_detail` manufacturer picker → `/manufacturers/[client-uuid]?create=1&returnTo=…` ([`25-manufacturer-detail.md`](../tasks/25-manufacturer-detail.md)).
 
 **Target instance:** `/manufacturers/new?returnTo=/parts/new&returnField=profile.manufacturer_party_id` ([task 27](../tasks/27-create-route-retrofit.md)).
+
+
+### Decision: provision user return context (2026-06-25)
+
+**Status:** Locked. [Party provision decision](./party.md#decision-provision-app-user-from-person-surface-2026-06-25) · [task 28](../tasks/28-employee-detail.md) steps 9–13 · [`iam-user.md`](../surface-specs/iam-user.md).
+
+**Choice:** Person surfaces **initiate** app-user creation by navigating to **`/users/new`** with query params. Same family as [picker return](#decision-picker-return-context--url-protocol-2026-06-24) but **not** a foreign-key picker — no `returnField` / `selectedId`.
+
+| Query param | Role |
+|-------------|------|
+| `linkPartyId` | `party.id` to link via `party_person.latch_user_id` — server-only; never an editable form field |
+| `returnTo` | Encoded path back to origin person surface (e.g. `/employees/[party_id]`) |
+
+**Save:** `POST` create user + link → `router.replace(returnTo)` (origin refetches; **App user** link appears).
+
+**Cancel:** `router.push(returnTo)` — no user created.
+
+**Validation (GET `/users/new` and POST):**
+
+| Check | On failure |
+|-------|------------|
+| `linkPartyId` present | Redirect `/users` |
+| Party exists; `party_person` row | Redirect `/users` |
+| `party_person.latch_user_id` null | Redirect `/users` |
+| Caller `read` + `add_as_db_user` on covering person surface (server-resolved lens) | 403 / redirect |
+| POST also requires `user_list` `create` | 403 |
+
+**`returnTo` security:** Must be a **same-origin relative path** (`/` prefix, no `//`, no scheme). Reject or fall back to person detail derived from `linkPartyId` if invalid — prevents open redirects (apply to picker `returnTo` when touched).
+
+**Helpers:** `buildProvisionUserUrl({ partyId, returnTo })`, `parseProvisionContext`, `sanitizeReturnTo` — shared across person surfaces that grant `add_as_db_user` (first: `employee_detail`).
+
+**Dirty origin form:** **Add User** navigation uses the same confirm dialog as picker add-new ([dirty form confirm](#decision-picker-navigate-away--dirty-form-confirm-v1-2026-06-24)).
+
+**Rationale:** Canonical create route for IAM credentials; refresh-safe URL context; server re-authorizes `linkPartyId` on POST — query param is UX only, not a security boundary.
 
 
 ### Decision: picker return on `SurfaceFormRoot` forms — merge `selectedId` into defaults (2026-06-24)
@@ -462,7 +498,7 @@ Per-row `POST` / `PATCH` / `DELETE` on catalog routes may remain for scripts and
 
 **Choice:** Platform migrate leaves **`latch_users` empty**. First admin via **`/setup`**: validate `LATCH_SETUP_KEY`, collect **login_name** + password, create user with `system_data` + `system_iam`. Migration `013_latch_identity_guards.sql` adds `login_name`, `setup_complete`, and DB triggers (immutable `role_class`, system catalog not deletable, last system-role holder not revocable). DAL mirrors last-holder guard. No `bootstrap-admin`, no SQL dev user seed.
 
-**Identity:** `login_name` is the setup login identifier. **Target (2026-06-18):** `latch_users.login_email` (nullable, UNIQUE) — app copies from `party_email.is_login_email`; session chrome on `party_person`; link via `party_person.latch_user_id`. Provision login from person Surfaces (`add_as_db_user`), not IAM user Surface. Sign-in: `login_name` or `login_email` on `latch_users` only (`resolveLatchUserId`). **Shipped interim:** `employee.latch_user_id` until identity implementation wave; `login_email` column already on `latch_users`.
+**Identity:** `login_name` is the setup login identifier. **Target (2026-06-18):** `latch_users.login_email` (nullable, UNIQUE) — app copies from `party_email.is_login_email`; session chrome on `party_person`; link via `party_person.latch_user_id`. **Provision (2026-06-25):** person surface **Add User** → `/users/new` (`add_as_db_user` + `user_list` `create` on POST) — [provision decision](./party.md#decision-provision-app-user-from-person-surface-2026-06-25). Sign-in: `login_name` or `login_email` on `latch_users` only (`resolveLatchUserId`).
 
 **Rationale:** Matches production bootstrap (customer chooses admin identity). `PolicyService` synthesizes IAM for `system_iam` — no grant seed. Platform-locked: [P4b amendment](../../../packages/policy/docs/tasks/00-decisions-needed.md#amendment-first-run-setup--db-identity-guards-2026-06-13) + [scaffold runbook](../../../packages/codegen/docs/scaffold-runbook.md#first-run-setup).
 

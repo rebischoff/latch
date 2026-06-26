@@ -18,8 +18,9 @@ export type PartyPhoneRow = {
 };
 
 export type PartyEmailRow = {
-  id: string;
   address: string;
+  id: string;
+  is_login_email: boolean;
   is_primary: boolean;
   label: string;
 };
@@ -41,6 +42,7 @@ export type PartyEmailPatchRow = {
   label: string;
   address: string;
   is_primary: boolean;
+  is_login_email?: boolean;
 };
 
 export type ContactDetailRelatedPatch = {

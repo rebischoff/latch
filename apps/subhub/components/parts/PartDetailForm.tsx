@@ -31,7 +31,7 @@ import {
 } from "@/components/parts/PartVendorPricingFields";
 import { useApplyPickerReturn } from "@/lib/hooks/use-apply-picker-return";
 import { useManufacturerPicker } from "@/lib/hooks/use-manufacturer-picker";
-import { useSurfaceCreate } from "@/lib/hooks/use-surface-create";
+import { useSurfaceListCreate } from "@/lib/hooks/use-surface-list-create";
 import { useSurfaceDetail } from "@/lib/hooks/use-surface-detail";
 import { useSurfaceDelete, useSurfacePatch } from "@/lib/hooks/use-surface-patch";
 import {
@@ -45,7 +45,6 @@ import { SurfaceApiError } from "@/lib/surface-api";
 type PartDetailFormProps = {
   partId: string;
   manifest: Manifest;
-  isCreate?: boolean;
   canNavigateManufacturer: boolean;
   canNavigateVendor: boolean;
   canCreateManufacturer: boolean;
@@ -165,11 +164,11 @@ const normalizeVendorPricingBody = (
 export const PartDetailForm = ({
   partId,
   manifest,
-  isCreate = false,
   canNavigateManufacturer,
   canNavigateVendor,
   canCreateManufacturer,
 }: PartDetailFormProps) => {
+  const isCreate = partId === "new";
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -186,7 +185,7 @@ export const PartDetailForm = ({
   const { data: manufacturerPicker, isLoading: manufacturerPickerLoading } =
     useManufacturerPicker();
   const patch = useSurfacePatch("part_detail", partId);
-  const create = useSurfaceCreate("part_detail", partId);
+  const create = useSurfaceListCreate("part_list", "part_detail");
   const remove = useSurfaceDelete("part_detail", partId);
 
   const activeManifest = detail?.manifest ?? manifest;
@@ -314,9 +313,10 @@ export const PartDetailForm = ({
 
     try {
       if (isCreate) {
-        await create.mutateAsync(body);
+        const result = await create.mutateAsync(body);
+        const newId = String(result.data.id);
         message.success("Part created");
-        router.replace(routes.parts.detail(partId));
+        router.replace(routes.parts.detail(newId));
         router.refresh();
         return;
       }

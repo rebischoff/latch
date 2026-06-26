@@ -40,7 +40,13 @@ const orgRow: ManufacturerDetailRow = {
 const related: ManufacturerDetailRelated = {
   phones: [{ id: "ph-1", label: "main", number: "555-0100", is_primary: true }],
   emails: [
-    { id: "em-1", label: "sales", address: "sales@acme.com", is_primary: true },
+    {
+      id: "em-1",
+      label: "sales",
+      address: "sales@acme.com",
+      is_primary: true,
+      is_login_email: false,
+    },
   ],
   also_roles: [{ role: "vendor" }],
 };

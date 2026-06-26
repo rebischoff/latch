@@ -27,7 +27,7 @@ import {
 import { useRegisterSurfaceActions } from "@/components/shell/SurfaceActionsProvider";
 import { SurfaceFormLayout } from "@/components/surface/SurfaceFormLayout";
 import { SurfaceFormRoot } from "@/components/surface/SurfaceFormRoot";
-import { useSurfaceCreate } from "@/lib/hooks/use-surface-create";
+import { useSurfaceListCreate } from "@/lib/hooks/use-surface-list-create";
 import { useSurfaceDetail } from "@/lib/hooks/use-surface-detail";
 import { useSurfaceDelete, useSurfacePatch } from "@/lib/hooks/use-surface-patch";
 import { useSitePartyPicker } from "@/lib/hooks/use-site-party-picker";
@@ -39,7 +39,6 @@ import { SurfaceApiError } from "@/lib/surface-api";
 type SiteDetailFormProps = {
   siteId: string;
   manifest: Manifest;
-  isCreate?: boolean;
   hubLinks: SiteHubLinkAccess;
 };
 
@@ -146,9 +145,9 @@ const PortfolioHubLink = ({
 export const SiteDetailForm = ({
   siteId,
   manifest,
-  isCreate = false,
   hubLinks,
 }: SiteDetailFormProps) => {
+  const isCreate = siteId === "new";
   const router = useRouter();
   const { message, modal } = App.useApp();
   const { data: detail, isLoading, isFetching, error } = useSurfaceDetail(
@@ -158,7 +157,7 @@ export const SiteDetailForm = ({
   const { data: customerPicker } = useSitePartyPicker("customer");
   const { data: propertyOwnerPicker } = useSitePartyPicker("property_owner");
   const patch = useSurfacePatch("site_detail", siteId);
-  const create = useSurfaceCreate("site_detail", siteId);
+  const create = useSurfaceListCreate("site_list", "site_detail");
   const remove = useSurfaceDelete("site_detail", siteId);
 
   const activeManifest = detail?.manifest ?? manifest;
@@ -253,9 +252,10 @@ export const SiteDetailForm = ({
 
     try {
       if (isCreate) {
-        await create.mutateAsync(body);
+        const result = await create.mutateAsync(body);
+        const newId = String(result.data.id);
         message.success("Site created");
-        router.replace(routes.sites.detail(siteId));
+        router.replace(routes.sites.detail(newId));
         router.refresh();
         return;
       }

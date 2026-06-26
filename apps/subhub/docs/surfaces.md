@@ -130,7 +130,7 @@ Design is holistic; **ship** in waves after catalog exits.
 | **Anchor (target)** | `party_person` — lens `latch_user_id IS NOT NULL` |
 | **Anchor (shipped)** | `latch_users` — catch up at identity wave |
 
-**Purpose:** IAM convenience directory — view linked app users and manage **roles** (and password actions). **Not** create/delete users; provision via **`add_as_db_user`** on person Surfaces (`employee_detail`, etc.).
+**Purpose:** IAM directory for **existing** linked app users — roles + password actions on `user_roles_detail`. **Provision** new logins: person surface **Add User** → **`/users/new`** ([`iam-user.md`](./surface-specs/iam-user.md), [provision decision](./decisions/party.md#decision-provision-app-user-from-person-surface-2026-06-25)). **No** list **New** in v1.
 
 **`user_list` Fields (target):** `summary` → person chrome + login identifiers — `party_person` (`party_id`, `display_name`, `nick_name`, `avatar_url`), joined `latch_users.login_name`, `latch_users.login_email`.
 
@@ -205,7 +205,7 @@ No `other_list`. Tag `other` → pickers / future global search only.
 | `property_owner_detail` | org hub: `parent_property_owner`, `subsidiaries`, `contacts`, `subsidiary_tree`, `related_sites` | wave 1 — [property-owner.md](./surface-specs/property-owner.md) |
 | `part_list` | *(no manufacturer filter v1)* | wave 3 — [part.md](./surface-specs/part.md); not on `manufacturer_detail` |
 | `{role}_detail` | `addresses` | wave 2 — `party_address` + nested `address` — [`party-addresses.md`](./surface-specs/party-addresses.md) |
-| `employee_detail` | `add_as_db_user` | identity wave — provision `latch_users` + link on `party_person` |
+| `employee_detail` | `add_as_db_user` | Initiate **Add User** → `/users/new`; POST links `party_person` — [provision decision](./decisions/party.md#decision-provision-app-user-from-person-surface-2026-06-25) |
 | `employee_detail` | HR scalars (`hire_date`, `job_title`, …) | HR + identity slice — [decision](./decisions/party.md#decision-employee_detail-scope--marker-now-hr-later-2026-06-17) |
 
 **Surface actions (type lenses):** standard `read` / `write` / `delete` + **`add_role`** / **`remove_role`** (optional) — server adds/removes `party_role` row; does not patch lens-specific Fields on the wrong Surface.
@@ -285,7 +285,7 @@ No `other_list`. Tag `other` → pickers / future global search only.
 | `phones` | collection | `party_phone` |
 | `emails` | collection | `party_email`; `is_login_email` sync |
 | `staff` | scalar | `employee` row marker |
-| `add_as_db_user` | action | Create `latch_users`, set `party_person.latch_user_id`, designate `party_email.is_login_email`, sync → `login_email` — [identity decision](./decisions/party.md#decision-login-email--app-sync-to-latch_userslogin_email-2026-06-18) |
+| `add_as_db_user` | action | Person surface initiates `/users/new`; creates `latch_users`, sets `party_person.latch_user_id`; optional `is_login_email` sync — [provision decision](./decisions/party.md#decision-provision-app-user-from-person-surface-2026-06-25) |
 
 **Deferred Fields:** `default_labor_class` (costing slice); HR scalars `employment`, `job_title`, `department`, `reports_to`, `primary_site` — [spec](./surface-specs/employee.md), [decision](./decisions/party.md#decision-employee_detail-scope--marker-now-hr-later-2026-06-17).
 

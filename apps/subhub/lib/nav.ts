@@ -159,6 +159,14 @@ export const SURFACE_NAV_CATALOG: SurfaceNavEntry[] = [
     icon: "manufacturer",
   },
   {
+    surfaceId: "employee_list",
+    href: "/employees",
+    navKey: "/employees",
+    label: "Employees",
+    group: "Contacts",
+    icon: "team",
+  },
+  {
     surfaceId: "site_list",
     href: "/sites",
     navKey: "/sites",

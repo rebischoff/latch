@@ -7,7 +7,6 @@ import {
 import { withSubhubApiHandler } from "../../../../lib/api-handler";
 import { resolveContext, resolveContextFresh } from "../../../../lib/latch";
 import { ensureSitesDal } from "../../../../lib/sites/dal";
-import { assertSurfaceRead } from "../../../../lib/surfaces/assert-surface-read";
 import { loadSurfaceDetailQuery } from "../../../../lib/surfaces/load-surface-detail";
 import { getSurfaceDetailDal } from "../../../../lib/surfaces/surface-loader-registry";
 
@@ -39,23 +38,6 @@ export const GET = async (
     const { id } = await context.params;
     const { data, manifest } = await loadSurfaceDetailQuery("site_detail", id);
     return jsonSuccess(data, manifest);
-  });
-
-export const POST = async (
-  request: Request,
-  context: { params: Promise<{ id: string }> },
-): Promise<Response> =>
-  withSubhubApiHandler(async () => {
-    const { id } = await context.params;
-    const ctx = await resolveContextFresh({
-      surfaceId: "site_detail",
-      entityId: id,
-    });
-    assertSurfaceRead(ctx);
-    const body: unknown = await request.json();
-    const dal = await ensureSitesDal();
-    const data = await dal.siteDetail.create(ctx, id, body);
-    return jsonSuccess(data, ctx.manifest);
   });
 
 export const PATCH = async (

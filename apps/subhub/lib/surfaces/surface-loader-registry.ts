@@ -1,13 +1,17 @@
 import type { PermissionContext } from "@latch/contracts";
 import type { SurfaceDal } from "@latch/dal";
+import { randomUUID } from "node:crypto";
 
 import { ensureContactsDal } from "../contacts/dal";
 import { ensureEstimatesDal } from "../estimates/dal";
 import { ensureIamDal } from "../iam/dal";
 import { ensureJobsDal } from "../jobs/dal";
 import { ensurePartsDal } from "../parts/dal";
+import { resolveContextFresh } from "../latch";
 import { ensureSitesDal } from "../sites/dal";
 import type { SurfaceListRow } from "../surface-api";
+
+import { assertSurfaceRead } from "./assert-surface-read";
 
 /** List surfaces with a shared loader (see surface-form-prefetch.md inventory). */
 export type SurfaceListId =
@@ -17,6 +21,7 @@ export type SurfaceListId =
   | "customer_list"
   | "vendor_list"
   | "manufacturer_list"
+  | "employee_list"
   | "site_list"
   | "site_contact_relation_table"
   | "job_party_relation_table"
@@ -28,6 +33,7 @@ export type SurfaceListId =
 export type SurfaceDetailId =
   | "contact_detail"
   | "manufacturer_detail"
+  | "employee_detail"
   | "site_detail"
   | "user_roles_detail"
   | "role_detail"
@@ -47,6 +53,21 @@ type ListLoader = {
 type DetailLoader = {
   ensureDal: () => Promise<void>;
   getDal: () => Promise<SurfaceDal>;
+};
+
+const createViaDetailDal = async (
+  detailSurfaceId: SurfaceDetailId,
+  runCreate: (
+    ctx: PermissionContext,
+    id: string,
+    body: unknown,
+  ) => Promise<Record<string, unknown>>,
+  body: unknown,
+): Promise<Record<string, unknown>> => {
+  const id = randomUUID();
+  const ctx = await resolveContextFresh({ surfaceId: detailSurfaceId, entityId: "new" });
+  assertSurfaceRead(ctx);
+  return runCreate(ctx, id, body);
 };
 
 const listLoaders: Record<SurfaceListId, ListLoader> = {
@@ -85,6 +106,31 @@ const listLoaders: Record<SurfaceListId, ListLoader> = {
       const dal = await ensureContactsDal();
       return dal.manufacturerList.list!(ctx, query);
     },
+    create: async (_ctx, body) => {
+      const dal = await ensureContactsDal();
+      return createViaDetailDal(
+        "manufacturer_detail",
+        dal.manufacturerDetail.create.bind(dal.manufacturerDetail),
+        body,
+      );
+    },
+  },
+  employee_list: {
+    ensureDal: async () => {
+      await ensureContactsDal();
+    },
+    list: async (ctx, query) => {
+      const dal = await ensureContactsDal();
+      return dal.employeeList.list!(ctx, query);
+    },
+    create: async (_ctx, body) => {
+      const dal = await ensureContactsDal();
+      return createViaDetailDal(
+        "employee_detail",
+        dal.employeeDetail.create.bind(dal.employeeDetail),
+        body,
+      );
+    },
   },
   site_list: {
     ensureDal: async () => {
@@ -94,6 +140,10 @@ const listLoaders: Record<SurfaceListId, ListLoader> = {
       const dal = await ensureSitesDal();
       return dal.siteList.list(ctx, query);
     },
+    create: async (_ctx, body) => {
+      const dal = await ensureSitesDal();
+      return createViaDetailDal("site_detail", dal.siteDetail.create.bind(dal.siteDetail), body);
+    },
   },
   user_list: {
     ensureDal: async () => {
@@ -102,6 +152,10 @@ const listLoaders: Record<SurfaceListId, ListLoader> = {
     list: async (ctx, query) => {
       const dal = await ensureIamDal();
       return dal.userList.list!(ctx, query);
+    },
+    create: async (ctx, body) => {
+      const dal = await ensureIamDal();
+      return dal.userList.create(ctx, body);
     },
   },
   role_list: {
@@ -143,6 +197,14 @@ const listLoaders: Record<SurfaceListId, ListLoader> = {
       const dal = await ensureEstimatesDal();
       return dal.estimateList.list(ctx, query);
     },
+    create: async (_ctx, body) => {
+      const dal = await ensureEstimatesDal();
+      return createViaDetailDal(
+        "estimate_detail",
+        dal.estimateDetail.create.bind(dal.estimateDetail),
+        body,
+      );
+    },
   },
   job_list: {
     ensureDal: async () => {
@@ -152,6 +214,10 @@ const listLoaders: Record<SurfaceListId, ListLoader> = {
       const dal = await ensureJobsDal();
       return dal.jobList.list(ctx, query);
     },
+    create: async (_ctx, body) => {
+      const dal = await ensureJobsDal();
+      return createViaDetailDal("job_detail", dal.jobDetail.create.bind(dal.jobDetail), body);
+    },
   },
   part_list: {
     ensureDal: async () => {
@@ -160,6 +226,10 @@ const listLoaders: Record<SurfaceListId, ListLoader> = {
     list: async (ctx, query) => {
       const dal = await ensurePartsDal();
       return dal.partList.list(ctx, query);
+    },
+    create: async (_ctx, body) => {
+      const dal = await ensurePartsDal();
+      return createViaDetailDal("part_detail", dal.partDetail.create.bind(dal.partDetail), body);
     },
   },
 };
@@ -181,6 +251,15 @@ const detailLoaders: Record<SurfaceDetailId, DetailLoader> = {
     getDal: async () => {
       const dal = await ensureContactsDal();
       return dal.manufacturerDetail;
+    },
+  },
+  employee_detail: {
+    ensureDal: async () => {
+      await ensureContactsDal();
+    },
+    getDal: async () => {
+      const dal = await ensureContactsDal();
+      return dal.employeeDetail;
     },
   },
   site_detail: {

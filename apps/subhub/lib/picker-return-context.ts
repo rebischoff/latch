@@ -20,15 +20,14 @@ export type BuildPickerCreateUrlInput = {
   target: PickerTarget;
   returnTo: string;
   returnField?: string;
-  createId?: string;
 };
 
 type SearchParamsLike = {
   get(name: string): string | null;
 };
 
-const PICKER_TARGET_ROUTES: Record<PickerTarget, (id: string) => string> = {
-  manufacturer: routes.manufacturers.detail,
+const PICKER_TARGET_ROUTES: Record<PickerTarget, string> = {
+  manufacturer: routes.manufacturers.new,
 };
 
 export const appendQueryParam = (url: string, key: string, value: string): string => {
@@ -59,16 +58,14 @@ export const buildPickerCreateUrl = ({
   target,
   returnTo,
   returnField,
-  createId = crypto.randomUUID(),
 }: BuildPickerCreateUrlInput): string => {
   const params = new URLSearchParams();
-  params.set(PICKER_RETURN_PARAMS.create, "1");
   params.set(PICKER_RETURN_PARAMS.returnTo, returnTo);
   if (returnField) {
     params.set(PICKER_RETURN_PARAMS.returnField, returnField);
   }
 
-  return `${PICKER_TARGET_ROUTES[target](createId)}?${params.toString()}`;
+  return `${PICKER_TARGET_ROUTES[target]}?${params.toString()}`;
 };
 
 export const parseReturnContext = (searchParams: SearchParamsLike): PickerReturnContext => ({

@@ -1,11 +1,10 @@
 import { jsonSuccess, parseOffsetLimitQuery, withApiHandler } from "@latch/app-kit";
-import { randomUUID } from "node:crypto";
 
 import { withSubhubApiHandler } from "../../../lib/api-handler";
 import { resolveContextFresh } from "../../../lib/latch";
-import { ensurePartsDal } from "../../../lib/parts/dal";
 import { assertSurfaceRead } from "../../../lib/surfaces/assert-surface-read";
 import { loadSurfaceListQuery } from "../../../lib/surfaces/load-surface-list";
+import { createListFromRegistry } from "../../../lib/surfaces/surface-loader-registry";
 
 const parsePartListQuery = (request: Request): Record<string, unknown> | undefined => {
   const base = parseOffsetLimitQuery(request) ?? {};
@@ -25,28 +24,9 @@ export const GET = async (request: Request): Promise<Response> =>
 
 export const POST = async (request: Request): Promise<Response> =>
   withSubhubApiHandler(async () => {
-    const raw: unknown = await request.json();
-    const id =
-      typeof raw === "object" &&
-      raw !== null &&
-      "id" in raw &&
-      typeof (raw as { id: unknown }).id === "string"
-        ? (raw as { id: string }).id
-        : randomUUID();
-    const body =
-      typeof raw === "object" && raw !== null
-        ? (() => {
-            const { id: _id, ...rest } = raw as Record<string, unknown>;
-            return rest;
-          })()
-        : raw;
-
-    const ctx = await resolveContextFresh({
-      surfaceId: "part_detail",
-      entityId: id,
-    });
+    const ctx = await resolveContextFresh({ surfaceId: "part_detail", entityId: "new" });
     assertSurfaceRead(ctx);
-    const dal = await ensurePartsDal();
-    const data = await dal.partDetail.create(ctx, id, body);
+    const body: unknown = await request.json();
+    const data = await createListFromRegistry("part_list", ctx, body);
     return jsonSuccess(data, ctx.manifest);
   });

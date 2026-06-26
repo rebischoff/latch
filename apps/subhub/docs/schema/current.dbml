@@ -50,6 +50,7 @@ Table latch_users {
   login_name text [unique, not null, note: 'required after /setup or provision']
   login_email text [unique, note: 'nullable — app copies from designated party_email; Latch enforces UNIQUE']
   password_hash text [note: 'Better Auth; nullable']
+  must_change_password boolean [not null, default: false, note: 'true when admin sets temp password on provision/reset; cleared after /change-password-required']
   created_at timestamptz [not null, default: `now()`]
 
   Note: '''

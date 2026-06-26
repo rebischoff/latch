@@ -45,6 +45,9 @@ _None._
 | SQL-first persistence | [general.md](./general.md) | inherits platform 2026-06-11 | active |
 | employee HR fields | [party.md](./party.md) | 2026-06-16, deferred | active |
 | notes and attachments — shared tables | [cross-cutting.md](./cross-cutting.md) | 2026-06-15, deferred, **amended 2026-06-17** | active |
+| employee wave 0 — implementation | [party.md](./party.md) | 2026-06-25 | shipped (task 28) |
+| provision app user from person surface | [party.md](./party.md) | 2026-06-25 | shipped (task 28) |
+| provision user return context | [general.md](./general.md) | 2026-06-25 | shipped (task 28) |
 | party identity — `party_person` login link | [party.md](./party.md) | 2026-06-18 | active |
 | login email — app sync to `latch_users.login_email` | [party.md](./party.md) | 2026-06-18 | active |
 | party_email.address unique — login safety | [party.md](./party.md) | 2026-06-18 | superseded |

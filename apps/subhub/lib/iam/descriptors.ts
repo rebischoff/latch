@@ -99,6 +99,15 @@ export const RoleListCreateSchema = z
   })
   .strict();
 
+export const UserListCreateSchema = z
+  .object({
+    linkPartyId: z.string().min(1),
+    login_name: z.string().min(1),
+    password: z.string().optional(),
+    role_assignments: z.array(z.string()).optional(),
+  })
+  .strict();
+
 export const RoleDetailPatchSchema = z
   .object({
     catalog: z

@@ -36,8 +36,7 @@ export const EstimateList = ({ createManifest }: EstimateListProps) => {
   const { data, isLoading, error } = useSurfaceList("estimate_list");
 
   const onCreate = useCallback(() => {
-    const id = crypto.randomUUID();
-    router.push(`${routes.estimates.detail(id)}?create=1`);
+    router.push(routes.estimates.new);
   }, [router]);
 
   const onListRoute = pathname === routes.estimates.list;

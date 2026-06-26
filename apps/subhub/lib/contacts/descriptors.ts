@@ -47,3 +47,21 @@ export {
   projectManufacturerListRow,
   type ManufacturerListRow,
 } from "../../modules/contact/generated/manufacturer_list.glue.generated";
+
+export {
+  employeeDetailDescriptor,
+  EmployeeDetailCreateSchema,
+  EmployeeDetailPatchSchema,
+  projectEmployeeDetailRow,
+  type EmployeeDetailRelated,
+  type EmployeeDetailRelatedPatch,
+  type EmployeeDetailRow,
+  type EmployeeDetailStoreRelated,
+  type EmployeeStaffRow,
+} from "./descriptors/employee-detail";
+
+export {
+  employeeListDescriptor,
+  projectEmployeeListRow,
+  type EmployeeListRow,
+} from "./descriptors/employee-list";

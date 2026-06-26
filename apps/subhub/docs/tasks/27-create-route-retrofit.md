@@ -1,6 +1,6 @@
 # 27 — Create route retrofit (`/new` + DB-assigned id)
 
-> **Status:** Pending (2026-06-25). **Next:** [Step 1 — Shared plumbing](#shared-plumbing) (task 26 stop gate complete).
+> **Status:** Complete (2026-06-25). Next: [28-employee-detail.md](./28-employee-detail.md).
 >
 > **Decision:** [Surface create route — `/new` + DB-assigned id](../decisions/general.md#decision-surface-create-route--new--db-assigned-id-2026-06-25)
 
@@ -35,7 +35,7 @@ Migrate shipped list+detail Surfaces from **`/[id]?create=1`** + **client `crypt
 
 ## Verify (stop gate)
 
-- [ ] Each surface: list **New** → `/…/new` → Save → `/…/[db-id]`
-- [ ] Part → add manufacturer picker → `/manufacturers/new` → return with `selectedId` from POST response
-- [ ] No remaining list toolbar uses `crypto.randomUUID()` for create navigation
-- [ ] `npm run test` — picker-return tests green
+- [x] Each surface: list **New** → `/…/new` → Save → `/…/[db-id]`
+- [x] Part → add manufacturer picker → `/manufacturers/new` → return with `selectedId` from POST response
+- [x] No remaining list toolbar uses `crypto.randomUUID()` for create navigation
+- [x] `npm run test` — picker-return tests green

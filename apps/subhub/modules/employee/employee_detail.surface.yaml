@@ -1,4 +1,4 @@
-# Employee — party profile + optional latch_users link
+# Employee — person profile + staff marker + identity provision
 id: employee_detail
 displayName: Employee detail
 anchorTable: employee
@@ -11,28 +11,40 @@ surfaceActions:
   - read
   - write
   - delete
+  - add_as_db_user
 
 tables:
-  - employee
   - party
+  - party_person
+  - party_phone
+  - party_email
+  - party_role
+  - employee
 
 fields:
   - id: profile
     columns:
       - column: party.id
         type: string
-      - column: party.kind
-        type: string
       - column: party.display_name
         type: string
-      - column: party.legal_name
+      - column: party_person.first_name
+        type: string
+      - column: party_person.last_name
+        type: string
+      - column: party_person.nick_name
         type: string
         nullable: true
-      - column: party.notes
+      - column: party_person.avatar_url
         type: string
         nullable: true
-  - id: account_link
+  - id: phones
+    # logical — DAL maps to party_phone; see docs/child-collections.md
+    columns: []
+  - id: emails
+    # logical — DAL maps to party_email; see docs/child-collections.md
+    columns: []
+  - id: staff
     columns:
-      - column: employee.latch_user_id
+      - column: employee.party_id
         type: string
-        nullable: true

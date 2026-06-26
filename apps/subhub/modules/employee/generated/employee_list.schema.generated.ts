@@ -10,7 +10,7 @@ export const EmployeeListFieldIds = {
 export type EmployeeListFieldId = (typeof EmployeeListFieldIds)[keyof typeof EmployeeListFieldIds];
 
 export const employeeListColumnMap = {
-  summary: ["party.id", "party.display_name", "employee.latch_user_id"],
+  summary: ["party.id", "party.display_name", "party_person.latch_user_id"],
 } as const satisfies Record<EmployeeListFieldId, readonly string[]>;
 
 /** Full read DTO keyed by Field id (narrow with `narrowSchema(..., manifest, 'read')`). */
@@ -42,5 +42,5 @@ export const employeeListSurfacePolicyDef = defineSurfacePolicy({
   surface: "employee_list",
   fieldIds: Object.values(EmployeeListFieldIds),
   fieldActions: ["read", "write"],
-  surfaceActions: ["read"],
+  surfaceActions: ["read", "create"],
 });

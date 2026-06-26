@@ -33,8 +33,8 @@ const insertMasterUser = async (
   passwordHash: string,
 ): Promise<string> => {
   const userResult = await client.query<{ id: string }>(
-    `INSERT INTO latch_users (id, login_name, password_hash)
-     VALUES (gen_random_uuid()::text, $1, $2)
+    `INSERT INTO latch_users (id, login_name, password_hash, must_change_password)
+     VALUES (gen_random_uuid()::text, $1, $2, false)
      RETURNING id`,
     [loginName, passwordHash],
   );

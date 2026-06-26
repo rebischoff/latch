@@ -4,10 +4,7 @@ import {
   withApiHandler,
 } from "@latch/app-kit";
 
-import { withSubhubApiHandler } from "../../../../lib/api-handler";
 import { resolveContext, resolveContextFresh } from "../../../../lib/latch";
-import { ensureJobsDal } from "../../../../lib/jobs/dal";
-import { assertSurfaceRead } from "../../../../lib/surfaces/assert-surface-read";
 import { loadSurfaceDetailQuery } from "../../../../lib/surfaces/load-surface-detail";
 import { getSurfaceDetailDal } from "../../../../lib/surfaces/surface-loader-registry";
 
@@ -38,23 +35,6 @@ export const GET = async (
     const { id } = await context.params;
     const { data, manifest } = await loadSurfaceDetailQuery("job_detail", id);
     return jsonSuccess(data, manifest);
-  });
-
-export const POST = async (
-  request: Request,
-  context: { params: Promise<{ id: string }> },
-): Promise<Response> =>
-  withSubhubApiHandler(async () => {
-    const { id } = await context.params;
-    const ctx = await resolveContextFresh({
-      surfaceId: "job_detail",
-      entityId: id,
-    });
-    assertSurfaceRead(ctx);
-    const body: unknown = await request.json();
-    const dal = await ensureJobsDal();
-    const data = await dal.jobDetail.create(ctx, id, body);
-    return jsonSuccess(data, ctx.manifest);
   });
 
 export const PATCH = async (

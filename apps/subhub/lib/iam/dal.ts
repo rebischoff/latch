@@ -1,3 +1,5 @@
+import { hashLatchPassword } from "@latch/adapter-better-auth";
+import { writeAudit } from "@latch/audit";
 import {
   ForbiddenError,
   ValidationError,
@@ -5,7 +7,6 @@ import {
   surfaceAllows,
   type PermissionContext,
 } from "@latch/contracts";
-import { writeAudit } from "@latch/audit";
 import { createSurfaceDal, type StoreAdapter, type SurfaceDal } from "@latch/dal";
 import {
   validateGrantTuple,
@@ -13,6 +14,8 @@ import {
 } from "@latch/policy";
 import type { Pool } from "pg";
 
+import { provisionLinkedDbUser } from "../contacts/identity/party-person-identity";
+import { assertProvisionPersonAccess } from "../provision-user";
 import { createRoleListStore } from "../../modules/iam/generated/role_list.store.generated";
 import { createUserDetailStore } from "../../modules/iam/generated/user_detail.store.generated";
 import { createUserListStore } from "../../modules/iam/generated/user_list.store.generated";
@@ -25,6 +28,7 @@ import {
   RoleListCreateSchema,
   userDetailDescriptor,
   userListDescriptor,
+  UserListCreateSchema,
   userRolesDetailDescriptor,
   type RoleDetailRelatedPatch,
   type RoleDetailRow,
@@ -56,8 +60,15 @@ export type RoleListDal = SurfaceDal & {
   ) => Promise<Record<string, unknown>>;
 };
 
+export type UserListDal = SurfaceDal & {
+  create: (
+    ctx: PermissionContext,
+    body: unknown,
+  ) => Promise<Record<string, unknown>>;
+};
+
 export type IamDal = {
-  userList: SurfaceDal;
+  userList: UserListDal;
   userDetail: SurfaceDal;
   userRolesDetail: SurfaceDal;
   roleList: RoleListDal;
@@ -351,6 +362,63 @@ const extendRoleListDal = (
   },
 });
 
+const extendUserListDal = (
+  pool: Pool,
+  getActorId: () => Promise<string>,
+  userListBaseDal: SurfaceDal,
+): UserListDal => ({
+  ...userListBaseDal,
+  create: async (ctx, body) => {
+    assertIamSurfaceRead(ctx);
+
+    if (!surfaceAllows(ctx.manifest, "create")) {
+      throw new ForbiddenError();
+    }
+
+    const parsed = UserListCreateSchema.safeParse(body);
+    if (!parsed.success) {
+      throw new ValidationError("Validation failed", parsed.error.flatten());
+    }
+
+    await assertProvisionPersonAccess(parsed.data.linkPartyId);
+
+    const roleIds = parsed.data.role_assignments ?? [];
+    if (!(await allRoleIdsExist(pool, roleIds))) {
+      throw new ValidationError("Unknown role id in role_assignments");
+    }
+
+    let passwordHash: string | undefined;
+    if (parsed.data.password !== undefined && parsed.data.password !== "") {
+      passwordHash = await hashLatchPassword(parsed.data.password);
+    }
+
+    const actorId = await getActorId();
+    const result = await provisionLinkedDbUser(pool, actorId, parsed.data.linkPartyId, {
+      login_name: parsed.data.login_name,
+      password_hash: passwordHash,
+      role_ids: roleIds,
+    });
+
+    const row = await loadUserRolesRow(pool, result.latch_user_id);
+    if (!row) {
+      throw new Error("Failed to load created user");
+    }
+
+    await writeAudit({
+      actorId: ctx.principal.id,
+      action: "insert",
+      tableName: userListDescriptor.anchorTable,
+      recordId: row.id,
+      moduleId: ctx.surface,
+      fieldIds: ["summary"],
+      before: null,
+      after: userListDescriptor.auditSnapshot(row),
+    });
+
+    return userListDescriptor.projectRow(row, ctx.manifest, {});
+  },
+});
+
 export const createIamDal = (options: CreateIamDalOptions): IamDal => {
   const registry = options.registry ?? subhubRegistry;
   const { pool, getActorId } = options;
@@ -359,11 +427,12 @@ export const createIamDal = (options: CreateIamDalOptions): IamDal => {
   const userDetailStore = createUserDetailStore(pool, getActorId);
   const roleListStore = createRoleListStore(pool, getActorId);
   const roleListBaseDal = createSurfaceDal(roleListDescriptor, roleListStore);
+  const userListBaseDal = createSurfaceDal(userListDescriptor, userListStore);
   const userRolesStore = createUserRolesDetailStore(pool, getActorId);
   const roleDetailStore = createRoleDetailStore(pool, getActorId, registry);
 
   const userList = withIamGate(
-    createSurfaceDal(userListDescriptor, userListStore),
+    extendUserListDal(pool, getActorId, userListBaseDal),
   );
   const userDetail = withIamGate(
     createSurfaceDal(userDetailDescriptor, userDetailStore),

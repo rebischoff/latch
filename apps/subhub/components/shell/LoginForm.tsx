@@ -11,6 +11,7 @@ import { RhfInput } from "@/components/form/RhfInput";
 import { RhfPassword } from "@/components/form/RhfPassword";
 import { loginPasswordFieldSchema } from "@/lib/auth-password";
 import {
+  changePasswordRequiredHref,
   sanitizeCallbackUrl,
 } from "@/lib/auth-utils";
 
@@ -64,7 +65,15 @@ export const LoginForm = () => {
       return;
     }
 
-    router.push(callbackUrl);
+    const payload = (await response.json().catch(() => null)) as {
+      mustChangePassword?: boolean;
+    } | null;
+
+    const destination = payload?.mustChangePassword
+      ? changePasswordRequiredHref(callbackUrl)
+      : callbackUrl;
+
+    router.push(destination);
     router.refresh();
   });
 

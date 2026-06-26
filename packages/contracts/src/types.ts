@@ -17,7 +17,8 @@ export type FieldAction =
   | "lose"
   | "complete"
   | "add_role"
-  | "remove_role";
+  | "remove_role"
+  | "add_as_db_user";
 
 export type SurfaceId = string;
 export type FieldId = string;

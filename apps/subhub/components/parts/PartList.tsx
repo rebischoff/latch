@@ -13,7 +13,6 @@ import { routes } from "@/lib/nav-routes";
 
 type PartListSummary = {
   mpn?: string | null;
-  description?: string | null;
   display_name?: string | null;
 };
 
@@ -39,8 +38,7 @@ export const PartList = ({ createManifest }: PartListProps) => {
   const { data, isLoading, isFetching, error } = useSurfaceList("part_list", listQuery);
 
   const onCreate = useCallback(() => {
-    const id = crypto.randomUUID();
-    router.push(`${routes.parts.detail(id)}?create=1`);
+    router.push(routes.parts.new);
   }, [router]);
 
   const onListRoute = pathname === routes.parts.list;
@@ -110,13 +108,6 @@ export const PartList = ({ createManifest }: PartListProps) => {
                   {summary?.mpn ?? row.id}
                 </Link>
               );
-            },
-          },
-          {
-            title: "Description",
-            render: (_, row) => {
-              const summary = row.summary as PartListSummary | undefined;
-              return summary?.description ?? "—";
             },
           },
           {

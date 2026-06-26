@@ -190,6 +190,50 @@ describe("PolicyService — system_data synthesis", () => {
     expect(binding.surfaceActions).toEqual(["read", "write", "delete"]);
   });
 
+  it("synthesizeDataMasterBinding: includes custom surfaceActions from registry", () => {
+    const surface = defineSurfacePolicy({
+      surface: "employee_detail",
+      fieldIds: ["profile", "emails"],
+      fieldActions: ["read", "write"],
+      surfaceActions: ["read", "write", "delete", "add_as_db_user"],
+      kind: "business",
+    });
+
+    const binding = synthesizeDataMasterBinding(surface);
+
+    expect(binding.surfaceActions).toEqual([
+      "read",
+      "write",
+      "delete",
+      "add_as_db_user",
+    ]);
+  });
+
+  it("system_data UUID on business surface with custom action in manifest", () => {
+    const registry = definePolicyRegistry(
+      defineSurfacePolicy({
+        surface: "employee_detail",
+        fieldIds: ["profile"],
+        fieldActions: ["read", "write"],
+        surfaceActions: ["read", "write", "delete", "add_as_db_user"],
+        kind: "business",
+      }),
+    );
+    const policy = new PolicyService({ registry });
+
+    const manifest = policy.resolve(systemPrincipal("system_data"), {
+      surface: "employee_detail",
+    });
+
+    expect(manifest.actions).toContain("add_as_db_user");
+    expect(manifest.actions).toEqual([
+      "read",
+      "write",
+      "delete",
+      "add_as_db_user",
+    ]);
+  });
+
   it("system_data UUID on business surface without per-role grant entry", () => {
     const registry = definePolicyRegistry(throwawayBusinessSurface);
     const policy = new PolicyService({

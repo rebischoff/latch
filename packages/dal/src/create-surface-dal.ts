@@ -418,11 +418,10 @@ export const createSurfaceDal = <TRow extends { id: string }, TRelated>(
             );
           }
 
-          const query = normalizeListQuery(
-            parsed.data as Record<string, unknown>,
-            defaultPageSize,
-          );
+          const parsedRecord = parsed.data as Record<string, unknown>;
+          const query = normalizeListQuery(parsedRecord, defaultPageSize);
           const { rows, total } = await store.list({
+            ...parsedRecord,
             principalId: ctx.principal.id,
             rowScope: ctx.manifest.rowScope ?? "all",
             scopeIds: ctx.manifest.scopeIds,

@@ -135,8 +135,8 @@ Type-specific **extra Fields** (e.g. `vendor_pricing` on `vendor_detail` in cata
 | Login link | `party_person.latch_user_id` | Nullable unique FK → `latch_users`. Any person (not only `employee`) may have a login. |
 | Staff HR | `employee` | HR extension only — **no** `latch_user_id` |
 | Permissions | `latch_user_roles` | Unchanged — keyed by `latch_users.id` |
-| IAM admin Surface | `user_list` / `user_roles_detail` | **Anchor `party_person`**; lens `latch_user_id IS NOT NULL`. Read + role/password actions — **not** create/delete users |
-| Provision login | `employee_detail`, `{role}_detail` (person) | **`add_as_db_user`** action: create `latch_users`, set link, designate login `party_email` (`is_login_email`) and sync → `login_email` |
+| IAM admin Surface | `user_list` / `user_roles_detail` | **Anchor `party_person`** (target); lens `latch_user_id IS NOT NULL`. List + detail: roles + password on **existing** users. **`user_list` `create`** for `POST` only — **no** list **New** in v1 |
+| Provision login | `employee_detail`, `{role}_detail` (person) | **`add_as_db_user`** initiates; **`/users/new`** executes (see [provision from person](#decision-provision-app-user-from-person-surface-2026-06-25)). Optional `party_email.is_login_email` sync → `login_email` |
 | Bootstrap master | `/setup` | May create `latch_users` without `party_person` until linked |
 
 **Email as login (separation of concerns):**
@@ -207,6 +207,52 @@ Type-specific **extra Fields** (e.g. `vendor_pricing` on `vendor_detail` in cata
 **Amended (2026-06-18):** Retired `account_link` / `employee.latch_user_id` Field — login provision via `add_as_db_user` on `party_person`.
 
 **Rationale:** Wave 1 party refactor and site slice do not need HR scope. Catalog documents the future Field list without blocking implementation. Name, phones, emails stay on party collections; IAM permissions stay on platform tables.
+
+
+### Decision: employee wave 0 — implementation (2026-06-25)
+
+**Status:** Locked for [task 28](../tasks/28-employee-detail.md).
+
+**Choice:**
+
+| # | Topic | Choice |
+|---|--------|--------|
+| 1 | Identity | **Full wave 0** on `employee_detail` — `add_as_db_user`, `party_email.is_login_email` migration, login-email sync; **`/users/new`** provision path ([amendment](#decision-provision-app-user-from-person-surface-2026-06-25)); IAM routes interim on `latch_users.id` |
+| 2a | YAML | **`modules/employee/`** |
+| 2b | Identity DAL/UI | **Shared** party-person helpers in `lib/contacts/`; grants evaluated **per active Surface** — same implementation, manifest must grant `add_as_db_user` on each Surface that exposes the action |
+| 3 | `add_role` / `remove_role` | **Omit** on `employee_detail` |
+| 4 | Form | **Extend** `PartyDetailForm` (`employee_detail` branch) |
+| 5 | Delete | **Allow** — operational FKs `SET NULL`; no `in_use` blocker |
+| 6 | Cross-nav | **App user** link → `/users/[latch_user_id]` until IAM identity wave |
+
+**Rationale:** Staff CRUD is the first production consumer of locked [party identity](#decision-party-identity--party_person-login-link-2026-06-18) provision. Identity logic is party-person infrastructure (link on `party_person`, not `employee`); employee Surface is the first wiring point. Per-Surface grants preserve separation between HR staff access and IAM role administration.
+
+**Amended (2026-06-25):** Provision UX and auth — [provision app user from person surface](#decision-provision-app-user-from-person-surface-2026-06-25). Task 28 steps 9–13 retrofit the interim modal + `POST …/add-as-db-user` path.
+
+
+### Decision: provision app user from person surface (2026-06-25)
+
+**Status:** Locked. Amends [party identity](#decision-party-identity--party_person-login-link-2026-06-18), [employee wave 0](#decision-employee-wave-0--implementation-2026-06-25), [`iam-user.md`](../surface-specs/iam-user.md), [`employee.md`](../surface-specs/employee.md). Implementation: [task 28](../tasks/28-employee-detail.md) steps 9–13.
+
+**Choice:** Split **intent** (person `{role}_detail`) from **execution** (`/users/new`). Shared party-person DAL links `party_person.latch_user_id`.
+
+| # | Topic | Choice |
+|---|--------|--------|
+| 1 | Initiate | Person surface **`add_as_db_user`** — UI **Add User** under title when `latch_user_id` null; linked state shows **App user** → `/users/[id]` |
+| 2 | Execute | Navigate **`/users/new?linkPartyId=<party_id>&returnTo=…`** ([provision return context](../decisions/general.md#decision-provision-user-return-context-2026-06-25)); Save → `replace(returnTo)`; Cancel → `push(returnTo)` |
+| 3 | Email | **Optional** at provision (`login_email` null OK); sync when **Login email** on person `emails`; checkbox when linked or `emails` writable |
+| 4 | Auth — show Add User | `add_as_db_user` on covering person surface (+ implicit person `read`) |
+| 4b | Auth — POST | **`add_as_db_user`** on server-resolved person lens **and** **`user_list` `create`** — separate grants (employee create ≠ user create) |
+| 5 | Form | `login_name` required; optional password + confirm; optional `role_assignments` (empty allowed); no `login_email` field |
+| 6 | Password | If set on create: `latch_users.must_change_password = true`; first login → `/change-password-required`; `/setup` master sets flag **false** |
+| 7 | Entry | **No** **New** on `/users` list; `/users/new` without valid `linkPartyId` → redirect `/users` |
+| 8 | Out of scope | Delete/unlink user; termination + role suspend; email invite; orphan create without person link |
+
+**Policy:** `system_data` synthesis must include **custom `surfaceActions`** from the surface registry (e.g. `add_as_db_user`) — see [`access-control.md`](../../../../packages/policy/docs/access-control.md#decision-data_master-wildcard-2026-06-02).
+
+**Retire:** Interim toolbar/modal **Add as DB user** + public `POST /api/employees/[id]/add-as-db-user` as the primary provision path (DAL helper may remain internal to user create).
+
+**Rationale:** Person surfaces own HR/contact context; IAM-shaped create belongs on `/users/new`. Matches `/new` + return convention; email optional per [party identity](#decision-party-identity--party_person-login-link-2026-06-18); dual POST gate preserves separation between staff lens access and platform user creation.
 
 
 ### Decision: org subsidiaries — separate tagged parties (Model A) (2026-06-18)

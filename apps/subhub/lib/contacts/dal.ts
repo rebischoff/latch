@@ -11,11 +11,16 @@ import {
   contactDetailDescriptor,
   contactListDescriptor,
   customerListDescriptor,
+  employeeDetailDescriptor,
+  employeeListDescriptor,
   manufacturerDetailDescriptor,
   manufacturerListDescriptor,
   vendorListDescriptor,
 } from "./descriptors";
 import { createContactDetailStore, createPartyListStore } from "./repository";
+import { extendEmployeeDetailDal } from "./stores/employee-detail-create";
+import { createEmployeeDetailStore } from "./stores/employee-detail-store";
+import { createEmployeeListStore } from "./stores/employee-list-store";
 import { extendManufacturerDetailDal } from "./stores/manufacturer-detail-create";
 import { createManufacturerDetailStore } from "./stores/manufacturer-detail-store";
 import { ensureAuditBootstrap, getPool, getPrincipal } from "../latch";
@@ -38,6 +43,14 @@ export type ManufacturerDetailDal = SurfaceDal & {
   ) => Promise<Record<string, unknown>>;
 };
 
+export type EmployeeDetailDal = SurfaceDal & {
+  create: (
+    ctx: PermissionContext,
+    id: string,
+    body: unknown,
+  ) => Promise<Record<string, unknown>>;
+};
+
 export type ContactsDal = {
   contactList: SurfaceDal;
   contactDetail: SurfaceDal;
@@ -45,6 +58,8 @@ export type ContactsDal = {
   vendorList: SurfaceDal;
   manufacturerList: SurfaceDal;
   manufacturerDetail: ManufacturerDetailDal;
+  employeeList: SurfaceDal;
+  employeeDetail: EmployeeDetailDal;
 };
 
 export type CreateContactsDalOptions = {
@@ -87,6 +102,17 @@ export const createContactsDal = (
     getActorId,
     manufacturerDetailBaseDal,
   );
+  const employeeListStore = createEmployeeListStore(pool);
+  const employeeDetailStore = createEmployeeDetailStore(pool, getActorId);
+  const employeeDetailBaseDal = createSurfaceDal(
+    employeeDetailDescriptor,
+    employeeDetailStore,
+  );
+  const employeeDetail = extendEmployeeDetailDal(
+    pool,
+    getActorId,
+    employeeDetailBaseDal,
+  );
 
   return {
     contactList: createSurfaceDal(contactListDescriptor, contactListStore),
@@ -98,6 +124,8 @@ export const createContactsDal = (
       manufacturerListStore,
     ),
     manufacturerDetail,
+    employeeList: createSurfaceDal(employeeListDescriptor, employeeListStore),
+    employeeDetail,
   };
 };
 

@@ -34,6 +34,7 @@ export const FIELD_ACTIONS = [
   "complete",
   "add_role",
   "remove_role",
+  "add_as_db_user",
 ] as const;
 
 export type PolicyFieldAction = (typeof FIELD_ACTIONS)[number];

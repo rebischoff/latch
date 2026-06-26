@@ -9,7 +9,7 @@ export type ListQuery = {
   status?: string;
   limit: number;
   offset: number;
-};
+} & Record<string, unknown>;
 
 export type ListResult<TRow> = {
   rows: TRow[];

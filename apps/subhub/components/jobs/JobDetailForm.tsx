@@ -29,7 +29,7 @@ import {
   type JobStakeholderFormRow,
 } from "@/components/jobs/JobStakeholderFields";
 import { useJobSitePicker } from "@/lib/hooks/use-job-site-picker";
-import { useSurfaceCreate } from "@/lib/hooks/use-surface-create";
+import { useSurfaceListCreate } from "@/lib/hooks/use-surface-list-create";
 import { useSurfaceDetail } from "@/lib/hooks/use-surface-detail";
 import { useSurfacePatch } from "@/lib/hooks/use-surface-patch";
 import {
@@ -67,7 +67,6 @@ const jobKindLabel = (kind: string): string =>
 type JobDetailFormProps = {
   jobId: string;
   manifest: Manifest;
-  isCreate?: boolean;
   canNavigateSite: boolean;
   canNavigateEstimate: boolean;
 };
@@ -180,10 +179,10 @@ const ProfileJobKind = ({ jobKind }: { jobKind: string }) => {
 export const JobDetailForm = ({
   jobId,
   manifest,
-  isCreate = false,
   canNavigateSite,
   canNavigateEstimate,
 }: JobDetailFormProps) => {
+  const isCreate = jobId === "new";
   const router = useRouter();
   const { message } = App.useApp();
   const { data: detail, isLoading, isFetching, error } = useSurfaceDetail(
@@ -192,7 +191,7 @@ export const JobDetailForm = ({
   );
   const { data: sitePicker, isLoading: sitePickerLoading } = useJobSitePicker();
   const patch = useSurfacePatch("job_detail", jobId);
-  const create = useSurfaceCreate("job_detail", jobId);
+  const create = useSurfaceListCreate("job_list", "job_detail");
 
   const activeManifest = detail?.manifest ?? manifest;
   const profile = detail?.data.profile as
@@ -289,9 +288,10 @@ export const JobDetailForm = ({
 
     try {
       if (isCreate) {
-        await create.mutateAsync(body);
+        const result = await create.mutateAsync(body);
+        const newId = String(result.data.id);
         message.success("Job created");
-        router.replace(routes.jobs.detail(jobId));
+        router.replace(routes.jobs.detail(newId));
         router.refresh();
         return;
       }

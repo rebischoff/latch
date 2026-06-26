@@ -56,8 +56,7 @@ export const ManufacturerList = ({ createManifest }: ManufacturerListProps) => {
   );
 
   const onCreate = useCallback(() => {
-    const id = crypto.randomUUID();
-    router.push(`${routes.manufacturers.detail(id)}?create=1`);
+    router.push(routes.manufacturers.new);
   }, [router]);
 
   const onListRoute = pathname === routes.manufacturers.list;

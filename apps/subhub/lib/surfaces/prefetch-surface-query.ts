@@ -58,12 +58,12 @@ export const prefetchSurfaceDetail = async (
   const queryKey = surfaceDetailKey(surfaceId, entityId);
   try {
     await Promise.all([
-      queryClient.prefetchQuery({
+      queryClient.fetchQuery({
         queryKey,
         queryFn: () => loadSurfaceDetailQuery(surfaceId, entityId),
       }),
       ...extraLists.map((listId) =>
-        queryClient.prefetchQuery({
+        queryClient.fetchQuery({
           queryKey: surfaceListKey(listId),
           queryFn: () => loadSurfaceListQuery(listId),
         }),

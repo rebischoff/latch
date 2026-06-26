@@ -5,14 +5,18 @@ import { z } from "zod";
 
 export const EmployeeDetailFieldIds = {
   profile: "profile",
-  account_link: "account_link",
+  phones: "phones",
+  emails: "emails",
+  staff: "staff",
 } as const;
 
 export type EmployeeDetailFieldId = (typeof EmployeeDetailFieldIds)[keyof typeof EmployeeDetailFieldIds];
 
 export const employeeDetailColumnMap = {
-  profile: ["party.id", "party.kind", "party.display_name", "party.legal_name", "party.notes"],
-  account_link: ["employee.latch_user_id"],
+  profile: ["party.id", "party.display_name", "party_person.first_name", "party_person.last_name", "party_person.nick_name", "party_person.avatar_url"],
+  phones: [],
+  emails: [],
+  staff: ["employee.party_id"],
 } as const satisfies Record<EmployeeDetailFieldId, readonly string[]>;
 
 /** Full read DTO keyed by Field id (narrow with `narrowSchema(..., manifest, 'read')`). */
@@ -20,13 +24,16 @@ export const EmployeeDetailSchema = z.object({
   id: z.string(),
   profile: z.object({
     id: z.string(),
-    kind: z.string(),
     display_name: z.string(),
-    legal_name: z.string().nullable(),
-    notes: z.string().nullable(),
+    first_name: z.string(),
+    last_name: z.string(),
+    nick_name: z.string().nullable(),
+    avatar_url: z.string().nullable(),
   }),
-  account_link: z.object({
-    latch_user_id: z.string().nullable(),
+  phones: z.array(z.object({ user_id: z.string() })),
+  emails: z.array(z.object({ user_id: z.string() })),
+  staff: z.object({
+    party_id: z.string(),
   }),
 });
 
@@ -35,15 +42,18 @@ export const EmployeeDetailPatchSchema = z.object({
   profile: z
     .object({
       id: z.string().optional(),
-      kind: z.string().optional(),
       display_name: z.string().optional(),
-      legal_name: z.string().nullable().optional(),
-      notes: z.string().nullable().optional(),
+      first_name: z.string().optional(),
+      last_name: z.string().optional(),
+      nick_name: z.string().nullable().optional(),
+      avatar_url: z.string().nullable().optional(),
     })
     .optional(),
-  account_link: z
+  phones: z.array(z.object({ user_id: z.string() })).optional(),
+  emails: z.array(z.object({ user_id: z.string() })).optional(),
+  staff: z
     .object({
-      latch_user_id: z.string().nullable().optional(),
+      party_id: z.string().optional(),
     })
     .optional(),
 });
@@ -56,5 +66,5 @@ export const employeeDetailSurfacePolicyDef = defineSurfacePolicy({
   surface: "employee_detail",
   fieldIds: Object.values(EmployeeDetailFieldIds),
   fieldActions: ["read", "write"],
-  surfaceActions: ["read", "write", "delete"],
+  surfaceActions: ["read", "write", "delete", "add_as_db_user"],
 });

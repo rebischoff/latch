@@ -22,6 +22,7 @@ export type PartyRoleFilter =
   | "customer"
   | "vendor"
   | "manufacturer"
+  | "employee"
   | "property_owner";
 
 export {
@@ -29,6 +30,13 @@ export {
   loadManufacturerDetailRelated,
   loadPartyOtherRoles,
 } from "./repository/manufacturer";
+
+export {
+  loadEmployeeDetail,
+  loadEmployeeDetailRelated,
+} from "./repository/employee-write";
+
+export { loadEmployeeList } from "./repository/employee";
 
 export type PartyListRow = {
   id: string;
@@ -185,7 +193,7 @@ export const loadPartyEmails = async (
   partyId: string,
 ): Promise<PartyEmailRow[]> => {
   const result = await pool.query<PartyEmailRow>(
-    `SELECT id, label, address, is_primary
+    `SELECT id, label, address, is_primary, is_login_email
      FROM party_email
      WHERE party_id = $1
      ORDER BY sort_order, id`,
@@ -231,6 +239,7 @@ const replacePartyCollection = async (
   partyId: string,
   rows: Array<{
     id?: string;
+    is_login_email?: boolean;
     label: string;
     is_primary: boolean;
     sort_order: number;
@@ -257,6 +266,29 @@ const replacePartyCollection = async (
 
   for (const row of rows) {
     const id = row.id ?? crypto.randomUUID();
+    if (table === "party_email") {
+      await client.query(
+        `INSERT INTO party_email (id, party_id, label, address, is_primary, is_login_email, sort_order)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         ON CONFLICT (id) DO UPDATE SET
+           label = EXCLUDED.label,
+           address = EXCLUDED.address,
+           is_primary = EXCLUDED.is_primary,
+           is_login_email = EXCLUDED.is_login_email,
+           sort_order = EXCLUDED.sort_order`,
+        [
+          id,
+          partyId,
+          row.label,
+          row.value,
+          row.is_primary,
+          row.is_login_email ?? false,
+          row.sort_order,
+        ],
+      );
+      continue;
+    }
+
     await client.query(
       `INSERT INTO ${table} (id, party_id, label, ${valueColumn}, is_primary, sort_order)
        VALUES ($1, $2, $3, $4, $5, $6)
@@ -295,6 +327,11 @@ export const replacePartyEmailsTx = async (
   partyId: string,
   rows: PartyEmailPatchRow[],
 ): Promise<void> => {
+  const loginCount = rows.filter((row) => row.is_login_email).length;
+  if (loginCount > 1) {
+    throw new ValidationError("At most one login email per party");
+  }
+
   await replacePartyCollection(
     client,
     "party_email",
@@ -303,6 +340,7 @@ export const replacePartyEmailsTx = async (
       id: row.id,
       label: row.label,
       is_primary: row.is_primary,
+      is_login_email: row.is_login_email,
       sort_order: index,
       value: row.address,
     })),

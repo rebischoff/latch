@@ -83,7 +83,10 @@ export const synthesizeDataMasterBinding = (
     field,
     actions: BUILTIN_FIELD_ACTIONS,
   })),
-  surfaceActions: BUILTIN_SURFACE_ACTIONS,
+  surfaceActions: unionSurfaceActions([
+    BUILTIN_SURFACE_ACTIONS,
+    [...surfaceDef.surfaceActions],
+  ]),
 });
 
 /** Synthesized grants when principal holds `system_iam` on an IAM surface. */

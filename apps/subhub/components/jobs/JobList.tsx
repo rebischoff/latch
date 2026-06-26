@@ -27,8 +27,7 @@ export const JobList = ({ createManifest }: JobListProps) => {
   const { data, isLoading, error } = useSurfaceList("job_list");
 
   const onCreate = useCallback(() => {
-    const id = crypto.randomUUID();
-    router.push(`${routes.jobs.detail(id)}?create=1`);
+    router.push(routes.jobs.new);
   }, [router]);
 
   const onListRoute = pathname === routes.jobs.list;

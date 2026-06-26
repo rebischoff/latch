@@ -2,7 +2,7 @@
 
 > **Wave:** 0 · **Status:** target spec (2026-06-19) — **shipped:** `employee_list` + `employee_detail` (interim YAML) · **Contrast:** person-only base lens + staff marker + identity provision — no org hub — [`manufacturer.md`](./manufacturer.md) · **Catalog:** [`surfaces.md`](../surfaces.md#employee_list--employee_detail) · **DBML:** `party`, `party_person`, `employee`, `labor_class` *(costing FK deferred)* · **Decisions:** [employee scope](../decisions/party.md#decision-employee_detail-scope--marker-now-hr-later-2026-06-17), [HR fields deferred](../decisions/party.md#decision-employee-hr-fields-deferred-2026-06-16), [party identity](../decisions/party.md#decision-party-identity--party_person-login-link-2026-06-18), [labor class](../decisions/catalog.md#decision-catalog--simplified-parts-items-categories-2026-06-16)
 
-**Related:** IAM role admin on **`user_roles_detail`** — provision login here via **`add_as_db_user`**, not on IAM pane ([`iam-user.md`](./iam-user.md)). Subcontract labor uses **`job_party`**, not `employee`. **Retire:** shipped `employee.latch_user_id` + `account_link` Field at identity wave.
+**Related:** IAM role admin on **`user_roles_detail`** for **existing** users. **Provision** login: person surface **Add User** → **`/users/new`** ([`iam-user.md`](./iam-user.md), [provision decision](../decisions/party.md#decision-provision-app-user-from-person-surface-2026-06-25)). Subcontract labor uses **`job_party`**, not `employee`. **Retire:** shipped `employee.latch_user_id` + `account_link` Field at identity wave.
 
 ---
 
@@ -16,7 +16,7 @@
 | 4 | Trade / “type” for estimates | **`default_labor_class_id`** → catalog **`labor_class`** — **not** a separate employee-type enum; lands in **costing slice** (DDL + Surface Fields deferred until `labor_class_table` exists) |
 | 5 | Pay & burdened rates | Org rates on deferred **`labor_rate`** + **`burden_profile`** (keyed by `labor_class`); **snapshotted** on `estimate_line.unit_cost` / `unit_price` at quote time — **not** live columns on `employee` |
 | 6 | `job_title` vs `labor_class` | **Distinct** — `job_title` is HR display (deferred); costing / quote defaults use **`labor_class`** |
-| 7 | Identity | **`add_as_db_user`** on this Surface; IAM list (`user_roles_detail`) is roles + password only — no create/delete user |
+| 7 | Identity | **`add_as_db_user`** initiates **Add User** → `/users/new`; IAM **`user_list` `create`** on POST; existing users: roles + password on `user_roles_detail` |
 | 8 | Termination | Future **`employment_status`** on `employee`; IAM **suspends roles** — do not delete `latch_users` when history/payroll access may still be required |
 | 9 | Subcontract labor | **`job_party`** + `subcontractor` relation — not `employee` |
 | 10 | Operational attribution | Existing FKs (`job_work_item.reported_by`, `requested_order.requested_by`, …) — attribution only; **no** v1 job assignment / crew scheduling |
@@ -92,7 +92,7 @@
 | `phones` | collection | read + write | `party_phone` | replace-array PATCH |
 | `emails` | collection | read + write | `party_email` | `is_login_email` when linked; sync → `latch_users.login_email` |
 | `staff` | scalar | read | `employee.party_id` | Marker — row exists when person is staff; not user-editable |
-| `add_as_db_user` | action | — | creates `latch_users`, sets `party_person.latch_user_id`, designates login `party_email` | Requires writable `emails`; see [identity decision](../decisions/party.md#decision-party-identity--party_person-login-link-2026-06-18) |
+| `add_as_db_user` | action | — | Navigates to `/users/new` with `linkPartyId`; POST creates `latch_users`, sets `party_person.latch_user_id`; optional sync if `is_login_email` row exists |
 
 **Omit on wave 0:** HR scalars, `default_labor_class`, `related_*`, org hub Fields, IAM `role_assignments`.
 
@@ -210,7 +210,7 @@
 
 | Action | Behavior |
 |--------|----------|
-| `add_as_db_user` | Create `latch_users` (`login_name` from policy/UI); set `party_person.latch_user_id`; require designated `party_email.is_login_email`; sync `address` → `latch_users.login_email` same transaction |
+| `add_as_db_user` | Navigate to `/users/new?linkPartyId=…&returnTo=…`; user create POST (see [`iam-user.md`](./iam-user.md)) sets `party_person.latch_user_id`; copy `login_email` only if designated `is_login_email` row exists |
 
 **Transactions:** each mutation single transaction; audit on success.
 
@@ -241,7 +241,10 @@ Single column — no tree, no related panels:
 
 ```text
 ┌─────────────────────────────────────────┐
-│ SurfaceToolbar — Add as DB user | Save …  │
+│ SurfaceToolbar — Save | Revert | Delete │
+├─────────────────────────────────────────┤
+│ {display_name}                          │
+│ [Add User] or [App user] link           │  ← identity chrome under title
 ├─────────────────────────────────────────┤
 │ profile → phones → emails               │
 │ staff (read-only badge)                 │
@@ -261,8 +264,14 @@ Single column — no tree, no related panels:
 |----------|--------|---------|
 | 1 | Save | PATCH `employee_detail` |
 | 2 | New (list) | POST create |
-| 3 | Add as DB user | `add_as_db_user` when no `latch_user_id` |
-| 4 | Delete | confirm modal → DELETE |
+| 3 | Delete | confirm modal → DELETE |
+
+**Under title (identity chrome):**
+
+| State | Control |
+|-------|---------|
+| No `latch_user_id` | **Add User** → `/users/new?linkPartyId=…&returnTo=…` when `add_as_db_user` granted |
+| Linked | **App user** link → `/users/[latch_user_id]` (interim) |
 
 ### Linked Surfaces (navigation only v1)
 
@@ -282,7 +291,7 @@ No `related_work_items` or job assignment UI on this Surface in v1.
 | Field | Add | Pickers | Empty state |
 |-------|-----|---------|-------------|
 | `phones` | inline row | — | "No phone numbers" |
-| `emails` | inline row | — | "No email addresses"; **login email** checkbox when user linked or during `add_as_db_user` flow |
+| `emails` | inline row | — | "No email addresses"; **Login email** checkbox when person linked or `emails` writable |
 
 ---
 
@@ -291,7 +300,7 @@ No `related_work_items` or job assignment UI on this Surface in v1.
 | Event | Transition | Notes |
 |-------|------------|-------|
 | Create employee | POST | `party` person + `employee` row + `employee` tag |
-| Provision login | `add_as_db_user` | Creates `latch_users`; operator assigns roles on IAM pane |
+| Provision login | **Add User** → `/users/new` | Creates `latch_users` + link; optional roles on create; return to employee |
 | Terminate (HR slice) | PATCH `employment` | `employment_status = terminated`; IAM role suspend is separate step |
 | Remove employee tag | `remove_role` | Does not delete `party` or `employee` row — clarify product: usually terminate instead |
 | Delete employee | DELETE | Hard delete party subtree when allowed; attribution FKs nulled |
@@ -304,7 +313,7 @@ No `related_work_items` or job assignment UI on this Surface in v1.
 |-------|----------|
 | **Organization POST** | Reject — employees are persons only |
 | **Duplicate login email** | `latch_users.login_email` UNIQUE; app pre-check on `add_as_db_user` / `emails` sync |
-| **`add_as_db_user` without email** | Reject — must designate `is_login_email` row |
+| **`add_as_db_user` without email** | **Allowed** — `login_email` null; designate login row on person `emails` later |
 | **Employee without login** | Normal — field tech may have no app account |
 | **Person with login, not staff** | Allowed — `party_person.latch_user_id` without `employee` row; IAM list shows user; no `/employees` row |
 | **Shipped `employee.latch_user_id`** | Migrate to `party_person.latch_user_id`; drop column + `account_link` Field |

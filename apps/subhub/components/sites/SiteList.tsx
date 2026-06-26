@@ -28,8 +28,7 @@ export const SiteList = ({ createManifest }: SiteListProps) => {
   const { data, isLoading, error } = useSurfaceList("site_list");
 
   const onCreate = useCallback(() => {
-    const id = crypto.randomUUID();
-    router.push(`${routes.sites.detail(id)}?create=1`);
+    router.push(routes.sites.new);
   }, [router]);
 
   const onListRoute = pathname === routes.sites.list;

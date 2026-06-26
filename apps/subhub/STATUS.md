@@ -5,13 +5,11 @@
 
 - **Package:** `@latch/subhub` · **Port:** 3003
 - **Docs:** [`docs/README.md`](./docs/README.md) · **Tasks:** [`docs/tasks/01-task-index.md`](./docs/tasks/01-task-index.md)
-- **State:** Task **26** IAM role CRUD **complete**. Task **25** manufacturer detail stop gate still open on index. **Next:** [task 27](./docs/tasks/27-create-route-retrofit.md) create-route retrofit (parallel) or **25 step 10** stop gate.
+- **State:** Task **28** employee detail **complete**. Task **27** create-route retrofit **complete**. Task **26** IAM role CRUD **complete**. Task **25** manufacturer detail — stop gate pending.
 
 ## Right now — do this next
 
-**Task 27 — Create route retrofit** — [`27-create-route-retrofit.md`](./docs/tasks/27-create-route-retrofit.md): migrate parts, manufacturers, sites, jobs, estimates from `?create=1` + client UUID to `/new` + DB-assigned id.
-
-*(Task 25 step 10 stop gate remains on the manufacturer wave checklist — close when ready.)*
+**Task 25 step 10** — manufacturer stop gate ([`25-manufacturer-detail.md`](./docs/tasks/25-manufacturer-detail.md#step-10--stop-gate)).
 
 ## Blockers
 
@@ -21,17 +19,26 @@ None.
 
 | Slice | Focus | State |
 |-------|--------|-------|
-| **01 — Party lenses** | Task 25 manufacturer detail | **active** — step 10 stop gate pending |
+| **01 — Party lenses** | Task 28 employee detail | **complete** ([task 28](./docs/tasks/28-employee-detail.md)) |
 | **00 — IAM** | Task 26 role CRUD | **complete** ([task 26](./docs/tasks/26-iam-role-crud.md)) |
 | **03 — Catalog** | Wave 3b items | **queued** — after task 25; [`item.md`](./docs/surface-specs/item.md) (#15) |
 | **04 — Estimates** | Wave 4a flat quote UI | **complete** ([task 22](./docs/tasks/22-estimate-wave-4a.md)); line UI **interim** until 4d′ |
 | **05 — Jobs** | Wave 5a shell | **complete** ([task 23](./docs/tasks/23-job-wave-5a.md)) |
 | [02 — Sites](./docs/tasks/01-task-index.md#task-20--ui-discovery) | Sites CRM slice | complete |
-| **Surface specs** | Implement-tier docs | **16/27** — `manufacturer.md` ✅ spec (#6); implementation in task 25 |
+| **Surface specs** | Implement-tier docs | **16/27** — `employee.md` ✅ shipped in task 28 |
 | **UI discovery** | Task 20 | complete (2026-06-23) |
 
 ## Recently completed
 
+- **Task 28 — Employee detail (stop gate)** — provision retrofit verified: email PATCH → `latch_users.login_email` sync; no **New** on `/users` list; `codegen:check` passed (2026-06-25).
+- **Task 28 step 12 — Forced password change gate** — `/change-password-required` page + form; `POST /api/account/change-password-required`; `requireAuth` redirects when flag set; login redirects after success (2026-06-25).
+- **Task 28 step 11 — Policy synthesis + `must_change_password`** — `synthesizeDataMasterBinding` unions custom `surfaceActions`; migration `026`; flag on admin-set password; setup master `false`; retired `POST …/add-as-db-user` (2026-06-25).
+- **Task 28 step 10 — `/users/new` + user create API** — `user_list` `create`; `POST /api/iam/users`; `UserCreateForm`; dual auth (`user_list` create + `add_as_db_user`); `provisionLinkedDbUser` DAL (2026-06-25).
+- **Task 28 step 9 — Provision UI retrofit** — **Add User** under employee title → `/users/new?linkPartyId&returnTo`; dirty-navigate confirm; login email checkbox when linked or `emails` writable; removed toolbar modal + `useEmployeeAddAsDbUser` (2026-06-25).
+- **Task 28 steps 1–8 — Employee detail (interim)** — CRUD, `is_login_email`, shared identity DAL, interim modal provision (2026-06-25). **Steps 10–13** provision retrofit documented — [decision](./docs/decisions/party.md#decision-provision-app-user-from-person-surface-2026-06-25).
+- **Task 28 planning (amend)** — locked provision UX: **Add User** → `/users/new`, dual auth gate, optional email/password, `must_change_password` (2026-06-25).
+- **Task 27 — Create route retrofit** — parts, manufacturers, sites, jobs, estimates on `/new` + server-assigned id; list POST via `createListFromRegistry`; picker return to `/manufacturers/new` (2026-06-25).
+- **Task 28 planning** — employee wave 0 decisions locked in [`party.md`](./docs/decisions/party.md#decision-employee-wave-0--implementation-2026-06-25); task file [`28-employee-detail.md`](./docs/tasks/28-employee-detail.md) (2026-06-25).
 - **Task 26 — IAM role CRUD** — `/roles/new` + POST create; app role grant edit/delete; system `display_name` save; delete `in_use` blocker; P8 self-grant guard; `codegen:check` + DAL smoke (`scripts/iam-role-crud-smoke.mjs`) (2026-06-25).
 - **Task 25 step 11** — `LinkedSelectInput` + `useConfirmDirtyNavigate`: compact select + open icon + `… Add {entity}` sentinel option; `PartDetailForm` manufacturer picker; `PartVendorPricingFields` vendor cell open icon (2026-06-24).
 - **Task 25 step 11 (spec)** — `LinkedSelectInput` UX locked: `… Add {entity}` dropdown option + open icon; dirty-navigate confirm (v1); vendor grid open icon; decisions in [`general.md`](./docs/decisions/general.md); task step + [`part.md`](./docs/surface-specs/part.md) §I updated — implementation pending (2026-06-24).
@@ -53,7 +60,8 @@ None.
 
 ## Pointers
 
-- [Task 26 — IAM role CRUD](./docs/tasks/26-iam-role-crud.md) · [Task 27 — create route retrofit](./docs/tasks/27-create-route-retrofit.md)
-- [Task 25 — manufacturer detail](./docs/tasks/25-manufacturer-detail.md) · [LinkedSelectInput step 11](./docs/tasks/25-manufacturer-detail.md#step-11--linked-picker-control-linkedselectinput) · [Picker return context](./docs/decisions/general.md#decision-picker-return-context--url-protocol-2026-06-24) · [Manufacturer spec](./docs/surface-specs/manufacturer.md)
-- [Task 24 — part wave 3a](./docs/tasks/24-part-wave-3a.md) · [Part spec](./docs/surface-specs/part.md) · [Item spec](./docs/surface-specs/item.md) (next after 25)
+- [Task 28 — employee detail](./docs/tasks/28-employee-detail.md) · [Employee spec](./docs/surface-specs/employee.md) · [Party identity decision](./docs/decisions/party.md#decision-employee-wave-0--implementation-2026-06-25)
+- [Task 27 — create route retrofit](./docs/tasks/27-create-route-retrofit.md) · [Task 26 — IAM role CRUD](./docs/tasks/26-iam-role-crud.md)
+- [Task 25 — manufacturer detail](./docs/tasks/25-manufacturer-detail.md) · [Manufacturer spec](./docs/surface-specs/manufacturer.md)
+- [Task 24 — part wave 3a](./docs/tasks/24-part-wave-3a.md) · [Item spec](./docs/surface-specs/item.md) (after 25)
 - [Schema DBML](./docs/schema/current.dbml) · [Decisions](./docs/decisions/README.md)

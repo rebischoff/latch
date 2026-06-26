@@ -1,4 +1,4 @@
-# Employees — party subset with latch user link
+# Employees — party subset filtered by party_role.employee (DAL)
 id: employee_list
 displayName: Employee list
 anchorTable: party
@@ -9,11 +9,13 @@ fieldActions:
 
 surfaceActions:
   - read
+  - create
 
 tables:
   - party
-  - employee
   - party_role
+  - party_person
+  - employee
 
 fields:
   - id: summary
@@ -22,6 +24,6 @@ fields:
         type: string
       - column: party.display_name
         type: string
-      - column: employee.latch_user_id
+      - column: party_person.latch_user_id
         type: string
         nullable: true
