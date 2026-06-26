@@ -73,6 +73,32 @@ const normalizeRoleDetailRelated = (
   grants: related.grants ?? [],
 });
 
+export const RoleListCreateSchema = z
+  .object({
+    catalog: z.object({
+      display_name: z.string(),
+    }),
+    surface_bindings: z
+      .array(
+        z.object({
+          surface_id: z.string(),
+          row_scope: z.string().nullable().optional(),
+        }),
+      )
+      .optional(),
+    grants: z
+      .array(
+        z.object({
+          surface_id: z.string(),
+          field_id: z.string().nullable(),
+          action: z.string(),
+          mode: z.string().nullable().optional(),
+        }),
+      )
+      .optional(),
+  })
+  .strict();
+
 export const RoleDetailPatchSchema = z
   .object({
     catalog: z
@@ -197,15 +223,15 @@ export const applyRoleDetailPatch = (
   row: RoleDetailRow,
   patch: Record<string, unknown>,
 ): RoleDetailRow => {
-  if (isSystemRoleClass(row.role_class)) {
-    return row;
-  }
-
   const next = { ...row };
   const typed = patch as z.infer<typeof RoleDetailPatchSchema>;
 
   if (typed.catalog?.display_name !== undefined) {
     next.display_name = typed.catalog.display_name;
+  }
+
+  if (isSystemRoleClass(row.role_class)) {
+    return next;
   }
 
   return next;

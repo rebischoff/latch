@@ -6,6 +6,7 @@
 /** Actions grantable on a Surface or Field. */
 export type FieldAction =
   | "read"
+  | "create"
   | "write"
   | "submit"
   | "delete"

@@ -2,6 +2,7 @@ import { ForbiddenError } from "@latch/contracts";
 import { withPermissionDb } from "@latch/pg-session";
 import type { Pool, PoolClient } from "pg";
 
+import { InUseError, type DeleteBlocker } from "../errors";
 import type {
   RoleDetailRelated,
   RoleDetailRow,
@@ -120,6 +121,78 @@ export const loadRoleDetailRelated = async (
   };
 };
 
+export type InsertAppRoleInput = {
+  displayName: string;
+  surfaceBindings?: SurfaceBindingTuple[];
+  grants?: RoleGrantTuple[];
+};
+
+export const insertAppRole = async (
+  pool: Pool,
+  actorId: string,
+  input: InsertAppRoleInput,
+): Promise<RoleDetailRow> => {
+  return withPermissionDb(pool, actorId, async (client) => {
+    const insertResult = await client.query<RoleDetailRow>(
+      `INSERT INTO latch_roles (id, role_class, display_name)
+       VALUES (gen_random_uuid(), 'app', $1)
+       RETURNING id::text AS id, role_class, display_name`,
+      [input.displayName],
+    );
+    const row = insertResult.rows[0]!;
+
+    if (input.surfaceBindings !== undefined) {
+      for (const binding of input.surfaceBindings) {
+        await client.query(
+          `INSERT INTO latch_role_surfaces (role_id, surface_id, row_scope)
+           VALUES ($1::uuid, $2, $3)`,
+          [row.id, binding.surface_id, binding.row_scope],
+        );
+      }
+    }
+
+    if (input.grants !== undefined) {
+      for (const grant of input.grants) {
+        await client.query(
+          `INSERT INTO latch_role_grants (role_id, surface_id, field_id, action, mode)
+           VALUES ($1::uuid, $2, $3, $4, $5)`,
+          [
+            row.id,
+            grant.surface_id,
+            grant.field_id,
+            grant.action,
+            grant.mode,
+          ],
+        );
+      }
+    }
+
+    if (input.surfaceBindings !== undefined || input.grants !== undefined) {
+      await bumpPolicyVersion(client);
+    }
+
+    return row;
+  });
+};
+
+export const loadRoleDeleteBlockers = async (
+  pool: Pool,
+  roleId: string,
+): Promise<DeleteBlocker[]> => {
+  const result = await pool.query<{ count: number }>(
+    `SELECT COUNT(*)::int AS count
+     FROM latch_user_roles
+     WHERE role_id = $1::uuid`,
+    [roleId],
+  );
+  const count = result.rows[0]?.count ?? 0;
+  if (count === 0) {
+    return [];
+  }
+
+  return [{ type: "user_role_assignment", count }];
+};
+
 export const updateRoleDisplayName = async (
   pool: Pool,
   actorId: string,
@@ -193,6 +266,11 @@ export const deleteAppRole = async (
   actorId: string,
   roleId: string,
 ): Promise<void> => {
+  const blockers = await loadRoleDeleteBlockers(pool, roleId);
+  if (blockers.length > 0) {
+    throw new InUseError("role", blockers);
+  }
+
   await withPermissionDb(pool, actorId, async (client) => {
     await client.query(`DELETE FROM latch_roles WHERE id = $1::uuid`, [roleId]);
     await bumpPolicyVersion(client);

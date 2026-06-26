@@ -1,8 +1,11 @@
 import {
   ForbiddenError,
   ValidationError,
+  principalHoldsRole,
+  surfaceAllows,
   type PermissionContext,
 } from "@latch/contracts";
+import { writeAudit } from "@latch/audit";
 import { createSurfaceDal, type StoreAdapter, type SurfaceDal } from "@latch/dal";
 import {
   validateGrantTuple,
@@ -19,6 +22,7 @@ import { ensureAuditBootstrap, getPool, getPrincipal } from "../latch";
 import {
   roleDetailDescriptor,
   roleListDescriptor,
+  RoleListCreateSchema,
   userDetailDescriptor,
   userListDescriptor,
   userRolesDetailDescriptor,
@@ -32,6 +36,7 @@ import {
   allRoleIdsExist,
   assertNotLastSystemRoleHolder,
   deleteAppRole,
+  insertAppRole,
   isSystemRoleClass,
   loadRoleDetailRelated,
   loadRoleDetailRow,
@@ -44,11 +49,18 @@ import {
   type RoleGrantTuple,
 } from "./repository";
 
+export type RoleListDal = SurfaceDal & {
+  create: (
+    ctx: PermissionContext,
+    body: unknown,
+  ) => Promise<Record<string, unknown>>;
+};
+
 export type IamDal = {
   userList: SurfaceDal;
   userDetail: SurfaceDal;
   userRolesDetail: SurfaceDal;
-  roleList: SurfaceDal;
+  roleList: RoleListDal;
   roleDetail: SurfaceDal;
 };
 
@@ -58,7 +70,7 @@ export type CreateIamDalOptions = {
   registry?: PolicyRegistry;
 };
 
-const withIamGate = (dal: SurfaceDal): SurfaceDal => ({
+const withIamGate = <T extends SurfaceDal>(dal: T): T => ({
   ...dal,
   get: async (ctx, id) => {
     assertIamSurfaceRead(ctx);
@@ -140,7 +152,7 @@ const createRoleDetailStore = (
   upsert: async (row) => {
     const actorId = await getActorId();
     const existing = await loadRoleDetailRow(pool, row.id);
-    if (!existing || isSystemRoleClass(existing.role_class)) {
+    if (!existing) {
       return;
     }
     await updateRoleDisplayName(pool, actorId, row.id, row.display_name);
@@ -193,6 +205,28 @@ const wrapUserRolesPatch = (dal: SurfaceDal): SurfaceDal => ({
   },
 });
 
+const assertNotSelfGrantPatch = (
+  ctx: PermissionContext,
+  roleId: string,
+  body: unknown,
+): void => {
+  if (!principalHoldsRole(ctx.principal, roleId)) {
+    return;
+  }
+
+  const parsed = roleDetailDescriptor.patchSchema.safeParse(body);
+  if (!parsed.success) {
+    return;
+  }
+
+  if (
+    parsed.data.grants !== undefined ||
+    parsed.data.surface_bindings !== undefined
+  ) {
+    throw new ForbiddenError();
+  }
+};
+
 const wrapRoleDetailPatch = (
   dal: SurfaceDal,
   pool: Pool,
@@ -213,18 +247,21 @@ const wrapRoleDetailPatch = (
         throw new ValidationError("Validation failed", parsed.error.flatten());
       }
 
-      const hasCatalogEdit =
-        parsed.data.catalog !== undefined &&
-        Object.keys(parsed.data.catalog).length > 0;
       const hasBindingEdit = parsed.data.surface_bindings !== undefined;
       const hasGrantEdit = parsed.data.grants !== undefined;
+      const catalog = parsed.data.catalog;
+      const hasDisallowedCatalogEdit =
+        catalog !== undefined &&
+        Object.keys(catalog).some((key) => key !== "display_name");
 
-      if (hasCatalogEdit || hasBindingEdit || hasGrantEdit) {
+      if (hasBindingEdit || hasGrantEdit || hasDisallowedCatalogEdit) {
         throw new ForbiddenError();
       }
 
       return dal.patch(ctx, id, body);
     }
+
+    assertNotSelfGrantPatch(ctx, id, body);
 
     const parsed = roleDetailDescriptor.patchSchema.safeParse(body);
     if (parsed.success && parsed.data.grants !== undefined) {
@@ -258,6 +295,62 @@ const wrapRoleDetailPatch = (
   },
 });
 
+const extendRoleListDal = (
+  pool: Pool,
+  getActorId: () => Promise<string>,
+  registry: PolicyRegistry,
+  roleListBaseDal: SurfaceDal,
+): RoleListDal => ({
+  ...roleListBaseDal,
+  create: async (ctx, body) => {
+    assertIamSurfaceRead(ctx);
+
+    if (!surfaceAllows(ctx.manifest, "create")) {
+      throw new ForbiddenError();
+    }
+
+    const parsed = RoleListCreateSchema.safeParse(body);
+    if (!parsed.success) {
+      throw new ValidationError("Validation failed", parsed.error.flatten());
+    }
+
+    const surfaceBindings = parsed.data.surface_bindings?.map((binding) => ({
+      surface_id: binding.surface_id,
+      row_scope: binding.row_scope ?? null,
+    }));
+    const grants = parsed.data.grants?.map((grant) => ({
+      surface_id: grant.surface_id,
+      field_id: grant.field_id,
+      action: grant.action,
+      mode: grant.mode ?? null,
+    }));
+
+    if (grants !== undefined) {
+      validateGrantRows(grants, registry);
+    }
+
+    const actorId = await getActorId();
+    const row = await insertAppRole(pool, actorId, {
+      displayName: parsed.data.catalog.display_name,
+      surfaceBindings,
+      grants,
+    });
+
+    await writeAudit({
+      actorId: ctx.principal.id,
+      action: "insert",
+      tableName: roleListDescriptor.anchorTable,
+      recordId: row.id,
+      moduleId: ctx.surface,
+      fieldIds: ["summary"],
+      before: null,
+      after: roleListDescriptor.auditSnapshot(row),
+    });
+
+    return roleListDescriptor.projectRow(row, ctx.manifest, {});
+  },
+});
+
 export const createIamDal = (options: CreateIamDalOptions): IamDal => {
   const registry = options.registry ?? subhubRegistry;
   const { pool, getActorId } = options;
@@ -265,6 +358,7 @@ export const createIamDal = (options: CreateIamDalOptions): IamDal => {
   const userListStore = createUserListStore(pool, getActorId);
   const userDetailStore = createUserDetailStore(pool, getActorId);
   const roleListStore = createRoleListStore(pool, getActorId);
+  const roleListBaseDal = createSurfaceDal(roleListDescriptor, roleListStore);
   const userRolesStore = createUserRolesDetailStore(pool, getActorId);
   const roleDetailStore = createRoleDetailStore(pool, getActorId, registry);
 
@@ -275,7 +369,7 @@ export const createIamDal = (options: CreateIamDalOptions): IamDal => {
     createSurfaceDal(userDetailDescriptor, userDetailStore),
   );
   const roleList = withIamGate(
-    createSurfaceDal(roleListDescriptor, roleListStore),
+    extendRoleListDal(pool, getActorId, registry, roleListBaseDal),
   );
 
   const userRolesDetail = wrapUserRolesPatch(

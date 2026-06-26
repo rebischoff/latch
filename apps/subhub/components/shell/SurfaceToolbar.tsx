@@ -9,7 +9,7 @@ import {
   type Manifest,
 } from "@latch/contracts";
 import { Button, Dropdown, Flex, Grid, Space, Tooltip, type MenuProps } from "antd";
-import type { ReactNode } from "react";
+import type { ReactNode, RefObject } from "react";
 
 export type ToolbarAction = {
   key: string;
@@ -28,6 +28,8 @@ export type ToolbarAction = {
 type SurfaceToolbarProps = {
   manifest: Manifest;
   actions: ToolbarAction[];
+  /** Resolve clicks from the latest registration ref (avoids stale toolbar handlers). */
+  liveRegistrationRef?: RefObject<{ actions: ToolbarAction[] } | null>;
 };
 
 const isActionGranted = (manifest: Manifest, action: ToolbarAction): boolean => {
@@ -42,7 +44,11 @@ const isActionGranted = (manifest: Manifest, action: ToolbarAction): boolean => 
   return true;
 };
 
-export const SurfaceToolbar = ({ manifest, actions }: SurfaceToolbarProps) => {
+export const SurfaceToolbar = ({
+  manifest,
+  actions,
+  liveRegistrationRef,
+}: SurfaceToolbarProps) => {
   const screens = Grid.useBreakpoint();
   const compact = !screens.lg;
 
@@ -50,6 +56,13 @@ export const SurfaceToolbar = ({ manifest, actions }: SurfaceToolbarProps) => {
   if (granted.length === 0) {
     return null;
   }
+
+  const invokeAction = (action: ToolbarAction) => {
+    const latest = liveRegistrationRef?.current?.actions.find(
+      (candidate) => candidate.key === action.key,
+    );
+    (latest ?? action).onClick();
+  };
 
   const primary = granted.filter((action) => action.priority === "primary");
   const secondary = granted.filter((action) => action.priority === "secondary");
@@ -63,7 +76,7 @@ export const SurfaceToolbar = ({ manifest, actions }: SurfaceToolbarProps) => {
         icon={action.icon}
         disabled={action.disabled}
         loading={action.loading}
-        onClick={action.onClick}
+        onClick={() => invokeAction(action)}
       >
         {iconOnly ? null : action.label}
       </Button>
@@ -84,7 +97,7 @@ export const SurfaceToolbar = ({ manifest, actions }: SurfaceToolbarProps) => {
     icon: action.icon,
     danger: action.danger,
     disabled: action.disabled,
-    onClick: action.onClick,
+    onClick: () => invokeAction(action),
   }));
 
   const showOverflow = compact && secondary.length > 0;

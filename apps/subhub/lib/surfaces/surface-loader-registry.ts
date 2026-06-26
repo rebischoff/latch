@@ -38,6 +38,10 @@ export type SurfaceDetailId =
 type ListLoader = {
   ensureDal: () => Promise<void>;
   list: NonNullable<SurfaceDal["list"]>;
+  create?: (
+    ctx: PermissionContext,
+    body: unknown,
+  ) => Promise<Record<string, unknown>>;
 };
 
 type DetailLoader = {
@@ -107,6 +111,10 @@ const listLoaders: Record<SurfaceListId, ListLoader> = {
     list: async (ctx, query) => {
       const dal = await ensureIamDal();
       return dal.roleList.list!(ctx, query);
+    },
+    create: async (ctx, body) => {
+      const dal = await ensureIamDal();
+      return dal.roleList.create(ctx, body);
     },
   },
   site_contact_relation_table: {
@@ -243,6 +251,19 @@ export const loadListFromRegistry = async (
     rows: result.rows as SurfaceListRow[],
     total: result.total,
   };
+};
+
+export const createListFromRegistry = async (
+  surfaceId: SurfaceListId,
+  ctx: PermissionContext,
+  body: unknown,
+): Promise<Record<string, unknown>> => {
+  const loader = listLoaders[surfaceId];
+  if (!loader.create) {
+    throw new Error(`No create loader for surface: ${surfaceId}`);
+  }
+  await loader.ensureDal();
+  return loader.create(ctx, body);
 };
 
 export const getSurfaceDetailDal = async (

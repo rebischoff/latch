@@ -141,5 +141,5 @@ export const HeaderSurfaceToolbar = () => {
     return null;
   }
 
-  return <SurfaceToolbar manifest={live.manifest} actions={live.actions} />;
+  return <SurfaceToolbar manifest={live.manifest} actions={live.actions} liveRegistrationRef={context?.registrationRef} />;
 };

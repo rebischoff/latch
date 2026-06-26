@@ -30,14 +30,15 @@ _None._
 | `part_detail` — MPN catalog and vendor pricing | [catalog.md](./catalog.md) | 2026-06-19 | active |
 | picker return context — URL protocol | [general.md](./general.md) | 2026-06-24 | active |
 | picker return on SurfaceFormRoot — merge selectedId into defaults | [general.md](./general.md) | 2026-06-24 | active |
-| list+detail Surface create — toolbar and picker add-new | [general.md](./general.md) | 2026-06-19 | active (amended 2026-06-24) |
+| list+detail Surface create — toolbar and picker add-new | [general.md](./general.md) | 2026-06-19 | active (amended 2026-06-25) |
+| Surface create route — `/new` + DB-assigned id | [general.md](./general.md) | 2026-06-25 | active (retrofit task 27) |
 | linked picker control (`LinkedSelectInput`) | [general.md](./general.md) | 2026-06-24 | active |
 | picker navigate away — dirty form confirm (v1) | [general.md](./general.md) | 2026-06-24 | active |
 | grant authoring model v2 (platform target) | [iam.md](./iam.md) | 2026-06-18 | active (impl deferred) |
 | delete blocked by referential use — structured errors | [cross-cutting.md](./cross-cutting.md) | 2026-06-18 | active (impl deferred) |
 | IAM role catalog — app CRUD, system cosmetic edit | [iam.md](./iam.md) | 2026-06-18 | active |
 | IAM role editor — allow-only grants | [iam.md](./iam.md) | 2026-06-18 | active |
-| IAM role create — list POST + New toolbar | [iam.md](./iam.md) | 2026-06-18 | active (impl deferred) |
+| IAM role create — list POST + New toolbar | [iam.md](./iam.md) | 2026-06-18 | active (impl task 26) |
 | IAM role detail UI — grant matrix app-only | [iam.md](./iam.md) | 2026-06-18 | active |
 | IAM routes — `/roles`, `/users` | [iam.md](./iam.md) | 2026-06-18 | active |
 | IAM assignment self-patch — platform rule, IAM DAL | [iam.md](./iam.md) | 2026-06-18 | active |

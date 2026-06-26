@@ -1,8 +1,10 @@
 import { HydrationBoundary } from "@tanstack/react-query";
 
 import { RoleListPane } from "@/components/iam/RoleListPane";
+import { RolesCreateManifestProvider } from "@/components/iam/roles-create-manifest-context";
 import { MasterDetailShell } from "@/components/shell/MasterDetailShell";
 import { routes } from "@/lib/nav-routes";
+import { resolveContext } from "@/lib/latch";
 import { requireAuth } from "@/lib/require-auth";
 import { prefetchSurfaceList } from "@/lib/surfaces/prefetch-surface-query";
 
@@ -12,11 +14,18 @@ type RolesLayoutProps = {
 
 const RolesLayout = async ({ children }: RolesLayoutProps) => {
   await requireAuth(routes.roles.list);
-  const dehydratedState = await prefetchSurfaceList("role_list");
+  const [dehydratedState, { manifest: createManifest }] = await Promise.all([
+    prefetchSurfaceList("role_list"),
+    resolveContext({ surfaceId: "role_list" }),
+  ]);
 
   return (
     <HydrationBoundary state={dehydratedState}>
-      <MasterDetailShell list={<RoleListPane />}>{children}</MasterDetailShell>
+      <RolesCreateManifestProvider manifest={createManifest}>
+        <MasterDetailShell list={<RoleListPane createManifest={createManifest} />}>
+          {children}
+        </MasterDetailShell>
+      </RolesCreateManifestProvider>
     </HydrationBoundary>
   );
 };

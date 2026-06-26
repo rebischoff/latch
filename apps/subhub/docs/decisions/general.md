@@ -147,10 +147,10 @@
 
 **Choice:**
 
-1. **List toolbar** — every **list+detail** Surface exposes **New** / **Create** on `SurfaceToolbar` when manifest grants `create` on `*_list`. Flow: **New on list → navigate to create detail → POST** (master-detail layout). Gated by `<Can>`; omit when principal lacks permission. Catalog **table** Surfaces (`*_table`) use their own per-row POST pattern instead.
-2. **Picker add-new** — when another Surface references records via **Select / lookup**, the control offers **`… Add {entity}`** as the **last dropdown option** when the principal has `create` on the target `*_detail` (create path) **and** the origin field is writable. Action opens the target create flow (navigate to canonical route; consumer passes **return context** to restore the originating form with the new id selected). If `create` is not granted, omit the option entirely (select-only). See [linked picker control](#decision-linked-picker-control-linkedselectinput--2026-06-24).
+1. **List toolbar** — every **list+detail** Surface exposes **New** / **Create** on `SurfaceToolbar` when manifest grants `create` on `*_list`. Flow: **New on list → navigate to `<surface>/new` → blank detail form → POST on Save** (master-detail layout). Gated by `<Can>`; omit when principal lacks permission. Catalog **table** Surfaces (`*_table`) use their own per-row POST pattern instead. **Route and id rules:** [Surface create route — `/new` + DB-assigned id](#decision-surface-create-route--new--db-assigned-id-2026-06-25).
+2. **Picker add-new** — when another Surface references records via **Select / lookup**, the control offers **`… Add {entity}`** as the **last dropdown option** when the principal has `create` on the target `*_detail` (create path) **and** the origin field is writable. Action opens the target create flow at **`<target>/new`** (navigate to canonical route; consumer passes **return context** to restore the originating form with the new id selected). If `create` is not granted, omit the option entirely (select-only). See [linked picker control](#decision-linked-picker-control-linkedselectinput--2026-06-24).
 
-**Examples:** `part_list` **New part**; `part_detail` manufacturer picker → **`… Add manufacturer`** in dropdown; estimate line part picker → **Add new part** (consumer specs #20+).
+**Examples:** `part_list` **New part** → `/parts/new`; `part_detail` manufacturer picker → **`… Add manufacturer`** → `/manufacturers/new?returnTo=…`; estimate line part picker → **Add new part** (consumer specs #20+).
 
 **Contrast:** Hub **quick-create** (e.g. site contact person inline) stays a minimal POST on the **same** Surface — not a substitute for full list+detail create.
 
@@ -162,6 +162,43 @@
 
 **Amended (2026-06-24):** Picker chrome — dropdown add-new + open icon via [`LinkedSelectInput`](#decision-linked-picker-control-linkedselectinput--2026-06-24); [task 25 step 11](../tasks/25-manufacturer-detail.md#step-11--linked-picker-control-linkedselectinput).
 
+**Amended (2026-06-25):** Create route and id assignment — [Surface create route — `/new` + DB-assigned id](#decision-surface-create-route--new--db-assigned-id-2026-06-25). First implementation: [task 26](../tasks/26-iam-role-crud.md) (`/roles/new`). Retrofit of shipped client-UUID create: [task 27](../tasks/27-create-route-retrofit.md).
+
+
+### Decision: Surface create route — `/new` + DB-assigned id (2026-06-25)
+
+**Status:** Locked in [task 26](../tasks/26-iam-role-crud.md). Retrofit of prior surfaces: [task 27](../tasks/27-create-route-retrofit.md).
+
+**Choice:** Standalone list+detail **create** uses a dedicated route and server-assigned primary keys.
+
+| Tier | When | Route | Primary key |
+|------|------|-------|-------------|
+| **Standalone create** | List toolbar **New** | **`<surface>/new`** | **DB assigns** on POST → `router.replace(<surface>/[id])` |
+| **Picker add-new** | Foreign form creates related record | **`<target>/new?returnTo=…&returnField=…`** | DB assigns on child POST → redirect to `returnTo` with **`selectedId=<db-id>`** |
+| **Inline child rows** | Collections inside a form (pricing, line items) | N/A | **Client temp id** for UI / FieldArray until parent POST; server assigns real ids on persist |
+
+**Standalone create flow:**
+
+1. List **New** → navigate to `<surface>/new` (no client UUID in URL).
+2. Blank detail form — required fields editable; **Save** disabled until valid (surface-specific).
+3. **Save** → `POST` — body **must not** include anchor `id` (server generates).
+4. On success → `router.replace(<surface>/[db-id])`; further saves use `PATCH`.
+
+**Picker add-new flow:**
+
+1. Origin at `<origin>/new` or `<origin>/[id]` — `returnTo` is current pathname + query (e.g. `/parts/new` or `/parts/[id]`).
+2. Navigate to `<target>/new?returnTo=…&returnField=…`.
+3. Target **Save** → POST → DB id → `redirectAfterCreate(returnTo, selectedId)`.
+4. Origin applies `selectedId` to form field (see [picker return on SurfaceFormRoot](#decision-picker-return-on-surfaceformroot-forms--merge-selectedid-into-defaults-2026-06-24)).
+
+**Manifest / prefetch:** `resolveContext({ surfaceId, entityId: "new" })` for create-mode manifest; `prefetchSurfaceCreate(surfaceId, "new")`.
+
+**Shipped interim (retrofit in task 27):** Parts, manufacturers, sites, jobs, estimates use **`/<surface>/[client-uuid]?create=1`** and POST bodies that accept client `id`. Do not copy that pattern for new work.
+
+**Rationale:** The database is the source of truth for anchor row ids. Client UUIDs in the URL before first save are misleading and complicate picker return. `/new` is a stable, bookmarkable create route without inventing a primary key. Inline collection rows still need ephemeral client ids until the parent row exists — distinct from anchor create.
+
+**First implementation:** [task 26](../tasks/26-iam-role-crud.md) — `/roles/new`.
+
 
 ### Decision: picker return context — URL protocol (2026-06-24)
 
@@ -171,12 +208,13 @@
 
 | Query param | Role |
 |-------------|------|
-| `create=1` | Detail pane is create mode (existing convention) |
-| `returnTo` | URL-encoded path back to origin — **include** origin’s own query string (e.g. `/parts/[id]?create=1`) |
+| `returnTo` | URL-encoded path back to origin — **include** origin’s own query string (e.g. `/parts/new` or `/parts/[id]`) |
 | `returnField` | Optional RHF field path to set on return (e.g. `profile.manufacturer_party_id`) |
-| `selectedId` | Set by create flow on **successful Save** when redirecting to `returnTo` |
+| `selectedId` | Set by create flow on **successful Save** when redirecting to `returnTo` — value is **DB-assigned id** from POST response |
 
-**Save:** POST create → redirect to `returnTo` with `selectedId=<new record id>`.
+**Target create route:** `<target>/new` (see [Surface create route](#decision-surface-create-route--new--db-assigned-id-2026-06-25)). **`create=1` query param** — **shipped interim only** on `/<surface>/[client-uuid]?create=1`; retired when [task 27](../tasks/27-create-route-retrofit.md) lands.
+
+**Save:** POST create → redirect to `returnTo` with `selectedId=<db-assigned id>`.
 
 **Cancel:** Redirect to `returnTo` only (no `selectedId`). Create mode shows toolbar **Cancel** (not **Revert**); edit mode keeps **Revert**.
 
@@ -190,7 +228,9 @@
 
 **Rationale:** Full foreign Surfaces keep their own manifest, toolbar, and policy boundary. URL-based return context is refresh-safe, deep-linkable, and avoids nested-modal picker chains. Shared helpers (`lib/picker-return-context.ts`) keep pickers consistent.
 
-**First instance:** `part_detail` manufacturer picker → `/manufacturers/[id]?create=1&returnTo=…&returnField=profile.manufacturer_party_id` ([`25-manufacturer-detail.md`](../tasks/25-manufacturer-detail.md)).
+**First instance (shipped interim):** `part_detail` manufacturer picker → `/manufacturers/[client-uuid]?create=1&returnTo=…` ([`25-manufacturer-detail.md`](../tasks/25-manufacturer-detail.md)).
+
+**Target instance:** `/manufacturers/new?returnTo=/parts/new&returnField=profile.manufacturer_party_id` ([task 27](../tasks/27-create-route-retrofit.md)).
 
 
 ### Decision: picker return on `SurfaceFormRoot` forms — merge `selectedId` into defaults (2026-06-24)
@@ -208,7 +248,7 @@
 
 | Step | What |
 |------|------|
-| 1 | **Add-new option** — `buildPickerCreateUrl({ target, returnTo, returnField })` where `returnTo` is current `pathname` + full query string (e.g. `/parts/[id]?create=1`). Gate on target `*_detail` `write` (create path) **and** origin field writable. Rendered as last dropdown option in [`LinkedSelectInput`](#decision-linked-picker-control-linkedselectinput--2026-06-24) (`… Add {entity}`), not a separate link below the control. |
+| 1 | **Add-new option** — `buildPickerCreateUrl({ target, returnTo, returnField })` where `returnTo` is current `pathname` + full query string (e.g. `/parts/new` or `/parts/[id]`). Gate on target `*_detail` `write` (create path) **and** origin field writable. Rendered as last dropdown option in [`LinkedSelectInput`](#decision-linked-picker-control-linkedselectinput--2026-06-24) (`… Add {entity}`), not a separate link below the control. |
 | 2 | **Persist `selectedId`** — `useRef<string \| null>(null)`; on each render, if `parseReturnContext(searchParams).selectedId` is set, copy into ref. Ref survives URL strip. |
 | 3 | **Merge defaults** — In `defaultValues` `useMemo`, if ref holds an id, shallow-merge into the nested field at `returnField` (e.g. `profile.manufacturer_party_id`). Include `pickerReturn.selectedId` in deps so the first landing with `selectedId` recomputes. |
 | 4 | **Hook** — `useApplyPickerReturn({ setValue, returnField, pickerQueryKey })` after `useForm`. |

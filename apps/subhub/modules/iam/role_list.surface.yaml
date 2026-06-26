@@ -10,6 +10,7 @@ fieldActions:
 
 surfaceActions:
   - read
+  - create
 
 tables:
   - latch_roles

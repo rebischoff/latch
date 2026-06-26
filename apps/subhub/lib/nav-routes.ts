@@ -11,6 +11,7 @@ export const routes = {
   },
   roles: {
     list: "/roles",
+    new: "/roles/new",
     detail: (id: string) => `/roles/${id}`,
   },
   contacts: {

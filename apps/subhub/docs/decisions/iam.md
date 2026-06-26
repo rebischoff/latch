@@ -106,11 +106,13 @@ SubHub (and platform spike) still use **read/write checkboxes** in `GrantMatrix`
 **Choice:** Creating an `app` role is a **`role_list`** operation, not a detail PATCH:
 
 1. Toolbar **New role** on `/roles` (manifest `create` on `role_list`).
-2. Collect `display_name` (modal or inline).
-3. `POST /api/iam/roles` with `{ "catalog": { "display_name": "…" } }` strict — inserts `role_class = 'app'`, zero grant rows (P2a).
-4. Navigate to `/roles/[newId]` to edit grants in `role_detail`.
+2. Navigate to **`/roles/new`** — blank detail form ([`/new` create route](./general.md#decision-surface-create-route--new--db-assigned-id-2026-06-25)).
+3. **Save** → `POST /api/iam/roles` with strict `{ catalog: { display_name }, grants?, surface_bindings? }` — **no client `id`**; DB assigns UUID; inserts `role_class = 'app'` (sparse / zero grants allowed).
+4. `router.replace(/roles/[db-id])` — configure grants on `role_detail`; subsequent saves PATCH.
 
-**Shipped gap:** GET-only list API; no toolbar — after `/setup` only system rows exist.
+**Shipped gap:** GET-only list API; no toolbar; client-UUID create pattern not used for roles.
+
+**Implementation:** [task 26](../tasks/26-iam-role-crud.md).
 
 **Spec:** [`surface-specs/iam-role.md`](../surface-specs/iam-role.md).
 

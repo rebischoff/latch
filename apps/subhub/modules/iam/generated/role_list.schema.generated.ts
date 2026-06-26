@@ -42,6 +42,6 @@ export const roleListSurfacePolicyDef = defineSurfacePolicy({
   surface: "role_list",
   fieldIds: Object.values(RoleListFieldIds),
   fieldActions: ["read", "write"],
-  surfaceActions: ["read"],
+  surfaceActions: ["read", "create"],
   kind: "iam",
 });

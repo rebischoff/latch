@@ -266,6 +266,7 @@ flowchart LR
 |------|---------------|---------------------|
 | 3a Parts | MPN + vendor pricing | `part_*` — **task 24 complete** |
 | — Manufacturer detail | Party lens + picker return | `manufacturer_detail` — **task 25 active** |
+| — IAM role CRUD | Create/save/delete app roles | `role_list` / `role_detail` — **task 26 complete** |
 | 3b Items | Items composed of parts | `item_*` — **after task 25** |
 | 3c Catalog tables | Progressive setup | `category_table`, `labor_class_table`, `phase_table` |
 | 3e Line editor | Shared line-item component spike | estimate + job Scope; later PO/invoice |
@@ -300,7 +301,10 @@ Field detail: [`surfaces.md`](../surfaces.md). DBML: [`current.dbml`](../schema/
 |---|------|----------|
 | 24 | [24-part-wave-3a.md](./24-part-wave-3a.md) | Wave **3a** — `manufacturer_part`, `vendor_part`, `part_*` surfaces — **complete** |
 | 25 | [25-manufacturer-detail.md](./25-manufacturer-detail.md) | `manufacturer_detail` + picker return — **active** |
-| 26+ | *TBD* | 3b `item_*`, 3c catalog tables — **DBML drafted** ([`schema/current.dbml`](../schema/current.dbml)) |
+| 26 | [26-iam-role-crud.md](./26-iam-role-crud.md) | IAM `app` role create/save/delete — **complete** (2026-06-25) |
+| 27 | [27-create-route-retrofit.md](./27-create-route-retrofit.md) | Migrate shipped surfaces to `/new` + DB id — **next** |
+| 27 | [27-create-route-retrofit.md](./27-create-route-retrofit.md) | `/new` + DB-assigned id retrofit — **queued** (after 26) |
+| 28+ | *TBD* | 3b `item_*`, 3c catalog tables — **DBML drafted** ([`schema/current.dbml`](../schema/current.dbml)) |
 
 ---
 

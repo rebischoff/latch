@@ -22,6 +22,7 @@ export interface SurfaceFieldDef {
 /** Closed vocabulary of FieldAction values for surface policy metadata. */
 export const FIELD_ACTIONS = [
   "read",
+  "create",
   "write",
   "submit",
   "delete",

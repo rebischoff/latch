@@ -112,10 +112,24 @@ const parseResponse = async <T>(response: Response): Promise<ApiSuccessBody<T>> 
 
     try {
       const body = (await response.json()) as {
-        error?: { message?: string; details?: unknown };
+        error?: {
+          message?: string;
+          details?: unknown;
+          code?: string;
+          entity?: string;
+          blockers?: Array<{ type: string; count: number }>;
+        };
       };
       message = body.error?.message ?? message;
-      details = body.error?.details;
+      details =
+        body.error?.details ??
+        (body.error?.code || body.error?.blockers
+          ? {
+              code: body.error.code,
+              entity: body.error.entity,
+              blockers: body.error.blockers,
+            }
+          : undefined);
     } catch {
       // ignore JSON parse errors
     }
