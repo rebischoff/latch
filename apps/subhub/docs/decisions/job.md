@@ -6,6 +6,21 @@
 
 ---
 
+### Decision: job scope, progress, and as-built staging (2026-06-27)
+
+**Status:** **Planning** — [`planning/03-jobs-progress.md`](../planning/03-jobs-progress.md). Open forks: [`planning/07-open-decisions.md`](../planning/07-open-decisions.md).
+
+**Choice (target model):**
+
+- **Job = work order v1** — no dispatch WO layer.
+- **`job_scope_group`** → **`job_line`** (scope item) → **`scope_phase`** → **`progress_entry`** / **`progress_entry_line`**.
+- Fractional completion on **`scope_phase.completed_qty`** — **`job_work_item` dropped** ([J1 locked](../planning/07-open-decisions.md#j1--field-progress-model--locked-2026-06-27)).
+- **`job.complete` (v1)** publishes site as-built — no staging table ([as-built publish](#decision-as-built-publish--on-job-complete-no-staging-v1-2026-06-27)).
+- **Change order** = contract $; **as-built** = site registry.
+
+**Rationale:** Progress attaches to scope phases so v2 scheduling does not require remodel; site updates are reviewed separately from field reports.
+
+
 ### Decision: job wave 5 — implementation order (2026-06-23)
 
 **Status:** Locked in job planning session (2026-06-23); **amended** spec planning session (2026-06-23). **Spec:** [`job.md`](../surface-specs/job.md) ✅ · **Task:** [`23-job-wave-5a.md`](../tasks/23-job-wave-5a.md).
@@ -61,13 +76,32 @@ Session locked in [`job.md`](../surface-specs/job.md) — overrides or extends r
 **Rationale:** Line items across estimates, jobs, POs, and invoices should anchor on real `item` / `part` pickers and assembly expand — not description-only grids. Job shell still lands early so policy, nav, stakeholders, and win-copy DAL are ready before Scope UI.
 
 
-### Decision: field status — `job_work_item` (2026-06-17)
+### Decision: as-built publish — on job complete, no staging v1 (2026-06-27)
 
-**Choice:** Replace `job_line_progress` with **`job_work_item`** — one row per trackable unit: sold line (+ optional `job_line_part`) × `site_location` × `phase`, with `status` (`pending` | `in_progress` | `installed` | `issue` | `verified` | `skipped`). **All-or-nothing per phase** — no fractional completion on `job_line`.
+**Status:** Locked (A2). See also [site.md](./site.md#decision-as-built-publish--on-job-complete-no-staging-v1-2026-06-27).
 
-**Not superseded by `site_location` or audit:** `site_location` is the as-built **registry** (what exists where). `job_work_item` is **per-job execution** (installed / issue / skipped on this engagement). Geography changes on job complete update `site_location` + `latch_audit`; field status stays on `job_work_item`. Status change history → `latch_audit` on work-item mutations; defer `job_work_item_event` until a tech timeline UI needs it.
+**Choice:** v1 **`complete`** action = site publish (`proposed` → `active`, scope-driven asset creation). **`job_as_built_change` deferred v1.5.**
 
-**Rationale:** Supports per-spot install reporting for billing rollups and stakeholders; percent-on-sold-line alone is insufficient.
+**Rationale:** Single closeout action; PM review queue when field data quality requires it.
+
+
+### Decision: field progress — scope phase + progress entries (2026-06-27)
+
+**Status:** Locked. Supersedes [field status — `job_work_item` (2026-06-17)](#decision-field-status--job_work_item-2026-06-17--superseded). Planning: [`07-open-decisions.md`](../planning/07-open-decisions.md#j1--field-progress-model--locked-2026-06-27).
+
+**Choice:** **`scope_phase`** (`planned_qty`, `completed_qty`) + **`progress_entry`** / **`progress_entry_line`**. Drop **`job_work_item`** from DBML — never migrated.
+
+- Progress entry lines sum into `scope_phase.completed_qty` (fractional — e.g. 6 of 10).
+- Optional `site_area_id` / `site_asset_id` on entry lines.
+- Billing `qty_installed` reads phase rollups — see [billing](../decisions/billing.md).
+- History → `latch_audit` on progress mutations.
+
+**Rationale:** One production model; supports qty-based progress and v2 scheduling without remodel.
+
+
+### Decision: field status — `job_work_item` (2026-06-17) — **superseded**
+
+**Superseded by** [field progress — scope phase + progress entries (2026-06-27)](#decision-field-progress--scope-phase--progress-entries-2026-06-27).
 
 
 ### Decision: change orders — unified `job_line` ledger (2026-06-17)

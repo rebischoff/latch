@@ -4,7 +4,23 @@
 
 ## Open
 
-_None._
+_Operations backbone planning (2026-06-27): **next → C2** (part tag storage). Remaining: [`planning/07-open-decisions.md`](../planning/07-open-decisions.md) — J2, J4, P2, B4, E4._
+
+## Operations backbone planning (2026-06-27)
+
+| Doc | Scope |
+|-----|--------|
+| [planning/README.md](../planning/README.md) | Index |
+| [00-backbone.md](../planning/00-backbone.md) | Spine, separations, flows |
+| [01-site-as-built.md](../planning/01-site-as-built.md) | System, area tree, asset |
+| [02-estimates.md](../planning/02-estimates.md) | Assumptions, lines, win |
+| [03-jobs-progress.md](../planning/03-jobs-progress.md) | Scope, progress, CO, as-built |
+| [04-procurement.md](../planning/04-procurement.md) | PO, lead time |
+| [05-billing.md](../planning/05-billing.md) | SOV, billable |
+| [06-catalog-trade-system.md](../planning/06-catalog-trade-system.md) | Trade, system, tags |
+| [07-open-decisions.md](../planning/07-open-decisions.md) | Open forks + glossary |
+| [08-supersedes.md](../planning/08-supersedes.md) | Prior decisions amended |
+| [09-migration-notes.md](../planning/09-migration-notes.md) | DBML / migration order |
 
 ## Domain files
 
@@ -25,6 +41,14 @@ _None._
 
 | Decision | File | Date | Status |
 |----------|------|------|--------|
+| Site as-built — system, area tree, asset | [site.md](./site.md) | 2026-06-27 | planning |
+| Estimate — per-system assumptions, no section v1 | [estimate.md](./estimate.md) | 2026-06-27 | planning |
+| As-built publish on job complete (A2) | [job.md](./job.md), [site.md](./site.md) | 2026-06-27 | **locked** |
+| Field progress — scope phase + progress entries (J1) | [job.md](./job.md) | 2026-06-27 | **locked** |
+| Job scope, progress model | [job.md](./job.md) | 2026-06-27 | planning |
+| Trade, system type, assumptions, part tags | [catalog.md](./catalog.md) | 2026-06-27 | planning |
+| Procurement — lead time, ad-hoc PO | [procurement.md](./procurement.md) | 2026-06-27 | planning |
+| Billing — scope phase rollups, SOV to scope groups | [billing.md](./billing.md) | 2026-06-27 | planning |
 | Bundler monorepo — extensionless relative imports | [general.md](./general.md) | 2026-06-20 | active (rollout task 21) |
 | Planning model — UI discovery before ops specs | [general.md](./general.md) | 2026-06-20 | active |
 | `part_detail` — MPN catalog and vendor pricing | [catalog.md](./catalog.md) | 2026-06-19 | active |
@@ -60,7 +84,7 @@ _None._
 | estimate line editor — expand on add and grouped Table UI | [estimate.md](./estimate.md) | 2026-06-23 | active |
 | estimate / job line grouping — site geography | [estimate.md](./estimate.md) | 2026-06-17 | active |
 | Surface catalog before migrations | [general.md](./general.md) | 2026-06-17 | active |
-| field status — `job_work_item` | [job.md](./job.md) | 2026-06-17 | active |
+| field status — `job_work_item` | [job.md](./job.md) | 2026-06-17 | superseded |
 | change orders — unified `job_line` ledger | [job.md](./job.md) | 2026-06-17 | active |
 | engagements — `job_kind` | [job.md](./job.md) | 2026-06-17 | active |
 | `job_detail` layout — tabbed | [job.md](./job.md) | 2026-06-17 | active |

@@ -6,7 +6,24 @@
 
 ---
 
+### Decision: estimate — per-system assumptions, no section v1, one job per win (2026-06-27)
+
+**Status:** **Planning** — [`planning/02-estimates.md`](../planning/02-estimates.md).
+
+**Choice:**
+
+- **`estimate_section` not v1** — subtotals/grouping by **`site_area` / `site_asset`** (flat persisted `estimate_line` array).
+- **`estimate_system_assumption`** — values per `site_system` (manufacturer, system type, …) narrow **tagged** parts/items.
+- Default: estimate → one `site_id` + optional `site_system_id`; **one won estimate → one job**.
+- Geography optional (flat rough quote OK); may create **`proposed`** areas inline.
+- Lines: `site_area_id`, `site_asset_id`, `material_status`, snapshot cost/sell — see planning doc for full column list.
+
+**Rationale:** System-scoped assumption knobs replace commercial sections for v1; area tree subtotals match production without an extra layer.
+
+
 ### Decision: estimate / job line grouping — site geography (2026-06-17)
+
+**Amended (2026-06-27):** lines FK **`site_area_id` / `site_asset_id`** — see [estimate (2026-06-27)](#decision-estimate--per-system-assumptions-no-section-v1-one-job-per-win-2026-06-27).
 
 **Status:** Locked in [task 18](../tasks/18-surface-catalog.md) (O3).
 

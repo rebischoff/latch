@@ -6,6 +6,19 @@
 
 ---
 
+### Decision: procurement — lead time and ad-hoc PO lines (2026-06-27)
+
+**Status:** **Planning** — [`planning/04-procurement.md`](../planning/04-procurement.md).
+
+**Choice:**
+
+- **`vendor_part.lead_time_days`** — readiness: `order_by = install_target − lead_time` (install_target source: open, see planning).
+- **Ad-hoc PO lines allowed** on draft PO (no requisition link).
+- Existing requisition → PO → receipt chain unchanged.
+
+**Rationale:** Order parts when install phase approaches minus vendor lead time; shop buys ad-hoc without full BOM.
+
+
 ### Decision: procurement — requisition layer and job-site inventory (2026-06-17)
 
 **Choice:** Three-layer procurement before billing:

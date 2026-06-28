@@ -6,6 +6,20 @@
 
 ---
 
+### Decision: billing — scope phase rollups and SOV to scope groups (2026-06-27)
+
+**Status:** **Planning** — [`planning/05-billing.md`](../planning/05-billing.md). **Amends** [billing (2026-06-17)](#decision-billing--earned-staging-progress-sov-retainage-2026-06-17) when progress model ships.
+
+**Choice:**
+
+- **`billable_line`** = earned staging (no separate billing_application table).
+- Extend **`sov_allocation`** with `job_scope_group_id`, `scope_phase_id`.
+- **`qty_installed`** generator reads **`scope_phase`** rollups (not `job_work_item`) when J1/B1 locked.
+- Auto billable generator ship timing: open (B4).
+
+**Rationale:** Billing stays three-layer; production progress drives earn % via scope phases.
+
+
 ### Decision: billing — earned staging, progress, SOV, retainage (2026-06-17)
 
 **Choice:** Three-layer **customer billing** (parallel to procurement's requisition → PO):

@@ -6,7 +6,38 @@
 
 ---
 
+### Decision: site as-built — system, area tree, asset (2026-06-27)
+
+**Status:** **Planning** — full spec in [`planning/01-site-as-built.md`](../planning/01-site-as-built.md). **Amends** [address vs site geography](#decision-address-vs-site-geography--rename-and-split-2026-06-17) and [section vs location](#decision-section-vs-location--granularity-2026-06-19) when DBML lands.
+
+**Choice:**
+
+| Entity | Role |
+|--------|------|
+| `site_system` | Optional — FA, CCTV, Access, … |
+| `site_area` | Nested tree per system (or default no-system bucket); `area_type` free text v1 |
+| `site_asset` | Installed serviceable **device** — leaf only; no `parent_asset_id` v1 |
+
+- **Site = source of truth** for service and future quotes.
+- **Option B:** e.g. access `door_group` area → reader/strike/REX/contact assets.
+- **No system topology v1** (loops/zones on drawings).
+- Lifecycle: `proposed` → `active` via **`job.complete`** publish — no `job_as_built_change` v1 ([A2](../planning/07-open-decisions.md#a2--as-built-review--locked-2026-06-27)).
+
+**Rationale:** Per-system as-built trees match trade practice; assets are exact devices (camera includes mount; door is an area not an asset).
+
+
+### Decision: as-built publish — on job complete, no staging v1 (2026-06-27)
+
+**Status:** Locked (A2). Planning: [`07-open-decisions.md`](../planning/07-open-decisions.md#a2--as-built-review--locked-2026-06-27).
+
+**Choice:** **No `job_as_built_change` table in v1.** `job.status → complete` publishes site: `proposed` → `active` areas/assets; DAL creates assets from scope. Staging + PM review deferred v1.5.
+
+**Rationale:** Aligns with prior site geography publish pattern; avoids second workflow before production pain justifies review queue.
+
+
 ### Decision: address vs site geography — rename and split (2026-06-17)
+
+**Amended (2026-06-27):** in-building registry becomes `site_area` / `site_asset` under optional `site_system` — see [site as-built (2026-06-27)](#decision-site-as-built--system-area-tree-asset-2026-06-27).
 
 **Choice:**
 

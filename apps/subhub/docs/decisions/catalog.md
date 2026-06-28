@@ -6,7 +6,23 @@
 
 ---
 
+### Decision: trade, system type, assumptions, and part tags (2026-06-27)
+
+**Status:** **Planning** — [`planning/06-catalog-trade-system.md`](../planning/06-catalog-trade-system.md).
+
+**Choice:**
+
+- Separate catalogs: **`trade`** (who performs) vs **`system_type`** (what system is installed).
+- **`system_assumption_def`** per system type; values on **`estimate_system_assumption`** / job snapshot.
+- **Parts/items tagged** (manufacturer, system type, attributes) for assumption-based suggestion — user verifies pick.
+- **`phase_template`** + **`phase_template_step`** seed **`scope_phase`** on job scope items.
+
+**Rationale:** Manufacturer knob is per-system assumptions + tagged catalog, not estimate sections.
+
+
 ### Decision: labor phases — catalog only in v1 (2026-06-17)
+
+**Amended (2026-06-27):** org **`phase`** evolves toward **`phase_template_step`** for scope phase seeding — see [trade/system (2026-06-27)](#decision-trade-system-type-assumptions-and-part-tags-2026-06-27).
 
 **Choice:** Org catalog **`phase`** (prewire, installation, programming, testing, …). Attach on **labor** `estimate_line` / `job_line` via `phase_id` and on **`job_work_item`**.
 
