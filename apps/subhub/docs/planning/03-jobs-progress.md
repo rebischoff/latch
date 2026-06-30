@@ -21,7 +21,7 @@
 |-------|---------|
 | `job_id`, `name` | |
 | `group_type` | `location` \| `trade` \| `system` \| `phase` \| `sov_section` \| `change_order` \| `repair_group` \| `testing_group` \| `closeout_group` \| `general` |
-| `trade_id`, `system_type_id` | Who / what |
+| `trade_id`, `system_id` | Who / what (catalog `system`) |
 | `fulfillment_type` | `self` \| `subcontracted` \| `by_others` \| `allowance` \| … |
 | `site_system_id`, `site_area_id` | Optional place context |
 | `sov_line_id` | Optional default SOV link |
@@ -34,9 +34,9 @@
 | `testing_group` | Acceptance / inspection block |
 | `closeout_group` | O&M, manuals, training — not install % |
 
-**J4 (open):** Implicit single **General** group vs required explicit group — see [07-open-decisions.md](./07-open-decisions.md#J4).
+**J4 locked (2026-06-27):** `job_scope_group_id` **nullable** on `job_line`. UI/DTO shows synthetic **General** when null. Real groups optional (from win / PM setup).
 
-**Win mapping:** Often one scope group per estimate area subtree, or one General group for flat estimates.
+**Win mapping:** `estimate_system` tab or area subtree → scope group(s); flat win → all lines null group_id → General in UI.
 
 ---
 
@@ -46,7 +46,7 @@ Sold measurable work — table name likely stays **`job_line`**.
 
 | Field | Notes |
 |-------|-------|
-| `job_scope_group_id` | Parent group |
+| `job_scope_group_id` | Parent group — **nullable** (J4: implicit General in UI) |
 | `quantity`, `unit_price`, … | Contract snapshot |
 | `site_area_id`, `site_asset_id` | From estimate |
 | `item_id`, `part_id` | Catalog |
@@ -69,19 +69,18 @@ Sold measurable work — table name likely stays **`job_line`**.
 | `planned_qty`, `completed_qty` | e.g. 6 of 10 |
 | `progress_weight`, `billing_weight` | Rollups — see [07-open-decisions.md](./07-open-decisions.md#J3) |
 | `requires_previous_phase` | Gate |
-| `target_date` | Optional — feeds PO lead time ([04-procurement.md](./04-procurement.md)) |
+| `target_date` | Optional — PM-set install target; feeds PO `order_by` ([04-procurement.md](./04-procurement.md), P2) |
 
-### Phase templates (J5)
+### Phase templates (J5 locked)
 
 | Catalog | Instance |
 |---------|----------|
-| `phase_template` | Per system or work item type |
-| `phase_template_step` | Ordered step names + default weights |
-| **`scope_phase`** | Created on scope item add or win-copy |
+| `phase_template` + `phase_template_step` | Ordered steps + default weights |
+| `system.default_phase_template_id` | Per-system fallback |
+| `item.phase_template_id` | Item override |
+| **`scope_phase`** | Created on job line add or win-copy |
 
-**When user picks catalog `item` on estimate:** DAL looks up item's `phase_template_id` (or system default) → seeds `scope_phase` rows on win or on job line add.
-
-**Labor-only lines:** Phases from template; labor `phase_id` on line (legacy catalog) maps to template step.
+**Estimate:** optional phase preview only. **`scope_phase` rows on job** when line is created or on win.
 
 ---
 
@@ -98,9 +97,9 @@ Rollups: by job, phase name, scope group, area, trade/system, SOV allocation.
 
 **`job_work_item` dropped.** Use `progress_entry` + `progress_entry_line` → `scope_phase.completed_qty`.
 
-### Progress approval (J2)
+### Progress approval (J2 locked)
 
-SubHub v1 has **no platform approval workflow** ([`decisions/general.md`](../decisions/general.md) — no pending changes). Whether progress entries need `draft` / `submitted` / `approved` is **open** — see [07-open-decisions.md](./07-open-decisions.md#J2).
+**No workflow v1.** Saved `progress_entry_line` rows roll up immediately. No status column. Billing review stays on `billable_line` — not field progress.
 
 ---
 

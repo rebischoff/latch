@@ -6,19 +6,30 @@
 
 ---
 
-### Decision: estimate — per-system assumptions, no section v1, one job per win (2026-06-27)
+### Decision: estimate — `estimate_system` tabs, system specs, no section v1 (2026-06-27)
 
-**Status:** **Planning** — [`planning/02-estimates.md`](../planning/02-estimates.md).
+**Status:** **C2 locked.** [`02-estimates.md`](../planning/02-estimates.md), [`06-catalog-trade-system.md`](../planning/06-catalog-trade-system.md).
 
 **Choice:**
 
-- **`estimate_section` not v1** — subtotals/grouping by **`site_area` / `site_asset`** (flat persisted `estimate_line` array).
-- **`estimate_system_assumption`** — values per `site_system` (manufacturer, system type, …) narrow **tagged** parts/items.
-- Default: estimate → one `site_id` + optional `site_system_id`; **one won estimate → one job**.
-- Geography optional (flat rough quote OK); may create **`proposed`** areas inline.
-- Lines: `site_area_id`, `site_asset_id`, `material_status`, snapshot cost/sell — see planning doc for full column list.
+- **`estimate_section` not v1** — subtotals by area/asset per **`estimate_system`** tab.
+- **`estimate_system`** + **`estimate_system_spec`** / area / line overrides; FK **`system_spec_def`** / **`system_spec_option`** (UUID).
+- **`manufacturer_party_id`** not used as spec knob.
+- One won estimate → one job. Multi-system = multiple tabs.
 
-**Rationale:** System-scoped assumption knobs replace commercial sections for v1; area tree subtotals match production without an extra layer.
+**Rationale:** Each system has own spec knobs and area tree.
+
+
+### Decision: location_confidence — defer v1 (E4 locked 2026-06-27)
+
+**Choice:** No `estimate.location_confidence` column in v1. UI may warn when lines lack `site_area_id` / `site_asset_id` FKs — derived, not stored. Does not block save or win.
+
+**Rationale:** Geography optional on estimates; avoid schema for a UI-only hint.
+
+
+### Decision: estimate — per-system assumptions, no section v1, one job per win (2026-06-27)
+
+**Superseded by** [estimate_system tabs (2026-06-27)](#decision-estimate--estimate_system-tabs-system-specs-no-section-v1-2026-06-27).
 
 
 ### Decision: estimate / job line grouping — site geography (2026-06-17)

@@ -4,7 +4,7 @@
 
 ## Open
 
-_Operations backbone planning (2026-06-27): **next → C2** (part tag storage). Remaining: [`planning/07-open-decisions.md`](../planning/07-open-decisions.md) — J2, J4, P2, B4, E4._
+_Operations backbone forks **resolved** (2026-06-27). Optional: [J3 phase weights](../planning/07-open-decisions.md#J3). **Next: [DBML pass](../planning/09-migration-notes.md)._
 
 ## Operations backbone planning (2026-06-27)
 
@@ -41,13 +41,19 @@ _Operations backbone planning (2026-06-27): **next → C2** (part tag storage). 
 
 | Decision | File | Date | Status |
 |----------|------|------|--------|
+| System specs + part compatibility (C2) | [catalog.md](./catalog.md) | 2026-06-27 | **locked** |
+| Location confidence — defer v1 (E4) | [estimate.md](./estimate.md) | 2026-06-27 | **locked** |
+| Estimate — estimate_system tabs | [estimate.md](./estimate.md) | 2026-06-27 | **locked** |
 | Site as-built — system, area tree, asset | [site.md](./site.md) | 2026-06-27 | planning |
-| Estimate — per-system assumptions, no section v1 | [estimate.md](./estimate.md) | 2026-06-27 | planning |
 | As-built publish on job complete (A2) | [job.md](./job.md), [site.md](./site.md) | 2026-06-27 | **locked** |
+| Progress entry — no workflow (J2) | [job.md](./job.md) | 2026-06-27 | **locked** |
+| Phase templates — per system default (J5) | [catalog.md](./catalog.md) | 2026-06-27 | **locked** |
+| Job scope group — implicit General (J4) | [job.md](./job.md) | 2026-06-27 | **locked** |
 | Field progress — scope phase + progress entries (J1) | [job.md](./job.md) | 2026-06-27 | **locked** |
 | Job scope, progress model | [job.md](./job.md) | 2026-06-27 | planning |
-| Trade, system type, assumptions, part tags | [catalog.md](./catalog.md) | 2026-06-27 | planning |
+| Install target — manual scope_phase.target_date (P2) | [procurement.md](./procurement.md) | 2026-06-27 | **locked** |
 | Procurement — lead time, ad-hoc PO | [procurement.md](./procurement.md) | 2026-06-27 | planning |
+| Auto billable — manual staging v1 (B4) | [billing.md](./billing.md) | 2026-06-27 | **locked** |
 | Billing — scope phase rollups, SOV to scope groups | [billing.md](./billing.md) | 2026-06-27 | planning |
 | Bundler monorepo — extensionless relative imports | [general.md](./general.md) | 2026-06-20 | active (rollout task 21) |
 | Planning model — UI discovery before ops specs | [general.md](./general.md) | 2026-06-20 | active |

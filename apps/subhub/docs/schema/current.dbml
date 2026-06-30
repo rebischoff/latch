@@ -1,9 +1,11 @@
 // SubHub schema view — design draft (see docs/schema/README.md for workflow).
 // Task 17 complete (2026-06-16); job/site geography pass (2026-06-17).
 // Procurement pass (2026-06-17): requisition layer, purchase_order_line_shipment splits, job-site inventory; billing split.
-// Pre-migration pass (2026-06-17): purchase_order_* table names, field completion via job_work_item, SOV XOR, billable FK direction.
+// Pre-migration pass (2026-06-17): purchase_order_* table names, SOV XOR, billable FK direction.
 // Billing pass (2026-06-17): billable_line staging, SOV allocation, retainage/deposit invoice kinds.
-// Slices 1–6 at column level. Next: task 18 SQL.
+// Planning pass (2026-06-27): site_area/site_asset + site_system; catalog system/specs/phase templates;
+//   estimate_system tabs; scope_phase + progress_entry; drop job_work_item + estimate_section — see planning/09-migration-notes.md.
+// Slices 1–6 at column level. Next: numbered migrations after DBML lock.
 //
 // Shipped baseline: migrations 001–016 (party interim shape). Target below.
 // Task 18 batches: 018_party_refactor → 019_site → 020_site_contact_relation_dev_seed.
@@ -208,7 +210,7 @@ Table note {
     Shipped 016: inline `party.notes` only. Task 18 backfill: non-empty `party.notes`
     → one `note` row per party (`entity_type = 'party'`), then drop the column.
 
-    v1 entity_type allowlist (extend with migrations): party, site, site_section, site_location,
+    v1 entity_type allowlist (extend with migrations): party, site, site_area, site_asset,
     estimate, job, requested_order, purchase_order, material_receipt, invoice, change_order
     — align with `latch_audit.entity_type`.
 
@@ -411,7 +413,7 @@ Table party_address {
 
   Note: '''
     Party ↔ postal address junction (`019_site.sql`). Purpose = billing, HQ, mailing, …
-    In-building work spots live on `site_location` (site-owned) — not here.
+    In-building geography lives on `site_area` / `site_asset` (site-owned) — not here.
   '''
 }
 
@@ -419,8 +421,9 @@ Table party_address {
 
 TableGroup site [color: #3498db] {
   site
-  site_section
-  site_location
+  site_system
+  site_area
+  site_asset
   site_contact_relation
   site_contact
 }
@@ -442,8 +445,8 @@ Table address {
   Note: '''
     Normalized **postal** address — shared spine (`TableGroup postal`). Manual entry in v1;
     verification deferred. Attached via `party_address` and optional `site.physical_address_id`.
-    Do **not** merge with `party_address`. Domain **location** (work spot) = `site_location` on a
-    `site` — see decisions.md 2026-06-19.
+    Do **not** merge with `party_address`. In-building geography = `site_area` / `site_asset` on a
+    `site` — see planning/01-site-as-built.md.
   '''
 }
 
@@ -467,8 +470,8 @@ Table site {
   Note: '''
     Logical place — portfolio, campus, building, job site. **No inline postal columns** on `site`.
     Optional **`physical_address_id`** → `address` for dispatch/maps (wave 2b). Billing postal on
-    party via `party_address`. **Site-owned geography** (as-built):
-    `site_section` + `site_location` — persists across jobs; estimates may add `proposed` rows.
+    party via `party_address`. **Site-owned as-built geography**:
+    optional `site_system` → `site_area` (tree) → `site_asset` (device leaf); estimates may add `proposed` rows.
 
     **`customer_party_id`** — which customer org owns this property in the address-book
     hub (subsidiary or top-level). Set when creating site from **customer_detail** only.
@@ -482,8 +485,8 @@ Table site {
 
     Worked example (Tower REIT / 200 Market Tower):
       party "Tower REIT" + party_address → address "200 Market St" (purpose: hq)
-      site "200 Market Tower" — site_section "Floor 3", site_location "Rm 345 Cam 1"
-      estimate @ site → may create proposed site_location; lines reference site_location_id
+      site "200 Market Tower" — site_system "Fire alarm" → site_area "Floor 3" → site_asset "Pull station PS-12"
+      estimate @ site → may create proposed site_area/site_asset; lines reference site_area_id / site_asset_id
       job complete → promotes proposed → active; publishes relocations/removals
 
     Hierarchy (optional): parent_site_id — Portfolio → Building → Wing.
@@ -492,38 +495,63 @@ Table site {
   '''
 }
 
-Table site_section {
+Table site_system {
   id text [pk, default: `gen_random_uuid()::text`]
   site_id text [not null]
-  title text [not null, default: '']
+  system_id text [not null, note: 'FK → system (catalog) — Fire alarm, Access, CCTV, …']
+  name text [not null, default: '']
+  status text [not null, default: 'proposed', note: 'CHECK: proposed | active | removed | cancelled']
+  sort_order int [not null, default: 0]
+
+  Note: '''
+    Optional installed **system instance** on a site. Not required — areas/assets may attach to a
+    default no-system bucket (`site_system_id` null on child rows). Each system has its own area
+    tree (FA Floor 1 ≠ CCTV Floor 1). Child collection on `site_detail` (`systems`).
+  '''
+}
+
+Table site_area {
+  id text [pk, default: `gen_random_uuid()::text`]
+  site_id text [not null]
+  site_system_id text [note: 'nullable FK → site_system — null = default no-system bucket']
+  parent_area_id text [note: 'nullable FK → site_area — tree within same system/bucket']
+  area_type text [not null, default: '', note: 'free text v1 — floor, door_group, corridor, riser, …']
+  name text [not null, default: '']
+  code text [not null, default: '']
   sort_order int [not null, default: 0]
   status text [not null, default: 'proposed', note: 'CHECK: proposed | active | removed | cancelled']
 
   Note: '''
-    Coarse site geography — Floor 3, wing, warehouse, suite-as-zone. **Flat list** (no nested
-    sections). Optional grouping parent for `site_location`; lines FK location only.
-    **Site-owned**; survives job completion (as-built). Child collection on `site_detail`
-    (`sections`). Provenance (who introduced/removed, when) → `latch_audit` on mutations —
-    no `*-by-*` columns on this row. Never hard-delete rows referenced by lines — tombstone
-    via `status`.
+    Nested organizational geography per system (or default bucket). **Site-owned** as-built;
+    survives job completion. Child collection on `site_detail` (`areas`). Option B: access
+    `door_group` area → reader/strike/REX/contact assets underneath. Provenance → `latch_audit`;
+    tombstone via `status` — never hard-delete rows referenced by lines.
   '''
 }
 
-Table site_location {
+Table site_asset {
   id text [pk, default: `gen_random_uuid()::text`]
   site_id text [not null]
-  site_section_id text [note: 'nullable FK → site_section']
-  label text [not null, default: '', note: 'exact work spot — Door A-32, Rm 345 Cam 1']
+  site_system_id text [note: 'nullable FK → site_system']
+  site_area_id text [note: 'nullable FK → site_area — placement parent']
+  asset_type text [not null, default: '', note: 'device kind — camera, reader, pull_station, …']
+  tag_label text [not null, default: '', note: 'field label — Rm 345 Cam 1, Door 101 reader']
+  part_id text [note: 'nullable FK → manufacturer_part']
+  manufacturer text [not null, default: '']
+  model text [not null, default: '']
+  serial_number text [not null, default: '']
   sort_order int [not null, default: 0]
-  status text [not null, default: 'proposed', note: 'CHECK: proposed | active | relocated | removed | cancelled']
-  replaced_by_site_location_id text [note: 'nullable FK → site_location — current relocate target']
+  status text [not null, default: 'planned', note: 'CHECK: planned | installed | active | removed | replaced']
+  replaced_by_site_asset_id text [note: 'nullable FK → site_asset — relocate/replace target']
+  serviceable boolean [not null, default: true]
+  installed_by_job_id text [note: 'nullable FK → job — provenance']
 
   Note: '''
-    Exact work spot at a site. **Site-owned** as-built registry. Child collection on
-    `site_detail` (`locations`). `replaced_by_site_location_id` = fast “where is it now?”
-    query; full who/when history → `latch_audit`. Relocate = new row + old row `relocated`.
-    Do not relabel rows referenced by completed jobs. Field execution status stays on
-    `job_work_item` — not on this table.
+    Installed **serviceable device** — leaf only (no `parent_asset_id` v1). Door = **area**
+    (`door_group`); reader/strike/REX/contact = **assets**. **Site-owned** as-built registry.
+    Child collection on `site_detail` (`assets`). `replaced_by_site_asset_id` = fast “where is it
+    now?” query; full history → `latch_audit`. Field progress does **not** update this table —
+    only `job.complete` publishes `proposed` → `active`.
   '''
 }
 
@@ -567,6 +595,13 @@ Table site_contact {
 // ─── Business (SubHub Slice 3 — catalog) ─────────────────────────────────────
 
 TableGroup catalog [color: #e67e22] {
+  system
+  trade
+  system_spec_def
+  system_spec_option
+  manufacturer_part_spec
+  phase_template
+  phase_template_step
   category
   labor_class
   phase
@@ -574,6 +609,92 @@ TableGroup catalog [color: #e67e22] {
   vendor_part
   item
   item_part_link
+}
+
+Table system {
+  id text [pk, default: `gen_random_uuid()::text`]
+  name text [not null, note: 'Fire alarm, Access control, CCTV, …']
+  default_phase_template_id text [note: 'nullable FK → phase_template — fallback when item has no template (J5)']
+  sort_order int [not null, default: 0]
+
+  Note: '''
+    Catalog **building system** type — distinct from `site_system` (installed instance on a property).
+    Drives `system_spec_def` dimensions and default phase templates. Progressive setup + catalog table page.
+  '''
+}
+
+Table trade {
+  id text [pk, default: `gen_random_uuid()::text`]
+  name text [not null, note: 'e.g. electrical, low voltage, fire alarm contractor']
+  sort_order int [not null, default: 0]
+
+  Note: 'Who performs work — used on `job_scope_group` for production rollups and labor costing.'
+}
+
+Table system_spec_def {
+  id uuid [pk, default: `gen_random_uuid()`]
+  system_id text [not null]
+  code text [note: 'nullable stable slug — e.g. slc_protocol; not PK']
+  display_name text [not null]
+  value_type text [not null, default: 'enum', note: 'CHECK: enum | boolean | text']
+  filter_mode text [not null, default: 'required', note: 'CHECK: required | prefer']
+  sort_order int [not null, default: 0]
+
+  Note: '''
+    One spec dimension per catalog `system` (UUID PK). Estimate and part rows FK to
+    `system_spec_option` for enums — not loose strings. `manufacturer_party_id` is **not** a spec knob.
+  '''
+}
+
+Table system_spec_option {
+  id uuid [pk, default: `gen_random_uuid()`]
+  system_spec_def_id uuid [not null]
+  code text [note: 'nullable slug — e.g. fire_lite_litespeed']
+  display_name text [not null]
+  sort_order int [not null, default: 0]
+
+  Note: 'Enum values for a `system_spec_def`. Child collection on spec-def catalog page.'
+}
+
+Table manufacturer_part_spec {
+  manufacturer_part_id text [not null]
+  system_spec_def_id uuid [not null]
+  system_spec_option_id uuid [note: 'nullable — enum match; multiple rows per def allowed']
+  value_text text [note: 'nullable — non-enum defs']
+  value_boolean boolean [note: 'nullable — boolean defs']
+
+  indexes {
+    (manufacturer_part_id, system_spec_def_id, system_spec_option_id) [unique, name: 'manufacturer_part_spec_unique']
+  }
+
+  Note: '''
+    Part compatibility rows — filter/suggest in estimate part picker. `manufacturer_part.specs` text
+    column is human notes only; never used for filtering.
+  '''
+}
+
+Table phase_template {
+  id text [pk, default: `gen_random_uuid()::text`]
+  name text [not null, note: 'e.g. standard install, FA commissioning']
+  sort_order int [not null, default: 0]
+
+  Note: 'Named ordered step set — referenced by `system.default_phase_template_id` and `item.phase_template_id`.'
+}
+
+Table phase_template_step {
+  id text [pk, default: `gen_random_uuid()::text`]
+  phase_template_id text [not null]
+  name text [not null, note: 'Install, Program, Test, Complete, …']
+  sequence int [not null]
+  progress_weight numeric [not null, default: 1]
+  billing_weight numeric [not null, default: 1]
+  requires_previous_phase boolean [not null, default: false]
+  sort_order int [not null, default: 0]
+
+  Note: '''
+    Ordered steps within a `phase_template`. Seeded onto `scope_phase` when job line is created or
+    on estimate win. Org `phase` catalog bridges here for legacy labor lines (`phase_id`).
+  '''
 }
 
 Table category {
@@ -609,10 +730,9 @@ Table phase {
   sort_order int [not null, default: 0]
 
   Note: '''
-    Org catalog of **labor / reporting phases** (not schedule — v2). Attached on labor
-    `estimate_line` / `job_line` and `job_work_item`. Progressive setup + `phase_table` Surface.
-    Scope subset = omit labor lines for phases not performed. Scheduling dates deferred (v2
-    `job_phase` instance table).
+    Org catalog of **labor / reporting phases** (not schedule — v2). Bridge to `phase_template_step`
+    for scope phase seeding on jobs. Attach on labor `estimate_line` / `job_line` via `phase_id`
+    until full template rollout. Scheduling dates deferred (v2 `job_phase` instance table).
   '''
 }
 
@@ -648,6 +768,7 @@ Table vendor_part {
   vendor_description text [not null, default: '']
   unit_price numeric [not null, note: 'per manufacturer_part.purchase_unit when set, else per unit']
   currency text [not null, default: 'USD']
+  lead_time_days int [note: 'nullable — vendor lead time; order_by = scope_phase.target_date − lead_time (P2)']
   is_preferred boolean [not null, default: false]
 
   indexes {
@@ -669,6 +790,7 @@ Table item {
   labor_class_id text [note: 'nullable FK → labor_class — required when kind = labor (app/DAL)']
   default_part_id text [note: 'nullable FK → manufacturer_part — primary part for costing']
   default_vendor_part_id text [note: 'nullable FK → vendor_part — default buy path for costing']
+  phase_template_id text [note: 'nullable FK → phase_template — overrides system default (J5)']
   created_at timestamptz [not null, default: `now()`]
   updated_at timestamptz [not null, default: `now()`]
 
@@ -707,7 +829,10 @@ TableGroup estimate [color: #f39c12] {
   job_party_relation
   estimate
   estimate_party
-  estimate_section
+  estimate_system
+  estimate_system_spec
+  estimate_area_spec
+  estimate_line_spec
   estimate_line
 }
 
@@ -742,9 +867,9 @@ Table estimate {
   updated_at timestamptz [not null, default: `now()`]
 
   Note: '''
-    Sales quote anchor. Stakeholders on `estimate_party`. Quote structure uses `estimate_section`
-    keyed by `category` (commercial names or CSI-aligned category nodes) — not per line.
-    Won quote → `job` copies site, parties, sections, and line snapshots.
+    Sales quote anchor. Stakeholders on `estimate_party`. Quote structure uses **`estimate_system`**
+    tabs (one per building system) with per-tab spec knobs and area/asset rollups — not
+    `estimate_section` in v1. Won quote → `job` copies site, parties, system blocks, and line snapshots.
   '''
 }
 
@@ -761,23 +886,58 @@ Table estimate_party {
   Note: 'Per-quote stakeholder graph. Copied to `job_party` when estimate is won.'
 }
 
-Table estimate_section {
+Table estimate_system {
   id text [pk, default: `gen_random_uuid()::text`]
   estimate_id text [not null]
-  title text [not null, default: '']
-  category_id text [note: 'nullable FK → category — commercial section bucket']
+  system_id text [not null, note: 'FK → system (catalog)']
+  site_system_id text [note: 'nullable FK → site_system — proposed or active instance on quote site']
   sort_order int [not null, default: 0]
 
   Note: '''
-    Quote presentation / rollup — **commercial** grouping by `category` (Card access, Division
-    26, …). Physical geography uses `site_section` / `site_location` on the site, not here.
+    One row per **system tab** on the quote (Fire alarm, CCTV, …). Area tree and lines are scoped
+    to this tab's `site_system_id`. Single-system quote = one tab; ROM/mobilization may have zero
+    tabs with flat lines. Child collection `systems` on `estimate_detail`.
   '''
+}
+
+Table estimate_system_spec {
+  id text [pk, default: `gen_random_uuid()::text`]
+  estimate_system_id text [not null]
+  system_spec_def_id uuid [not null]
+  system_spec_option_id uuid [note: 'nullable — enum defs']
+  value_text text [note: 'nullable — text defs']
+  value_boolean boolean [note: 'nullable — boolean defs']
+
+  Note: 'Tab-default spec values — inherited by lines unless overridden at area or line level.'
+}
+
+Table estimate_area_spec {
+  id text [pk, default: `gen_random_uuid()::text`]
+  estimate_system_id text [not null]
+  site_area_id text [not null]
+  system_spec_def_id uuid [not null]
+  system_spec_option_id uuid [note: 'nullable — enum defs']
+  value_text text [note: 'nullable — text defs']
+  value_boolean boolean [note: 'nullable — boolean defs']
+
+  Note: 'Per-area spec override within an `estimate_system` tab — applies to lines with matching `site_area_id`.'
+}
+
+Table estimate_line_spec {
+  id text [pk, default: `gen_random_uuid()::text`]
+  estimate_line_id text [not null]
+  system_spec_def_id uuid [not null]
+  system_spec_option_id uuid [note: 'nullable — enum defs']
+  value_text text [note: 'nullable — text defs']
+  value_boolean boolean [note: 'nullable — boolean defs']
+
+  Note: 'Per-line spec override. Resolution: line → area (same tab) → `estimate_system_spec`.'
 }
 
 Table estimate_line {
   id text [pk, default: `gen_random_uuid()::text`]
   estimate_id text [not null]
-  estimate_section_id text [note: 'nullable FK → estimate_section']
+  estimate_system_id text [note: 'nullable FK → estimate_system — which system tab']
   parent_line_id text [note: 'nullable FK → estimate_line — kit header/component']
   line_number int [not null]
   line_role text [not null, default: 'standalone', note: 'CHECK: standalone | kit_header | kit_component']
@@ -787,8 +947,10 @@ Table estimate_line {
   unit text [not null, default: 'ea', note: 'snapshotted UOM — from manufacturer_part.unit or labor/expense default']
   unit_cost numeric [not null, default: 0]
   unit_price numeric [not null, default: 0]
-  site_location_id text [note: 'nullable FK → site_location — work spot on site']
-  phase_id text [note: 'nullable FK → phase — labor lines only']
+  site_area_id text [note: 'nullable FK → site_area — geography within tab site_system']
+  site_asset_id text [note: 'nullable FK → site_asset — device-level scope']
+  material_status text [note: 'nullable — generic | suggested | verified | …']
+  phase_id text [note: 'nullable FK → phase — labor lines only; bridges to phase_template_step on win']
   item_id text [note: 'nullable FK → item']
   part_id text [note: 'nullable FK → manufacturer_part — when specific MPN quoted']
   vendor_part_id text [note: 'nullable FK → vendor_part — cost source when pinned']
@@ -799,9 +961,10 @@ Table estimate_line {
   }
 
   Note: '''
-    Quote line — snapshot description, qty, unit, cost, sell at save. May reference or create
-    `proposed` `site_location` rows on the quote site. Labor lines attach `phase_id`; product
-    lines attach `site_location_id` when scoped. Kits via `parent_line_id` + `line_role`.
+    Quote line — snapshot description, qty, unit, cost, sell at save. Flat persisted array; UI
+    groups by area within active `estimate_system` tab. May reference or create `proposed`
+    `site_area` / `site_asset` rows on the quote site. Kits via `parent_line_id` + `line_role`.
+    Part picker filters via resolved specs → `manufacturer_part_spec`.
   '''
 }
 
@@ -810,9 +973,15 @@ Table estimate_line {
 TableGroup job [color: #e74c3c] {
   job
   job_party
+  job_scope_group
   job_line
   job_line_part
-  job_work_item
+  scope_phase
+  progress_entry
+  progress_entry_line
+  job_system_spec
+  job_area_spec
+  job_line_spec
   change_order
   change_order_line
 }
@@ -834,12 +1003,16 @@ Table job {
 
   Note: '''
     Operations anchor — install projects, service calls, and warranty work share one model
-    (`job_kind`). No sole customer_id — graph on `job_party`. Site geography on `site_section` /
-    `site_location`; lines FK `site_location_id`. On `complete`, DAL publishes proposed → active
-    and applies relocations/removals to site registry (does not rewrite closed job line FKs).
+    (`job_kind`). No sole customer_id — graph on `job_party`. Site geography on `site_area` /
+    `site_asset`; lines FK `site_area_id` / `site_asset_id`. On `complete`, DAL publishes
+    proposed → active and applies relocations/removals to site registry (does not rewrite closed
+    job line FKs).
+
+    **Scope model:** `job_scope_group` → `job_line` → `scope_phase` → `progress_entry` /
+    `progress_entry_line` (replaces `job_work_item` — J1 locked).
 
     **Billing:** `billing_model` selects lump-sum at complete, line progress, SOV milestones, or
-    T&M. `billing_basis` drives auto `billable_line` generation (field install vs receipt vs manual).
+    T&M. `billing_basis` drives auto `billable_line` generation (deferred v1 — manual staging first).
     Customer invoices always snapshot on `invoice` / `invoice_line` — see billing TableGroup.
   '''
 }
@@ -857,9 +1030,30 @@ Table job_party {
   Note: 'Per-job stakeholders. Relations from `job_party_relation` catalog — not master `party_role`.'
 }
 
+Table job_scope_group {
+  id text [pk, default: `gen_random_uuid()::text`]
+  job_id text [not null]
+  name text [not null, default: '']
+  group_type text [not null, default: 'general', note: 'CHECK: location | trade | system | phase | sov_section | change_order | repair_group | testing_group | closeout_group | general']
+  trade_id text [note: 'nullable FK → trade']
+  system_id text [note: 'nullable FK → system']
+  fulfillment_type text [note: 'nullable — self | subcontracted | by_others | allowance | …']
+  site_system_id text [note: 'nullable FK → site_system']
+  site_area_id text [note: 'nullable FK → site_area']
+  sov_line_id text [note: 'nullable FK → sov_line — optional default SOV link']
+  sort_order int [not null, default: 0]
+
+  Note: '''
+    Production organizer on the job — **not** a work order, **not** a `site_area`. Win from
+    `estimate_system` tabs may create groups; flat jobs use null `job_line.job_scope_group_id` →
+    synthetic **General** in UI (J4). Child collection on `job_detail` Scope tab.
+  '''
+}
+
 Table job_line {
   id text [pk, default: `gen_random_uuid()::text`]
   job_id text [not null]
+  job_scope_group_id text [note: 'nullable FK → job_scope_group — null = implicit General (J4)']
   line_number int [not null]
   line_role text [not null, default: 'standalone', note: 'CHECK: standalone | kit_header | kit_component']
   line_kind text [not null, default: 'product', note: 'CHECK: product | labor | expense']
@@ -868,8 +1062,10 @@ Table job_line {
   unit text [not null, default: 'ea']
   unit_cost numeric [not null, default: 0]
   unit_price numeric [not null, default: 0]
-  site_location_id text [note: 'nullable FK → site_location — frozen for this job line']
-  phase_id text [note: 'nullable FK → phase — labor lines only']
+  site_area_id text [note: 'nullable FK → site_area — frozen for this job line']
+  site_asset_id text [note: 'nullable FK → site_asset — device-level scope']
+  material_status text [note: 'nullable — carried from estimate']
+  phase_id text [note: 'nullable FK → phase — labor lines only; bridges to scope_phase seeding']
   item_id text [note: 'nullable FK → item — sold scope; may stay generic']
   part_id text [note: 'nullable FK → manufacturer_part']
   vendor_part_id text [note: 'nullable FK → vendor_part']
@@ -887,8 +1083,8 @@ Table job_line {
 
   Note: '''
     Sold / contract scope — unified ledger from estimate win, change orders, or manual entry.
-    Engineering buy list on `job_line_part`. Field status on `job_work_item`. Operational
-    reports sum `status = active` only; voided rows keep CO deduct provenance.
+    Engineering buy list on `job_line_part`. Field progress on `scope_phase` + `progress_entry`.
+    Operational reports sum `status = active` only; voided rows keep CO deduct provenance.
   '''
 }
 
@@ -897,7 +1093,8 @@ Table job_line_part {
   job_line_id text [not null]
   part_id text [not null, note: 'FK → manufacturer_part']
   vendor_part_id text [note: 'nullable FK → vendor_part']
-  site_location_id text [note: 'nullable FK → site_location — override sold-line place']
+  site_area_id text [note: 'nullable FK → site_area — override sold-line place']
+  site_asset_id text [note: 'nullable FK → site_asset — device-level override']
   description text [not null, default: '']
   quantity numeric [not null, default: 1]
   unit text [not null, default: 'ea', note: 'snapshotted — often purchase_unit from part']
@@ -912,28 +1109,87 @@ Table job_line_part {
   '''
 }
 
-Table job_work_item {
+Table scope_phase {
   id text [pk, default: `gen_random_uuid()::text`]
-  job_id text [not null]
   job_line_id text [not null]
-  job_line_part_id text [note: 'nullable FK → job_line_part — track at MPN level']
-  site_location_id text [note: 'nullable FK → site_location']
-  phase_id text [note: 'nullable FK → phase']
-  status text [not null, default: 'pending', note: 'CHECK: pending | in_progress | installed | issue | verified | skipped']
-  recorded_at timestamptz [not null, default: `now()`]
-  reported_by text [note: 'nullable FK → employee.party_id']
+  phase_template_step_id text [note: 'nullable FK → phase_template_step']
+  name text [not null, note: 'Install, Program, Test, Complete, …']
+  sequence int [not null]
+  planned_qty numeric [not null, default: 0]
+  completed_qty numeric [not null, default: 0]
+  progress_weight numeric [not null, default: 1]
+  billing_weight numeric [not null, default: 1]
+  requires_previous_phase boolean [not null, default: false]
+  target_date date [note: 'nullable — install target; order_by = target − vendor_part.lead_time_days (P2)']
+  sort_order int [not null, default: 0]
 
   Note: '''
-    Field-reported work unit — one row per sold line (+ optional `job_line_part`) × `site_location`
-    × `phase`. **Completion is all-or-nothing per phase** — e.g. toilet installed or not; pull
-    station tested or not. No fractional `percent_complete` on `job_line`. Labor lines may have
-    one work item per phase; product lines per place × phase when scoped.
-
-    Nested Field or sub-section on `job_detail`. Rollups for billing and stakeholder progress;
-    feeds `billable_line` when `billing_basis = qty_installed` (threshold = `job.bill_on_work_status`).
-    Does not replace invoice amounts — staging copies suggested qty/price at pickup. Latest row
-    or explicit update policy in DAL.
+    Per scope item (`job_line`) — fractional completion lives here (replaces `job_work_item`).
+    Seeded from `phase_template_step` on line create or estimate win. `progress_entry_line`
+    quantities roll up into `completed_qty`. Billing `qty_installed` reads rollups when auto
+    generator ships (deferred v1 — manual `billable_line` first).
   '''
+}
+
+Table progress_entry {
+  id text [pk, default: `gen_random_uuid()::text`]
+  job_id text [not null]
+  work_date date [not null]
+  entered_by text [note: 'nullable FK → employee.party_id']
+  crew_note text [not null, default: '']
+  note text [not null, default: '']
+  created_at timestamptz [not null, default: `now()`]
+
+  Note: '''
+    Field progress header — work date, crew, notes. No workflow/status v1 (J2) — save applies
+    immediately to `scope_phase.completed_qty`. Child collection on `job_detail` Field tab.
+  '''
+}
+
+Table progress_entry_line {
+  id text [pk, default: `gen_random_uuid()::text`]
+  progress_entry_id text [not null]
+  scope_phase_id text [not null]
+  quantity_completed numeric [not null, default: 0]
+  site_area_id text [note: 'nullable FK → site_area']
+  site_asset_id text [note: 'nullable FK → site_asset']
+  sort_order int [not null, default: 0]
+
+  Note: 'One row per scope phase reported in this entry. Sums into `scope_phase.completed_qty`.'
+}
+
+Table job_system_spec {
+  id text [pk, default: `gen_random_uuid()::text`]
+  job_scope_group_id text [not null, note: 'FK → job_scope_group — system block from win']
+  system_spec_def_id uuid [not null]
+  system_spec_option_id uuid [note: 'nullable — enum defs']
+  value_text text [note: 'nullable — text defs']
+  value_boolean boolean [note: 'nullable — boolean defs']
+
+  Note: 'Spec snapshot on win — copied from `estimate_system_spec` per scope group.'
+}
+
+Table job_area_spec {
+  id text [pk, default: `gen_random_uuid()::text`]
+  job_scope_group_id text [not null]
+  site_area_id text [not null]
+  system_spec_def_id uuid [not null]
+  system_spec_option_id uuid [note: 'nullable — enum defs']
+  value_text text [note: 'nullable — text defs']
+  value_boolean boolean [note: 'nullable — boolean defs']
+
+  Note: 'Per-area spec snapshot on win — copied from `estimate_area_spec`.'
+}
+
+Table job_line_spec {
+  id text [pk, default: `gen_random_uuid()::text`]
+  job_line_id text [not null]
+  system_spec_def_id uuid [not null]
+  system_spec_option_id uuid [note: 'nullable — enum defs']
+  value_text text [note: 'nullable — text defs']
+  value_boolean boolean [note: 'nullable — boolean defs']
+
+  Note: 'Per-line spec snapshot on win — copied from `estimate_line_spec`.'
 }
 
 Table change_order {
@@ -1011,7 +1267,8 @@ Table requested_order_line {
   description text [not null, default: '']
   quantity numeric [not null, default: 1]
   unit text [not null, default: 'ea']
-  site_location_id text [note: 'nullable FK → site_location — where parts are needed']
+  site_area_id text [note: 'nullable FK → site_area — where parts are needed']
+  site_asset_id text [note: 'nullable FK → site_asset — device-level need']
   status text [not null, default: 'open', note: 'CHECK: open | on_purchase_order | fulfilled | withdrawn']
   withdrawal_note text [not null, default: '', note: 'required context when status = withdrawn']
   sort_order int [not null, default: 0]
@@ -1159,7 +1416,7 @@ Table job_material_movement {
   purchase_order_line_shipment_id text [note: 'nullable FK → purchase_order_line_shipment — receive against scheduled portion']
   material_receipt_line_id text [note: 'nullable FK → material_receipt_line']
   job_line_part_id text [note: 'nullable FK → job_line_part — demand row this supports']
-  job_work_item_id text [note: 'nullable FK → job_work_item — when issued to installed work']
+  scope_phase_id text [note: 'nullable FK → scope_phase — when issued to installed work']
   note text [not null, default: '']
   recorded_at timestamptz [not null, default: `now()`]
   recorded_by text [note: 'nullable FK → employee.party_id']
@@ -1190,10 +1447,10 @@ TableGroup billing [color: #9b59b6] {
 Table billable_line {
   id text [pk, default: `gen_random_uuid()::text`]
   job_id text [not null]
-  source_kind text [not null, default: 'manual', note: 'CHECK: job_line | work_item | receipt_line | sov_line | manual']
+  source_kind text [not null, default: 'manual', note: 'CHECK: job_line | scope_phase | receipt_line | sov_line | manual']
   billing_basis text [not null, default: 'manual', note: 'CHECK: qty_installed | qty_received | sov_scheduled | manual']
   job_line_id text [note: 'nullable FK → job_line — scope traceability; set when mappable']
-  job_work_item_id text [note: 'nullable FK → job_work_item — when source_kind = work_item']
+  scope_phase_id text [note: 'nullable FK → scope_phase — when source_kind = scope_phase']
   material_receipt_line_id text [note: 'nullable FK → material_receipt_line — when billing on receipt']
   sov_line_id text [note: 'nullable FK → sov_line — when billing SOV milestone']
   description text [not null, default: '']
@@ -1213,9 +1470,9 @@ Table billable_line {
 
   Note: '''
     **Earned / billable staging** — parallel to requisition before PO. What *may* be invoiced,
-    not yet a customer document. DAL auto-generates from `job_work_item` (install), from
-    `material_receipt_line` (received qty), or from SOV remaining balance; user adjusts on job
-    billing workbench. **Invoice pickup:** DAL inserts `invoice_line` with `billable_line_id` (canonical),
+    not yet a customer document. DAL may auto-generate from `scope_phase` rollups (install),
+    from `material_receipt_line` (received qty), or from SOV remaining balance — **deferred v1**
+    (B4: manual staging first). **Invoice pickup:** DAL inserts `invoice_line` with `billable_line_id`
     then sets `billable_line.invoice_line_id` + status `on_invoice` in the same transaction. Void
     invoice → revert linked rows to `open`. Child collection `billable_items` on `job_detail`
     billing section (Slice 6b).
@@ -1310,17 +1567,19 @@ Table sov_line {
 Table sov_allocation {
   id text [pk, default: `gen_random_uuid()::text`]
   sov_line_id text [not null]
+  job_scope_group_id text [note: 'nullable FK → job_scope_group — primary v1 milestone target']
   job_line_id text [note: 'nullable FK → job_line']
-  phase_id text [note: 'nullable FK → phase — when milestone tracks labor phase']
+  scope_phase_id text [note: 'nullable FK → scope_phase — phase-weighted earn']
+  phase_id text [note: 'nullable FK → phase — org catalog bridge; retire for new jobs']
   allocation_pct numeric [note: 'nullable — XOR with allocated_value; percent of job_line extended price']
   allocated_value numeric [note: 'nullable — XOR with allocation_pct; fixed $ slice on this SOV line']
   sort_order int [not null, default: 0]
 
   Note: '''
-    Maps sold scope and/or phases to SOV milestones (many-to-many). Sync from estimate sections
-    or manual on job setup. **Exactly one** of `allocation_pct` or `allocated_value` must be set
-    per row (CHECK in migration). DAL rolls up earned qty from linked `job_line` / `job_work_item`
-    by phase to cap billable amount per `sov_line.scheduled_value`.
+    Maps sold scope, scope groups, and/or phases to SOV milestones (many-to-many). Manual on job
+    setup in v1. **Exactly one** of `allocation_pct` or `allocated_value` must be set per row
+    (CHECK in migration). DAL rolls up earned qty from linked `scope_phase` / `job_line` to cap
+    billable amount per `sov_line.scheduled_value`.
   '''
 }
 
@@ -1356,13 +1615,28 @@ Ref: site.physical_address_id > address.id [delete: set null]
 Ref: site.customer_party_id > party.id [delete: set null]
 Ref: site.property_owner_party_id > party.id [delete: set null]
 Ref: site.parent_site_id > site.id [delete: set null]
-Ref: site_section.site_id > site.id [delete: cascade]
-Ref: site_location.site_id > site.id [delete: cascade]
-Ref: site_location.site_section_id > site_section.id [delete: set null]
-Ref: site_location.replaced_by_site_location_id > site_location.id [delete: set null]
+Ref: site_system.site_id > site.id [delete: cascade]
+Ref: site_system.system_id > system.id [delete: restrict]
+Ref: site_area.site_id > site.id [delete: cascade]
+Ref: site_area.site_system_id > site_system.id [delete: set null]
+Ref: site_area.parent_area_id > site_area.id [delete: set null]
+Ref: site_asset.site_id > site.id [delete: cascade]
+Ref: site_asset.site_system_id > site_system.id [delete: set null]
+Ref: site_asset.site_area_id > site_area.id [delete: set null]
+Ref: site_asset.part_id > manufacturer_part.id [delete: set null]
+Ref: site_asset.replaced_by_site_asset_id > site_asset.id [delete: set null]
+Ref: site_asset.installed_by_job_id > job.id [delete: set null]
 Ref: site_contact.site_id > site.id [delete: cascade]
 Ref: site_contact.party_id > party.id [delete: cascade]
 Ref: site_contact.relation_id > site_contact_relation.id [delete: restrict]
+
+Ref: system.default_phase_template_id > phase_template.id [delete: set null]
+Ref: system_spec_def.system_id > system.id [delete: cascade]
+Ref: system_spec_option.system_spec_def_id > system_spec_def.id [delete: cascade]
+Ref: manufacturer_part_spec.manufacturer_part_id > manufacturer_part.id [delete: cascade]
+Ref: manufacturer_part_spec.system_spec_def_id > system_spec_def.id [delete: cascade]
+Ref: manufacturer_part_spec.system_spec_option_id > system_spec_option.id [delete: set null]
+Ref: phase_template_step.phase_template_id > phase_template.id [delete: cascade]
 
 Ref: manufacturer_part.manufacturer_party_id > party.id [delete: restrict]
 Ref: vendor_part.vendor_party_id > party.id [delete: cascade]
@@ -1372,6 +1646,7 @@ Ref: item.category_id > category.id [delete: set null]
 Ref: item.labor_class_id > labor_class.id [delete: set null]
 Ref: item.default_part_id > manufacturer_part.id [delete: set null]
 Ref: item.default_vendor_part_id > vendor_part.id [delete: set null]
+Ref: item.phase_template_id > phase_template.id [delete: set null]
 Ref: item_part_link.item_id > item.id [delete: cascade]
 Ref: item_part_link.part_id > manufacturer_part.id [delete: restrict]
 
@@ -1381,12 +1656,24 @@ Ref: estimate.category_id > category.id [delete: set null]
 Ref: estimate_party.estimate_id > estimate.id [delete: cascade]
 Ref: estimate_party.party_id > party.id [delete: cascade]
 Ref: estimate_party.relation_id > job_party_relation.id [delete: restrict]
-Ref: estimate_section.estimate_id > estimate.id [delete: cascade]
-Ref: estimate_section.category_id > category.id [delete: set null]
+Ref: estimate_system.estimate_id > estimate.id [delete: cascade]
+Ref: estimate_system.system_id > system.id [delete: restrict]
+Ref: estimate_system.site_system_id > site_system.id [delete: set null]
+Ref: estimate_system_spec.estimate_system_id > estimate_system.id [delete: cascade]
+Ref: estimate_system_spec.system_spec_def_id > system_spec_def.id [delete: restrict]
+Ref: estimate_system_spec.system_spec_option_id > system_spec_option.id [delete: set null]
+Ref: estimate_area_spec.estimate_system_id > estimate_system.id [delete: cascade]
+Ref: estimate_area_spec.site_area_id > site_area.id [delete: cascade]
+Ref: estimate_area_spec.system_spec_def_id > system_spec_def.id [delete: restrict]
+Ref: estimate_area_spec.system_spec_option_id > system_spec_option.id [delete: set null]
+Ref: estimate_line_spec.estimate_line_id > estimate_line.id [delete: cascade]
+Ref: estimate_line_spec.system_spec_def_id > system_spec_def.id [delete: restrict]
+Ref: estimate_line_spec.system_spec_option_id > system_spec_option.id [delete: set null]
 Ref: estimate_line.estimate_id > estimate.id [delete: cascade]
-Ref: estimate_line.estimate_section_id > estimate_section.id [delete: set null]
+Ref: estimate_line.estimate_system_id > estimate_system.id [delete: set null]
 Ref: estimate_line.parent_line_id > estimate_line.id [delete: set null]
-Ref: estimate_line.site_location_id > site_location.id [delete: set null]
+Ref: estimate_line.site_area_id > site_area.id [delete: set null]
+Ref: estimate_line.site_asset_id > site_asset.id [delete: set null]
 Ref: estimate_line.phase_id > phase.id [delete: set null]
 Ref: estimate_line.item_id > item.id [delete: set null]
 Ref: estimate_line.part_id > manufacturer_part.id [delete: set null]
@@ -1398,9 +1685,17 @@ Ref: job.parent_job_id > job.id [delete: set null]
 Ref: job_party.job_id > job.id [delete: cascade]
 Ref: job_party.party_id > party.id [delete: cascade]
 Ref: job_party.relation_id > job_party_relation.id [delete: restrict]
+Ref: job_scope_group.job_id > job.id [delete: cascade]
+Ref: job_scope_group.trade_id > trade.id [delete: set null]
+Ref: job_scope_group.system_id > system.id [delete: set null]
+Ref: job_scope_group.site_system_id > site_system.id [delete: set null]
+Ref: job_scope_group.site_area_id > site_area.id [delete: set null]
+Ref: job_scope_group.sov_line_id > sov_line.id [delete: set null]
 Ref: job_line.job_id > job.id [delete: cascade]
+Ref: job_line.job_scope_group_id > job_scope_group.id [delete: set null]
 Ref: job_line.parent_line_id > job_line.id [delete: set null]
-Ref: job_line.site_location_id > site_location.id [delete: set null]
+Ref: job_line.site_area_id > site_area.id [delete: set null]
+Ref: job_line.site_asset_id > site_asset.id [delete: set null]
 Ref: job_line.phase_id > phase.id [delete: set null]
 Ref: job_line.item_id > item.id [delete: set null]
 Ref: job_line.part_id > manufacturer_part.id [delete: set null]
@@ -1411,13 +1706,26 @@ Ref: job_line.superseded_by_job_line_id > job_line.id [delete: set null]
 Ref: job_line_part.job_line_id > job_line.id [delete: cascade]
 Ref: job_line_part.part_id > manufacturer_part.id [delete: restrict]
 Ref: job_line_part.vendor_part_id > vendor_part.id [delete: set null]
-Ref: job_line_part.site_location_id > site_location.id [delete: set null]
-Ref: job_work_item.job_id > job.id [delete: cascade]
-Ref: job_work_item.job_line_id > job_line.id [delete: cascade]
-Ref: job_work_item.job_line_part_id > job_line_part.id [delete: set null]
-Ref: job_work_item.site_location_id > site_location.id [delete: set null]
-Ref: job_work_item.phase_id > phase.id [delete: set null]
-Ref: job_work_item.reported_by > employee.party_id [delete: set null]
+Ref: job_line_part.site_area_id > site_area.id [delete: set null]
+Ref: job_line_part.site_asset_id > site_asset.id [delete: set null]
+Ref: scope_phase.job_line_id > job_line.id [delete: cascade]
+Ref: scope_phase.phase_template_step_id > phase_template_step.id [delete: set null]
+Ref: progress_entry.job_id > job.id [delete: cascade]
+Ref: progress_entry.entered_by > employee.party_id [delete: set null]
+Ref: progress_entry_line.progress_entry_id > progress_entry.id [delete: cascade]
+Ref: progress_entry_line.scope_phase_id > scope_phase.id [delete: restrict]
+Ref: progress_entry_line.site_area_id > site_area.id [delete: set null]
+Ref: progress_entry_line.site_asset_id > site_asset.id [delete: set null]
+Ref: job_system_spec.job_scope_group_id > job_scope_group.id [delete: cascade]
+Ref: job_system_spec.system_spec_def_id > system_spec_def.id [delete: restrict]
+Ref: job_system_spec.system_spec_option_id > system_spec_option.id [delete: set null]
+Ref: job_area_spec.job_scope_group_id > job_scope_group.id [delete: cascade]
+Ref: job_area_spec.site_area_id > site_area.id [delete: cascade]
+Ref: job_area_spec.system_spec_def_id > system_spec_def.id [delete: restrict]
+Ref: job_area_spec.system_spec_option_id > system_spec_option.id [delete: set null]
+Ref: job_line_spec.job_line_id > job_line.id [delete: cascade]
+Ref: job_line_spec.system_spec_def_id > system_spec_def.id [delete: restrict]
+Ref: job_line_spec.system_spec_option_id > system_spec_option.id [delete: set null]
 Ref: change_order.job_id > job.id [delete: cascade]
 Ref: change_order.estimate_id > estimate.id [delete: set null]
 Ref: change_order_line.change_order_id > change_order.id [delete: cascade]
@@ -1429,7 +1737,8 @@ Ref: requested_order.requested_by > employee.party_id [delete: set null]
 Ref: requested_order_line.requested_order_id > requested_order.id [delete: cascade]
 Ref: requested_order_line.job_line_part_id > job_line_part.id [delete: set null]
 Ref: requested_order_line.part_id > manufacturer_part.id [delete: set null]
-Ref: requested_order_line.site_location_id > site_location.id [delete: set null]
+Ref: requested_order_line.site_area_id > site_area.id [delete: set null]
+Ref: requested_order_line.site_asset_id > site_asset.id [delete: set null]
 Ref: purchase_order.job_id > job.id [delete: restrict]
 Ref: purchase_order.vendor_party_id > party.id [delete: restrict]
 Ref: purchase_order_line.purchase_order_id > purchase_order.id [delete: cascade]
@@ -1452,12 +1761,12 @@ Ref: job_material_movement.purchase_order_line_id > purchase_order_line.id [dele
 Ref: job_material_movement.purchase_order_line_shipment_id > purchase_order_line_shipment.id [delete: set null]
 Ref: job_material_movement.material_receipt_line_id > material_receipt_line.id [delete: set null]
 Ref: job_material_movement.job_line_part_id > job_line_part.id [delete: set null]
-Ref: job_material_movement.job_work_item_id > job_work_item.id [delete: set null]
+Ref: job_material_movement.scope_phase_id > scope_phase.id [delete: set null]
 Ref: job_material_movement.recorded_by > employee.party_id [delete: set null]
 
 Ref: billable_line.job_id > job.id [delete: cascade]
 Ref: billable_line.job_line_id > job_line.id [delete: set null]
-Ref: billable_line.job_work_item_id > job_work_item.id [delete: set null]
+Ref: billable_line.scope_phase_id > scope_phase.id [delete: set null]
 Ref: billable_line.material_receipt_line_id > material_receipt_line.id [delete: set null]
 Ref: billable_line.sov_line_id > sov_line.id [delete: set null]
 Ref: billable_line.invoice_line_id > invoice_line.id [delete: set null]
@@ -1471,5 +1780,7 @@ Ref: invoice_line.sov_line_id > sov_line.id [delete: set null]
 Ref: schedule_of_value.job_id > job.id [delete: cascade]
 Ref: sov_line.schedule_of_value_id > schedule_of_value.id [delete: cascade]
 Ref: sov_allocation.sov_line_id > sov_line.id [delete: cascade]
+Ref: sov_allocation.job_scope_group_id > job_scope_group.id [delete: set null]
 Ref: sov_allocation.job_line_id > job_line.id [delete: set null]
+Ref: sov_allocation.scope_phase_id > scope_phase.id [delete: set null]
 Ref: sov_allocation.phase_id > phase.id [delete: set null]

@@ -5,36 +5,9 @@ import type { Pool, PoolClient } from "pg";
 import { tableExists } from "../../sites/repository/sql-utils";
 import type { JobLineItemPatchRow } from "../descriptors/job-detail";
 
-const assertSiteLocationBelongsToSite = async (
-  client: PoolClient,
-  siteLocationId: string,
-  siteId: string,
-): Promise<void> => {
-  if (!(await tableExists(client, "site_location"))) {
-    throw new ValidationError("site_location_id is not available", {
-      field: "line_items",
-      code: "unknown_location",
-      site_location_id: siteLocationId,
-    });
-  }
-
-  const result = await client.query<{ id: string }>(
-    `SELECT id FROM site_location WHERE id = $1 AND site_id = $2`,
-    [siteLocationId, siteId],
-  );
-
-  if (result.rows.length === 0) {
-    throw new ValidationError("site_location_id does not belong to job site", {
-      field: "line_items",
-      code: "invalid_location",
-      site_location_id: siteLocationId,
-    });
-  }
-};
-
 const validateLineItems = async (
   client: PoolClient,
-  siteId: string,
+  _siteId: string,
   rows: JobLineItemPatchRow[],
 ): Promise<Array<JobLineItemPatchRow & { id: string }>> => {
   const normalized = rows.map((row) => ({
@@ -92,10 +65,6 @@ const validateLineItems = async (
         }
       }
     }
-
-    if (row.site_location_id !== null && row.site_location_id !== undefined) {
-      await assertSiteLocationBelongsToSite(client, row.site_location_id, siteId);
-    }
   }
 
   return normalized;
@@ -128,7 +97,8 @@ export const replaceJobLineItemsTx = async (
          unit,
          unit_cost,
          unit_price,
-         site_location_id,
+         site_area_id,
+         site_asset_id,
          phase_id,
          item_id,
          part_id,
@@ -140,7 +110,7 @@ export const replaceJobLineItemsTx = async (
          superseded_by_job_line_id,
          sort_order
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)`,
       [
         row.id,
         jobId,
@@ -153,7 +123,8 @@ export const replaceJobLineItemsTx = async (
         row.unit,
         row.unit_cost,
         row.unit_price,
-        row.site_location_id ?? null,
+        row.site_area_id ?? null,
+        row.site_asset_id ?? null,
         row.phase_id ?? null,
         row.item_id ?? null,
         row.part_id ?? null,

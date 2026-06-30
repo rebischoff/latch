@@ -17,12 +17,26 @@
 | P3 | Ad-hoc parts on PO allowed |
 | A1 | Normally gate job `complete` on as-built applied |
 | **J1** | **Replace `job_work_item`** with `scope_phase` + `progress_entry` / `progress_entry_line` (fractional qty) |
-| **A2** | **No as-built staging v1** — publish site on job `complete` (no `job_as_built_change` table) |
-| **A1** | **Amended** — v1 `complete` = as-built publish in one step |
+| **A2** | **No as-built staging v1** — publish site on job `complete` |
+| **C2** | **`system` + `system_spec_def` (UUID) + `estimate_system` tabs; … |
+| **J4** | **Implicit General** — `job_scope_group_id` nullable; synthetic General in UI |
+| **J5** | **Per `system` default `phase_template`** + optional `item.phase_template_id` override |
+| **J2** | **No progress entry workflow** — saved lines count immediately |
+| **P2** | **Manual `scope_phase.target_date`** as `install_target` for PO readiness |
+| **B4** | **Manual billable staging v1** — no auto generator from progress |
+| **E4** | **Defer `location_confidence`** — no column v1; UI derives warnings from line FKs |
 
-## Next open decision
+## Next step
 
-**→ [C2 — part tag storage](#C2)** (then J4, J2, P2, B4, E4).
+**Backbone forks resolved.** Tasks **29–32** formalize the DBML → migration → estimate ship path — see [`tasks/01-task-index.md`](../tasks/01-task-index.md). **Active:** [task 30 — surfaces review](../tasks/30-backbone-surfaces-review.md). Optional polish: [J3 — phase weights](#J3) (equal weights OK v1).
+
+---
+
+## C2 — System specs — **Locked (2026-06-27)**
+
+Detail: [06-catalog-trade-system.md](./06-catalog-trade-system.md), [02-estimates.md](./02-estimates.md).
+
+---
 
 ---
 
@@ -72,38 +86,35 @@
 
 ---
 
-## E4 — `location_confidence`
+## E4 — `location_confidence` — **Locked (2026-06-27)**
 
-**What it is:** Optional estimate-level hint — **not required for v1 schema**.
+**Choice: A — Defer v1.**
 
-| Value | Meaning |
-|-------|---------|
-| `none` | Flat quote — no geography |
-| `rough` | Note in header only |
-| `by_area` | Lines FK areas |
-| `by_asset` | Device-specific lines |
+| v1 | Behavior |
+|----|----------|
+| No `estimate.location_confidence` column | Not in schema |
+| UI warnings | Derive from line FKs when useful (e.g. lines missing `site_area_id`) |
+| Does not block | Save, win, or job copy |
 
-**Purpose:** UI warnings only (“3 lines have no area — assign before field progress”). Does not block save or win.
+**Deferred v1.5+:** Optional stored enum if PM wants explicit flat vs by-area intent on header.
 
-**Open:** Ship field v1 vs defer vs derive from line FKs automatically.
+Detail: [02-estimates.md](./02-estimates.md).
 
 ---
 
-## J2 — Progress approval — “huh?”
+## J2 — Progress entry workflow — **Locked (2026-06-27)**
 
-**Platform context:** SubHub v1 has **no** Latch verification / pending-changes workflow ([`decisions/general.md`](../decisions/general.md)).
+**Choice: A — No workflow.**
 
-**Question:** Should **field progress entries** have their own lightweight status?
+| v1 | Behavior |
+|----|----------|
+| Save | `progress_entry` + lines apply immediately to `scope_phase.completed_qty` |
+| No status column | No `draft` / `submitted` / `approved` on progress entries |
+| Billing | PM review stays on **`billable_line`** staging — separate from field progress |
 
-| Option | Behavior |
-|--------|----------|
-| **A — No workflow** | All progress lines count immediately |
-| **B — Draft → submitted** | Tech saves draft; lead submits |
-| **C — Submitted → approved** | PM approves before progress affects billing % |
+**Rationale:** Keep v1 simple; no approval surface until bad field data is observed in production.
 
-**Recommendation for v1:** **A** or **B** only. Billing can still use PM-reviewed **billable** staging separately.
-
-**Status:** Open.
+Detail: [03-jobs-progress.md](./03-jobs-progress.md).
 
 ---
 
@@ -125,33 +136,33 @@ When rolling up **job % complete** or **SOV earn %**, phases on one line may mat
 
 ---
 
-## J4 — `job_scope_group` — required?
+## J4 — `job_scope_group` — **Locked (2026-06-27)**
 
-**What it is:** See [03-jobs-progress.md](./03-jobs-progress.md). Folder for scope items on the job.
+**Choice: A — Implicit General.**
 
-| Option | Behavior |
-|--------|----------|
-| **A — Implicit General** | `job_scope_group_id` nullable; UI shows one default group |
-| **B — Required** | Every line must belong to a group |
+- `job_line.job_scope_group_id` **nullable**.
+- UI/DTO synthesizes a **“General”** group when null (flat jobs, small service tickets).
+- Win from `estimate_system` tabs may create real groups (by area, phase, SOV); not required for every line.
 
-**Recommendation:** **A** — nullable FK + synthetic General in DTO for flat jobs.
-
-**Status:** Open.
+Detail: [03-jobs-progress.md](./03-jobs-progress.md).
 
 ---
 
-## J5 — Phase templates — how does phase get known?
+## J5 — Phase templates — **Locked (2026-06-27)**
 
-**Flow:**
+**Choice: A — Per `system_id` default + item override.**
 
-1. **Catalog:** `item` (or `system_type`) has `phase_template_id`.
-2. **Estimate add line:** User picks item → optional preview of phases (UI only).
-3. **Win / job line create:** DAL copies template steps → `scope_phase` rows with `planned_qty` = line qty (or split per template rules).
-4. **Manual lines:** System default template (e.g. Install → Test → Complete) or single phase.
+| Source | `scope_phase` seed |
+|--------|-------------------|
+| `item.phase_template_id` | Use item's template when set |
+| Else `system.default_phase_template_id` | Fallback per catalog system (FA, Access, …) |
+| Manual line, no system context | Org-wide last-resort template (single row in progressive setup) |
 
-**Labor lines:** Template may include Program/Test; product-only lines may get Install → Complete only.
+**On win / job line create:** DAL copies `phase_template_step` rows → `scope_phase` with `planned_qty` = line `quantity` (unless template defines per-step qty rules later).
 
-**Open:** Single global default template vs per-`system_type` required.
+**Estimate:** optional phase preview in UI only — `scope_phase` rows created on job.
+
+Detail: [06-catalog-trade-system.md](./06-catalog-trade-system.md), [03-jobs-progress.md](./03-jobs-progress.md).
 
 ---
 
@@ -163,21 +174,23 @@ When rolling up **job % complete** or **SOV earn %**, phases on one line may mat
 
 ---
 
-## P2 — `install_target`
+## P2 — `install_target` — **Locked (2026-06-27)**
 
-**Definition:** The date the **install phase** is expected to need the material on site.
+**Choice: A — Manual `scope_phase.target_date`.**
 
-**Used in:** `order_by_date = install_target − vendor_part.lead_time_days`
+```
+order_by_date = scope_phase.target_date − vendor_part.lead_time_days
+```
 
-| Source v1 | |
-|-----------|---|
-| **Manual** | `scope_phase.target_date` set by PM |
-| **Derived** | `job.start_date` + offset per phase sequence |
-| **None** | Ready pool disabled; manual PO only |
+| v1 | Behavior |
+|----|----------|
+| `scope_phase.target_date` | Optional — PM sets when known |
+| No target | Line excluded from ready-to-order pool; PO still manual |
+| Derived schedule | Deferred v1.5 (`job.start_date` + phase offset) |
 
-**Recommendation:** Manual `target_date` on scope phase optional field; derived is v1.5.
+**Rationale:** Readiness math without a scheduling engine. PM enters install dates when they know them.
 
-**Status:** Open.
+Detail: [04-procurement.md](./04-procurement.md), [03-jobs-progress.md](./03-jobs-progress.md).
 
 ---
 
@@ -209,29 +222,20 @@ Billing `qty_installed` generator reads **`scope_phase.completed_qty`** rollups 
 
 ---
 
-## B4 — Auto billable v1
+## B4 — Auto billable v1 — **Locked (2026-06-27)**
 
-**Question:** Ship generator that creates `billable_line` from progress, or manual staging only in first billing wave?
+**Choice: A — Manual first.**
 
-| Option | |
-|--------|---|
-| **Manual first** | Lower risk; matches deferred 6b |
-| **Auto with review** | Creates open billables; PM edits before invoice |
+| v1 | Behavior |
+|----|----------|
+| `billable_line` | PM creates/edits staging rows by hand |
+| `billing_basis = qty_installed` | No auto generator from `scope_phase` rollups |
+| `manual` | Primary path in first billing wave (6b) |
+| Auto generator | Deferred until progress model is in production |
 
-**Recommendation:** Manual billable first wave; auto generator when progress model ships.
+**Rationale:** Lower risk for first billing wave; progress → billable automation ships later.
 
-**Status:** Open.
-
-## C2 — Part suggestion rules (detail)
-
-| Rule | v1 |
-|------|-----|
-| Manufacturer assumption set | **Hard filter** — hide non-matching MPNs |
-| Color / system_type | **Soft rank** — show compatible first |
-| No assumption set | Show all items for `system_type` |
-| User pick | Sets `material_status = verified` |
-
-**Open:** Tag storage — `tag_json` vs junction tables vs columns on part.
+Detail: [05-billing.md](./05-billing.md).
 
 ---
 
@@ -245,11 +249,11 @@ See [08-supersedes.md](./08-supersedes.md) and [09-migration-notes.md](./09-migr
 
 | ID | Blocks DBML? | Blocks UI? |
 |----|--------------|------------|
-| J2 | No | Field tab polish |
-| J4 | Minor | Job scope UI |
+| J2 | ~~No~~ ✓ — no status column | Field tab |
+| J4 | ~~Minor~~ ✓ — nullable `job_scope_group_id` |
 | A2 | ~~Yes~~ **No v1** — publish on `complete`; defer `job_as_built_change` |
-| P2 | No — nullable target_date | Ready-to-order pool |
-| B4 | No | Billing tab |
-| C2 tag shape | Yes — part filter | Estimate pickers |
+| P2 | ~~No~~ ✓ — optional `scope_phase.target_date` | Ready-to-order pool |
+| B4 | ~~No~~ ✓ — manual staging only | Billing tab |
+| C2 | ~~Yes~~ ✓ locked | Estimate pickers |
 
-**Minimum to amend DBML:** ~~J1~~ ✓, ~~A2~~ ✓ (no as-built table v1), **C2** tag shape.
+**Minimum to amend DBML:** ~~J1~~ ✓, ~~A2~~ ✓, ~~C2~~ ✓, ~~J4~~ ✓, ~~J5~~ ✓, ~~J2~~ ✓, ~~P2~~ ✓, ~~B4~~ ✓, ~~E4~~ ✓ — **proceed with DBML pass.** J3 (weights) optional — equal weights OK v1.

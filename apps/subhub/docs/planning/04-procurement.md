@@ -8,7 +8,7 @@
 
 - **`lead_time_days` on `vendor_part`** (locked P1) — per vendor SKU, not only on manufacturer part.
 - **Ad-hoc parts on PO allowed** (locked P3) — PO lines without requisition/BOM link; `part_id` + description on draft PO.
-- **Install target** for readiness math — see [07-open-decisions.md](./07-open-decisions.md#P2).
+- **Install target:** optional **`scope_phase.target_date`** (P2 locked) — `order_by = target_date − lead_time`.
 
 ---
 
@@ -55,7 +55,7 @@ order_by_date = install_target − vendor_part.lead_time_days
 
 | Term | Meaning |
 |------|---------|
-| **`install_target`** | Date install phase is expected to need the part — source **open** (P2): manual on `scope_phase.target_date`, job start + offset, or manual only v1 |
+| **`install_target`** | **`scope_phase.target_date`** when set (P2 locked); omitted lines skip ready pool |
 | **`lead_time_days`** | On **`vendor_part`** — vendor-specific |
 
 When `order_by_date <= today` and material is verified (or policy allows assumed), line appears in ready pool → user adds to requisition/PO.

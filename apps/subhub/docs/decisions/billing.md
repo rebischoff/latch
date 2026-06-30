@@ -14,10 +14,16 @@
 
 - **`billable_line`** = earned staging (no separate billing_application table).
 - Extend **`sov_allocation`** with `job_scope_group_id`, `scope_phase_id`.
-- **`qty_installed`** generator reads **`scope_phase`** rollups (not `job_work_item`) when J1/B1 locked.
-- Auto billable generator ship timing: open (B4).
+- **`qty_installed`** generator reads **`scope_phase`** rollups when implemented — **not v1** (B4 locked: manual staging first).
 
-**Rationale:** Billing stays three-layer; production progress drives earn % via scope phases.
+**Rationale:** Billing stays three-layer; production progress drives earn % via scope phases when auto generator ships.
+
+
+### Decision: auto billable — manual staging v1 (B4 locked 2026-06-27)
+
+**Choice:** First billing wave (6b) — PM creates/edits `billable_line` manually. No auto generator from `scope_phase` / progress rollups in v1.
+
+**Rationale:** Ship billing UI without coupling to field progress automation; generator deferred.
 
 
 ### Decision: billing — earned staging, progress, SOV, retainage (2026-06-17)

@@ -11,7 +11,7 @@ import {
   deleteEstimate,
   loadEstimateDetail,
   loadEstimateDetailRelated,
-  replaceEstimateLineItems,
+  replaceEstimateCollections,
   replaceEstimateStakeholders,
   updateEstimate,
 } from "../repository";
@@ -67,14 +67,11 @@ export const createEstimateDetailStore = (
       await replaceEstimateStakeholders(pool, actorId, estimateId, patch.stakeholders);
     }
 
-    if (patch.line_items !== undefined) {
-      await replaceEstimateLineItems(
-        pool,
-        actorId,
-        estimateId,
-        estimate.site_id,
-        patch.line_items,
-      );
+    if (patch.systems !== undefined || patch.line_items !== undefined) {
+      await replaceEstimateCollections(pool, actorId, estimateId, estimate.site_id, {
+        systems: patch.systems,
+        line_items: patch.line_items,
+      });
     }
   },
 

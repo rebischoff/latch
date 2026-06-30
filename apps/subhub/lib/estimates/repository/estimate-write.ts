@@ -13,6 +13,10 @@ import type {
 } from "../descriptors/estimate-detail";
 import { replaceEstimateLineItemsTx } from "./estimate-lines-write";
 import { replaceEstimateStakeholdersTx } from "./estimate-stakeholders";
+import {
+  loadEstimateSystemBlockIds,
+  replaceEstimateSystemsTx,
+} from "./estimate-systems-write";
 
 const assertSiteExists = async (
   client: Pool | PoolClient,
@@ -65,6 +69,47 @@ const validateEstimateWriteRow = async (
   if (row.source_estimate_id !== null) {
     await assertSourceEstimateExists(client, row.source_estimate_id, row.id);
   }
+};
+
+export const replaceEstimateCollectionsTx = async (
+  client: PoolClient,
+  estimateId: string,
+  siteId: string,
+  related: Pick<EstimateDetailRelatedPatch, "systems" | "line_items">,
+): Promise<void> => {
+  let validSystemIds: Set<string>;
+
+  if (related.systems !== undefined) {
+    validSystemIds = await replaceEstimateSystemsTx(
+      client,
+      estimateId,
+      related.systems,
+    );
+  } else {
+    validSystemIds = await loadEstimateSystemBlockIds(client, estimateId);
+  }
+
+  if (related.line_items !== undefined) {
+    await replaceEstimateLineItemsTx(
+      client,
+      estimateId,
+      siteId,
+      related.line_items,
+      validSystemIds,
+    );
+  }
+};
+
+export const replaceEstimateCollections = async (
+  pool: Pool,
+  actorId: string,
+  estimateId: string,
+  siteId: string,
+  related: Pick<EstimateDetailRelatedPatch, "systems" | "line_items">,
+): Promise<void> => {
+  await withPermissionDb(pool, actorId, async (client) => {
+    await replaceEstimateCollectionsTx(client, estimateId, siteId, related);
+  });
 };
 
 export const loadEstimateDeleteBlockers = async (
@@ -125,13 +170,14 @@ export const insertEstimate = async (
         await replaceEstimateStakeholdersTx(client, row.id, related.stakeholders);
       }
 
-      if (related?.line_items !== undefined) {
-        await replaceEstimateLineItemsTx(
-          client,
-          row.id,
-          row.site_id,
-          related.line_items,
-        );
+      if (
+        related?.systems !== undefined ||
+        related?.line_items !== undefined
+      ) {
+        await replaceEstimateCollectionsTx(client, row.id, row.site_id, {
+          systems: related.systems,
+          line_items: related.line_items,
+        });
       }
     });
   } catch (error) {

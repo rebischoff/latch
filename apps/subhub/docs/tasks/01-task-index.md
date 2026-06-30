@@ -23,6 +23,7 @@ Orient the SubHub delivery slices and task chain. Global status: [`../../STATUS.
   → 15-entity-flow → 16-slice2-planning-gate → 17-schema-design-pass
   → 18-surface-catalog → 19-surface-implement-specs (checkpoint)
   → 20-ui-discovery → resume 19 → 22-estimate-wave-4a → 23-job-wave-5a → 24-part-wave-3a → 25-manufacturer-detail → implementation waves
+  → **29-backbone-dbml-pass** → **30-backbone-surfaces-review** → **31-estimate-backbone-migrations** → **32-estimate-wave-4e** (estimate finish on backbone)
   → 21-bundler-import-convention (parallel — Turbopack / import paths)
 ```
 
@@ -102,16 +103,20 @@ flowchart TD
 
 ## Surface implement specs
 
-| **Checkpoint (2026-06-24):** Part wave 3a complete. **Next:** wave **3b** `item_*` — task TBD; spec [`item.md`](../surface-specs/item.md) (#15).
+| **Checkpoint (2026-06-29):** Backbone DDL shipped — tasks **29**–**31** complete (`current.dbml` amend, surfaces review, `028`–`031` migrations applied to dev). **Next:** task **32** estimate 4e (finish estimates on backbone). Manufacturer task **25** paused — not blocking estimate track.
 
 | # | Task | Delivers |
 |---|------|----------|
 | 19 | [19-surface-implement-specs.md](./19-surface-implement-specs.md) | Implement specs — **`part.md`** ✅ (row #14); rows **#15–18** before 3b/3c |
 | 20 | [20-ui-discovery.md](./20-ui-discovery.md) | Migration + sites UI + estimate spike + planning — **complete** (2026-06-23) |
 | 21 | [21-bundler-import-convention.md](./21-bundler-import-convention.md) | Extensionless imports; Turbopack-first dev — **complete** (2026-06-20) |
-| 22 | [22-estimate-wave-4a.md](./22-estimate-wave-4a.md) | Wave 4a — estimate migration, DAL, flat production UI — **complete** |
+| 22 | [22-estimate-wave-4a.md](./22-estimate-wave-4a.md) | Wave 4a — estimate migration, DAL, flat production UI — **complete** (legacy schema) |
 | 23 | [23-job-wave-5a.md](./23-job-wave-5a.md) | Wave 5a — job shell, Overview + stub tabs — **complete** |
 | 24 | [24-part-wave-3a.md](./24-part-wave-3a.md) | Wave 3a — part MPN catalog + vendor pricing — **complete** |
+| **29** | [29-backbone-dbml-pass.md](./29-backbone-dbml-pass.md) | Planning → amended `current.dbml` — **complete** (2026-06-29) |
+| **30** | [30-backbone-surfaces-review.md](./30-backbone-surfaces-review.md) | `codegen:check` + impact matrix + schema README — **complete** (2026-06-29) |
+| **31** | [31-estimate-backbone-migrations.md](./31-estimate-backbone-migrations.md) | Estimate-minimal DDL + discussed dev seeds (`028`–`031`) — **complete** (2026-06-29) |
+| **32** | [32-estimate-wave-4e.md](./32-estimate-wave-4e.md) | Estimate `estimate_system` tabs + backbone DAL/UI — **active** |
 
 ---
 
@@ -187,7 +192,7 @@ flowchart LR
 | # | Task | Delivers |
 |---|------|----------|
 | *TBD* | | `addresses` on `{role}_detail` lenses |
-| *TBD* | | `sections`, `locations` on `site_detail` |
+| *TBD* | | `systems`, `areas`, `assets` on `site_detail` — **amended** from legacy `sections`/`locations` ([planning/01-site-as-built.md](../planning/01-site-as-built.md)) |
 
 ### Wave 4 — Estimates (flat) — **task 22** — **complete**
 
@@ -213,7 +218,27 @@ flowchart LR
   t22 --> mig --> yaml --> dal --> ui --> gate
 ```
 
-**Follow-on (not 4a):** wave **4b** `win`/`lose` (after job 5a + line editor); wave **4c** grouped editor (needs wave 2b geography); wave **4d′** shared line editor retrofit (after wave **3** + **3e** spike) — [job wave 5 decision](../decisions/job.md#decision-job-wave-5--implementation-order-2026-06-23).
+**Follow-on (not 4a):** wave **4e** backbone alignment ([task 32](./32-estimate-wave-4e.md)) — **complete**; wave **4c′** quote geography (`estimate_area`); wave **4b** `win`/`lose`; wave **4c** grouped editor polish; wave **4d′** shared line editor retrofit (after wave **3** + **3e** spike) — [job wave 5 decision](../decisions/job.md#decision-job-wave-5--implementation-order-2026-06-23).
+
+### Backbone pass (estimate finish) — tasks 29–32
+
+**Exit criteria:** Estimates CRUD on `estimate_system` + backbone line FKs; legacy `estimate_section` / `site_location_id` retired in app code.
+
+| # | Task | Delivers |
+|---|------|----------|
+| 29 | [29-backbone-dbml-pass.md](./29-backbone-dbml-pass.md) | Amended `current.dbml` per [planning/09-migration-notes.md](../planning/09-migration-notes.md) — **complete** |
+| 30 | [30-backbone-surfaces-review.md](./30-backbone-surfaces-review.md) | Pre-migration gate — impact matrix, `codegen:check`, schema README — **complete** |
+| 31 | [31-estimate-backbone-migrations.md](./31-estimate-backbone-migrations.md) | DDL + discussed dev seeds (site rename, `system`, `estimate_system`, …) — **complete** (`028`–`031`) |
+| 32 | [32-estimate-wave-4e.md](./32-estimate-wave-4e.md) | DAL + UI — system tabs, specs, backbone line columns — **complete** |
+
+```mermaid
+flowchart LR
+  t29[29 DBML pass]
+  t30[30 surfaces review]
+  t31[31 migrations]
+  t32[32 estimate 4e]
+  t29 --> t30 --> t31 --> t32
+```
 
 ### Wave 5a — Jobs shell — **task 23** — **complete**
 
@@ -245,9 +270,9 @@ flowchart LR
 
 **Follow-on:** task **25** manufacturer detail → wave **3b** `item_*` → **3c** catalog tables → **3e** line editor → **4d′** Scope UI.
 
-### Task 25 — Manufacturer detail — **active**
+### Task 25 — Manufacturer detail — **paused** (not blocking estimate track)
 
-**Exit criteria:** CRUD `manufacturer_detail` (kind-specific profile, phones/emails); `add_role` / `remove_role`; picker return-context from `part_detail`; `/manufacturers` master-detail; `LinkedSelectInput` on part manufacturer picker. Spec: [`manufacturer.md`](../surface-specs/manufacturer.md). **Decision:** [picker return context](../decisions/general.md#decision-picker-return-context--url-protocol-2026-06-24), [linked picker](../decisions/general.md#decision-linked-picker-control-linkedselectinput--2026-06-24).
+**Exit criteria:** CRUD `manufacturer_detail` (kind-specific profile, phones/emails); `add_role` / `remove_role`; picker return-context from `part_detail`; `/manufacturers` master-detail; `LinkedSelectInput` on part manufacturer picker. Spec: [`manufacturer.md`](../surface-specs/manufacturer.md). **Resume after task 32 or in parallel.**
 
 | # | Task | Delivers |
 |---|------|----------|
@@ -305,7 +330,9 @@ Field detail: [`surfaces.md`](../surfaces.md). DBML: [`current.dbml`](../schema/
 | 26 | [26-iam-role-crud.md](./26-iam-role-crud.md) | IAM `app` role create/save/delete — **complete** (2026-06-25) |
 | 27 | [27-create-route-retrofit.md](./27-create-route-retrofit.md) | `/new` + DB-assigned id retrofit — **complete** (2026-06-25) |
 | 28 | [28-employee-detail.md](./28-employee-detail.md) | Staff lens CRUD + provision retrofit (`/users/new`) — **complete** (2026-06-25) |
-| 29+ | *TBD* | 3b `item_*`, 3c catalog tables — **DBML drafted** ([`schema/current.dbml`](../schema/current.dbml)) |
+| 29 | [29-backbone-dbml-pass.md](./29-backbone-dbml-pass.md) | Backbone DBML amend — **complete** (2026-06-29) |
+| 30–32 | [30](./30-backbone-surfaces-review.md) · [31](./31-estimate-backbone-migrations.md) · [32](./32-estimate-wave-4e.md) | **Estimate finish** on backbone — **active** |
+| 33+ | *TBD* | 3b `item_*`, 3c catalog tables; resume task **25** manufacturer stop gate |
 
 ---
 

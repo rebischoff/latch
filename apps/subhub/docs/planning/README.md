@@ -16,7 +16,7 @@
    - [06-catalog-trade-system.md](./06-catalog-trade-system.md)
 3. [07-open-decisions.md](./07-open-decisions.md) — unresolved forks + glossary for planning questions
 4. [08-supersedes.md](./08-supersedes.md) — which prior decisions this plan amends
-5. [09-migration-notes.md](./09-migration-notes.md) — DBML / migration approach (D3)
+5. [09-migration-notes.md](./09-migration-notes.md) — DBML / migration approach (D3) → tasks [29](../tasks/29-backbone-dbml-pass.md)–[32](../tasks/32-estimate-wave-4e.md)
 
 ## Locked at a glance (2026-06-27)
 

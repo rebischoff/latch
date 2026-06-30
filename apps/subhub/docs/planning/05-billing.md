@@ -62,7 +62,7 @@ SOV caps earned $; invoice lines still snapshot and trace scope.
 
 ```
 earned_qty = f(scope_phase.completed_qty, billing_weight, job.bill_on_work_status)
-billable_line auto-generated when billing_basis = qty_installed
+billable_line created manually in v1 (B4 locked — no auto generator)
 ```
 
 Cap: `SUM(invoiced qty per job_line) ≤ job_line.quantity`.
@@ -71,14 +71,14 @@ See [07-open-decisions.md](./07-open-decisions.md#B1) for migration from `job_wo
 
 ---
 
-## Auto billable generator (B4 — open)
+## Auto billable generator (B4 locked)
 
 | `billing_basis` | Source | V1 ship? |
 |-----------------|--------|----------|
-| `qty_installed` | Scope phase / progress rollups | **Open** — manual billable OK for first billing wave |
+| `qty_installed` | Scope phase / progress rollups | **Deferred** — manual `billable_line` only |
 | `qty_received` | Material receipt | Deferred |
 | `sov_scheduled` | SOV remaining | Manual cap v1 |
-| `manual` | User staging row | Yes |
+| `manual` | User staging row | **Yes** — primary path in 6b |
 
 ---
 

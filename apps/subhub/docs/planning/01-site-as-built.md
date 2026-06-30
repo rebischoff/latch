@@ -2,6 +2,14 @@
 
 > **Status:** Planning (2026-06-27). Amends [`decisions/site.md`](../decisions/site.md) section/location model.
 
+### Decision: estimate does not write site geography — reconcile at win (2026-06-29)
+
+**Amends** “estimate may create `proposed` rows inline” below.
+
+**Choice:** While quoting, estimate **reads** `site_system` / `site_area` / `site_asset` only. Quote geography is **`estimate_area`** only ([02-estimates.md](./02-estimates.md)) — no quote-level assets. **`site_asset`** is site registry only. **Win → job** reconciles quote areas → `site_area` (`proposed` where needed). **`job.complete`** publishes `proposed` → `active` and may create **`site_asset`** from installed scope (A2).
+
+---
+
 ### Decision: site as-built — system, area tree, asset (2026-06-27)
 
 **Choice:**
@@ -9,7 +17,7 @@
 | Entity | Table | Role |
 |--------|-------|------|
 | **Site** | `site` | Building / property anchor; portfolio FKs; optional `physical_address_id` |
-| **Site system** | `site_system` | Optional — FA, CCTV, Access, Sprinkler, … |
+| **Site system** | `site_system` | Optional instance: `site_id` + **`system_id`** (catalog) + name/status |
 | **Site area** | `site_area` | Nested organizational nodes **per system** (or default bucket) |
 | **Site asset** | `site_asset` | Installed **serviceable device** — leaf only |
 
@@ -68,7 +76,8 @@ Site
 
 **Rules:**
 
-- Estimate/job may create **`proposed`** rows inline.
+- **Estimate (amended 2026-06-29):** does **not** write `site_area` / `site_asset` while quoting — reads active site geography only. Quote uses **`estimate_area`** only (4c′ DDL); see [02-estimates.md](./02-estimates.md). **Win → job** reconciles quote areas → `site_area`. **`site_asset`** is created on the site at install / **`job.complete`**, not on the estimate.
+- **Open job** may still create **`proposed`** site rows inline when scope requires (service, CO, field).
 - Field **progress** does not update site master.
 - **`job.complete` (v1)** promotes `proposed` → `active` and applies scope-driven asset/area updates — no `job_as_built_change` table ([A2 locked](./07-open-decisions.md#a2--as-built-review--locked-2026-06-27)).
 

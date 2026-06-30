@@ -1,15 +1,17 @@
 # STATUS — SubHub
 
 > App-local quarterback. Platform pointer: [`../../STATUS.md`](../../STATUS.md).
-> Updated: 2026-06-25.
+> Updated: 2026-06-29.
 
 - **Package:** `@latch/subhub` · **Port:** 3003
 - **Docs:** [`docs/README.md`](./docs/README.md) · **Tasks:** [`docs/tasks/01-task-index.md`](./docs/tasks/01-task-index.md)
-- **State:** Task **28** employee detail **complete**. Task **27** create-route retrofit **complete**. Task **26** IAM role CRUD **complete**. Task **25** manufacturer detail — stop gate pending.
+- **State:** **Estimate finish track** — tasks **29–32** complete (backbone + 4e shipped). **Next:** estimate wave **4c′** (`estimate_area` DDL + area parent rows) or **4b** (win → job). Task **25** manufacturer stop gate **paused** (not blocking).
 
 ## Right now — do this next
 
-**Task 25 step 10** — manufacturer stop gate ([`25-manufacturer-detail.md`](./docs/tasks/25-manufacturer-detail.md#step-10--stop-gate)).
+**Estimate wave 4c′** — quote geography (`estimate_area` DDL, area parent rows in tree editor, `estimate_area_id` on lines, Import from site). Planning: [`02-estimates.md`](./docs/planning/02-estimates.md) · prior work: [task 32](./docs/tasks/32-estimate-wave-4e.md) ✅.
+
+**Alternate track:** wave **4b** — `win`/`lose` → job copy + reconcile quote areas → `site_area`. No task file yet.
 
 ## Blockers
 
@@ -19,49 +21,40 @@ None.
 
 | Slice | Focus | State |
 |-------|--------|-------|
-| **01 — Party lenses** | Task 28 employee detail | **complete** ([task 28](./docs/tasks/28-employee-detail.md)) |
-| **00 — IAM** | Task 26 role CRUD | **complete** ([task 26](./docs/tasks/26-iam-role-crud.md)) |
-| **03 — Catalog** | Wave 3b items | **queued** — after task 25; [`item.md`](./docs/surface-specs/item.md) (#15) |
-| **04 — Estimates** | Wave 4a flat quote UI | **complete** ([task 22](./docs/tasks/22-estimate-wave-4a.md)); line UI **interim** until 4d′ |
+| **Backbone** | Tasks 29–32 — estimate on new schema | **29–32** ✅ |
+| **04 — Estimates** | Wave 4e backbone alignment | **complete** ([task 32](./docs/tasks/32-estimate-wave-4e.md)) |
+| **04 — Estimates** | Wave 4c′ quote geography | **next** (no task file yet) |
+| **04 — Estimates** | Wave 4b win → job | planned |
+| **03 — Catalog** | Wave 3a parts | **complete** ([task 24](./docs/tasks/24-part-wave-3a.md)); 3b `item_*` after estimate 4e |
+| **03 — Catalog** | Task 25 manufacturer | **paused** — resume after 4c′/4b or parallel |
 | **05 — Jobs** | Wave 5a shell | **complete** ([task 23](./docs/tasks/23-job-wave-5a.md)) |
-| [02 — Sites](./docs/tasks/01-task-index.md#task-20--ui-discovery) | Sites CRM slice | complete |
-| **Surface specs** | Implement-tier docs | **16/27** — `employee.md` ✅ shipped in task 28 |
-| **UI discovery** | Task 20 | complete (2026-06-23) |
+| [02 — Sites](./docs/tasks/01-task-index.md#task-20--ui-discovery) | Sites CRM slice | complete (legacy geography DDL) |
+
+## Estimate finish chain
+
+```text
+29 DBML pass ✅  →  30 surfaces review ✅  →  31 migrations + seeds ✅  →  32 estimate 4e ✅  →  4c′ / 4b
+```
+
+Planning source: [`planning/09-migration-notes.md`](./docs/planning/09-migration-notes.md) — formalized as tasks **29–32**.
 
 ## Recently completed
 
-- **Task 28 — Employee detail (stop gate)** — provision retrofit verified: email PATCH → `latch_users.login_email` sync; no **New** on `/users` list; `codegen:check` passed (2026-06-25).
-- **Task 28 step 12 — Forced password change gate** — `/change-password-required` page + form; `POST /api/account/change-password-required`; `requireAuth` redirects when flag set; login redirects after success (2026-06-25).
-- **Task 28 step 11 — Policy synthesis + `must_change_password`** — `synthesizeDataMasterBinding` unions custom `surfaceActions`; migration `026`; flag on admin-set password; setup master `false`; retired `POST …/add-as-db-user` (2026-06-25).
-- **Task 28 step 10 — `/users/new` + user create API** — `user_list` `create`; `POST /api/iam/users`; `UserCreateForm`; dual auth (`user_list` create + `add_as_db_user`); `provisionLinkedDbUser` DAL (2026-06-25).
-- **Task 28 step 9 — Provision UI retrofit** — **Add User** under employee title → `/users/new?linkPartyId&returnTo`; dirty-navigate confirm; login email checkbox when linked or `emails` writable; removed toolbar modal + `useEmployeeAddAsDbUser` (2026-06-25).
-- **Task 28 steps 1–8 — Employee detail (interim)** — CRUD, `is_login_email`, shared identity DAL, interim modal provision (2026-06-25). **Steps 10–13** provision retrofit documented — [decision](./docs/decisions/party.md#decision-provision-app-user-from-person-surface-2026-06-25).
-- **Task 28 planning (amend)** — locked provision UX: **Add User** → `/users/new`, dual auth gate, optional email/password, `must_change_password` (2026-06-25).
-- **Task 27 — Create route retrofit** — parts, manufacturers, sites, jobs, estimates on `/new` + server-assigned id; list POST via `createListFromRegistry`; picker return to `/manufacturers/new` (2026-06-25).
-- **Task 28 planning** — employee wave 0 decisions locked in [`party.md`](./docs/decisions/party.md#decision-employee-wave-0--implementation-2026-06-25); task file [`28-employee-detail.md`](./docs/tasks/28-employee-detail.md) (2026-06-25).
-- **Task 26 — IAM role CRUD** — `/roles/new` + POST create; app role grant edit/delete; system `display_name` save; delete `in_use` blocker; P8 self-grant guard; `codegen:check` + DAL smoke (`scripts/iam-role-crud-smoke.mjs`) (2026-06-25).
-- **Task 25 step 11** — `LinkedSelectInput` + `useConfirmDirtyNavigate`: compact select + open icon + `… Add {entity}` sentinel option; `PartDetailForm` manufacturer picker; `PartVendorPricingFields` vendor cell open icon (2026-06-24).
-- **Task 25 step 11 (spec)** — `LinkedSelectInput` UX locked: `… Add {entity}` dropdown option + open icon; dirty-navigate confirm (v1); vendor grid open icon; decisions in [`general.md`](./docs/decisions/general.md); task step + [`part.md`](./docs/surface-specs/part.md) §I updated — implementation pending (2026-06-24).
-- **Task 25 step 9** — part form picker integration: `resolvePartLinkAccess` gains `canCreateManufacturer` (`manufacturer_detail` write); `PartDetailForm` **Add new manufacturer** link via `buildPickerCreateUrl`; `useApplyPickerReturn` applies `selectedId` to `profile.manufacturer_party_id` and invalidates manufacturer picker (2026-06-24).
-- **Task 25 step 8** — `PartyDetailForm` + manufacturer list UI: shared `PartyDetailForm` (`manufacturer_detail` branch — kind-specific profile, phones/emails, create Cancel / edit Revert+Delete); `PartyRoleFields` (Also chips, Add as…, Remove manufacturer tag); `ManufacturerList` debounced `q` search; role-action API helpers + `useManufacturerRoleActions` (2026-06-24).
-- **Task 25 step 7** — nav + routes: `routes.manufacturers` confirmed; Contacts group `manufacturer_list` in `SURFACE_NAV_CATALOG`; `manufacturers/(master-detail)/` layout + pages (`create=1` + picker return params on detail); `ManufacturerList` list pane; longest-prefix nav highlight for `/manufacturers/[id]` (2026-06-24).
-- **Task 25 step 6** — manufacturer surface plumbing: `manufacturer_detail` in `SURFACE_API` (`/api/manufacturers`, `listSurfaceId: manufacturer_list`); detail loader + `load-surface-detail` + generic `prefetchSurfaceDetail` / `prefetchSurfaceCreate` + `surfaceDetailKey` already wired (2026-06-24).
-- **Task 25 step 5** — manufacturer API routes: `GET/PATCH/POST/DELETE /api/manufacturers/[id]`; `POST …/add-role` and `…/remove-role` sub-routes; `manufacturer_detail` in surface-loader-registry + `load-surface-detail` (2026-06-24).
-- **Task 25 step 4** — manufacturer DAL write path: `insertManufacturerParty` / `updateManufacturerParty` (kind-specific profile + DAL-maintained `display_name`, org `parent_party_id` null); `replacePartyPhones`/`Emails` on patch; `addPartyRole` / `removePartyRole` with `manufacturer_part` blocker on tag removal; `extendManufacturerDetailDal` (`create`, `addRole`, `removeRole`, kind-immutable patch guard) + audit (2026-06-24).
-- **Task 25 step 3** — manufacturer DAL read path: `loadManufacturerDetail` (kind-specific `party_person` / `party_organization` profile), `loadManufacturerDetailRelated` (phones, emails, `also_roles` for multi-tag chips); `createManufacturerDetailStore` with `party_role.manufacturer` lens guard (404 when tag missing); `manufacturerDetail` wired on `ContactsDal`; manifest projection tests (2026-06-24).
-- **Task 24 step 9** — vendor pricing grid: `PartVendorPricingFields` (`FieldArrayTable` — vendor picker, PN, description, unit price, exclusive Preferred); `useVendorPicker` + prefetch; UOM conversion hint when `purchase_unit` ≠ `unit`; cross-nav to `/manufacturers/[id]` and `/vendors/[id]` when manifest grants; whole-part Save PATCHes `profile` + `vendor_pricing` (2026-06-24).
-- **Task 24 step 8** — part UI shell: `PartList` (MPN / description / manufacturer columns, debounced `q` search, New → create); `PartDetailForm` profile (manufacturer picker, MPN, description, UOM fields); `SurfaceFormRoot` + Save/Revert/Delete toolbar; `useManufacturerPicker` + prefetch on detail page (2026-06-24).
-- **Task 24 step 7** — nav + routes: `routes.parts.list` / `detail(id)`; Catalog group `part_list` in `SURFACE_NAV_CATALOG`; `parts/(master-detail)/` layout + pages; `PartList` list pane (MPN column); longest-prefix nav highlight for `/parts/[id]` (2026-06-24).
-- **Task 24 step 6** — part API routes: `GET/POST /api/parts` (list supports `q` search), `GET/PATCH/POST/DELETE /api/parts/[id]`; `SURFACE_API` + surface-loader-registry wiring for `part_list` / `part_detail` (2026-06-24).
-- **Task 24 step 5** — part DAL write path: `create` (profile required + optional `vendor_pricing`), `patch` profile + replace-array pricing, `delete` with `loadPartDeleteBlockers`; manufacturer/vendor role validation; MPN 409 + vendor PN duplicate checks; `is_preferred` exclusivity (2026-06-24).
-- **Task 24 step 4** — part DAL read path: `lib/parts/` with `list` (`q` search on `mpn`/`description`, sort manufacturer + `mpn`) and `get` (`profile` + `vendor_pricing` manifest projection) (2026-06-24).
-- **Task 24 step 3** — manufacturer delete blocker: `loadManufacturerDeleteBlockers` checks `manufacturer_part.manufacturer_party_id`; `InUseError` payload includes MPN `samples`; `deleteManufacturerParty` wired on manufacturer list store (2026-06-24).
-- **Task 23 — job wave 5a** — stop gate: `023` migration + DBML `job_party.sort_order`; `job_list` / `job_detail` YAML + `codegen:check`; DAL list/get/create/patch (profile + stakeholders, internal `line_items`); API + surface-api; `/jobs` master-detail with tabbed shell (Overview live, Scope/Field/Billing stubbed); Operations nav (2026-06-24).
+- **Task 32 — Estimate wave 4e (stop gate)** — tree line editor (`EstimateLineTreeTable`); `systems` + nested specs; backbone `line_items`; job line DAL `site_area_id`/`site_asset_id`; `codegen:check` + build pass (2026-06-29).
+- **Task 32 step 7 — System specs in expanded row** — `EstimateSystemSpecFields` (enum/boolean/text); specs child row in tree table; catalog picker + GET include spec def options (2026-06-29).
+- **Task 32 step 6 — Tree line editor UI** — `EstimateLineTreeTable` + `estimate-line-tree.ts` helpers; catalog system picker API; `EstimateDetailForm` wires `systems` + backbone `line_items` PATCH (2026-06-29).
+- **Task 32 step 5 — Job line DAL** — `job-lines*` + `job-detail` descriptor: `site_area_id` / `site_asset_id`; dropped `site_location` references (2026-06-29).
+- **Task 32 step 4 — Estimate DAL write** — `estimate-systems-write.ts` replace-array + nested specs; `estimate-lines-write.ts` backbone columns; `replaceEstimateCollectionsTx` orchestrates systems → lines in one transaction (2026-06-29). — shipped + applied `028`–`031` (catalog `system`/specs/phase templates, site as-built rename + backfill, `estimate_system` + spec tables, agreed dev seeds) to dev DB; legacy `site_section`/`site_location`/`estimate_section` dropped (2026-06-29).
+- **Task 30 — Backbone surfaces review** — impact matrix, `codegen:check` pass, schema README coverage refresh; estimate path to 32 confirmed (2026-06-29).
+- **Task 29 — Backbone DBML pass** — `current.dbml` amended per planning/09-migration-notes (site_area/asset, estimate_system, scope_phase, catalog system/specs); task file + index (2026-06-29).
+- **Task 28 — Employee detail (stop gate)** — provision retrofit verified; `codegen:check` passed (2026-06-25).
+- **Task 23 — job wave 5a** — job shell + Overview (2026-06-24).
+- **Task 22 — estimate wave 4a** — flat production `/estimates` on legacy schema (2026-06-23).
 
 ## Pointers
 
-- [Task 28 — employee detail](./docs/tasks/28-employee-detail.md) · [Employee spec](./docs/surface-specs/employee.md) · [Party identity decision](./docs/decisions/party.md#decision-employee-wave-0--implementation-2026-06-25)
-- [Task 27 — create route retrofit](./docs/tasks/27-create-route-retrofit.md) · [Task 26 — IAM role CRUD](./docs/tasks/26-iam-role-crud.md)
-- [Task 25 — manufacturer detail](./docs/tasks/25-manufacturer-detail.md) · [Manufacturer spec](./docs/surface-specs/manufacturer.md)
-- [Task 24 — part wave 3a](./docs/tasks/24-part-wave-3a.md) · [Item spec](./docs/surface-specs/item.md) (after 25)
-- [Schema DBML](./docs/schema/current.dbml) · [Decisions](./docs/decisions/README.md)
+- [Task 32 — estimate 4e](./docs/tasks/32-estimate-wave-4e.md) · [Task 31 — migrations](./docs/tasks/31-estimate-backbone-migrations.md)
+- [Task 30 — surfaces review](./docs/tasks/30-backbone-surfaces-review.md) · [Task 29 — DBML pass](./docs/tasks/29-backbone-dbml-pass.md)
+- [Planning 09-migration-notes](./docs/planning/09-migration-notes.md) · [Planning 02-estimates](./docs/planning/02-estimates.md)
+- [Estimate spec](./docs/surface-specs/estimate.md) · [Schema DBML](./docs/schema/current.dbml)
+- [Task 25 — manufacturer](./docs/tasks/25-manufacturer-detail.md) (paused)

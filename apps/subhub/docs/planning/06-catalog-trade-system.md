@@ -1,93 +1,117 @@
-# Catalog — trade, system type, assumptions, part tags
+# Catalog — trade, system, specs
 
-> **Status:** Planning (2026-06-27). Extends [`decisions/catalog.md`](../decisions/catalog.md).
+> **Status:** Planning (2026-06-27). **C2 locked.** Amends [`decisions/catalog.md`](../decisions/catalog.md).
 
-### Decision: trade vs system type — separate catalogs (2026-06-27)
+### Decision: system specs and part compatibility (C2 locked 2026-06-27)
 
-**Choice:** **`trade`** and **`system_type`** are separate reference tables. Both are used; neither owns the site area tree.
+**Choice:**
 
----
+| Piece | Rule |
+|-------|------|
+| **`manufacturer_party_id`** | FK → `party` (manufacturer role). Catalog/PO only — **not** estimate spec knobs. Pickers filter manufacturer-tagged parties. |
+| **`system`** | Catalog table: `id`, `name` (Fire alarm, Access control, …) |
+| **`site_system`** | Instance on site: `site_id` + `system_id` + … |
+| **`system_spec_def`** | UUID PK — one spec dimension per catalog `system` |
+| **`system_spec_option`** | Enum values; FK → `system_spec_def` |
+| **`manufacturer_part_spec`** | Part compatibility: FK `system_spec_def_id` + `system_spec_option_id` (multi-row per def allowed) |
+| **`manufacturer_part.specs`** | Freeform text column — human notes; **never** used for filtering |
 
-## When each is used (C1)
-
-| Concept | Table | Examples | Used on |
-|---------|-------|----------|---------|
-| **Trade** | `trade` | Low voltage, Electrical, Sprinkler fitter | Job primary trade; scope group `trade_id`; labor costing; fulfillment / subcontract |
-| **System type** | `system_type` | Fire alarm, CCTV, Access control, Wet sprinkler | `site_system.system_type_id`; estimate `site_system_id`; assumption defs; part tags |
-
-| Question | Answer |
-|----------|--------|
-| Who performs the work? | **Trade** |
-| What building system is installed/serviced? | **System type** |
-| Site area tree keyed by? | **`site_system`** (optional), not trade |
-| One trade, many systems? | Yes — LV installs FA and CCTV |
-| One system, multiple trades? | Yes — FA job with electrical subcontract lines |
+**No `manufacturer` spec knob** — use technical defs (`slc_protocol`, `reader_type`, …).
 
 ---
 
-## System assumption definitions (C2, E1)
+## Trade vs system (C1)
+
+| Concept | Table | Used for |
+|---------|-------|----------|
+| **Trade** | `trade` | Who performs work (job scope, labor costing) |
+| **System** | **`system`** | What building system; spec defs; `site_system.system_id` |
+| **Manufacturer** | `party` via **`manufacturer_party_id`** | MPN identity, `vendor_part` pricing |
+
+---
+
+## `system` (catalog)
+
+| Column | Notes |
+|--------|--------|
+| `id` | PK (UUID) |
+| `name` | Fire alarm, Access control, CCTV, … |
+| `default_phase_template_id` | Fallback when `item` has no template (J5) |
+| `sort_order` | |
+
+Not to be confused with **`site_system`** (installed instance on a property).
+
+---
+
+## `system_spec_def`
+
+| Column | Notes |
+|--------|--------|
+| `id` | **PK (UUID)** — referenced as `system_spec_def_id` / `spec_id` |
+| `system_id` | FK → `system` |
+| `code` | Optional stable slug (`slc_protocol`) for import — not PK |
+| `display_name` | “SLC protocol” |
+| `value_type` | `enum` \| `boolean` \| `text` |
+| `filter_mode` | `required` \| `prefer` |
+| `sort_order` | |
+
+## `system_spec_option`
+
+| Column | Notes |
+|--------|--------|
+| `id` | PK |
+| `system_spec_def_id` | FK |
+| `code` | Optional slug (`fire_lite_litespeed`) |
+| `display_name` | “Fire-Lite LiteSpeed” |
+| `sort_order` | |
+
+Estimate and part rows **FK to option id** for enums — not loose string values.
+
+---
+
+## `manufacturer_part_spec`
+
+| Column | Notes |
+|--------|--------|
+| `manufacturer_part_id` | |
+| `system_spec_def_id` | FK |
+| `system_spec_option_id` | Enum match (multiple rows = multi-value) |
+| `value_text` / `value_boolean` | Non-enum defs |
+
+**Unique:** `(manufacturer_part_id, system_spec_def_id, system_spec_option_id)` where applicable.
+
+---
+
+## `vendor_part` (unchanged intent)
+
+Links **vendor** ↔ **manufacturer_part**: `vendor_pn`, `unit_price`, `vendor_description`, `lead_time_days`, `is_preferred`.
+
+---
+
+## Suggestion algorithm (v1)
+
+1. Resolve specs: `estimate_line_spec` → `estimate_area_spec` → `estimate_system_spec` (within same `estimate_system_id`).
+2. Each `required` `system_spec_def`: part must have matching `manufacturer_part_spec` row.
+3. Each `prefer` def: rank matches first.
+4. User confirms pick → `material_status = verified`.
+
+---
+
+## Phase templates (J5 locked)
 
 | Table | Role |
 |-------|------|
-| `system_type` | Fire Alarm, Access, … |
-| `system_assumption_def` | Per system type: `manufacturer`, `device_color`, … |
-| `system_assumption_option` | Optional enumerated values |
-| `estimate_system_assumption` | Values chosen on estimate |
-| `job_system_assumption` | Snapshot on win |
+| `phase_template` | Named step set |
+| `phase_template_step` | Install, program, test, … + default weights |
+| `system.default_phase_template_id` | Fallback per catalog **`system`** |
+| `item.phase_template_id` | Override when set |
+| **`scope_phase`** | Instance on `job_line` — seeded on win / line create |
 
----
-
-## Part tagging for assumption narrowing (1.2, C2)
-
-Parts and items must be **filterable** by assumption keys.
-
-### `manufacturer_part` (extend)
-
-| Field | Purpose |
-|-------|---------|
-| `manufacturer_party_id` | Already exists |
-| `system_type_id` | Primary system compatibility |
-| `tag_json` or junction | `addressable`, `conventional`, `color:red`, … |
-
-### `item` (extend)
-
-| Field | Purpose |
-|-------|---------|
-| `system_type_id` | Default system |
-| `phase_template_id` | Seeds scope phases on add |
-| `default_part_id` | Costing |
-
-### Suggestion algorithm (v1)
-
-1. Load estimate/job assumptions for active `site_system`.
-2. Filter items/parts where tags **match** assumption values (manufacturer required match; color soft match).
-3. Rank by match score; present in picker — user confirms → `material_status = verified`.
-
-**Not v1:** Perfect auto-match; configurators; invisible BOM rollups.
-
----
-
-## Phase templates (J5)
-
-| Table | Role |
-|-------|------|
-| `phase_template` | Named set per `system_type` or `item` |
-| `phase_template_step` | `name`, `sequence`, default `progress_weight`, `billing_weight` |
-
-Replaces org-wide `phase` catalog for **new** scope phase seeding. Migration: map existing `phase` rows to template steps or bridge during transition.
-
----
-
-## Labor
-
-- **`labor_class`** = rate bucket (installer, programmer).
-- **`phase_template_step`** = install vs program vs test for scope phases.
-- Labor estimate lines may still reference a template step for costing alignment.
+**Resolution:** item template → else system default → else org fallback.
 
 ---
 
 ## Related
 
-- [02-estimates.md](./02-estimates.md) — assumptions on estimate
-- [03-jobs-progress.md](./03-jobs-progress.md) — scope phases from templates
-- [01-site-as-built.md](./01-site-as-built.md) — `site_system.system_type_id`
+- [02-estimates.md](./02-estimates.md) — `estimate_system` tabs
+- [01-site-as-built.md](./01-site-as-built.md) — `site_system.system_id`

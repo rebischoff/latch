@@ -12,11 +12,18 @@
 
 **Choice:**
 
-- **`vendor_part.lead_time_days`** — readiness: `order_by = install_target − lead_time` (install_target source: open, see planning).
+- **`vendor_part.lead_time_days`** — readiness: `order_by = scope_phase.target_date − lead_time` when target set (P2 locked).
 - **Ad-hoc PO lines allowed** on draft PO (no requisition link).
 - Existing requisition → PO → receipt chain unchanged.
 
 **Rationale:** Order parts when install phase approaches minus vendor lead time; shop buys ad-hoc without full BOM.
+
+
+### Decision: install target — manual scope_phase.target_date (P2 locked 2026-06-27)
+
+**Choice:** Optional `scope_phase.target_date` is `install_target`. `order_by_date = target_date − vendor_part.lead_time_days`. No target → line not in ready pool; PO still manual.
+
+**Rationale:** Readiness without scheduling engine; derived dates deferred v1.5.
 
 
 ### Decision: procurement — requisition layer and job-site inventory (2026-06-17)

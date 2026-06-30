@@ -1,6 +1,6 @@
 # 25 — Manufacturer detail (party lens + picker return)
 
-> **Status:** Active (2026-06-24). **Next:** [Step 10 — Stop gate](#step-10--stop-gate), then [Step 11 — Linked picker control](#step-11--linked-picker-control-linkedselectinput).
+> **Status:** Paused (2026-06-29) — estimate finish track (tasks 30–32) takes priority; stop gate not blocking. **Resume:** after [32-estimate-wave-4e.md](./32-estimate-wave-4e.md) or in parallel. **Next when resumed:** [Step 10 — Stop gate](#step-10--stop-gate).
 >
 > **Spec:** [`manufacturer.md`](../surface-specs/manufacturer.md) · **Decisions:** [manufacturer hub](../decisions/party.md#decision-manufacturer-hub--base-lens-only-2026-06-18), [party profile](../decisions/party.md#decision-party-profile-fields-on-type-lenses-2026-06-17), [picker return context](../decisions/general.md#decision-picker-return-context--url-protocol-2026-06-24) · **Pattern:** [`child-collections.md`](../child-collections.md), [`contact-retire.md`](../surface-specs/contact-retire.md)
 

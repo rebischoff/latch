@@ -6,18 +6,31 @@
 
 ---
 
-### Decision: trade, system type, assumptions, and part tags (2026-06-27)
+### Decision: system specs and part compatibility (C2 locked 2026-06-27)
 
-**Status:** **Planning** — [`planning/06-catalog-trade-system.md`](../planning/06-catalog-trade-system.md).
+**Status:** Locked. [`06-catalog-trade-system.md`](../planning/06-catalog-trade-system.md).
 
 **Choice:**
 
-- Separate catalogs: **`trade`** (who performs) vs **`system_type`** (what system is installed).
-- **`system_assumption_def`** per system type; values on **`estimate_system_assumption`** / job snapshot.
-- **Parts/items tagged** (manufacturer, system type, attributes) for assumption-based suggestion — user verifies pick.
-- **`phase_template`** + **`phase_template_step`** seed **`scope_phase`** on job scope items.
+- **`system`** catalog table (`id`, `name`); **`site_system.system_id`** for instances.
+- **`system_spec_def`** (UUID PK) + **`system_spec_option`**; **`manufacturer_part_spec`** FKs to def + option.
+- **`manufacturer_party_id`** = catalog/PO only (party FK, manufacturer role); not estimate spec knobs.
+- **`manufacturer_part.specs`** text = human notes only.
+- Estimate: **`estimate_system`** tabs + **`estimate_system_spec`** / area / line overrides.
 
-**Rationale:** Manufacturer knob is per-system assumptions + tagged catalog, not estimate sections.
+**Rationale:** Protocol/spec dimensions filter parts; manufacturer brand is wrong knob; UUID spec defs align part and estimate rows.
+
+
+### Decision: phase templates — per system default + item override (J5 locked 2026-06-27)
+
+**Choice:** `item.phase_template_id` when set; else `system.default_phase_template_id`; else org fallback. Job line create / win copies steps → `scope_phase`.
+
+**Rationale:** Default install/program/test paths differ by system; items override when needed.
+
+
+### Decision: trade, system type, assumptions, and part tags (2026-06-27)
+
+**Superseded by** [system specs C2 (2026-06-27)](#decision-system-specs-and-part-compatibility-c2-locked-2026-06-27).
 
 
 ### Decision: labor phases — catalog only in v1 (2026-06-17)

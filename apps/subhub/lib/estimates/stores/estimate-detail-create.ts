@@ -59,9 +59,21 @@ const hasLineItemsPatch = (body: unknown): boolean => {
   return (body as { line_items?: unknown }).line_items !== undefined;
 };
 
-const assertLineItemsPatchAllowed = (status: string, body: unknown): void => {
-  if (status === "won" && hasLineItemsPatch(body)) {
-    throw new ConflictError("Cannot modify line items on a won estimate");
+const hasSystemsPatch = (body: unknown): boolean => {
+  if (typeof body !== "object" || body === null) {
+    return false;
+  }
+
+  return (body as { systems?: unknown }).systems !== undefined;
+};
+
+const assertCollectionsPatchAllowed = (status: string, body: unknown): void => {
+  if (status !== "won") {
+    return;
+  }
+
+  if (hasLineItemsPatch(body) || hasSystemsPatch(body)) {
+    throw new ConflictError("Cannot modify line items or systems on a won estimate");
   }
 };
 
@@ -83,7 +95,7 @@ export const extendEstimateDetailDal = (
       return estimateDetailBaseDal.patch(ctx, id, body);
     }
 
-    assertLineItemsPatchAllowed(existing.status, body);
+    assertCollectionsPatchAllowed(existing.status, body);
     await estimateDetailBaseDal.patch(ctx, id, body);
     return estimateDetailBaseDal.get(ctx, id);
   },
@@ -107,12 +119,16 @@ export const extendEstimateDetailDal = (
     const actorId = await getActorId();
     await insertEstimate(pool, actorId, writeRow, {
       stakeholders: input.stakeholders,
+      systems: input.systems,
       line_items: input.line_items,
     });
 
     const fieldIds = ["profile"];
     if (input.stakeholders !== undefined) {
       fieldIds.push("stakeholders");
+    }
+    if (input.systems !== undefined) {
+      fieldIds.push("systems");
     }
     if (input.line_items !== undefined) {
       fieldIds.push("line_items");

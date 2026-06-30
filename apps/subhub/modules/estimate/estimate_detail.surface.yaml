@@ -1,4 +1,4 @@
-# Estimate profile + stakeholders + flat line items
+# Estimate profile + stakeholders + system blocks + flat line items
 id: estimate_detail
 displayName: Estimate detail
 anchorTable: estimate
@@ -16,6 +16,8 @@ surfaceActions:
 
 tables:
   - estimate
+  - estimate_system
+  - estimate_system_spec
   - estimate_line
   - estimate_party
   - job_party_relation
@@ -46,6 +48,9 @@ fields:
         nullable: true
   - id: stakeholders
     # logical — DAL maps to estimate_party; see docs/child-collections.md
+    columns: []
+  - id: systems
+    # logical — DAL maps to estimate_system + estimate_system_spec; see docs/child-collections.md
     columns: []
   - id: line_items
     # logical — DAL maps to estimate_line; see docs/child-collections.md

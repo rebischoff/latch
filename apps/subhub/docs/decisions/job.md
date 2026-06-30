@@ -6,6 +6,27 @@
 
 ---
 
+### Decision: job scope group — implicit General (J4 locked 2026-06-27)
+
+**Choice:** `job_line.job_scope_group_id` **nullable**. DAL/UI expose synthetic **General** group for lines with null FK. Real `job_scope_group` rows when organized by area, phase, SOV, or from `estimate_system` win mapping.
+
+**Rationale:** Small/flat jobs need no extra grouping row; production rollups still work via General bucket.
+
+
+### Decision: phase templates — per system default + item override (J5 locked 2026-06-27)
+
+**Choice:** `item.phase_template_id` when set; else `system.default_phase_template_id`; else org fallback. Job line create / win copies `phase_template_step` → `scope_phase`.
+
+**Rationale:** FA vs access vs CCTV need different default install/program/test paths; items can narrow further.
+
+
+### Decision: progress entry workflow — none in v1 (J2 locked 2026-06-27)
+
+**Choice:** No status on `progress_entry`. Save applies qty to `scope_phase` immediately. PM review for billing stays on `billable_line` — separate concern.
+
+**Rationale:** Ship field progress without an approval surface; add draft/submit later if needed.
+
+
 ### Decision: job scope, progress, and as-built staging (2026-06-27)
 
 **Status:** **Planning** — [`planning/03-jobs-progress.md`](../planning/03-jobs-progress.md). Open forks: [`planning/07-open-decisions.md`](../planning/07-open-decisions.md).

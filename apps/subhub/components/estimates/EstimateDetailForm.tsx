@@ -18,9 +18,14 @@ import { z } from "zod";
 
 import { DatePickerInput } from "@/components/form/DatePickerInput";
 import {
-  EstimateLineItemsField,
+  EstimateLineTreeTable,
   type EstimateLineFormRow,
-} from "@/components/estimates/EstimateLineItemsField";
+  type EstimateSystemFormRow,
+} from "@/components/estimates/EstimateLineTreeTable";
+import {
+  orderLineItemsForPatch,
+  type EstimateSystemSpecFormRow,
+} from "@/components/estimates/estimate-line-tree";
 import {
   EstimateStakeholderFields,
   validateEstimateStakeholderDuplicates,
@@ -70,6 +75,7 @@ type EstimateDetailFormValues = {
     valid_until: string | null;
   };
   stakeholders: EstimateStakeholderFormRow[];
+  systems: EstimateSystemFormRow[];
   line_items: EstimateLineFormRow[];
 };
 
@@ -92,6 +98,74 @@ const mapStakeholders = (rows: unknown): EstimateStakeholderFormRow[] => {
   });
 };
 
+const mapSystems = (rows: unknown): EstimateSystemFormRow[] => {
+  if (!Array.isArray(rows)) {
+    return [];
+  }
+
+  return rows.map((row, index) => {
+    const item = row as Record<string, unknown>;
+    const specs: EstimateSystemSpecFormRow[] = Array.isArray(item.specs)
+      ? item.specs.map((specRow) => {
+          const spec = specRow as Record<string, unknown>;
+          const valueType =
+            spec.value_type === "enum" ||
+            spec.value_type === "boolean" ||
+            spec.value_type === "text"
+              ? spec.value_type
+              : undefined;
+
+          return {
+            system_spec_def_id:
+              typeof spec.system_spec_def_id === "string" ? spec.system_spec_def_id : "",
+            def_display_name:
+              typeof spec.def_display_name === "string" ? spec.def_display_name : undefined,
+            value_type: valueType,
+            system_spec_option_id:
+              typeof spec.system_spec_option_id === "string"
+                ? spec.system_spec_option_id
+                : null,
+            option_display_name:
+              typeof spec.option_display_name === "string"
+                ? spec.option_display_name
+                : undefined,
+            value_text: typeof spec.value_text === "string" ? spec.value_text : null,
+            value_boolean:
+              typeof spec.value_boolean === "boolean" ? spec.value_boolean : null,
+            options: Array.isArray(spec.options)
+              ? spec.options
+                  .map((optionRow) => {
+                    const option = optionRow as Record<string, unknown>;
+                    if (
+                      typeof option.id !== "string" ||
+                      typeof option.display_name !== "string"
+                    ) {
+                      return null;
+                    }
+
+                    return {
+                      id: option.id,
+                      display_name: option.display_name,
+                    };
+                  })
+                  .filter((option): option is { id: string; display_name: string } =>
+                    Boolean(option),
+                  )
+              : undefined,
+          };
+        })
+      : [];
+
+    return {
+      id: typeof item.id === "string" ? item.id : crypto.randomUUID(),
+      system_id: typeof item.system_id === "string" ? item.system_id : "",
+      system_name: typeof item.system_name === "string" ? item.system_name : "",
+      sort_order: typeof item.sort_order === "number" ? item.sort_order : index + 1,
+      specs,
+    };
+  });
+};
+
 const mapLineItems = (rows: unknown): EstimateLineFormRow[] => {
   if (!Array.isArray(rows)) {
     return [];
@@ -101,6 +175,13 @@ const mapLineItems = (rows: unknown): EstimateLineFormRow[] => {
     const item = row as Record<string, unknown>;
     const asString = (value: unknown): string | null =>
       typeof value === "string" ? value : null;
+
+    const materialStatus =
+      item.material_status === "generic" ||
+      item.material_status === "suggested" ||
+      item.material_status === "verified"
+        ? item.material_status
+        : null;
 
     return {
       id: typeof item.id === "string" ? item.id : crypto.randomUUID(),
@@ -112,8 +193,8 @@ const mapLineItems = (rows: unknown): EstimateLineFormRow[] => {
       unit_cost: typeof item.unit_cost === "number" ? item.unit_cost : 0,
       unit_price: typeof item.unit_price === "number" ? item.unit_price : 0,
       parent_line_id: asString(item.parent_line_id),
-      estimate_section_id: asString(item.estimate_section_id),
-      site_location_id: asString(item.site_location_id),
+      estimate_system_id: asString(item.estimate_system_id),
+      material_status: materialStatus,
       phase_id: asString(item.phase_id),
       item_id: asString(item.item_id),
       part_id: asString(item.part_id),
@@ -142,6 +223,7 @@ const buildDefaultValues = (
       valid_until: profile?.valid_until ?? null,
     },
     stakeholders: mapStakeholders(data?.stakeholders),
+    systems: mapSystems(data?.systems),
     line_items: mapLineItems(data?.line_items),
   };
 };
@@ -214,6 +296,7 @@ export const EstimateDetailForm = ({
     const narrowed = narrowPatchSchema(baseSchema, activeManifest) as z.ZodObject<z.ZodRawShape>;
     const loosened = narrowed.extend({
       stakeholders: z.array(z.object({}).passthrough()).optional(),
+      systems: z.array(z.object({}).passthrough()).optional(),
       line_items: z.array(z.object({}).passthrough()).optional(),
     });
 
@@ -270,8 +353,27 @@ export const EstimateDetailForm = ({
       }));
     }
 
+    if (fieldAllows(activeManifest, "systems", "write")) {
+      body.systems = (values.systems ?? []).map((row, index) => ({
+        id: row.id,
+        system_id: row.system_id,
+        sort_order: index + 1,
+        specs: row.specs.map((spec) => ({
+          system_spec_def_id: spec.system_spec_def_id,
+          system_spec_option_id: spec.system_spec_option_id,
+          value_text: spec.value_text,
+          value_boolean: spec.value_boolean,
+        })),
+      }));
+    }
+
     if (fieldAllows(activeManifest, "line_items", "write")) {
-      body.line_items = (values.line_items ?? []).map((row) => ({
+      const orderedLines = orderLineItemsForPatch(
+        values.systems ?? [],
+        values.line_items ?? [],
+      );
+
+      body.line_items = orderedLines.map((row) => ({
         id: row.id,
         line_role: row.line_role,
         line_kind: row.line_kind,
@@ -281,8 +383,8 @@ export const EstimateDetailForm = ({
         unit_cost: row.unit_cost,
         unit_price: row.unit_price,
         parent_line_id: row.parent_line_id,
-        estimate_section_id: row.estimate_section_id,
-        site_location_id: row.site_location_id,
+        estimate_system_id: row.estimate_system_id,
+        material_status: row.material_status,
         phase_id: row.phase_id,
         item_id: row.item_id,
         part_id: row.part_id,
@@ -488,7 +590,7 @@ export const EstimateDetailForm = ({
           ) : null}
 
           {fieldAllows(activeManifest, "line_items", "read") ? (
-            <EstimateLineItemsField manifest={activeManifest} />
+            <EstimateLineTreeTable manifest={activeManifest} />
           ) : null}
         </SurfaceFormLayout>
       </form>

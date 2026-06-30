@@ -162,6 +162,36 @@ export const fetchEstimateSitePicker = async (): Promise<
   return parseResponse<EstimateSitePickerData>(response);
 };
 
+export type EstimateSystemPickerSpecOption = {
+  display_name: string;
+  id: string;
+};
+
+export type EstimateSystemPickerSpecDef = {
+  def_display_name: string;
+  options: EstimateSystemPickerSpecOption[];
+  system_spec_def_id: string;
+  value_type: "enum" | "boolean" | "text";
+};
+
+export type EstimateSystemPickerRow = {
+  id: string;
+  name: string;
+  spec_defs: EstimateSystemPickerSpecDef[];
+};
+
+export type EstimateSystemPickerData = {
+  rows: EstimateSystemPickerRow[];
+  total: number;
+};
+
+export const fetchEstimateSystemPicker = async (): Promise<
+  ApiSuccessBody<EstimateSystemPickerData>
+> => {
+  const response = await fetch("/api/estimates/pickers/systems");
+  return parseResponse<EstimateSystemPickerData>(response);
+};
+
 export const fetchJobSitePicker = async (): Promise<
   ApiSuccessBody<EstimateSitePickerData>
 > => {

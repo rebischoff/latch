@@ -9,6 +9,24 @@ const EstimateStakeholderPatchElementSchema = z
   })
   .strict();
 
+const EstimateSystemSpecPatchElementSchema = z
+  .object({
+    system_spec_def_id: z.string(),
+    system_spec_option_id: z.string().nullable().optional(),
+    value_text: z.string().nullable().optional(),
+    value_boolean: z.boolean().nullable().optional(),
+  })
+  .strict();
+
+const EstimateSystemPatchElementSchema = z
+  .object({
+    id: z.string().optional(),
+    system_id: z.string(),
+    sort_order: z.number(),
+    specs: z.array(EstimateSystemSpecPatchElementSchema),
+  })
+  .strict();
+
 const EstimateLineItemPatchElementSchema = z
   .object({
     id: z.string().optional(),
@@ -19,8 +37,11 @@ const EstimateLineItemPatchElementSchema = z
     unit: z.string(),
     unit_cost: z.number(),
     unit_price: z.number(),
-    estimate_section_id: z.string().nullable().optional(),
-    site_location_id: z.string().nullable().optional(),
+    estimate_system_id: z.string().nullable().optional(),
+    material_status: z
+      .enum(["generic", "suggested", "verified"])
+      .nullable()
+      .optional(),
     phase_id: z.string().nullable().optional(),
     item_id: z.string().nullable().optional(),
     part_id: z.string().nullable().optional(),
@@ -45,6 +66,7 @@ export const EstimateDetailPatchSchema = z
       .strict()
       .optional(),
     stakeholders: z.array(EstimateStakeholderPatchElementSchema).optional(),
+    systems: z.array(EstimateSystemPatchElementSchema).optional(),
     line_items: z.array(EstimateLineItemPatchElementSchema).optional(),
   })
   .strict();
@@ -63,6 +85,7 @@ export const EstimateDetailCreateSchema = z
       })
       .strict(),
     stakeholders: z.array(EstimateStakeholderPatchElementSchema).optional(),
+    systems: z.array(EstimateSystemPatchElementSchema).optional(),
     line_items: z.array(EstimateLineItemPatchElementSchema).optional(),
   })
   .strict();
@@ -88,19 +111,38 @@ export type EstimateStakeholderRow = {
   sort_order: number;
 };
 
+export type EstimateSystemSpecRow = {
+  def_display_name: string;
+  option_display_name: string | null;
+  options?: Array<{ display_name: string; id: string }>;
+  system_spec_def_id: string;
+  system_spec_option_id: string | null;
+  value_boolean: boolean | null;
+  value_text: string | null;
+  value_type: "enum" | "boolean" | "text";
+};
+
+export type EstimateSystemRow = {
+  id: string;
+  sort_order: number;
+  specs: EstimateSystemSpecRow[];
+  system_id: string;
+  system_name: string;
+};
+
 export type EstimateLineItemRow = {
   description: string;
-  estimate_section_id: string | null;
+  estimate_system_id: string | null;
   id: string;
   item_id: string | null;
   line_kind: string;
   line_number: number;
   line_role: string;
+  material_status: string | null;
   parent_line_id: string | null;
   part_id: string | null;
   phase_id: string | null;
   quantity: number;
-  site_location_id: string | null;
   sort_order: number;
   unit: string;
   unit_cost: number;
@@ -111,12 +153,21 @@ export type EstimateLineItemRow = {
 export type EstimateDetailRelated = {
   line_items: EstimateLineItemRow[];
   stakeholders: EstimateStakeholderRow[];
+  systems: EstimateSystemRow[];
 };
 
 export type EstimateStakeholderPatchRow = {
   party_id: string;
   relation_id: string;
 };
+
+export type EstimateSystemSpecPatchRow = z.infer<
+  typeof EstimateSystemSpecPatchElementSchema
+>;
+
+export type EstimateSystemPatchRow = z.infer<
+  typeof EstimateSystemPatchElementSchema
+>;
 
 export type EstimateLineItemPatchRow = z.infer<
   typeof EstimateLineItemPatchElementSchema
@@ -136,6 +187,7 @@ export type EstimateDetailWriteRow = Pick<
 export type EstimateDetailRelatedPatch = {
   line_items?: EstimateLineItemPatchRow[];
   stakeholders?: EstimateStakeholderPatchRow[];
+  systems?: EstimateSystemPatchRow[];
 };
 
 export type EstimateDetailStoreRelated =
@@ -158,6 +210,7 @@ const normalizeEstimateDetailRelated = (
   related: EstimateDetailStoreRelated,
 ): EstimateDetailRelated => ({
   stakeholders: (related.stakeholders ?? []) as EstimateStakeholderRow[],
+  systems: (related.systems ?? []) as EstimateSystemRow[],
   line_items: (related.line_items ?? []) as EstimateLineItemRow[],
 });
 
@@ -185,6 +238,10 @@ export const projectEstimateDetailRow = (
 
   if (manifest.fields.stakeholders?.includes("read")) {
     dto.stakeholders = normalized.stakeholders;
+  }
+
+  if (manifest.fields.systems?.includes("read")) {
+    dto.systems = normalized.systems;
   }
 
   if (manifest.fields.line_items?.includes("read")) {
@@ -244,6 +301,9 @@ export const estimateDetailDescriptor: SurfaceDescriptor<
     if (typed.stakeholders !== undefined) {
       related.stakeholders = typed.stakeholders;
     }
+    if (typed.systems !== undefined) {
+      related.systems = typed.systems;
+    }
     if (typed.line_items !== undefined) {
       related.line_items = typed.line_items;
     }
@@ -254,6 +314,7 @@ export const estimateDetailDescriptor: SurfaceDescriptor<
   deleteAuditSnapshot: (row, related) => ({
     ...formatEstimateDetailRow(row),
     stakeholders: normalizeEstimateDetailRelated(related).stakeholders,
+    systems: normalizeEstimateDetailRelated(related).systems,
     line_items: normalizeEstimateDetailRelated(related).line_items,
   }),
   canDelete: (ctx) => ctx.manifest.actions.includes("delete"),
