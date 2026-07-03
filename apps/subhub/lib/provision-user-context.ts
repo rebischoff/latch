@@ -1,4 +1,7 @@
 import { routes } from "./nav-routes";
+import { sanitizeReturnTo } from "./surface-navigation";
+
+export { sanitizeReturnTo };
 
 export const PROVISION_USER_PARAMS = {
   linkPartyId: "linkPartyId",
@@ -12,23 +15,6 @@ export type ProvisionUserContext = {
 
 type SearchParamsLike = {
   get(name: string): string | null;
-};
-
-/** Same-origin relative path only — rejects open redirects. */
-export const sanitizeReturnTo = (
-  returnTo: string | null | undefined,
-  fallback: string,
-): string => {
-  if (!returnTo) {
-    return fallback;
-  }
-
-  const trimmed = returnTo.trim();
-  if (!trimmed.startsWith("/") || trimmed.startsWith("//") || trimmed.includes("://")) {
-    return fallback;
-  }
-
-  return trimmed;
 };
 
 export const buildProvisionUserUrl = ({

@@ -65,6 +65,11 @@ export const routes = {
     new: "/parts/new",
     detail: (id: string) => `/parts/${id}`,
   },
+  categories: {
+    list: "/categories",
+    new: "/categories/new",
+    detail: (id: string) => `/categories/${id}`,
+  },
 } as const;
 
 const navMatchPrefixes = [

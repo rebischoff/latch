@@ -40,7 +40,7 @@ export const createEstimateDetailStore = (
       source_estimate_id: row.source_estimate_id,
       category_id: row.category_id,
     };
-    await updateEstimate(pool, actorId, writeRow);
+    await updateEstimate(pool, actorId, writeRow, existing);
   },
 
   delete: async (id) => {
@@ -52,7 +52,18 @@ export const createEstimateDetailStore = (
     await deleteEstimate(pool, actorId, id, existing.status);
   },
 
-  getRelated: (estimateId) => loadEstimateDetailRelated(pool, estimateId),
+  getRelated: async (estimateId) => {
+    const estimate = await loadEstimateDetail(pool, estimateId);
+    if (!estimate) {
+      return {
+        stakeholders: [],
+        scopes: [],
+        site_tree: null,
+        line_items: [],
+      };
+    }
+    return loadEstimateDetailRelated(pool, estimateId, estimate.site_id);
+  },
 
   replaceRelated: async (estimateId, related) => {
     const actorId = await getActorId();
@@ -67,9 +78,9 @@ export const createEstimateDetailStore = (
       await replaceEstimateStakeholders(pool, actorId, estimateId, patch.stakeholders);
     }
 
-    if (patch.systems !== undefined || patch.line_items !== undefined) {
+    if (patch.scopes !== undefined || patch.line_items !== undefined) {
       await replaceEstimateCollections(pool, actorId, estimateId, estimate.site_id, {
-        systems: patch.systems,
+        scopes: patch.scopes,
         line_items: patch.line_items,
       });
     }

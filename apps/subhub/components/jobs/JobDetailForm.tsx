@@ -1,6 +1,5 @@
 "use client";
 
-import { SaveOutlined, UndoOutlined } from "@ant-design/icons";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   fieldAllows,
@@ -11,7 +10,7 @@ import {
 import { App, Space, Tabs, Tag, Typography } from "antd";
 import Link from "next/link";
 import { notFound, useRouter } from "next/navigation";
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { useForm, type Resolver } from "react-hook-form";
 import { z } from "zod";
 
@@ -19,7 +18,7 @@ import { FormSection } from "@/components/form/FormSection";
 import { SURFACE_FORM_MAX_WIDTH } from "@/components/form/formLayout";
 import { SelectInput } from "@/components/form/SelectInput";
 import { TextInput } from "@/components/form/TextInput";
-import { useRegisterSurfaceActions } from "@/components/shell/SurfaceActionsProvider";
+import { useSurfaceFormChrome } from "@/components/surface/SurfaceFormChromeContext";
 import { SurfaceFormLayout } from "@/components/surface/SurfaceFormLayout";
 import { SurfaceFormRoot } from "@/components/surface/SurfaceFormRoot";
 import { useFieldMode } from "@/components/surface/useFieldMode";
@@ -37,6 +36,7 @@ import {
   JobDetailPatchSchema,
 } from "@/lib/jobs/descriptors/job-detail";
 import { routes } from "@/lib/nav-routes";
+import { navigateOnCancel } from "@/lib/surface-navigation";
 import { SurfaceApiError } from "@/lib/surface-api";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -184,7 +184,7 @@ export const JobDetailForm = ({
 }: JobDetailFormProps) => {
   const isCreate = jobId === "new";
   const router = useRouter();
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const { data: detail, isLoading, isFetching, error } = useSurfaceDetail(
     "job_detail",
     isCreate ? undefined : jobId,
@@ -250,120 +250,140 @@ export const JobDetailForm = ({
     watch,
   } = form;
 
-  const canSave = patchableFieldIds(activeManifest).length > 0;
-  const saving = patch.isPending || create.isPending;
   const siteId = watch("profile.site_id");
   const status = watch("profile.status") ?? profile?.status ?? "planned";
   const jobKind = watch("profile.job_kind") ?? profile?.job_kind ?? "project";
   const isCancelled = !isCreate && status === "cancelled";
 
-  const onSave = form.handleSubmit(async (values) => {
-    const stakeholders = values.stakeholders ?? [];
+  const canSave = patchableFieldIds(activeManifest).length > 0 && !isCancelled;
+  const saving = patch.isPending || create.isPending;
 
-    if (
-      fieldAllows(activeManifest, "stakeholders", "write") &&
-      !validateJobStakeholderDuplicates(stakeholders, form.setError)
-    ) {
-      message.error("Fix duplicate stakeholders before saving");
-      return;
-    }
+  const persistJob = useCallback(
+    async (values: JobDetailFormValues, afterCreate: "detail" | "reset") => {
+      const stakeholders = values.stakeholders ?? [];
 
-    const body: Record<string, unknown> = isCreate
-      ? {
-          profile: {
-            title: values.profile.title,
-            site_id: values.profile.site_id,
-          },
-        }
-      : {
-          profile: values.profile,
-        };
-
-    if (fieldAllows(activeManifest, "stakeholders", "write")) {
-      body.stakeholders = stakeholders.map((row) => ({
-        party_id: row.party_id,
-        relation_id: row.relation_id,
-      }));
-    }
-
-    try {
-      if (isCreate) {
-        const result = await create.mutateAsync(body);
-        const newId = String(result.data.id);
-        message.success("Job created");
-        router.replace(routes.jobs.detail(newId));
-        router.refresh();
+      if (
+        fieldAllows(activeManifest, "stakeholders", "write") &&
+        !validateJobStakeholderDuplicates(stakeholders, form.setError)
+      ) {
+        message.error("Fix duplicate stakeholders before saving");
         return;
       }
 
-      await patch.mutateAsync(body);
-      message.success("Job saved");
-    } catch (saveError) {
-      if (saveError instanceof SurfaceApiError) {
-        if (saveError.status === 409) {
-          message.error("Cannot modify a cancelled job");
-          return;
-        }
+      const body: Record<string, unknown> = isCreate
+        ? {
+            profile: {
+              title: values.profile.title,
+              site_id: values.profile.site_id,
+            },
+          }
+        : {
+            profile: values.profile,
+          };
 
-        const details = saveError.details as
-          | { field?: string; code?: string; party_id?: string; relation_id?: string }
-          | undefined;
-
-        if (details?.field === "stakeholders" && details.code === "duplicate") {
-          stakeholders.forEach((row, index) => {
-            if (
-              row.party_id === details.party_id &&
-              row.relation_id === details.relation_id
-            ) {
-              form.setError(`stakeholders.${index}.relation_id`, {
-                message: "This party already has this relation on the job",
-              });
-            }
-          });
-          message.error("Fix duplicate stakeholders before saving");
-          return;
-        }
+      if (fieldAllows(activeManifest, "stakeholders", "write")) {
+        body.stakeholders = stakeholders.map((row) => ({
+          party_id: row.party_id,
+          relation_id: row.relation_id,
+        }));
       }
 
-      message.error(isCreate ? "Unable to create job" : "Unable to save job");
-    }
-  });
+      try {
+        if (isCreate) {
+          const result = await create.mutateAsync(body);
+          const newId = String(result.data.id);
+          message.success("Job created");
 
-  const onRevert = () => {
-    form.reset(defaultValues);
-    message.info("Reverted to last loaded values");
-  };
+          if (afterCreate === "reset") {
+            form.reset(buildDefaultValues(undefined, true));
+            return;
+          }
 
-  const toolbarActions = useMemo(
-    () => [
-      {
-        key: "save",
-        label: "Save",
-        icon: <SaveOutlined />,
-        priority: "primary" as const,
-        surfaceAction: "write" as const,
-        disabled: !canSave || isCancelled || (!isCreate && !isDirty),
-        loading: saving,
-        onClick: onSave,
-      },
-      ...(isCreate
-        ? []
-        : [
-            {
-              key: "revert",
-              label: "Revert",
-              icon: <UndoOutlined />,
-              priority: "secondary" as const,
-              surfaceAction: "write" as const,
-              disabled: isCancelled || !isDirty || saving,
-              onClick: onRevert,
-            },
-          ]),
-    ],
-    [canSave, isCancelled, isCreate, isDirty, onRevert, onSave, saving],
+          router.replace(routes.jobs.detail(newId));
+          router.refresh();
+          return;
+        }
+
+        await patch.mutateAsync(body);
+        message.success("Job saved");
+      } catch (saveError) {
+        if (saveError instanceof SurfaceApiError) {
+          if (saveError.status === 409) {
+            message.error("Cannot modify a cancelled job");
+            return;
+          }
+
+          const details = saveError.details as
+            | { field?: string; code?: string; party_id?: string; relation_id?: string }
+            | undefined;
+
+          if (details?.field === "stakeholders" && details.code === "duplicate") {
+            stakeholders.forEach((row, index) => {
+              if (
+                row.party_id === details.party_id &&
+                row.relation_id === details.relation_id
+              ) {
+                form.setError(`stakeholders.${index}.relation_id`, {
+                  message: "This party already has this relation on the job",
+                });
+              }
+            });
+            message.error("Fix duplicate stakeholders before saving");
+            return;
+          }
+        }
+
+        message.error(isCreate ? "Unable to create job" : "Unable to save job");
+      }
+    },
+    [activeManifest, create, form, isCreate, message, patch, router],
   );
 
-  useRegisterSurfaceActions(activeManifest, toolbarActions);
+  const onSave = form.handleSubmit((values) => persistJob(values, "detail"));
+
+  const onSaveAndNew = useMemo(
+    () =>
+      isCreate
+        ? form.handleSubmit((values) => persistJob(values, "reset"))
+        : undefined,
+    [form, isCreate, persistJob],
+  );
+
+  const onCancel = useCallback(() => {
+    const navigate = () => {
+      navigateOnCancel(router, null, routes.jobs.list);
+    };
+
+    if (isDirty) {
+      modal.confirm({
+        title: "Leave without saving?",
+        content: "Unsaved changes will be lost.",
+        okText: "Leave",
+        onOk: navigate,
+      });
+      return;
+    }
+
+    navigate();
+  }, [isDirty, modal, router]);
+
+  const onRevert = useCallback(() => {
+    form.reset(defaultValues);
+    message.info("Reverted to last loaded values");
+  }, [defaultValues, form, message]);
+
+  useSurfaceFormChrome({
+    mode: isCreate ? "create" : "edit",
+    manifest: activeManifest,
+    canSave,
+    saving,
+    onSave,
+    isDirty,
+    canDelete: false,
+    onRevert: isCreate || isCancelled ? undefined : onRevert,
+    onCancel: isCreate ? onCancel : undefined,
+    onSaveAndNew,
+  });
 
   if (!isCreate && error instanceof SurfaceApiError && error.status === 404) {
     notFound();

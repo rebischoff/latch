@@ -1,12 +1,97 @@
 # SubHub decisions — site
 
-> Sites, postal addresses, site geography, standing contacts, and Slice 2 scope.
+> Sites, postal addresses, site scopes & zones, standing contacts, and Slice 2 scope.
 
 [Index](./README.md) · [All decisions](../decisions/README.md)
 
 ---
 
-### Decision: site as-built — system, area tree, asset (2026-06-27)
+### Decision: site scopes & zones — API rename + picker auth (2026-07-01)
+
+**Status:** **Locked** (task 37c).
+
+| # | Topic | Choice |
+|---|--------|--------|
+| D1 | **API / Field vocabulary** | Rename Fields and PATCH keys: `scopes` + `general_zones`; nested `zones[]`; `root_category_id` / `root_category_name` (drop `systems`, `default_areas`, `areas`, `system_id`) |
+| D2 | **Root picker auth** | Field-grant entailed read — picker runs under **`site_detail`** context; `scopes` **read** or **write** grants load root categories; no `category_list` grant required |
+| D3 | **Execution order** | 37c first — thin `listRootCategories` + site picker; 37d reuses helper + catalog surfaces |
+| D4 | **Add scope default name** | Prefill instance `name` from selected root category `name`; user may rename |
+| D5 | **Empty roots catalog** | Zero root categories → disable **Add scope** |
+| D6 | **File rename** | Geography artifacts → `site-scopes*`, `SiteScopesZonesTree` |
+| D7 | **Site scope duplicate names** | Not enforced v1 — multiple `site_scope` rows may share the same `name` |
+
+**Task:** [37c](../tasks/37c-site-scopes-zones.md) · **Spec:** [`site.md`](../surface-specs/site.md)
+
+---
+
+### Decision: site scopes & zones — category root instances (2026-06-30)
+
+**Status:** **Locked.** Supersedes geography UI terms **`site_system` / `site_area`** (tasks 34–36) **at DDL level** via migration **033**.
+
+**Choice:**
+
+- **`site_scope`** — installed **root category** instance on a site (`root_category_id`, renamable **`name`**); multiple instances per root OK (Panel A / Panel B).
+- **`site_zone`** — nested zones; **`site_scope_id` null** = site **General** bucket.
+- **Site tab label:** **Scopes & zones** (was Geography).
+- **PATCH / UI** — same Tree editor pattern as task 36; picker adds **root category** instead of catalog `system`.
+- **`site_asset`** — FK `site_scope_id` / `site_zone_id` (unchanged lifecycle rules).
+
+**Planning:** [11-categories-scope-model.md](../planning/11-categories-scope-model.md) · **Task:** [37a](../tasks/37a-category-scope-decision-dbml-migration.md) · **UI refactor:** 37c.
+
+---
+
+### Decision: site area shape — name-only v1 (2026-06-30)
+
+**Choice:** Drop `site_area.area_type` and `site_area.code`. Geography UI edits **`name`** only; hierarchy is the organizing model.
+
+**Amends:** S4 / L5 (`area_type` free text) and optional `code` from [site-as-built planning](../planning/01-site-as-built.md). Migration `032_drop_site_area_metadata.sql`.
+
+**Rationale:** Site geography on `site_detail` is a simple editable tree; categorization and import keys deferred until estimate import or access-control patterns need them.
+
+**Task:** [35](../tasks/35-site-geography-drop-area-metadata.md).
+
+---
+
+### Decision: site geography UI — antd Tree editor (2026-06-30)
+
+**Choice:**
+
+- **`site_detail` Geography tab** — Ant Design **`Tree`** + `titleRender` (`SiteGeographyTree`); name-only `Input` — **`readOnly` + `variant="borderless"`** until click/focus, reverts on blur; **Name** label aligns with General tab fields.
+- **PATCH:** `systems[]` (nested `areas[]`) + `default_areas[]` (General bucket, `site_system_id` null); single Save with profile/contacts.
+- **General** synthetic root always visible; not deletable; fixed first; not draggable.
+- **Toolbar:** **Add system ▾** (catalog dropdown) + **Add area** (button). Add area enabled when **General**, **system**, or **area** row is selected (not empty).
+- **Delete:** cascade unreferenced subtrees; **409** when `estimate_line`, `job_line`, or `site_asset` references row.
+- **DnD:** antd Tree `draggable` + `allowDrop` — sibling reorder only; `sort_order` from index on Save.
+- **New rows** on `site_detail` default **`active`**.
+- **`site_asset` editor** deferred (job phase).
+
+**Amends:** [site geography tree table decision](#decision-site-geography-ui--systems--areas-tree-table-2026-06-30) (task 34 interim `Table` + `@dnd-kit`).
+
+**Rationale:** Name-only tree editor is simpler than table columns; antd native DnD and selection replace custom table chrome.
+
+**Spec:** [`site.md`](../surface-specs/site.md) · **Task:** [36](../tasks/36-site-geography-tree-ui.md) · **Gate:** [`10-site-geography-ui-decisions.md`](../planning/10-site-geography-ui-decisions.md) (SG11, SG12, SG13, SG16 amended).
+
+---
+
+### Decision: site geography UI — systems & areas tree table (2026-06-30)
+
+**Choice:**
+
+- **`site_detail` Geography tab** — Ant Design `Table` + `treeData` (`SiteGeographyTreeTable`). **Superseded by task 36** — `SiteGeographyTree` (antd `Tree`).
+- **PATCH:** `systems[]` (nested `areas[]`) + `default_areas[]` (General bucket, `site_system_id` null); single Save with profile/contacts.
+- **General** synthetic parent always visible; not deletable; fixed first; not draggable.
+- **Add ▾:** unfocused → catalog `system` dropdown (duplicate `system_id` allowed); system/area/General focused → add area child + focus name.
+- **Delete:** cascade unreferenced subtrees; **409** when `estimate_line`, `job_line`, or `site_asset` references row.
+- **DnD:** sibling reorder only; `sort_order` from index on Save.
+- **New rows** on `site_detail` default **`active`**.
+- **`site_asset` editor** deferred (job phase).
+
+**Rationale:** Validate tree UX on site before estimate `estimate_area` / import. Matches [`EstimateLineTreeTable`](../components/estimates/EstimateLineTreeTable.tsx) pattern.
+
+**Spec:** [`site.md`](../surface-specs/site.md) · **Task:** [34](../tasks/34-site-geography-ui.md) · **Gate:** [`10-site-geography-ui-decisions.md`](../planning/10-site-geography-ui-decisions.md) (SG1–SG16).
+
+---
+
 
 **Status:** **Planning** — full spec in [`planning/01-site-as-built.md`](../planning/01-site-as-built.md). **Amends** [address vs site geography](#decision-address-vs-site-geography--rename-and-split-2026-06-17) and [section vs location](#decision-section-vs-location--granularity-2026-06-19) when DBML lands.
 
@@ -15,7 +100,7 @@
 | Entity | Role |
 |--------|------|
 | `site_system` | Optional — FA, CCTV, Access, … |
-| `site_area` | Nested tree per system (or default no-system bucket); `area_type` free text v1 |
+| `site_area` | Nested tree per system (or default no-system bucket); **name-only** v1 (task 35) |
 | `site_asset` | Installed serviceable **device** — leaf only; no `parent_asset_id` v1 |
 
 - **Site = source of truth** for service and future quotes.

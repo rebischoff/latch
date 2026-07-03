@@ -166,6 +166,12 @@
 
 **Amended (2026-06-25):** **Toolbar label** — standalone create action is **`New`** only (not `New {entity}`; surface context is in nav / pane title). **Placement** — register on **detail** toolbar at `<surface>/[id]`; also on **list-only** route `<surface>` when the detail pane is the empty placeholder. **Business Surfaces** gate on `*_detail` `write` (not `*_list` `create` — `system_data` synthesis omits list `create`). **IAM Surfaces** gate on `*_list` `create`.
 
+**Amended (2026-07-01):** **Implementation drift** — shipped lists gate **New** with `onListRoute` only; target is shared master-detail chrome ([`12-master-detail-chrome.md`](../planning/12-master-detail-chrome.md), [task 38](../tasks/38-master-detail-chrome.md)). **Standalone New** (not picker-only) attaches **`returnTo`** = current pathname + query so **Cancel** on `<surface>/new` returns to list or detail. **Categories** may use a **New** dropdown (root / child) — first standard dropdown exception; still navigates to `/categories/new` draft + Save.
+
+**Amended (2026-07-01):** **Resolved (task 38)** — business master-detail surfaces use `MasterDetailChromeLayout` + `MasterDetailToolbarHost` + `useSurfaceFormChrome`; business `*List.tsx` no longer register toolbar actions or `onListRoute` gate **New**.
+
+**Amended (2026-07-02):** **Tree-list child create (task 39)** — on tree master-detail surfaces (categories), **New child** parent id comes from **`MasterDetailSelectionContext`** (`selectionRef` read synchronously at click; `selectedId ?? pathname entityId` fallback). Pathname-only sourcing races with async `router.push` — never sync pathname → selection. Flat list surfaces unchanged.
+
 
 ### Decision: Surface create route — `/new` + DB-assigned id (2026-06-25)
 

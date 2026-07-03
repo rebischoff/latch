@@ -10,7 +10,11 @@ import {
   deleteSite,
   loadSiteDetail,
   loadSiteDetailRelated,
+  loadSiteScopes,
   replaceSiteContacts,
+  replaceSiteScopes,
+  toScopePatchRow,
+  toZonePatchRow,
   updateSite,
 } from "../repository";
 
@@ -44,6 +48,18 @@ export const createSiteDetailStore = (
 
     if (patch.contacts !== undefined) {
       await replaceSiteContacts(pool, actorId, siteId, patch.contacts);
+    }
+
+    if (patch.scopes !== undefined || patch.general_zones !== undefined) {
+      const existing = await loadSiteScopes(pool, siteId);
+      await replaceSiteScopes(pool, actorId, siteId, {
+        scopes:
+          patch.scopes ??
+          existing.scopes.map((row) => toScopePatchRow(row)),
+        general_zones:
+          patch.general_zones ??
+          existing.general_zones.map((row) => toZonePatchRow(row)),
+      });
     }
   },
 

@@ -16,6 +16,8 @@ tables:
   - site
   - site_contact
   - site_contact_relation
+  - site_scope
+  - site_zone
 
 fields:
   - id: profile
@@ -36,4 +38,10 @@ fields:
         nullable: true
   - id: contacts
     # logical — DAL maps to site_contact; see docs/child-collections.md
+    columns: []
+  - id: scopes
+    # logical — DAL maps to site_scope + nested site_zone
+    columns: []
+  - id: general_zones
+    # logical — site_zone rows with site_scope_id null (General bucket)
     columns: []

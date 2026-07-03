@@ -1,14 +1,11 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-
+import { createSurfacePickerHook } from "@/lib/hooks/create-surface-picker-hook";
 import { fetchSurfaceList } from "@/lib/surface-api";
 
 import { manufacturerPickerKey } from "./surface-query-keys";
 
-export const useManufacturerPicker = () =>
-  useQuery({
-    queryKey: manufacturerPickerKey,
-    queryFn: () => fetchSurfaceList("manufacturer_list"),
-    staleTime: 30_000,
-  });
+export const useManufacturerPicker = createSurfacePickerHook(
+  manufacturerPickerKey,
+  () => fetchSurfaceList("manufacturer_list"),
+);

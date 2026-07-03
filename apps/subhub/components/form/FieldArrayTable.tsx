@@ -37,6 +37,7 @@ import {
 
 import { useFieldMode } from "@/components/surface/useFieldMode";
 import { useFormUi } from "@/components/surface/useFormUi";
+import { useClientMounted } from "@/lib/hooks/use-client-mounted";
 
 export type FieldArrayTableCellContext<
   T extends FieldValues,
@@ -152,6 +153,7 @@ export const FieldArrayTable = <
   const { control, getValues, setValue } = useFormContext<T>();
   const { fields, append, remove, move } = useFieldArray({ control, name });
   const { loading: formLoading, disabled } = useFormUi();
+  const mounted = useClientMounted();
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 1 } }),
@@ -167,7 +169,7 @@ export const FieldArrayTable = <
   const useFieldWriteGate = allowAdd === undefined && allowRemove === undefined;
   const allowAddRows = allowAdd ?? writable;
   const allowRemoveRows = allowRemove ?? writable;
-  const canReorder = orderable && writable;
+  const canReorder = orderable && writable && mounted;
 
   const reindexSortOrder = () => {
     const current = getValues(name as Path<T>) as unknown as Array<

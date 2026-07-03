@@ -3,6 +3,7 @@ import type { SurfaceDal } from "@latch/dal";
 import { randomUUID } from "node:crypto";
 
 import { ensureContactsDal } from "../contacts/dal";
+import { ensureCatalogDal } from "../catalog/dal";
 import { ensureEstimatesDal } from "../estimates/dal";
 import { ensureIamDal } from "../iam/dal";
 import { ensureJobsDal } from "../jobs/dal";
@@ -27,7 +28,8 @@ export type SurfaceListId =
   | "job_party_relation_table"
   | "estimate_list"
   | "job_list"
-  | "part_list";
+  | "part_list"
+  | "category_list";
 
 /** Detail surfaces with a shared loader (see surface-form-prefetch.md inventory). */
 export type SurfaceDetailId =
@@ -39,7 +41,8 @@ export type SurfaceDetailId =
   | "role_detail"
   | "estimate_detail"
   | "job_detail"
-  | "part_detail";
+  | "part_detail"
+  | "category_detail";
 
 type ListLoader = {
   ensureDal: () => Promise<void>;
@@ -232,6 +235,23 @@ const listLoaders: Record<SurfaceListId, ListLoader> = {
       return createViaDetailDal("part_detail", dal.partDetail.create.bind(dal.partDetail), body);
     },
   },
+  category_list: {
+    ensureDal: async () => {
+      await ensureCatalogDal();
+    },
+    list: async (ctx, query) => {
+      const dal = await ensureCatalogDal();
+      return dal.categoryList.list(ctx, query);
+    },
+    create: async (_ctx, body) => {
+      const dal = await ensureCatalogDal();
+      return createViaDetailDal(
+        "category_detail",
+        dal.categoryDetail.create.bind(dal.categoryDetail),
+        body,
+      );
+    },
+  },
 };
 
 const detailLoaders: Record<SurfaceDetailId, DetailLoader> = {
@@ -314,6 +334,15 @@ const detailLoaders: Record<SurfaceDetailId, DetailLoader> = {
     getDal: async () => {
       const dal = await ensurePartsDal();
       return dal.partDetail;
+    },
+  },
+  category_detail: {
+    ensureDal: async () => {
+      await ensureCatalogDal();
+    },
+    getDal: async () => {
+      const dal = await ensureCatalogDal();
+      return dal.categoryDetail;
     },
   },
 };

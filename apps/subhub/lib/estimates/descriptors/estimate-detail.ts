@@ -9,21 +9,33 @@ const EstimateStakeholderPatchElementSchema = z
   })
   .strict();
 
-const EstimateSystemSpecPatchElementSchema = z
+const EstimateScopeSpecPatchElementSchema = z
   .object({
-    system_spec_def_id: z.string(),
-    system_spec_option_id: z.string().nullable().optional(),
+    spec_def_id: z.string(),
+    spec_option_id: z.string().nullable().optional(),
     value_text: z.string().nullable().optional(),
     value_boolean: z.boolean().nullable().optional(),
   })
   .strict();
 
-const EstimateSystemPatchElementSchema = z
+const EstimateScopeZonePatchElementSchema = z
+  .object({
+    site_zone_id: z.string(),
+    sort_order: z.number(),
+    specs: z.array(EstimateScopeSpecPatchElementSchema),
+  })
+  .strict();
+
+const EstimateScopePatchElementSchema = z
   .object({
     id: z.string().optional(),
-    system_id: z.string(),
+    site_scope_id: z.string().nullable().optional(),
+    root_category_id: z.string().nullable().optional(),
     sort_order: z.number(),
-    specs: z.array(EstimateSystemSpecPatchElementSchema),
+    labor_context_type_id: z.string().nullable().optional(),
+    markup_type_id: z.string().nullable().optional(),
+    specs: z.array(EstimateScopeSpecPatchElementSchema),
+    zones: z.array(EstimateScopeZonePatchElementSchema),
   })
   .strict();
 
@@ -37,7 +49,8 @@ const EstimateLineItemPatchElementSchema = z
     unit: z.string(),
     unit_cost: z.number(),
     unit_price: z.number(),
-    estimate_system_id: z.string().nullable().optional(),
+    estimate_scope_id: z.string().nullable().optional(),
+    site_zone_id: z.string().nullable().optional(),
     material_status: z
       .enum(["generic", "suggested", "verified"])
       .nullable()
@@ -66,7 +79,7 @@ export const EstimateDetailPatchSchema = z
       .strict()
       .optional(),
     stakeholders: z.array(EstimateStakeholderPatchElementSchema).optional(),
-    systems: z.array(EstimateSystemPatchElementSchema).optional(),
+    scopes: z.array(EstimateScopePatchElementSchema).optional(),
     line_items: z.array(EstimateLineItemPatchElementSchema).optional(),
   })
   .strict();
@@ -85,7 +98,7 @@ export const EstimateDetailCreateSchema = z
       })
       .strict(),
     stakeholders: z.array(EstimateStakeholderPatchElementSchema).optional(),
-    systems: z.array(EstimateSystemPatchElementSchema).optional(),
+    scopes: z.array(EstimateScopePatchElementSchema).optional(),
     line_items: z.array(EstimateLineItemPatchElementSchema).optional(),
   })
   .strict();
@@ -111,28 +124,58 @@ export type EstimateStakeholderRow = {
   sort_order: number;
 };
 
-export type EstimateSystemSpecRow = {
+export type EstimateSiteZoneTreeRow = {
+  id: string;
+  name: string;
+  zones?: EstimateSiteZoneTreeRow[];
+};
+
+export type EstimateSiteScopeTreeRow = {
+  id: string;
+  name: string;
+  root_category_id: string;
+  zones: EstimateSiteZoneTreeRow[];
+};
+
+export type EstimateSiteTreeRow = {
+  general_zones: EstimateSiteZoneTreeRow[];
+  scopes: EstimateSiteScopeTreeRow[];
+  spec_templates: Record<string, EstimateScopeSpecRow[]>;
+};
+
+export type EstimateScopeSpecRow = {
   def_display_name: string;
   option_display_name: string | null;
   options?: Array<{ display_name: string; id: string }>;
-  system_spec_def_id: string;
-  system_spec_option_id: string | null;
+  spec_def_id: string;
+  spec_option_id: string | null;
   value_boolean: boolean | null;
   value_text: string | null;
   value_type: "enum" | "boolean" | "text";
 };
 
-export type EstimateSystemRow = {
-  id: string;
+export type EstimateScopeZoneRow = {
+  site_zone_id: string;
   sort_order: number;
-  specs: EstimateSystemSpecRow[];
-  system_id: string;
-  system_name: string;
+  specs: EstimateScopeSpecRow[];
+};
+
+export type EstimateScopeRow = {
+  id: string;
+  labor_context_type_id: string | null;
+  markup_type_id: string | null;
+  root_category_id: string | null;
+  root_category_name: string | null;
+  site_scope_id: string | null;
+  site_scope_name: string | null;
+  sort_order: number;
+  specs: EstimateScopeSpecRow[];
+  zones: EstimateScopeZoneRow[];
 };
 
 export type EstimateLineItemRow = {
   description: string;
-  estimate_system_id: string | null;
+  estimate_scope_id: string | null;
   id: string;
   item_id: string | null;
   line_kind: string;
@@ -143,6 +186,7 @@ export type EstimateLineItemRow = {
   part_id: string | null;
   phase_id: string | null;
   quantity: number;
+  site_zone_id: string | null;
   sort_order: number;
   unit: string;
   unit_cost: number;
@@ -152,8 +196,9 @@ export type EstimateLineItemRow = {
 
 export type EstimateDetailRelated = {
   line_items: EstimateLineItemRow[];
+  scopes: EstimateScopeRow[];
+  site_tree: EstimateSiteTreeRow | null;
   stakeholders: EstimateStakeholderRow[];
-  systems: EstimateSystemRow[];
 };
 
 export type EstimateStakeholderPatchRow = {
@@ -161,13 +206,15 @@ export type EstimateStakeholderPatchRow = {
   relation_id: string;
 };
 
-export type EstimateSystemSpecPatchRow = z.infer<
-  typeof EstimateSystemSpecPatchElementSchema
+export type EstimateScopeSpecPatchRow = z.infer<
+  typeof EstimateScopeSpecPatchElementSchema
 >;
 
-export type EstimateSystemPatchRow = z.infer<
-  typeof EstimateSystemPatchElementSchema
+export type EstimateScopeZonePatchRow = z.infer<
+  typeof EstimateScopeZonePatchElementSchema
 >;
+
+export type EstimateScopePatchRow = z.infer<typeof EstimateScopePatchElementSchema>;
 
 export type EstimateLineItemPatchRow = z.infer<
   typeof EstimateLineItemPatchElementSchema
@@ -186,8 +233,8 @@ export type EstimateDetailWriteRow = Pick<
 
 export type EstimateDetailRelatedPatch = {
   line_items?: EstimateLineItemPatchRow[];
+  scopes?: EstimateScopePatchRow[];
   stakeholders?: EstimateStakeholderPatchRow[];
-  systems?: EstimateSystemPatchRow[];
 };
 
 export type EstimateDetailStoreRelated =
@@ -210,7 +257,8 @@ const normalizeEstimateDetailRelated = (
   related: EstimateDetailStoreRelated,
 ): EstimateDetailRelated => ({
   stakeholders: (related.stakeholders ?? []) as EstimateStakeholderRow[],
-  systems: (related.systems ?? []) as EstimateSystemRow[],
+  scopes: (related.scopes ?? []) as EstimateScopeRow[],
+  site_tree: (related as EstimateDetailRelated).site_tree ?? null,
   line_items: (related.line_items ?? []) as EstimateLineItemRow[],
 });
 
@@ -240,8 +288,11 @@ export const projectEstimateDetailRow = (
     dto.stakeholders = normalized.stakeholders;
   }
 
-  if (manifest.fields.systems?.includes("read")) {
-    dto.systems = normalized.systems;
+  if (manifest.fields.scopes?.includes("read")) {
+    dto.scopes = normalized.scopes;
+    if (normalized.site_tree) {
+      dto.site_tree = normalized.site_tree;
+    }
   }
 
   if (manifest.fields.line_items?.includes("read")) {
@@ -301,8 +352,8 @@ export const estimateDetailDescriptor: SurfaceDescriptor<
     if (typed.stakeholders !== undefined) {
       related.stakeholders = typed.stakeholders;
     }
-    if (typed.systems !== undefined) {
-      related.systems = typed.systems;
+    if (typed.scopes !== undefined) {
+      related.scopes = typed.scopes;
     }
     if (typed.line_items !== undefined) {
       related.line_items = typed.line_items;
@@ -314,7 +365,7 @@ export const estimateDetailDescriptor: SurfaceDescriptor<
   deleteAuditSnapshot: (row, related) => ({
     ...formatEstimateDetailRow(row),
     stakeholders: normalizeEstimateDetailRelated(related).stakeholders,
-    systems: normalizeEstimateDetailRelated(related).systems,
+    scopes: normalizeEstimateDetailRelated(related).scopes,
     line_items: normalizeEstimateDetailRelated(related).line_items,
   }),
   canDelete: (ctx) => ctx.manifest.actions.includes("delete"),

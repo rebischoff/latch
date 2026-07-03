@@ -1,60 +1,59 @@
 # STATUS — SubHub
 
 > App-local quarterback. Platform pointer: [`../../STATUS.md`](../../STATUS.md).
-> Updated: 2026-06-29.
+> Updated: 2026-07-02.
 
 - **Package:** `@latch/subhub` · **Port:** 3003
 - **Docs:** [`docs/README.md`](./docs/README.md) · **Tasks:** [`docs/tasks/01-task-index.md`](./docs/tasks/01-task-index.md)
-- **State:** **Estimate finish track** — tasks **29–32** complete (backbone + 4e shipped). **Next:** estimate wave **4c′** (`estimate_area` DDL + area parent rows) or **4b** (win → job). Task **25** manufacturer stop gate **paused** (not blocking).
+- **State:** Migration **036** applied on dev. Tasks **29–36**, **37a**, **37b**, **37c**, **37d**, **37d2**, **37e**, **38**, **39** complete.
 
 ## Right now — do this next
 
-**Estimate wave 4c′** — quote geography (`estimate_area` DDL, area parent rows in tree editor, `estimate_area_id` on lines, Import from site). Planning: [`02-estimates.md`](./docs/planning/02-estimates.md) · prior work: [task 32](./docs/tasks/32-estimate-wave-4e.md) ✅.
-
-**Alternate track:** wave **4b** — `win`/`lose` → job copy + reconcile quote areas → `site_area`. No task file yet.
+**Task 37f — Estimate line costing** — `spec_def` number type, part filter engine, TreeSelect lines. Task: [`37f-estimate-line-costing.md`](./docs/tasks/37f-estimate-line-costing.md) *(TBD)*.
 
 ## Blockers
 
-None.
+None for 37f start (37d2 complete).
 
 ## Active slice
 
 | Slice | Focus | State |
 |-------|--------|-------|
 | **Backbone** | Tasks 29–32 — estimate on new schema | **29–32** ✅ |
-| **04 — Estimates** | Wave 4e backbone alignment | **complete** ([task 32](./docs/tasks/32-estimate-wave-4e.md)) |
-| **04 — Estimates** | Wave 4c′ quote geography | **next** (no task file yet) |
-| **04 — Estimates** | Wave 4b win → job | planned |
-| **03 — Catalog** | Wave 3a parts | **complete** ([task 24](./docs/tasks/24-part-wave-3a.md)); 3b `item_*` after estimate 4e |
-| **03 — Catalog** | Task 25 manufacturer | **paused** — resume after 4c′/4b or parallel |
+| **Catalog / scope** | Task 37b apply `033` | **complete** ([37b](./docs/tasks/37b-category-scope-migration-apply.md)) |
+| **02 — Sites** | Task 37c scopes & zones DAL/UI | **complete** ([37c](./docs/tasks/37c-site-scopes-zones.md)) |
+| **03 — Catalog** | Task 37d2 spec inheritance | **complete** ([37d2](./docs/tasks/37d2-category-spec-inheritance.md)) |
+| **04 — Estimates** | Task 37f line costing | **active** — next ([37f](./docs/tasks/37f-estimate-line-costing.md)) |
+| **Cross-cutting** | Task 38 master-detail chrome | **complete** ([38](./docs/tasks/38-master-detail-chrome.md)) |
+| **Cross-cutting** | Task 39 toolbar chrome slots | **complete** ([39](./docs/tasks/39-toolbar-chrome-slots.md)) |
+| **04 — Estimates** | Task 33 site anchor | **complete** ([task 33](./docs/tasks/33-estimate-site-anchor.md)) |
+| **04 — Estimates** | Task 37e scope tab | **complete** ([37e](./docs/tasks/37e-estimate-scope-tab.md)) |
+| **02 — Sites** | Tasks 34–36 geography UI | **complete** (superseded at DDL by 37a — refactor in 37c ✅) |
+| **03 — Catalog** | Wave 3a parts | **complete** ([task 24](./docs/tasks/24-part-wave-3a.md)) |
 | **05 — Jobs** | Wave 5a shell | **complete** ([task 23](./docs/tasks/23-job-wave-5a.md)) |
-| [02 — Sites](./docs/tasks/01-task-index.md#task-20--ui-discovery) | Sites CRM slice | complete (legacy geography DDL) |
 
-## Estimate finish chain
+## Estimate / scope finish chain
 
 ```text
-29 DBML pass ✅  →  30 surfaces review ✅  →  31 migrations + seeds ✅  →  32 estimate 4e ✅  →  4c′ / 4b
+37a ✅  →  37b ✅  →  37c site ✅  →  37d catalog ✅  →  37e scope tab ✅  →  37d2 spec inheritance ✅  →  37f estimate lines
 ```
 
-Planning source: [`planning/09-migration-notes.md`](./docs/planning/09-migration-notes.md) — formalized as tasks **29–32**.
+Planning: [`11-categories-scope-model.md`](./docs/planning/11-categories-scope-model.md) · Migration: [`033-category-scope-plan.md`](./docs/migrations/033-category-scope-plan.md) · [`035-estimate-zone-plan.md`](./docs/migrations/035-estimate-zone-plan.md) · [`036-category-spec-exclude-plan.md`](./docs/migrations/036-category-spec-exclude-plan.md)
 
 ## Recently completed
 
-- **Task 32 — Estimate wave 4e (stop gate)** — tree line editor (`EstimateLineTreeTable`); `systems` + nested specs; backbone `line_items`; job line DAL `site_area_id`/`site_asset_id`; `codegen:check` + build pass (2026-06-29).
-- **Task 32 step 7 — System specs in expanded row** — `EstimateSystemSpecFields` (enum/boolean/text); specs child row in tree table; catalog picker + GET include spec def options (2026-06-29).
-- **Task 32 step 6 — Tree line editor UI** — `EstimateLineTreeTable` + `estimate-line-tree.ts` helpers; catalog system picker API; `EstimateDetailForm` wires `systems` + backbone `line_items` PATCH (2026-06-29).
-- **Task 32 step 5 — Job line DAL** — `job-lines*` + `job-detail` descriptor: `site_area_id` / `site_asset_id`; dropped `site_location` references (2026-06-29).
-- **Task 32 step 4 — Estimate DAL write** — `estimate-systems-write.ts` replace-array + nested specs; `estimate-lines-write.ts` backbone columns; `replaceEstimateCollectionsTx` orchestrates systems → lines in one transaction (2026-06-29). — shipped + applied `028`–`031` (catalog `system`/specs/phase templates, site as-built rename + backfill, `estimate_system` + spec tables, agreed dev seeds) to dev DB; legacy `site_section`/`site_location`/`estimate_section` dropped (2026-06-29).
-- **Task 30 — Backbone surfaces review** — impact matrix, `codegen:check` pass, schema README coverage refresh; estimate path to 32 confirmed (2026-06-29).
-- **Task 29 — Backbone DBML pass** — `current.dbml` amended per planning/09-migration-notes (site_area/asset, estimate_system, scope_phase, catalog system/specs); task file + index (2026-06-29).
-- **Task 28 — Employee detail (stop gate)** — provision retrofit verified; `codegen:check` passed (2026-06-25).
-- **Task 23 — job wave 5a** — job shell + Overview (2026-06-24).
-- **Task 22 — estimate wave 4a** — flat production `/estimates` on legacy schema (2026-06-23).
+- **Task 37d2 — Category spec inheritance** — migration `036_category_spec_exclude.sql`; `effectiveParticipation` / `scopePanelDefs` DAL; inherited + include − exclude UI; estimate scope panel subtree union; PATCH rejects orphan `spec_def_id` (2026-07-02).
+- **Task 37e — Estimate scope tab** — migration `035_estimate_zone.sql`; `scopes` + `site_tree` DAL; Scope tab checkboxes + spec panel; line tree scope parents; retired catalog system picker (2026-07-02).
+- **Task 39 — Toolbar chrome / category New child fix** — `MasterDetailSelectionContext` + ref-backed `resolveChildParentId`; tree highlight `selectedId ?? selectedFromRoute`; docs amended (2026-07-02).
+- **Task 38 — Master-detail chrome** — shared toolbar host + form chrome; route flatten for sites, parts, jobs, estimates, employees, manufacturers, categories; list scaffolding (`SurfaceListTable`, `useSurfaceListSearch`); categories Track B (New dropdown, draft create) (2026-07-01).
+- **Task 37d — Category catalog DAL + surfaces** — `category_list` / `category_detail`; tree list pane; spec_def / category_spec_def DAL; `/categories` UI; `GET /api/categories/roots` (2026-07-01).
 
 ## Pointers
 
-- [Task 32 — estimate 4e](./docs/tasks/32-estimate-wave-4e.md) · [Task 31 — migrations](./docs/tasks/31-estimate-backbone-migrations.md)
-- [Task 30 — surfaces review](./docs/tasks/30-backbone-surfaces-review.md) · [Task 29 — DBML pass](./docs/tasks/29-backbone-dbml-pass.md)
-- [Planning 09-migration-notes](./docs/planning/09-migration-notes.md) · [Planning 02-estimates](./docs/planning/02-estimates.md)
-- [Estimate spec](./docs/surface-specs/estimate.md) · [Schema DBML](./docs/schema/current.dbml)
-- [Task 25 — manufacturer](./docs/tasks/25-manufacturer-detail.md) (paused)
+- [Task 37f — estimate line costing](./docs/tasks/37f-estimate-line-costing.md) *(TBD)*
+- [Task 37d2 — category spec inheritance](./docs/tasks/37d2-category-spec-inheritance.md)
+- [Task 37e — estimate scope tab](./docs/tasks/37e-estimate-scope-tab.md)
+- [Planning 11 — categories scope model](./docs/planning/11-categories-scope-model.md)
+- [Migration 036 plan](./docs/migrations/036-category-spec-exclude-plan.md)
+- [Migration 035 plan](./docs/migrations/035-estimate-zone-plan.md)
+- [Migration 033 plan](./docs/migrations/033-category-scope-plan.md) · [Schema DBML](./docs/schema/current.dbml)

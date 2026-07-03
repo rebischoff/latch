@@ -59,12 +59,12 @@ const hasLineItemsPatch = (body: unknown): boolean => {
   return (body as { line_items?: unknown }).line_items !== undefined;
 };
 
-const hasSystemsPatch = (body: unknown): boolean => {
+const hasScopesPatch = (body: unknown): boolean => {
   if (typeof body !== "object" || body === null) {
     return false;
   }
 
-  return (body as { systems?: unknown }).systems !== undefined;
+  return (body as { scopes?: unknown }).scopes !== undefined;
 };
 
 const assertCollectionsPatchAllowed = (status: string, body: unknown): void => {
@@ -72,8 +72,8 @@ const assertCollectionsPatchAllowed = (status: string, body: unknown): void => {
     return;
   }
 
-  if (hasLineItemsPatch(body) || hasSystemsPatch(body)) {
-    throw new ConflictError("Cannot modify line items or systems on a won estimate");
+  if (hasLineItemsPatch(body) || hasScopesPatch(body)) {
+    throw new ConflictError("Cannot modify line items or scopes on a won estimate");
   }
 };
 
@@ -119,7 +119,7 @@ export const extendEstimateDetailDal = (
     const actorId = await getActorId();
     await insertEstimate(pool, actorId, writeRow, {
       stakeholders: input.stakeholders,
-      systems: input.systems,
+      scopes: input.scopes,
       line_items: input.line_items,
     });
 
@@ -127,8 +127,8 @@ export const extendEstimateDetailDal = (
     if (input.stakeholders !== undefined) {
       fieldIds.push("stakeholders");
     }
-    if (input.systems !== undefined) {
-      fieldIds.push("systems");
+    if (input.scopes !== undefined) {
+      fieldIds.push("scopes");
     }
     if (input.line_items !== undefined) {
       fieldIds.push("line_items");

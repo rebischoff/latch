@@ -1,6 +1,6 @@
 # Estimates
 
-> **Status:** Planning (2026-06-27). **C2 locked.** Amends [`decisions/estimate.md`](../decisions/estimate.md).
+> **Status:** Planning (2026-06-27). **Amended 2026-06-30:** category-only scope supersedes 4c′ `estimate_area` snapshots — see [11-categories-scope-model.md](./11-categories-scope-model.md).
 
 ### Decision: quote geography — estimate-owned tree, reconcile at win (2026-06-29)
 

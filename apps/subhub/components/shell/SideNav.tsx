@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  ApartmentOutlined,
   BuildOutlined,
   ContactsOutlined,
   EnvironmentOutlined,
@@ -37,6 +38,7 @@ const NAV_ICONS: Record<NavIcon, ReactNode> = {
   estimate: <FileTextOutlined />,
   job: <ProjectOutlined />,
   part: <TagOutlined />,
+  category: <ApartmentOutlined />,
   menu: null,
   login: null,
   logout: null,

@@ -1,6 +1,5 @@
 "use client";
 
-import { DeleteOutlined, SaveOutlined, UndoOutlined } from "@ant-design/icons";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   fieldAllows,
@@ -11,7 +10,7 @@ import {
 } from "@latch/contracts";
 import { App, Typography } from "antd";
 import { notFound, usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useMemo, useRef } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import { useForm, type Resolver } from "react-hook-form";
 import { z } from "zod";
 
@@ -21,7 +20,7 @@ import { InputNumberInput } from "@/components/form/InputNumberInput";
 import { LinkedSelectInput } from "@/components/form/LinkedSelectInput";
 import { TextAreaInput } from "@/components/form/TextAreaInput";
 import { TextInput } from "@/components/form/TextInput";
-import { useRegisterSurfaceActions } from "@/components/shell/SurfaceActionsProvider";
+import { useSurfaceFormChrome } from "@/components/surface/SurfaceFormChromeContext";
 import { SurfaceFormLayout } from "@/components/surface/SurfaceFormLayout";
 import { SurfaceFormRoot } from "@/components/surface/SurfaceFormRoot";
 import {
@@ -40,6 +39,11 @@ import {
 } from "@/lib/parts/descriptors/part-detail";
 import { routes } from "@/lib/nav-routes";
 import { buildPickerCreateUrl, parseReturnContext } from "@/lib/picker-return-context";
+import {
+  navigateAfterCreate,
+  navigateOnCancel,
+  sanitizeReturnTo,
+} from "@/lib/surface-navigation";
 import { SurfaceApiError } from "@/lib/surface-api";
 
 type PartDetailFormProps = {
@@ -292,94 +296,142 @@ export const PartDetailForm = ({
   const showAddManufacturer =
     canCreateManufacturer && fieldAllows(activeManifest, "profile", "write");
 
-  const onSave = form.handleSubmit(async (values) => {
-    const pricingRows = values.vendor_pricing ?? [];
+  const persistPart = useCallback(
+    async (values: PartDetailFormValues, afterCreate: "detail" | "reset") => {
+      const pricingRows = values.vendor_pricing ?? [];
 
-    if (
-      fieldAllows(activeManifest, "vendor_pricing", "write") &&
-      !validateVendorPricingDuplicates(pricingRows, form.setError)
-    ) {
-      message.error("Fix duplicate vendor pricing before saving");
-      return;
-    }
-
-    const body: Record<string, unknown> = {
-      profile: normalizeProfileBody(values.profile),
-    };
-
-    if (fieldAllows(activeManifest, "vendor_pricing", "write")) {
-      body.vendor_pricing = normalizeVendorPricingBody(pricingRows);
-    }
-
-    try {
-      if (isCreate) {
-        const result = await create.mutateAsync(body);
-        const newId = String(result.data.id);
-        message.success("Part created");
-        router.replace(routes.parts.detail(newId));
-        router.refresh();
+      if (
+        fieldAllows(activeManifest, "vendor_pricing", "write") &&
+        !validateVendorPricingDuplicates(pricingRows, form.setError)
+      ) {
+        message.error("Fix duplicate vendor pricing before saving");
         return;
       }
 
-      await patch.mutateAsync(body);
-      message.success("Part saved");
-    } catch (saveError) {
-      if (saveError instanceof SurfaceApiError) {
-        if (saveError.status === 409) {
-          message.error(saveError.message || "MPN already exists for this manufacturer");
-          return;
-        }
+      const body: Record<string, unknown> = {
+        profile: normalizeProfileBody(values.profile),
+      };
 
-        const details = saveError.details as
-          | {
-              field?: string;
-              code?: string;
-              vendor_party_id?: string;
-              vendor_pn?: string;
-            }
-          | undefined;
-
-        if (details?.field === "vendor_pricing" && details.code === "duplicate") {
-          pricingRows.forEach((row, index) => {
-            if (
-              row.vendor_party_id === details.vendor_party_id &&
-              row.vendor_pn === details.vendor_pn
-            ) {
-              form.setError(`vendor_pricing.${index}.vendor_pn`, {
-                message: "This vendor part number already exists on the part",
-              });
-            }
-          });
-          message.error("Fix duplicate vendor pricing before saving");
-          return;
-        }
-
-        if (details?.field === "vendor_pricing" && details.code === "duplicate_vendor_pn") {
-          pricingRows.forEach((row, index) => {
-            if (
-              row.vendor_party_id === details.vendor_party_id &&
-              row.vendor_pn === details.vendor_pn
-            ) {
-              form.setError(`vendor_pricing.${index}.vendor_pn`, {
-                message: "Vendor part number already exists for this vendor",
-              });
-            }
-          });
-          message.error(saveError.message || "Vendor part number already exists");
-          return;
-        }
+      if (fieldAllows(activeManifest, "vendor_pricing", "write")) {
+        body.vendor_pricing = normalizeVendorPricingBody(pricingRows);
       }
 
-      message.error(isCreate ? "Unable to create part" : "Unable to save part");
-    }
-  });
+      try {
+        if (isCreate) {
+          const result = await create.mutateAsync(body);
+          const newId = String(result.data.id);
+          message.success("Part created");
 
-  const onRevert = () => {
+          if (afterCreate === "reset") {
+            form.reset(buildDefaultValues(undefined, true));
+            return;
+          }
+
+          if (pickerReturn.returnField && returnTo) {
+            navigateAfterCreate(router, {
+              returnTo: sanitizeReturnTo(returnTo, routes.parts.list),
+              returnField: pickerReturn.returnField,
+              newId,
+              fallbackList: routes.parts.list,
+              fallbackDetail: routes.parts.detail,
+            });
+            return;
+          }
+
+          router.replace(routes.parts.detail(newId));
+          router.refresh();
+          return;
+        }
+
+        await patch.mutateAsync(body);
+        message.success("Part saved");
+      } catch (saveError) {
+        if (saveError instanceof SurfaceApiError) {
+          if (saveError.status === 409) {
+            message.error(saveError.message || "MPN already exists for this manufacturer");
+            return;
+          }
+
+          const details = saveError.details as
+            | {
+                field?: string;
+                code?: string;
+                vendor_party_id?: string;
+                vendor_pn?: string;
+              }
+            | undefined;
+
+          if (details?.field === "vendor_pricing" && details.code === "duplicate") {
+            pricingRows.forEach((row, index) => {
+              if (
+                row.vendor_party_id === details.vendor_party_id &&
+                row.vendor_pn === details.vendor_pn
+              ) {
+                form.setError(`vendor_pricing.${index}.vendor_pn`, {
+                  message: "This vendor part number already exists on the part",
+                });
+              }
+            });
+            message.error("Fix duplicate vendor pricing before saving");
+            return;
+          }
+
+          if (details?.field === "vendor_pricing" && details.code === "duplicate_vendor_pn") {
+            pricingRows.forEach((row, index) => {
+              if (
+                row.vendor_party_id === details.vendor_party_id &&
+                row.vendor_pn === details.vendor_pn
+              ) {
+                form.setError(`vendor_pricing.${index}.vendor_pn`, {
+                  message: "Vendor part number already exists for this vendor",
+                });
+              }
+            });
+            message.error(saveError.message || "Vendor part number already exists");
+            return;
+          }
+        }
+
+        message.error(isCreate ? "Unable to create part" : "Unable to save part");
+      }
+    },
+    [activeManifest, create, form, isCreate, message, patch, pickerReturn.returnField, returnTo, router],
+  );
+
+  const onSave = form.handleSubmit((values) => persistPart(values, "detail"));
+
+  const onSaveAndNew = useMemo(
+    () =>
+      isCreate && !pickerReturn.returnField
+        ? form.handleSubmit((values) => persistPart(values, "reset"))
+        : undefined,
+    [form, isCreate, persistPart, pickerReturn.returnField],
+  );
+
+  const onCancel = useCallback(() => {
+    const navigate = () => {
+      navigateOnCancel(router, returnTo, routes.parts.list);
+    };
+
+    if (isDirty) {
+      modal.confirm({
+        title: "Leave without saving?",
+        content: "Unsaved changes will be lost.",
+        okText: "Leave",
+        onOk: navigate,
+      });
+      return;
+    }
+
+    navigate();
+  }, [isDirty, modal, returnTo, router]);
+
+  const onRevert = useCallback(() => {
     form.reset(defaultValues);
     message.info("Reverted to last loaded values");
-  };
+  }, [defaultValues, form, message]);
 
-  const onDelete = () => {
+  const onDelete = useCallback(() => {
     modal.confirm({
       title: "Delete part?",
       content: "This permanently removes the part and its vendor pricing.",
@@ -401,59 +453,21 @@ export const PartDetailForm = ({
         }
       },
     });
-  };
+  }, [message, modal, remove, router]);
 
-  const toolbarActions = useMemo(
-    () => [
-      {
-        key: "save",
-        label: "Save",
-        icon: <SaveOutlined />,
-        priority: "primary" as const,
-        surfaceAction: "write" as const,
-        disabled: !canSave || (!isCreate && !isDirty),
-        loading: saving,
-        onClick: onSave,
-      },
-      ...(isCreate
-        ? []
-        : [
-            {
-              key: "revert",
-              label: "Revert",
-              icon: <UndoOutlined />,
-              priority: "secondary" as const,
-              surfaceAction: "write" as const,
-              disabled: !isDirty || saving,
-              onClick: onRevert,
-            },
-            {
-              key: "delete",
-              label: "Delete",
-              icon: <DeleteOutlined />,
-              priority: "secondary" as const,
-              surfaceAction: "delete" as const,
-              danger: true,
-              disabled: !canDelete,
-              loading: remove.isPending,
-              onClick: onDelete,
-            },
-          ]),
-    ],
-    [
-      canDelete,
-      canSave,
-      isCreate,
-      isDirty,
-      onDelete,
-      onRevert,
-      onSave,
-      remove.isPending,
-      saving,
-    ],
-  );
-
-  useRegisterSurfaceActions(activeManifest, toolbarActions);
+  useSurfaceFormChrome({
+    mode: isCreate ? "create" : "edit",
+    manifest: activeManifest,
+    canSave,
+    saving,
+    onSave,
+    isDirty,
+    canDelete,
+    onDelete: isCreate ? undefined : onDelete,
+    onRevert: isCreate ? undefined : onRevert,
+    onCancel: isCreate ? onCancel : undefined,
+    onSaveAndNew,
+  });
 
   if (!isCreate && error instanceof SurfaceApiError && error.status === 404) {
     notFound();

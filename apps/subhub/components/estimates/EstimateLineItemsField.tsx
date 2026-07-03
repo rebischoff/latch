@@ -3,10 +3,10 @@ export {
   type EstimateLineFormRow,
   type EstimateLineKind,
   type EstimateLineRole,
-  type EstimateSystemFormRow,
+  type EstimateScopeFormRow,
 } from "@/components/estimates/EstimateLineTreeTable";
 
 export type EstimateLineItemsFormValues = {
-  systems: import("@/components/estimates/estimate-line-tree").EstimateSystemFormRow[];
+  scopes: import("@/components/estimates/estimate-line-tree").EstimateScopeFormRow[];
   line_items: import("@/components/estimates/estimate-line-tree").EstimateLineFormRow[];
 };

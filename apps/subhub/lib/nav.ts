@@ -15,6 +15,7 @@ export type NavIcon =
   | "estimate"
   | "job"
   | "part"
+  | "category"
   | "menu"
   | "login"
   | "logout";
@@ -205,5 +206,13 @@ export const SURFACE_NAV_CATALOG: SurfaceNavEntry[] = [
     label: "Parts",
     group: "Catalog",
     icon: "part",
+  },
+  {
+    surfaceId: "category_list",
+    href: "/categories",
+    navKey: "/categories",
+    label: "Categories",
+    group: "Catalog",
+    icon: "category",
   },
 ];

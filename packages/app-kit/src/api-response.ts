@@ -1,4 +1,5 @@
 import {
+  ConflictError,
   isLatchError,
   ValidationError,
   type Manifest,
@@ -29,7 +30,10 @@ export const mapLatchError = (error: unknown): Response => {
       },
     };
 
-    if (error instanceof ValidationError && error.details !== undefined) {
+    if (
+      (error instanceof ValidationError || error instanceof ConflictError) &&
+      error.details !== undefined
+    ) {
       body.error.details = error.details;
     }
 

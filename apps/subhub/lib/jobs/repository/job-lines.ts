@@ -25,7 +25,7 @@ export const loadJobLineItems = async (
        jl.unit,
        jl.unit_cost,
        jl.unit_price,
-       jl.site_area_id,
+       jl.site_zone_id,
        jl.site_asset_id,
        jl.phase_id,
        jl.item_id,

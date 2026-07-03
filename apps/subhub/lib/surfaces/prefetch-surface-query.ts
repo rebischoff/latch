@@ -174,6 +174,23 @@ export const resolveSiteDetailLinkAccess = async (): Promise<boolean> => {
   }
 };
 
+/** Whether the principal may create a site from a linked picker (e.g. estimate). */
+export const resolveSiteCreateAccess = async (): Promise<boolean> => {
+  if (!("site_detail" in subhubRegistry)) {
+    return false;
+  }
+
+  try {
+    const { manifest } = await resolveContext({
+      surfaceId: "site_detail",
+      entityId: "new",
+    });
+    return surfaceAllows(manifest, "write");
+  } catch {
+    return false;
+  }
+};
+
 /** Whether the principal may navigate to `estimate_detail` from job profile. */
 export const resolveEstimateDetailLinkAccess = async (): Promise<boolean> => {
   try {

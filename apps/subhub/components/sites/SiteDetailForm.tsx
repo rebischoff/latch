@@ -1,6 +1,5 @@
 "use client";
 
-import { DeleteOutlined, SaveOutlined } from "@ant-design/icons";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   narrowPatchSchema,
@@ -9,11 +8,12 @@ import {
   fieldAllows,
   type Manifest,
 } from "@latch/contracts";
-import { App, Space, Typography } from "antd";
+import { App, Space, Tabs, Typography } from "antd";
 import Link from "next/link";
 import { notFound, useRouter } from "next/navigation";
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { useForm, type Resolver } from "react-hook-form";
+import { z } from "zod";
 
 import { FormSection } from "@/components/form/FormSection";
 import { SURFACE_FORM_MAX_WIDTH } from "@/components/form/formLayout";
@@ -24,15 +24,27 @@ import {
   validateSiteContactDuplicates,
   type SiteContactFormRow,
 } from "@/components/sites/SiteContactFields";
-import { useRegisterSurfaceActions } from "@/components/shell/SurfaceActionsProvider";
+import { SiteScopesZonesTree } from "@/components/sites/SiteScopesZonesTree";
+import {
+  stripScopesForPatch,
+  type SiteScopeFormRow,
+  type SiteScopesFormValues,
+  type SiteZoneFormRow,
+} from "@/components/sites/site-scopes-tree";
 import { SurfaceFormLayout } from "@/components/surface/SurfaceFormLayout";
+import { useSurfaceFormChrome } from "@/components/surface/SurfaceFormChromeContext";
 import { SurfaceFormRoot } from "@/components/surface/SurfaceFormRoot";
 import { useSurfaceListCreate } from "@/lib/hooks/use-surface-list-create";
 import { useSurfaceDetail } from "@/lib/hooks/use-surface-detail";
 import { useSurfaceDelete, useSurfacePatch } from "@/lib/hooks/use-surface-patch";
 import { useSitePartyPicker } from "@/lib/hooks/use-site-party-picker";
 import { routes } from "@/lib/nav-routes";
-import { SiteDetailPatchSchema } from "@/lib/sites/descriptors";
+import {
+  navigateAfterCreate,
+  navigateOnCancel,
+  sanitizeReturnTo,
+} from "@/lib/surface-navigation";
+import { SiteDetailCreateSchema, SiteDetailPatchSchema } from "@/lib/sites/descriptors";
 import type { SiteHubLinkAccess } from "@/lib/surfaces/prefetch-surface-query";
 import { SurfaceApiError } from "@/lib/surface-api";
 
@@ -40,9 +52,11 @@ type SiteDetailFormProps = {
   siteId: string;
   manifest: Manifest;
   hubLinks: SiteHubLinkAccess;
+  returnTo?: string | null;
+  returnField?: string | null;
 };
 
-type SiteDetailFormValues = {
+type SiteDetailFormValues = SiteScopesFormValues & {
   profile: {
     name: string;
   };
@@ -53,6 +67,48 @@ type SiteDetailFormValues = {
     property_owner_party_id: string | null;
   };
   contacts: SiteContactFormRow[];
+};
+
+const mapZones = (rows: unknown): SiteZoneFormRow[] => {
+  if (!Array.isArray(rows)) {
+    return [];
+  }
+
+  const mapNested = (items: unknown[]): SiteZoneFormRow[] =>
+    items.map((row, index) => {
+      const item = row as Record<string, unknown>;
+      return {
+        id: typeof item.id === "string" ? item.id : crypto.randomUUID(),
+        name: typeof item.name === "string" ? item.name : "",
+        sort_order: typeof item.sort_order === "number" ? item.sort_order : index + 1,
+        status: typeof item.status === "string" ? item.status : "active",
+        can_delete: item.can_delete !== false,
+        zones: Array.isArray(item.zones) ? mapNested(item.zones) : [],
+      };
+    });
+
+  return mapNested(rows);
+};
+
+const mapScopes = (rows: unknown): SiteScopeFormRow[] => {
+  if (!Array.isArray(rows)) {
+    return [];
+  }
+
+  return rows.map((row, index) => {
+    const item = row as Record<string, unknown>;
+    return {
+      id: typeof item.id === "string" ? item.id : crypto.randomUUID(),
+      root_category_id: typeof item.root_category_id === "string" ? item.root_category_id : "",
+      root_category_name:
+        typeof item.root_category_name === "string" ? item.root_category_name : "",
+      name: typeof item.name === "string" ? item.name : "",
+      sort_order: typeof item.sort_order === "number" ? item.sort_order : index + 1,
+      status: typeof item.status === "string" ? item.status : "active",
+      can_delete: item.can_delete !== false,
+      zones: mapZones(item.zones),
+    };
+  });
 };
 
 const mapContacts = (rows: unknown): SiteContactFormRow[] => {
@@ -97,6 +153,8 @@ const buildDefaultValues = (
       property_owner_party_id: propertyOwnerParty?.property_owner_party_id ?? null,
     },
     contacts: mapContacts(data?.contacts),
+    scopes: mapScopes(data?.scopes),
+    general_zones: mapZones(data?.general_zones),
   };
 };
 
@@ -146,6 +204,8 @@ export const SiteDetailForm = ({
   siteId,
   manifest,
   hubLinks,
+  returnTo = null,
+  returnField = null,
 }: SiteDetailFormProps) => {
   const isCreate = siteId === "new";
   const router = useRouter();
@@ -180,14 +240,30 @@ export const SiteDetailForm = ({
     [detail?.data, isCreate],
   );
 
-  const resolver = zodResolver(
-    narrowPatchSchema(SiteDetailPatchSchema, activeManifest),
-  );
+  const resolver = useMemo(() => {
+    const baseSchema = (isCreate
+      ? SiteDetailCreateSchema
+      : SiteDetailPatchSchema) as z.ZodObject<z.ZodRawShape>;
+
+    // Server enforces strict collection schemas; form rows carry display-only keys.
+    const narrowed = narrowPatchSchema(baseSchema, activeManifest) as z.ZodObject<z.ZodRawShape>;
+    const loosened = narrowed.extend({
+      contacts: z.array(z.object({}).passthrough()).optional(),
+      scopes: z.array(z.object({}).passthrough()).optional(),
+      general_zones: z.array(z.object({}).passthrough()).optional(),
+    });
+
+    return zodResolver(loosened);
+  }, [activeManifest, isCreate]);
 
   const form = useForm<SiteDetailFormValues>({
     resolver: resolver as unknown as Resolver<SiteDetailFormValues>,
     defaultValues,
   });
+
+  const {
+    formState: { isDirty },
+  } = form;
 
   const customerOptions = useMemo(() => {
     const options = partyPickerOptions(customerPicker?.data.rows);
@@ -225,75 +301,162 @@ export const SiteDetailForm = ({
   const canDelete = !isCreate && surfaceAllows(activeManifest, "delete");
   const saving = patch.isPending || create.isPending;
 
-  const onSave = form.handleSubmit(async (values) => {
-    const contacts = values.contacts as SiteContactFormRow[];
+  const persistSite = useCallback(
+    async (values: SiteDetailFormValues, afterCreate: "detail" | "reset") => {
+      const contacts = values.contacts as SiteContactFormRow[];
 
-    if (
-      fieldAllows(activeManifest, "contacts", "write") &&
-      !validateSiteContactDuplicates(contacts, form.setError)
-    ) {
-      message.error("Fix duplicate standing contacts before saving");
-      return;
-    }
-
-    const body: Record<string, unknown> = {
-      profile: values.profile,
-      customer_party: values.customer_party,
-      property_owner_party: values.property_owner_party,
-    };
-
-    if (fieldAllows(activeManifest, "contacts", "write")) {
-      body.contacts = contacts.map((row) => ({
-        ...(row.id ? { id: row.id } : {}),
-        party_id: row.party_id,
-        relation_id: row.relation_id,
-      }));
-    }
-
-    try {
-      if (isCreate) {
-        const result = await create.mutateAsync(body);
-        const newId = String(result.data.id);
-        message.success("Site created");
-        router.replace(routes.sites.detail(newId));
-        router.refresh();
+      if (
+        fieldAllows(activeManifest, "contacts", "write") &&
+        !validateSiteContactDuplicates(contacts, form.setError)
+      ) {
+        message.error("Fix duplicate standing contacts before saving");
         return;
       }
 
-      await patch.mutateAsync(body);
-      message.success("Site saved");
-    } catch (error) {
-      if (error instanceof SurfaceApiError) {
-        const details = error.details as
-          | {
-              field?: string;
-              code?: string;
-              party_id?: string;
-              relation_id?: string;
-            }
-          | undefined;
+      const body: Record<string, unknown> = {
+        profile: values.profile,
+        customer_party: values.customer_party,
+        property_owner_party: values.property_owner_party,
+      };
 
-        if (details?.field === "contacts" && details.code === "duplicate") {
-          contacts.forEach((row, index) => {
-            if (
-              row.party_id === details.party_id &&
-              row.relation_id === details.relation_id
-            ) {
-              form.setError(`contacts.${index}.relation_id`, {
-                message: "This party already has this relation on the site",
-              });
-            }
-          });
-          message.error("Fix duplicate standing contacts before saving");
-          return;
+      if (fieldAllows(activeManifest, "contacts", "write")) {
+        body.contacts = contacts.map((row) => ({
+          ...(row.id ? { id: row.id } : {}),
+          party_id: row.party_id,
+          relation_id: row.relation_id,
+        }));
+      }
+
+      if (
+        !isCreate &&
+        (fieldAllows(activeManifest, "scopes", "write") ||
+          fieldAllows(activeManifest, "general_zones", "write"))
+      ) {
+        const scopesPatch = stripScopesForPatch({
+          scopes: values.scopes,
+          general_zones: values.general_zones,
+        });
+
+        if (fieldAllows(activeManifest, "scopes", "write")) {
+          body.scopes = scopesPatch.scopes;
+        }
+
+        if (fieldAllows(activeManifest, "general_zones", "write")) {
+          body.general_zones = scopesPatch.general_zones;
         }
       }
 
-      message.error(isCreate ? "Unable to create site" : "Unable to save site");
-    }
-  });
+      try {
+        if (isCreate) {
+          const result = await create.mutateAsync(body);
+          const newId = String(result.data.id);
+          message.success("Site created");
 
-  const onDelete = () => {
+          if (afterCreate === "reset") {
+            form.reset(buildDefaultValues(undefined));
+            return;
+          }
+
+          if (returnField && returnTo) {
+            navigateAfterCreate(router, {
+              returnTo: sanitizeReturnTo(returnTo, routes.sites.list),
+              returnField,
+              newId,
+              fallbackList: routes.sites.list,
+              fallbackDetail: routes.sites.detail,
+            });
+            return;
+          }
+
+          router.replace(routes.sites.detail(newId));
+          router.refresh();
+          return;
+        }
+
+        await patch.mutateAsync(body);
+        message.success("Site saved");
+      } catch (saveError) {
+        if (saveError instanceof SurfaceApiError) {
+          const details = saveError.details as
+            | {
+                field?: string;
+                code?: string;
+                party_id?: string;
+                relation_id?: string;
+              }
+            | undefined;
+
+          if (details?.field === "contacts" && details.code === "duplicate") {
+            contacts.forEach((row, index) => {
+              if (
+                row.party_id === details.party_id &&
+                row.relation_id === details.relation_id
+              ) {
+                form.setError(`contacts.${index}.relation_id`, {
+                  message: "This party already has this relation on the site",
+                });
+              }
+            });
+            message.error("Fix duplicate standing contacts before saving");
+            return;
+          }
+
+          if (
+            (details?.field === "scopes" || details?.field === "general_zones") &&
+            details.code === "referenced"
+          ) {
+            message.error(
+              "Cannot delete scopes or zones referenced by estimates, jobs, or assets",
+            );
+            return;
+          }
+        }
+
+        message.error(isCreate ? "Unable to create site" : "Unable to save site");
+      }
+    },
+    [
+      activeManifest,
+      create,
+      form,
+      isCreate,
+      message,
+      patch,
+      returnField,
+      returnTo,
+      router,
+    ],
+  );
+
+  const onSave = form.handleSubmit((values) => persistSite(values, "detail"));
+
+  const onSaveAndNew = useMemo(
+    () =>
+      isCreate && !returnField
+        ? form.handleSubmit((values) => persistSite(values, "reset"))
+        : undefined,
+    [form, isCreate, persistSite, returnField],
+  );
+
+  const onCancel = useCallback(() => {
+    const navigate = () => {
+      navigateOnCancel(router, returnTo, routes.sites.list);
+    };
+
+    if (isDirty) {
+      modal.confirm({
+        title: "Leave without saving?",
+        content: "Unsaved changes will be lost.",
+        okText: "Leave",
+        onOk: navigate,
+      });
+      return;
+    }
+
+    navigate();
+  }, [isDirty, modal, returnTo, router]);
+
+  const onDelete = useCallback(() => {
     modal.confirm({
       title: "Delete site?",
       content: "This permanently removes the site.",
@@ -310,40 +473,20 @@ export const SiteDetailForm = ({
         }
       },
     });
-  };
+  }, [message, modal, remove, router]);
 
-  const toolbarActions = useMemo(
-    () => [
-      {
-        key: "save",
-        label: "Save",
-        icon: <SaveOutlined />,
-        priority: "primary" as const,
-        surfaceAction: "write" as const,
-        disabled: !canSave,
-        loading: saving,
-        onClick: onSave,
-      },
-      ...(isCreate
-        ? []
-        : [
-            {
-              key: "delete",
-              label: "Delete",
-              icon: <DeleteOutlined />,
-              priority: "secondary" as const,
-              surfaceAction: "delete" as const,
-              danger: true,
-              disabled: !canDelete,
-              loading: remove.isPending,
-              onClick: onDelete,
-            },
-          ]),
-    ],
-    [canDelete, canSave, isCreate, onDelete, onSave, remove.isPending, saving],
-  );
-
-  useRegisterSurfaceActions(activeManifest, toolbarActions);
+  useSurfaceFormChrome({
+    mode: isCreate ? "create" : "edit",
+    manifest: activeManifest,
+    canSave,
+    saving,
+    onSave,
+    isDirty,
+    canDelete,
+    onDelete,
+    onCancel: isCreate ? onCancel : undefined,
+    onSaveAndNew,
+  });
 
   if (!isCreate && error instanceof SurfaceApiError && error.status === 404) {
     notFound();
@@ -353,6 +496,79 @@ export const SiteDetailForm = ({
   const blocking = !isCreate && isFetching && Boolean(detail);
   const customerPartyId = form.watch("customer_party.customer_party_id");
   const propertyOwnerPartyId = form.watch("property_owner_party.property_owner_party_id");
+
+  const generalTab = (
+    <>
+      <FormSection title="Profile">
+        <TextInput<SiteDetailFormValues>
+          field="profile"
+          name="profile.name"
+          label="Name"
+        />
+      </FormSection>
+
+      <FormSection title="Portfolio">
+        <SelectInput<SiteDetailFormValues>
+          field="customer_party"
+          name="customer_party.customer_party_id"
+          label="Customer"
+          options={customerOptions}
+          selectProps={{ allowClear: true, showSearch: true, optionFilterProp: "label" }}
+        />
+        {customerPartyId ? (
+          <div style={{ marginBottom: 16 }}>
+            <Space>
+              <Typography.Text type="secondary">Open:</Typography.Text>
+              <PortfolioHubLink
+                partyId={customerPartyId}
+                displayName={customerParty?.customer_display_name}
+                href={routes.customers.detail(customerPartyId)}
+                canNavigate={hubLinks.customer}
+              />
+            </Space>
+          </div>
+        ) : null}
+
+        <SelectInput<SiteDetailFormValues>
+          field="property_owner_party"
+          name="property_owner_party.property_owner_party_id"
+          label="Property owner"
+          options={propertyOwnerOptions}
+          selectProps={{ allowClear: true, showSearch: true, optionFilterProp: "label" }}
+        />
+        {propertyOwnerPartyId ? (
+          <div style={{ marginBottom: 16 }}>
+            <Space>
+              <Typography.Text type="secondary">Open:</Typography.Text>
+              <PortfolioHubLink
+                partyId={propertyOwnerPartyId}
+                displayName={propertyOwnerParty?.property_owner_display_name}
+                href={routes.propertyOwners.detail(propertyOwnerPartyId)}
+                canNavigate={hubLinks.propertyOwner}
+              />
+            </Space>
+          </div>
+        ) : null}
+      </FormSection>
+
+      <SiteContactFields manifest={activeManifest} />
+    </>
+  );
+
+  const tabItems = [
+    { key: "general", label: "General", children: generalTab },
+    ...(!isCreate &&
+    (fieldAllows(activeManifest, "scopes", "read") ||
+      fieldAllows(activeManifest, "general_zones", "read"))
+      ? [
+          {
+            key: "scopes-zones",
+            label: "Scopes & zones",
+            children: <SiteScopesZonesTree manifest={activeManifest} />,
+          },
+        ]
+      : []),
+  ];
 
   return (
     <SurfaceFormRoot
@@ -370,59 +586,7 @@ export const SiteDetailForm = ({
             {isCreate ? "New site" : (profile?.name ?? "Site")}
           </Typography.Title>
 
-          <FormSection title="Profile">
-            <TextInput<SiteDetailFormValues>
-              field="profile"
-              name="profile.name"
-              label="Name"
-            />
-          </FormSection>
-
-          <FormSection title="Portfolio">
-            <SelectInput<SiteDetailFormValues>
-              field="customer_party"
-              name="customer_party.customer_party_id"
-              label="Customer"
-              options={customerOptions}
-              selectProps={{ allowClear: true, showSearch: true, optionFilterProp: "label" }}
-            />
-            {customerPartyId ? (
-              <div style={{ marginBottom: 16 }}>
-                <Space>
-                  <Typography.Text type="secondary">Open:</Typography.Text>
-                  <PortfolioHubLink
-                    partyId={customerPartyId}
-                    displayName={customerParty?.customer_display_name}
-                    href={routes.customers.detail(customerPartyId)}
-                    canNavigate={hubLinks.customer}
-                  />
-                </Space>
-              </div>
-            ) : null}
-
-            <SelectInput<SiteDetailFormValues>
-              field="property_owner_party"
-              name="property_owner_party.property_owner_party_id"
-              label="Property owner"
-              options={propertyOwnerOptions}
-              selectProps={{ allowClear: true, showSearch: true, optionFilterProp: "label" }}
-            />
-            {propertyOwnerPartyId ? (
-              <div style={{ marginBottom: 16 }}>
-                <Space>
-                  <Typography.Text type="secondary">Open:</Typography.Text>
-                  <PortfolioHubLink
-                    partyId={propertyOwnerPartyId}
-                    displayName={propertyOwnerParty?.property_owner_display_name}
-                    href={routes.propertyOwners.detail(propertyOwnerPartyId)}
-                    canNavigate={hubLinks.propertyOwner}
-                  />
-                </Space>
-              </div>
-            ) : null}
-          </FormSection>
-
-          <SiteContactFields manifest={activeManifest} />
+          {tabItems.length > 0 ? <Tabs items={tabItems} /> : null}
         </SurfaceFormLayout>
       </form>
     </SurfaceFormRoot>

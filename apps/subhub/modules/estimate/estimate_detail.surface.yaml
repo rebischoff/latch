@@ -16,8 +16,10 @@ surfaceActions:
 
 tables:
   - estimate
-  - estimate_system
-  - estimate_system_spec
+  - estimate_scope
+  - estimate_scope_spec
+  - estimate_zone
+  - estimate_zone_spec
   - estimate_line
   - estimate_party
   - job_party_relation
@@ -49,8 +51,8 @@ fields:
   - id: stakeholders
     # logical — DAL maps to estimate_party; see docs/child-collections.md
     columns: []
-  - id: systems
-    # logical — DAL maps to estimate_system + estimate_system_spec; see docs/child-collections.md
+  - id: scopes
+    # logical — DAL maps to estimate_scope + estimate_zone + specs; see docs/child-collections.md
     columns: []
   - id: line_items
     # logical — DAL maps to estimate_line; see docs/child-collections.md

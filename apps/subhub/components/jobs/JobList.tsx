@@ -1,13 +1,9 @@
 "use client";
 
-import { PlusOutlined } from "@ant-design/icons";
-import { type Manifest } from "@latch/contracts";
 import { Table, Typography } from "antd";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useMemo } from "react";
+import { usePathname } from "next/navigation";
 
-import { useRegisterSurfaceActions } from "@/components/shell/SurfaceActionsProvider";
 import { useSurfaceList } from "@/lib/hooks/use-surface-list";
 import { routes } from "@/lib/nav-routes";
 
@@ -17,39 +13,9 @@ type JobListSummary = {
   name?: string | null;
 };
 
-type JobListProps = {
-  createManifest: Manifest;
-};
-
-export const JobList = ({ createManifest }: JobListProps) => {
+export const JobList = () => {
   const pathname = usePathname();
-  const router = useRouter();
   const { data, isLoading, error } = useSurfaceList("job_list");
-
-  const onCreate = useCallback(() => {
-    router.push(routes.jobs.new);
-  }, [router]);
-
-  const onListRoute = pathname === routes.jobs.list;
-
-  const toolbarActions = useMemo(
-    () =>
-      onListRoute
-        ? [
-            {
-              key: "new",
-              label: "New",
-              icon: <PlusOutlined />,
-              priority: "secondary" as const,
-              surfaceAction: "write" as const,
-              onClick: onCreate,
-            },
-          ]
-        : [],
-    [onCreate, onListRoute],
-  );
-
-  useRegisterSurfaceActions(createManifest, toolbarActions);
 
   if (error) {
     return (

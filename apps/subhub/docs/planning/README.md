@@ -17,6 +17,9 @@
 3. [07-open-decisions.md](./07-open-decisions.md) — unresolved forks + glossary for planning questions
 4. [08-supersedes.md](./08-supersedes.md) — which prior decisions this plan amends
 5. [09-migration-notes.md](./09-migration-notes.md) — DBML / migration approach (D3) → tasks [29](../tasks/29-backbone-dbml-pass.md)–[32](../tasks/32-estimate-wave-4e.md)
+6. [11-categories-scope-model.md](./11-categories-scope-model.md) — **locked 2026-06-30** — category roots replace catalog `system` ([37a](../tasks/37a-category-scope-decision-dbml-migration.md))
+7. [12-master-detail-chrome.md](./12-master-detail-chrome.md) — **planning 2026-07-01** — shared toolbar + create navigation ([38](../tasks/38-master-detail-chrome.md)); categories create fix follows Layer 2
+8. [13-toolbar-chrome.md](./13-toolbar-chrome.md) — **planning 2026-07-02** — slot-based toolbar communication ([39](../tasks/39-toolbar-chrome-slots.md)); category New child parent id
 
 ## Locked at a glance (2026-06-27)
 

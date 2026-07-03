@@ -7,7 +7,7 @@ export const PICKER_RETURN_PARAMS = {
   selectedId: "selectedId",
 } as const;
 
-export type PickerTarget = "manufacturer";
+export type PickerTarget = "manufacturer" | "site";
 
 export type PickerReturnContext = {
   isCreate: boolean;
@@ -28,6 +28,7 @@ type SearchParamsLike = {
 
 const PICKER_TARGET_ROUTES: Record<PickerTarget, string> = {
   manufacturer: routes.manufacturers.new,
+  site: routes.sites.new,
 };
 
 export const appendQueryParam = (url: string, key: string, value: string): string => {

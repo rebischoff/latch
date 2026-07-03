@@ -19,7 +19,7 @@ const JobLineItemPatchElementSchema = z
     unit: z.string(),
     unit_cost: z.number(),
     unit_price: z.number(),
-    site_area_id: z.string().nullable().optional(),
+    site_zone_id: z.string().nullable().optional(),
     site_asset_id: z.string().nullable().optional(),
     phase_id: z.string().nullable().optional(),
     item_id: z.string().nullable().optional(),
@@ -107,7 +107,7 @@ export type JobLineItemRow = {
   part_id: string | null;
   phase_id: string | null;
   quantity: number;
-  site_area_id: string | null;
+  site_zone_id: string | null;
   site_asset_id: string | null;
   sort_order: number;
   source: string;

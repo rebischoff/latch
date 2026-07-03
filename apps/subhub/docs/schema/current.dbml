@@ -421,8 +421,8 @@ Table party_address {
 
 TableGroup site [color: #3498db] {
   site
-  site_system
-  site_area
+  site_scope
+  site_zone
   site_asset
   site_contact_relation
   site_contact
@@ -495,45 +495,41 @@ Table site {
   '''
 }
 
-Table site_system {
+Table site_scope {
   id text [pk, default: `gen_random_uuid()::text`]
   site_id text [not null]
-  system_id text [not null, note: 'FK → system (catalog) — Fire alarm, Access, CCTV, …']
+  root_category_id text [not null, note: 'FK → category (parent_id IS NULL) — Fire alarm, CCTV, …']
   name text [not null, default: '']
   status text [not null, default: 'proposed', note: 'CHECK: proposed | active | removed | cancelled']
   sort_order int [not null, default: 0]
 
   Note: '''
-    Optional installed **system instance** on a site. Not required — areas/assets may attach to a
-    default no-system bucket (`site_system_id` null on child rows). Each system has its own area
-    tree (FA Floor 1 ≠ CCTV Floor 1). Child collection on `site_detail` (`systems`).
+    Optional installed **scope root** instance on a site (renamed from `site_system`). Multiple
+    instances per root category OK (Panel A / Panel B). Zones/assets may attach to a scope or
+    default no-scope bucket (`site_scope_id` null). Child collection on `site_detail` (`scopes`).
   '''
 }
 
-Table site_area {
+Table site_zone {
   id text [pk, default: `gen_random_uuid()::text`]
   site_id text [not null]
-  site_system_id text [note: 'nullable FK → site_system — null = default no-system bucket']
-  parent_area_id text [note: 'nullable FK → site_area — tree within same system/bucket']
-  area_type text [not null, default: '', note: 'free text v1 — floor, door_group, corridor, riser, …']
+  site_scope_id text [note: 'nullable FK → site_scope — null = site General bucket']
+  parent_zone_id text [note: 'nullable FK → site_zone — tree within same scope/bucket']
   name text [not null, default: '']
-  code text [not null, default: '']
   sort_order int [not null, default: 0]
   status text [not null, default: 'proposed', note: 'CHECK: proposed | active | removed | cancelled']
 
   Note: '''
-    Nested organizational geography per system (or default bucket). **Site-owned** as-built;
-    survives job completion. Child collection on `site_detail` (`areas`). Option B: access
-    `door_group` area → reader/strike/REX/contact assets underneath. Provenance → `latch_audit`;
-    tombstone via `status` — never hard-delete rows referenced by lines.
+    Nested zones per scope (or General bucket). Renamed from `site_area`. Site-owned as-built;
+    tombstone via `status`. UI label: **zone**.
   '''
 }
 
 Table site_asset {
   id text [pk, default: `gen_random_uuid()::text`]
   site_id text [not null]
-  site_system_id text [note: 'nullable FK → site_system']
-  site_area_id text [note: 'nullable FK → site_area — placement parent']
+  site_scope_id text [note: 'nullable FK → site_scope']
+  site_zone_id text [note: 'nullable FK → site_zone — placement parent']
   asset_type text [not null, default: '', note: 'device kind — camera, reader, pull_station, …']
   tag_label text [not null, default: '', note: 'field label — Rm 345 Cam 1, Door 101 reader']
   part_id text [note: 'nullable FK → manufacturer_part']
@@ -595,32 +591,27 @@ Table site_contact {
 // ─── Business (SubHub Slice 3 — catalog) ─────────────────────────────────────
 
 TableGroup catalog [color: #e67e22] {
-  system
   trade
-  system_spec_def
-  system_spec_option
+  spec_def
+  spec_option
+  category_spec_def
+  category_spec_exclude
   manufacturer_part_spec
   phase_template
   phase_template_step
   category
+  item_category
+  part_category
+  labor_context_type
+  labor_rate_type
+  incidental_rate_type
+  markup_type
   labor_class
   phase
   manufacturer_part
   vendor_part
   item
   item_part_link
-}
-
-Table system {
-  id text [pk, default: `gen_random_uuid()::text`]
-  name text [not null, note: 'Fire alarm, Access control, CCTV, …']
-  default_phase_template_id text [note: 'nullable FK → phase_template — fallback when item has no template (J5)']
-  sort_order int [not null, default: 0]
-
-  Note: '''
-    Catalog **building system** type — distinct from `site_system` (installed instance on a property).
-    Drives `system_spec_def` dimensions and default phase templates. Progressive setup + catalog table page.
-  '''
 }
 
 Table trade {
@@ -631,40 +622,40 @@ Table trade {
   Note: 'Who performs work — used on `job_scope_group` for production rollups and labor costing.'
 }
 
-Table system_spec_def {
+Table spec_def {
   id uuid [pk, default: `gen_random_uuid()`]
-  system_id text [not null]
+  root_category_id text [not null, note: 'FK → category (scope root)']
   code text [note: 'nullable stable slug — e.g. slc_protocol; not PK']
   display_name text [not null]
   value_type text [not null, default: 'enum', note: 'CHECK: enum | boolean | text']
-  filter_mode text [not null, default: 'required', note: 'CHECK: required | prefer']
+  filter_mode text [not null, default: 'required', note: 'CHECK: required | prefer — behavior deferred v1']
   sort_order int [not null, default: 0]
 
   Note: '''
-    One spec dimension per catalog `system` (UUID PK). Estimate and part rows FK to
-    `system_spec_option` for enums — not loose strings. `manufacturer_party_id` is **not** a spec knob.
+    One spec dimension per **scope root category** (UUID PK). Renamed from `system_spec_def`.
+    Estimate and part rows FK to `spec_option` for enums — not loose strings.
   '''
 }
 
-Table system_spec_option {
+Table spec_option {
   id uuid [pk, default: `gen_random_uuid()`]
-  system_spec_def_id uuid [not null]
+  spec_def_id uuid [not null]
   code text [note: 'nullable slug — e.g. fire_lite_litespeed']
   display_name text [not null]
   sort_order int [not null, default: 0]
 
-  Note: 'Enum values for a `system_spec_def`. Child collection on spec-def catalog page.'
+  Note: 'Enum values for a `spec_def`. Renamed from `system_spec_option`.'
 }
 
 Table manufacturer_part_spec {
   manufacturer_part_id text [not null]
-  system_spec_def_id uuid [not null]
-  system_spec_option_id uuid [note: 'nullable — enum match; multiple rows per def allowed']
+  spec_def_id uuid [not null]
+  spec_option_id uuid [note: 'nullable — enum match; multiple rows per def allowed']
   value_text text [note: 'nullable — non-enum defs']
   value_boolean boolean [note: 'nullable — boolean defs']
 
   indexes {
-    (manufacturer_part_id, system_spec_def_id, system_spec_option_id) [unique, name: 'manufacturer_part_spec_unique']
+    (manufacturer_part_id, spec_def_id, spec_option_id) [unique, name: 'manufacturer_part_spec_unique']
   }
 
   Note: '''
@@ -700,16 +691,98 @@ Table phase_template_step {
 Table category {
   id text [pk, default: `gen_random_uuid()::text`]
   name text [not null]
-  parent_id text [note: 'nullable FK → category.id; ON DELETE SET NULL']
+  parent_id text [note: 'nullable FK → category.id; NULL = scope root (Fire Alarm, HVAC, …)']
   csi_code text [note: 'nullable — when aligned to CSI MasterFormat (e.g. 26, 26 05 00)']
+  default_phase_template_id text [note: 'nullable FK → phase_template — on scope roots (J5 fallback)']
   sort_order int [not null, default: 0]
 
   Note: '''
-    Single hierarchy for catalog and quote grouping. Child categories nest under `parent_id`.
-    Optional `csi_code` when the org adopts CSI MasterFormat for that node — no separate
-    taxonomy tables. Unclassified items use `category_id` NULL (general). Admin catalog —
-    may get `category_table` Surface later.
+    **Scope roots** (`parent_id IS NULL`) replace catalog `system`. Nested categories classify
+    items/parts (M:N). Leaf categories carry most `category_spec_def` expectations. Optional
+    `csi_code` when org uses CSI MasterFormat.
   '''
+}
+
+Table category_spec_def {
+  category_id text [not null]
+  spec_def_id uuid [not null]
+  sort_order int [not null, default: 0]
+
+  indexes {
+    (category_id, spec_def_id) [pk]
+  }
+
+  Note: '''
+    **Include** — add `spec_def_id` to this category node's effective participation set (in addition
+    to inherited). Root rows = base set for the namespace. See catalog decision inherit/include/exclude
+    (2026-07-02).
+  '''
+}
+
+Table category_spec_exclude {
+  category_id text [not null]
+  spec_def_id uuid [not null]
+  sort_order int [not null, default: 0]
+
+  indexes {
+    (category_id, spec_def_id) [pk]
+  }
+
+  Note: '''
+    **Exclude** — remove `spec_def_id` from inherited effective set (opt-out). Migration follow-on
+    (2026-07-02 decision). Nested nodes only in v1 UI.
+  '''
+}
+
+Table item_category {
+  item_id text [not null]
+  category_id text [not null]
+  sort_order int [not null, default: 0]
+
+  indexes {
+    (item_id, category_id) [pk]
+  }
+}
+
+Table part_category {
+  part_id text [not null]
+  category_id text [not null]
+  sort_order int [not null, default: 0]
+
+  indexes {
+    (part_id, category_id) [pk]
+  }
+}
+
+Table labor_context_type {
+  id text [pk, default: `gen_random_uuid()::text`]
+  name text [not null]
+  sort_order int [not null, default: 0]
+
+  Note: 'Estimate scope bucket context — retrofit vs new, warehouse vs office, …'
+}
+
+Table labor_rate_type {
+  id text [pk, default: `gen_random_uuid()::text`]
+  name text [not null]
+  rate_cents int [not null, default: 0]
+  labor_class_id text [note: 'nullable — bridge to labor_class when shipped']
+  sort_order int [not null, default: 0]
+}
+
+Table incidental_rate_type {
+  id text [pk, default: `gen_random_uuid()::text`]
+  name text [not null]
+  amount_cents int [not null, default: 0]
+  unit text [not null, default: 'ea']
+  sort_order int [not null, default: 0]
+}
+
+Table markup_type {
+  id text [pk, default: `gen_random_uuid()::text`]
+  name text [not null]
+  markup_percent numeric [not null, default: 0]
+  sort_order int [not null, default: 0]
 }
 
 Table labor_class {
@@ -829,9 +902,9 @@ TableGroup estimate [color: #f39c12] {
   job_party_relation
   estimate
   estimate_party
-  estimate_system
-  estimate_system_spec
-  estimate_area_spec
+  estimate_scope
+  estimate_scope_spec
+  estimate_zone_spec
   estimate_line_spec
   estimate_line
 }
@@ -886,58 +959,72 @@ Table estimate_party {
   Note: 'Per-quote stakeholder graph. Copied to `job_party` when estimate is won.'
 }
 
-Table estimate_system {
+Table estimate_scope {
   id text [pk, default: `gen_random_uuid()::text`]
   estimate_id text [not null]
-  system_id text [not null, note: 'FK → system (catalog)']
-  site_system_id text [note: 'nullable FK → site_system — proposed or active instance on quote site']
+  root_category_id text [note: 'nullable FK → category — null for General scope row']
+  site_scope_id text [note: 'nullable FK → site_scope — checked scope instance on quote site']
+  labor_context_type_id text [note: 'nullable FK → labor_context_type']
+  markup_type_id text [note: 'nullable FK → markup_type']
   sort_order int [not null, default: 0]
 
   Note: '''
-    One row per **system tab** on the quote (Fire alarm, CCTV, …). Area tree and lines are scoped
-    to this tab's `site_system_id`. Single-system quote = one tab; ROM/mobilization may have zero
-    tabs with flat lines. Child collection `systems` on `estimate_detail`.
+    Checked **scope root** on a quote (renamed from `estimate_system`). Links to site scope
+    instance when user checks a site scope row. General row: both `site_scope_id` and
+    `root_category_id` null. Spec values in `estimate_scope_spec`.
   '''
 }
 
-Table estimate_system_spec {
-  id text [pk, default: `gen_random_uuid()::text`]
-  estimate_system_id text [not null]
-  system_spec_def_id uuid [not null]
-  system_spec_option_id uuid [note: 'nullable — enum defs']
-  value_text text [note: 'nullable — text defs']
-  value_boolean boolean [note: 'nullable — boolean defs']
+Table estimate_zone {
+  estimate_scope_id text [not null]
+  site_zone_id text [not null]
+  sort_order int [not null, default: 0]
 
-  Note: 'Tab-default spec values — inherited by lines unless overridden at area or line level.'
+  indexes {
+    (estimate_scope_id, site_zone_id) [pk]
+  }
+
+  Note: 'Zone checkbox membership — row existence = checked; uncheck = delete row.'
 }
 
-Table estimate_area_spec {
+Table estimate_scope_spec {
   id text [pk, default: `gen_random_uuid()::text`]
-  estimate_system_id text [not null]
-  site_area_id text [not null]
-  system_spec_def_id uuid [not null]
-  system_spec_option_id uuid [note: 'nullable — enum defs']
+  estimate_scope_id text [not null]
+  spec_def_id uuid [not null]
+  spec_option_id uuid [note: 'nullable — enum defs']
   value_text text [note: 'nullable — text defs']
   value_boolean boolean [note: 'nullable — boolean defs']
 
-  Note: 'Per-area spec override within an `estimate_system` tab — applies to lines with matching `site_area_id`.'
+  Note: 'Scope-root spec values — inherited by lines unless overridden at zone or line level.'
+}
+
+Table estimate_zone_spec {
+  id text [pk, default: `gen_random_uuid()::text`]
+  estimate_scope_id text [not null]
+  site_zone_id text [not null]
+  spec_def_id uuid [not null]
+  spec_option_id uuid [note: 'nullable — enum defs']
+  value_text text [note: 'nullable — text defs']
+  value_boolean boolean [note: 'nullable — boolean defs']
+
+  Note: 'Per-zone spec override within a scope — applies to lines with matching `site_zone_id`.'
 }
 
 Table estimate_line_spec {
   id text [pk, default: `gen_random_uuid()::text`]
   estimate_line_id text [not null]
-  system_spec_def_id uuid [not null]
-  system_spec_option_id uuid [note: 'nullable — enum defs']
+  spec_def_id uuid [not null]
+  spec_option_id uuid [note: 'nullable — enum defs']
   value_text text [note: 'nullable — text defs']
   value_boolean boolean [note: 'nullable — boolean defs']
 
-  Note: 'Per-line spec override. Resolution: line → area (same tab) → `estimate_system_spec`.'
+  Note: 'Per-line spec override. Resolution: line → zone → `estimate_scope_spec`.'
 }
 
 Table estimate_line {
   id text [pk, default: `gen_random_uuid()::text`]
   estimate_id text [not null]
-  estimate_system_id text [note: 'nullable FK → estimate_system — which system tab']
+  estimate_scope_id text [note: 'nullable FK → estimate_scope — checked scope root']
   parent_line_id text [note: 'nullable FK → estimate_line — kit header/component']
   line_number int [not null]
   line_role text [not null, default: 'standalone', note: 'CHECK: standalone | kit_header | kit_component']
@@ -947,12 +1034,15 @@ Table estimate_line {
   unit text [not null, default: 'ea', note: 'snapshotted UOM — from manufacturer_part.unit or labor/expense default']
   unit_cost numeric [not null, default: 0]
   unit_price numeric [not null, default: 0]
-  site_area_id text [note: 'nullable FK → site_area — geography within tab site_system']
+  unit_material numeric [not null, default: 0]
+  unit_labor numeric [not null, default: 0]
+  unit_incidental numeric [not null, default: 0]
+  site_zone_id text [note: 'nullable FK → site_zone — zone bucket placement']
   site_asset_id text [note: 'nullable FK → site_asset — device-level scope']
   material_status text [note: 'nullable — generic | suggested | verified | …']
   phase_id text [note: 'nullable FK → phase — labor lines only; bridges to phase_template_step on win']
-  item_id text [note: 'nullable FK → item']
-  part_id text [note: 'nullable FK → manufacturer_part — when specific MPN quoted']
+  item_id text [note: 'nullable FK → item — primary catalog attachment']
+  part_id text [note: 'nullable FK → manufacturer_part — optional pin when MPN known']
   vendor_part_id text [note: 'nullable FK → vendor_part — cost source when pinned']
   sort_order int [not null, default: 0]
 
@@ -961,10 +1051,8 @@ Table estimate_line {
   }
 
   Note: '''
-    Quote line — snapshot description, qty, unit, cost, sell at save. Flat persisted array; UI
-    groups by area within active `estimate_system` tab. May reference or create `proposed`
-    `site_area` / `site_asset` rows on the quote site. Kits via `parent_line_id` + `line_role`.
-    Part picker filters via resolved specs → `manufacturer_part_spec`.
+    Quote line — item-first; optional part pin. Material/labor/incidental $ snapshotted internally
+    (not separate labor rows). Flat persisted array; UI groups by zone within checked scope.
   '''
 }
 
@@ -1036,10 +1124,10 @@ Table job_scope_group {
   name text [not null, default: '']
   group_type text [not null, default: 'general', note: 'CHECK: location | trade | system | phase | sov_section | change_order | repair_group | testing_group | closeout_group | general']
   trade_id text [note: 'nullable FK → trade']
-  system_id text [note: 'nullable FK → system']
+  root_category_id text [note: 'nullable FK → category (scope root)']
   fulfillment_type text [note: 'nullable — self | subcontracted | by_others | allowance | …']
-  site_system_id text [note: 'nullable FK → site_system']
-  site_area_id text [note: 'nullable FK → site_area']
+  site_scope_id text [note: 'nullable FK → site_scope']
+  site_zone_id text [note: 'nullable FK → site_zone']
   sov_line_id text [note: 'nullable FK → sov_line — optional default SOV link']
   sort_order int [not null, default: 0]
 
@@ -1062,7 +1150,7 @@ Table job_line {
   unit text [not null, default: 'ea']
   unit_cost numeric [not null, default: 0]
   unit_price numeric [not null, default: 0]
-  site_area_id text [note: 'nullable FK → site_area — frozen for this job line']
+  site_zone_id text [note: 'nullable FK → site_zone — frozen for this job line']
   site_asset_id text [note: 'nullable FK → site_asset — device-level scope']
   material_status text [note: 'nullable — carried from estimate']
   phase_id text [note: 'nullable FK → phase — labor lines only; bridges to scope_phase seeding']
@@ -1615,14 +1703,14 @@ Ref: site.physical_address_id > address.id [delete: set null]
 Ref: site.customer_party_id > party.id [delete: set null]
 Ref: site.property_owner_party_id > party.id [delete: set null]
 Ref: site.parent_site_id > site.id [delete: set null]
-Ref: site_system.site_id > site.id [delete: cascade]
-Ref: site_system.system_id > system.id [delete: restrict]
-Ref: site_area.site_id > site.id [delete: cascade]
-Ref: site_area.site_system_id > site_system.id [delete: set null]
-Ref: site_area.parent_area_id > site_area.id [delete: set null]
+Ref: site_scope.site_id > site.id [delete: cascade]
+Ref: site_scope.root_category_id > category.id [delete: restrict]
+Ref: site_zone.site_id > site.id [delete: cascade]
+Ref: site_zone.site_scope_id > site_scope.id [delete: set null]
+Ref: site_zone.parent_zone_id > site_zone.id [delete: set null]
 Ref: site_asset.site_id > site.id [delete: cascade]
-Ref: site_asset.site_system_id > site_system.id [delete: set null]
-Ref: site_asset.site_area_id > site_area.id [delete: set null]
+Ref: site_asset.site_scope_id > site_scope.id [delete: set null]
+Ref: site_asset.site_zone_id > site_zone.id [delete: set null]
 Ref: site_asset.part_id > manufacturer_part.id [delete: set null]
 Ref: site_asset.replaced_by_site_asset_id > site_asset.id [delete: set null]
 Ref: site_asset.installed_by_job_id > job.id [delete: set null]
@@ -1630,12 +1718,17 @@ Ref: site_contact.site_id > site.id [delete: cascade]
 Ref: site_contact.party_id > party.id [delete: cascade]
 Ref: site_contact.relation_id > site_contact_relation.id [delete: restrict]
 
-Ref: system.default_phase_template_id > phase_template.id [delete: set null]
-Ref: system_spec_def.system_id > system.id [delete: cascade]
-Ref: system_spec_option.system_spec_def_id > system_spec_def.id [delete: cascade]
+Ref: category.parent_id > category.id [delete: set null]
+Ref: category.default_phase_template_id > phase_template.id [delete: set null]
+Ref: category_spec_def.category_id > category.id [delete: cascade]
+Ref: category_spec_def.spec_def_id > spec_def.id [delete: cascade]
+Ref: category_spec_exclude.category_id > category.id [delete: cascade]
+Ref: category_spec_exclude.spec_def_id > spec_def.id [delete: cascade]
+Ref: spec_def.root_category_id > category.id [delete: cascade]
+Ref: spec_option.spec_def_id > spec_def.id [delete: cascade]
 Ref: manufacturer_part_spec.manufacturer_part_id > manufacturer_part.id [delete: cascade]
-Ref: manufacturer_part_spec.system_spec_def_id > system_spec_def.id [delete: cascade]
-Ref: manufacturer_part_spec.system_spec_option_id > system_spec_option.id [delete: set null]
+Ref: manufacturer_part_spec.spec_def_id > spec_def.id [delete: cascade]
+Ref: manufacturer_part_spec.spec_option_id > spec_option.id [delete: set null]
 Ref: phase_template_step.phase_template_id > phase_template.id [delete: cascade]
 
 Ref: manufacturer_part.manufacturer_party_id > party.id [delete: restrict]
@@ -1656,23 +1749,31 @@ Ref: estimate.category_id > category.id [delete: set null]
 Ref: estimate_party.estimate_id > estimate.id [delete: cascade]
 Ref: estimate_party.party_id > party.id [delete: cascade]
 Ref: estimate_party.relation_id > job_party_relation.id [delete: restrict]
-Ref: estimate_system.estimate_id > estimate.id [delete: cascade]
-Ref: estimate_system.system_id > system.id [delete: restrict]
-Ref: estimate_system.site_system_id > site_system.id [delete: set null]
-Ref: estimate_system_spec.estimate_system_id > estimate_system.id [delete: cascade]
-Ref: estimate_system_spec.system_spec_def_id > system_spec_def.id [delete: restrict]
-Ref: estimate_system_spec.system_spec_option_id > system_spec_option.id [delete: set null]
-Ref: estimate_area_spec.estimate_system_id > estimate_system.id [delete: cascade]
-Ref: estimate_area_spec.site_area_id > site_area.id [delete: cascade]
-Ref: estimate_area_spec.system_spec_def_id > system_spec_def.id [delete: restrict]
-Ref: estimate_area_spec.system_spec_option_id > system_spec_option.id [delete: set null]
+Ref: item_category.item_id > item.id [delete: cascade]
+Ref: item_category.category_id > category.id [delete: cascade]
+Ref: part_category.part_id > manufacturer_part.id [delete: cascade]
+Ref: part_category.category_id > category.id [delete: cascade]
+Ref: estimate_scope.estimate_id > estimate.id [delete: cascade]
+Ref: estimate_scope.root_category_id > category.id [delete: restrict]
+Ref: estimate_scope.site_scope_id > site_scope.id [delete: set null]
+Ref: estimate_scope.labor_context_type_id > labor_context_type.id [delete: set null]
+Ref: estimate_scope.markup_type_id > markup_type.id [delete: set null]
+Ref: estimate_scope_spec.estimate_scope_id > estimate_scope.id [delete: cascade]
+Ref: estimate_scope_spec.spec_def_id > spec_def.id [delete: restrict]
+Ref: estimate_scope_spec.spec_option_id > spec_option.id [delete: set null]
+Ref: estimate_zone.estimate_scope_id > estimate_scope.id [delete: cascade]
+Ref: estimate_zone.site_zone_id > site_zone.id [delete: cascade]
+Ref: estimate_zone_spec.estimate_scope_id > estimate_scope.id [delete: cascade]
+Ref: estimate_zone_spec.site_zone_id > site_zone.id [delete: cascade]
+Ref: estimate_zone_spec.spec_def_id > spec_def.id [delete: restrict]
+Ref: estimate_zone_spec.spec_option_id > spec_option.id [delete: set null]
 Ref: estimate_line_spec.estimate_line_id > estimate_line.id [delete: cascade]
-Ref: estimate_line_spec.system_spec_def_id > system_spec_def.id [delete: restrict]
-Ref: estimate_line_spec.system_spec_option_id > system_spec_option.id [delete: set null]
+Ref: estimate_line_spec.spec_def_id > spec_def.id [delete: restrict]
+Ref: estimate_line_spec.spec_option_id > spec_option.id [delete: set null]
 Ref: estimate_line.estimate_id > estimate.id [delete: cascade]
-Ref: estimate_line.estimate_system_id > estimate_system.id [delete: set null]
+Ref: estimate_line.estimate_scope_id > estimate_scope.id [delete: set null]
 Ref: estimate_line.parent_line_id > estimate_line.id [delete: set null]
-Ref: estimate_line.site_area_id > site_area.id [delete: set null]
+Ref: estimate_line.site_zone_id > site_zone.id [delete: set null]
 Ref: estimate_line.site_asset_id > site_asset.id [delete: set null]
 Ref: estimate_line.phase_id > phase.id [delete: set null]
 Ref: estimate_line.item_id > item.id [delete: set null]
@@ -1687,14 +1788,14 @@ Ref: job_party.party_id > party.id [delete: cascade]
 Ref: job_party.relation_id > job_party_relation.id [delete: restrict]
 Ref: job_scope_group.job_id > job.id [delete: cascade]
 Ref: job_scope_group.trade_id > trade.id [delete: set null]
-Ref: job_scope_group.system_id > system.id [delete: set null]
-Ref: job_scope_group.site_system_id > site_system.id [delete: set null]
-Ref: job_scope_group.site_area_id > site_area.id [delete: set null]
+Ref: job_scope_group.root_category_id > category.id [delete: set null]
+Ref: job_scope_group.site_scope_id > site_scope.id [delete: set null]
+Ref: job_scope_group.site_zone_id > site_zone.id [delete: set null]
 Ref: job_scope_group.sov_line_id > sov_line.id [delete: set null]
 Ref: job_line.job_id > job.id [delete: cascade]
 Ref: job_line.job_scope_group_id > job_scope_group.id [delete: set null]
 Ref: job_line.parent_line_id > job_line.id [delete: set null]
-Ref: job_line.site_area_id > site_area.id [delete: set null]
+Ref: job_line.site_zone_id > site_zone.id [delete: set null]
 Ref: job_line.site_asset_id > site_asset.id [delete: set null]
 Ref: job_line.phase_id > phase.id [delete: set null]
 Ref: job_line.item_id > item.id [delete: set null]

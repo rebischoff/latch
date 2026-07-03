@@ -55,7 +55,10 @@ export class ConflictError extends LatchError {
   readonly statusCode = 409;
   readonly code = "CONFLICT";
 
-  constructor(message = "Conflict") {
+  constructor(
+    message = "Conflict",
+    readonly details?: unknown,
+  ) {
     super(message);
   }
 }

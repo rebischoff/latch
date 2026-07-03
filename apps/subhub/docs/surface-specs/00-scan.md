@@ -38,7 +38,7 @@ General scan before one-by-one implement specs. **Legend:** ✅ spec complete ·
 | 13 | [site-geography.md](./site-geography.md) | `sections` · `locations` on `site_detail` | 2b | ✅ target (2026-06-19) |
 | 14 | [part.md](./part.md) | `part_list` · `part_detail` | 3 | ✅ target (2026-06-19); code shipped (3a) |
 | 15 | [item.md](./item.md) | `item_list` · `item_detail` | 3 | ⏸ after discovery |
-| 16 | [category.md](./category.md) | `category_table` | 3 | ⏸ after discovery |
+| 16 | [category.md](./category.md) | `category_list` · `category_detail` | 3 | ✅ target (2026-06-30); tree list pane — [37d](../tasks/37d-category-catalog-dal-surfaces.md) |
 | 17 | [labor-class.md](./labor-class.md) | `labor_class_table` | 3 | ⏸ after discovery |
 | 18 | [phase.md](./phase.md) | `phase_table` *(add to surfaces.md)* | 3 | ⏸ after discovery |
 | 19 | [job-party-relation.md](./job-party-relation.md) | `job_party_relation_table` | 4 | ✅ target (2026-06-23); code shipped |
@@ -96,7 +96,7 @@ General scan before one-by-one implement specs. **Legend:** ✅ spec complete ·
 | `vendor_part` | `vendor_pricing` on `part_detail` | |
 | `item` | `item_*` | |
 | `item_part_link` | `part_links` | |
-| `category` | `category_table` | |
+| `category` | `category_list` · `category_detail` | Tree list pane; roots = scope |
 | `labor_class` | `labor_class_table` | |
 | `phase` | **`phase_table` — catalog gap** | In DBML; add to `surfaces.md` in spec #18 |
 

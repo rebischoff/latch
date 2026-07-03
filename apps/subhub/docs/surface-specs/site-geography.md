@@ -1,6 +1,8 @@
 # Cross-cutting — geography on `site_detail`
 
-> **Wave:** 2b · **Status:** target spec (2026-06-19) · **Parent:** [`site.md`](./site.md) · **Catalog:** [`surfaces.md`](../surfaces.md#site_list--site_detail) · **DBML:** `site`, `site_section`, `site_location`, `address` · **Decisions:** [geography timing](../decisions/site.md#decision-site-geography-on-site_detail--timing-2026-06-17), [section vs location](../decisions/site.md#decision-section-vs-location--granularity-2026-06-19), [lifecycle](../decisions/site.md#decision-site-owned-sections-and-locations--lifecycle-and-history-2026-06-17), [slim rows + audit](../decisions/site.md#decision-site-geography--slim-rows-and-latch_audit-2026-06-17), [postal spine](../decisions/site.md#decision-postal-address--normalized-spine-and-party-vs-site-roles-2026-06-19), [site nesting](../decisions/site.md#decision-site-nesting--when-site-vs-site_location-vs-job-2026-06-19) · **Pattern:** [`child-collections.md`](../child-collections.md) · **Postal PATCH:** [`party-addresses.md`](./party-addresses.md)
+> **⚠️ Superseded (2026-06-30)** — Legacy `site_section` / `site_location` model. **Systems & areas** geography is specified on [`site.md`](./site.md) + task [34](../tasks/34-site-geography-ui.md). This file remains for **`parent_site`** and **`physical_address`** only until those Fields ship.
+>
+> **Wave:** 2b · **Status:** partially superseded · **Parent:** [`site.md`](./site.md)
 
 **Consumers:** `site_detail` only — adds **`parent_site`**, **`physical_address`**, **`sections`**, **`locations`**. Estimate/job surfaces create `proposed` rows and publish on job complete (specs #20–21); they do **not** duplicate geography editors.
 

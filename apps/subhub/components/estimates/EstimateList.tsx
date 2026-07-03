@@ -1,14 +1,10 @@
 "use client";
 
-import { PlusOutlined } from "@ant-design/icons";
-import { type Manifest } from "@latch/contracts";
 import { Table, Tag, Typography } from "antd";
 import dayjs from "dayjs";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useMemo } from "react";
+import { usePathname } from "next/navigation";
 
-import { useRegisterSurfaceActions } from "@/components/shell/SurfaceActionsProvider";
 import { useSurfaceList } from "@/lib/hooks/use-surface-list";
 import { routes } from "@/lib/nav-routes";
 
@@ -26,39 +22,9 @@ const formatDate = (value: string | null | undefined): string =>
 const statusLabel = (status: string): string =>
   status.charAt(0).toUpperCase() + status.slice(1);
 
-type EstimateListProps = {
-  createManifest: Manifest;
-};
-
-export const EstimateList = ({ createManifest }: EstimateListProps) => {
+export const EstimateList = () => {
   const pathname = usePathname();
-  const router = useRouter();
   const { data, isLoading, error } = useSurfaceList("estimate_list");
-
-  const onCreate = useCallback(() => {
-    router.push(routes.estimates.new);
-  }, [router]);
-
-  const onListRoute = pathname === routes.estimates.list;
-
-  const toolbarActions = useMemo(
-    () =>
-      onListRoute
-        ? [
-            {
-              key: "new",
-              label: "New",
-              icon: <PlusOutlined />,
-              priority: "secondary" as const,
-              surfaceAction: "write" as const,
-              onClick: onCreate,
-            },
-          ]
-        : [],
-    [onCreate, onListRoute],
-  );
-
-  useRegisterSurfaceActions(createManifest, toolbarActions);
 
   if (error) {
     return (

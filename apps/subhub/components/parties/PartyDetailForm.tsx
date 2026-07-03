@@ -1,13 +1,6 @@
 "use client";
 
-import {
-  CloseOutlined,
-  DeleteOutlined,
-  PlusOutlined,
-  SaveOutlined,
-  UndoOutlined,
-  UserAddOutlined,
-} from "@ant-design/icons";
+import { UserAddOutlined } from "@ant-design/icons";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   fieldAllows,
@@ -33,7 +26,7 @@ import { SURFACE_FORM_MAX_WIDTH } from "@/components/form/formLayout";
 import { SelectInput } from "@/components/form/SelectInput";
 import { TextInput } from "@/components/form/TextInput";
 import { PartyRoleFields } from "@/components/parties/PartyRoleFields";
-import { useRegisterSurfaceActions } from "@/components/shell/SurfaceActionsProvider";
+import { useSurfaceFormChrome } from "@/components/surface/SurfaceFormChromeContext";
 import { SurfaceFormLayout } from "@/components/surface/SurfaceFormLayout";
 import { SurfaceFormRoot } from "@/components/surface/SurfaceFormRoot";
 import {
@@ -47,7 +40,11 @@ import { useSurfaceListCreate } from "@/lib/hooks/use-surface-list-create";
 import { useSurfaceDetail } from "@/lib/hooks/use-surface-detail";
 import { useSurfaceDelete, useSurfacePatch } from "@/lib/hooks/use-surface-patch";
 import { routes } from "@/lib/nav-routes";
-import { redirectAfterCreate, redirectOnCancel } from "@/lib/picker-return-context";
+import {
+  navigateAfterCreate,
+  navigateOnCancel,
+  sanitizeReturnTo,
+} from "@/lib/surface-navigation";
 import { buildProvisionUserUrl } from "@/lib/provision-user-context";
 import { SurfaceApiError } from "@/lib/surface-api";
 
@@ -246,6 +243,7 @@ export const PartyDetailForm = ({
   surfaceId,
   manifest,
   returnTo = null,
+  returnField = null,
 }: PartyDetailFormProps) => {
   const isCreate = entityId === "new";
   const employee = isEmployeeSurface(surfaceId);
@@ -307,13 +305,7 @@ export const PartyDetailForm = ({
     employee &&
     !latchUserId &&
     surfaceAllows(activeManifest, "add_as_db_user");
-  const canCreateEmployee =
-    employee && !isCreate && surfaceAllows(activeManifest, "write");
   const saving = patch.isPending || create.isPending;
-
-  const onCreateEmployee = useCallback(() => {
-    router.push(routes.employees.new);
-  }, [router]);
 
   const profileWritable = fieldAllows(activeManifest, "profile", "write");
   const phonesWritable = fieldAllows(activeManifest, "phones", "write");
@@ -326,68 +318,119 @@ export const PartyDetailForm = ({
   const entityLabel = employee ? "employee" : "manufacturer";
   const entityLabelTitle = employee ? "Employee" : "Manufacturer";
 
-  const onSave = form.handleSubmit(async (values) => {
-    const body: Record<string, unknown> = {};
+  const persistParty = useCallback(
+    async (values: PartyDetailFormValues, afterCreate: "detail" | "reset") => {
+      const body: Record<string, unknown> = {};
 
-    if (profileWritable) {
-      body.profile = employee
-        ? buildEmployeeProfileBody(values.profile)
-        : buildManufacturerProfileBody(values.profile, isCreate);
-    }
+      if (profileWritable) {
+        body.profile = employee
+          ? buildEmployeeProfileBody(values.profile)
+          : buildManufacturerProfileBody(values.profile, isCreate);
+      }
 
-    if (phonesWritable) {
-      body.phones = normalizePhonesBody(values.phones);
-    }
+      if (phonesWritable) {
+        body.phones = normalizePhonesBody(values.phones);
+      }
 
-    if (emailsWritable) {
-      body.emails = normalizeEmailsBody(values.emails, showLoginEmail);
-    }
+      if (emailsWritable) {
+        body.emails = normalizeEmailsBody(values.emails, showLoginEmail);
+      }
 
-    try {
-      if (isCreate) {
-        const result = await create.mutateAsync(body);
-        const newId = String(result.data.id);
-        message.success(`${entityLabelTitle} created`);
+      try {
+        if (isCreate) {
+          const result = await create.mutateAsync(body);
+          const newId = String(result.data.id);
+          message.success(`${entityLabelTitle} created`);
 
-        if (returnTo) {
-          router.replace(redirectAfterCreate(returnTo, newId));
+          if (afterCreate === "reset") {
+            form.reset(buildDefaultValues(surfaceId, undefined, true));
+            return;
+          }
+
+          if (returnField && returnTo) {
+            navigateAfterCreate(router, {
+              returnTo: sanitizeReturnTo(returnTo, listRoute),
+              returnField,
+              newId,
+              fallbackList: listRoute,
+              fallbackDetail: detailRoute,
+            });
+            return;
+          }
+
+          router.replace(detailRoute(newId));
           router.refresh();
           return;
         }
 
-        router.replace(detailRoute(newId));
-        router.refresh();
-        return;
+        await patch.mutateAsync(body);
+        message.success(`${entityLabelTitle} saved`);
+      } catch (saveError) {
+        message.error(
+          saveError instanceof SurfaceApiError
+            ? saveError.message
+            : isCreate
+              ? `Unable to create ${entityLabel}`
+              : `Unable to save ${entityLabel}`,
+        );
       }
+    },
+    [
+      create,
+      detailRoute,
+      emailsWritable,
+      employee,
+      entityLabel,
+      entityLabelTitle,
+      form,
+      isCreate,
+      listRoute,
+      message,
+      patch,
+      phonesWritable,
+      profileWritable,
+      returnField,
+      returnTo,
+      router,
+      showLoginEmail,
+      surfaceId,
+    ],
+  );
 
-      await patch.mutateAsync(body);
-      message.success(`${entityLabelTitle} saved`);
-    } catch (saveError) {
-      message.error(
-        saveError instanceof SurfaceApiError
-          ? saveError.message
-          : isCreate
-            ? `Unable to create ${entityLabel}`
-            : `Unable to save ${entityLabel}`,
-      );
-    }
-  });
+  const onSave = form.handleSubmit((values) => persistParty(values, "detail"));
 
-  const onCancel = () => {
-    if (returnTo) {
-      router.push(redirectOnCancel(returnTo));
+  const onSaveAndNew = useMemo(
+    () =>
+      isCreate && !returnField
+        ? form.handleSubmit((values) => persistParty(values, "reset"))
+        : undefined,
+    [form, isCreate, persistParty, returnField],
+  );
+
+  const onCancel = useCallback(() => {
+    const navigate = () => {
+      navigateOnCancel(router, returnTo, listRoute);
+    };
+
+    if (isDirty) {
+      modal.confirm({
+        title: "Leave without saving?",
+        content: "Unsaved changes will be lost.",
+        okText: "Leave",
+        onOk: navigate,
+      });
       return;
     }
 
-    router.push(listRoute);
-  };
+    navigate();
+  }, [isDirty, listRoute, modal, returnTo, router]);
 
-  const onRevert = () => {
+  const onRevert = useCallback(() => {
     form.reset(defaultValues);
     message.info("Reverted to last loaded values");
-  };
+  }, [defaultValues, form, message]);
 
-  const onDelete = () => {
+  const onDelete = useCallback(() => {
     modal.confirm({
       title: `Delete ${entityLabel}?`,
       content: employee
@@ -414,84 +457,21 @@ export const PartyDetailForm = ({
         }
       },
     });
-  };
+  }, [employee, entityLabel, entityLabelTitle, listRoute, message, modal, remove, router]);
 
-  const toolbarActions = useMemo(
-    () => [
-      {
-        key: "save",
-        label: "Save",
-        icon: <SaveOutlined />,
-        priority: "primary" as const,
-        surfaceAction: "write" as const,
-        disabled: !canSave || (!isCreate && !isDirty),
-        loading: saving,
-        onClick: onSave,
-      },
-      ...(canCreateEmployee
-        ? [
-            {
-              key: "new",
-              label: "New",
-              icon: <PlusOutlined />,
-              priority: "secondary" as const,
-              surfaceAction: "write" as const,
-              onClick: onCreateEmployee,
-            },
-          ]
-        : []),
-      ...(isCreate
-        ? [
-            {
-              key: "cancel",
-              label: "Cancel",
-              icon: <CloseOutlined />,
-              priority: "secondary" as const,
-              surfaceAction: "write" as const,
-              disabled: saving,
-              onClick: onCancel,
-            },
-          ]
-        : [
-            {
-              key: "revert",
-              label: "Revert",
-              icon: <UndoOutlined />,
-              priority: "secondary" as const,
-              surfaceAction: "write" as const,
-              disabled: !isDirty || saving,
-              onClick: onRevert,
-            },
-            {
-              key: "delete",
-              label: "Delete",
-              icon: <DeleteOutlined />,
-              priority: "secondary" as const,
-              surfaceAction: "delete" as const,
-              danger: true,
-              disabled: !canDelete,
-              loading: remove.isPending,
-              onClick: onDelete,
-            },
-          ]),
-    ],
-    [
-      canCreateEmployee,
-      canDelete,
-      canSave,
-      isCreate,
-      isDirty,
-      onCancel,
-      onCreateEmployee,
-      onDelete,
-      onRevert,
-      onSave,
-      remove.isPending,
-      saving,
-    ],
-  );
-
-  useRegisterSurfaceActions(activeManifest, toolbarActions);
+  useSurfaceFormChrome({
+    mode: isCreate ? "create" : "edit",
+    manifest: activeManifest,
+    canSave,
+    saving,
+    onSave,
+    isDirty,
+    canDelete,
+    onDelete: isCreate ? undefined : onDelete,
+    onRevert: isCreate ? undefined : onRevert,
+    onCancel: isCreate ? onCancel : undefined,
+    onSaveAndNew,
+  });
 
   if (!isCreate && error instanceof SurfaceApiError && error.status === 404) {
     notFound();

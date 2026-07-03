@@ -21,8 +21,50 @@ export type SiteContactRow = {
   sort_order: number;
 };
 
+export type SiteZoneRow = {
+  can_delete: boolean;
+  id: string;
+  name: string;
+  sort_order: number;
+  status: string;
+  zones: SiteZoneRow[];
+};
+
+export type SiteScopeRow = {
+  can_delete: boolean;
+  id: string;
+  name: string;
+  root_category_id: string;
+  root_category_name: string;
+  sort_order: number;
+  status: string;
+  zones: SiteZoneRow[];
+};
+
+export type SiteZonePatchRow = {
+  id?: string;
+  name: string;
+  sort_order?: number;
+  zones: SiteZonePatchRow[];
+};
+
+export type SiteScopePatchRow = {
+  id?: string;
+  name: string;
+  root_category_id: string;
+  sort_order?: number;
+  zones: SiteZonePatchRow[];
+};
+
+export type SiteScopesPatch = {
+  general_zones?: SiteZonePatchRow[];
+  scopes?: SiteScopePatchRow[];
+};
+
 export type SiteDetailRelated = {
   contacts: SiteContactRow[];
+  general_zones: SiteZoneRow[];
+  scopes: SiteScopeRow[];
 };
 
 export type SiteContactPatchRow = {
@@ -33,6 +75,8 @@ export type SiteContactPatchRow = {
 
 export type SiteDetailRelatedPatch = {
   contacts?: SiteContactPatchRow[];
+  general_zones?: SiteZonePatchRow[];
+  scopes?: SiteScopePatchRow[];
 };
 
 export type SiteDetailStoreRelated =
@@ -44,6 +88,27 @@ const SiteContactPatchElementSchema = z
     id: z.string().optional(),
     party_id: z.string(),
     relation_id: z.string(),
+  })
+  .strict();
+
+const SiteZonePatchElementSchema: z.ZodType<SiteZonePatchRow> = z.lazy(() =>
+  z
+    .object({
+      id: z.string().optional(),
+      name: z.string(),
+      sort_order: z.number().optional(),
+      zones: z.array(SiteZonePatchElementSchema),
+    })
+    .strict(),
+);
+
+const SiteScopePatchElementSchema = z
+  .object({
+    id: z.string().optional(),
+    root_category_id: z.string(),
+    name: z.string(),
+    sort_order: z.number().optional(),
+    zones: z.array(SiteZonePatchElementSchema),
   })
   .strict();
 
@@ -70,6 +135,8 @@ export const SiteDetailPatchSchema = z
       .strict()
       .optional(),
     contacts: z.array(SiteContactPatchElementSchema).optional(),
+    scopes: z.array(SiteScopePatchElementSchema).optional(),
+    general_zones: z.array(SiteZonePatchElementSchema).optional(),
   })
   .strict();
 
@@ -94,6 +161,8 @@ export const SiteDetailCreateSchema = z
       .strict()
       .optional(),
     contacts: z.array(SiteContactPatchElementSchema).optional(),
+    scopes: z.array(SiteScopePatchElementSchema).optional(),
+    general_zones: z.array(SiteZonePatchElementSchema).optional(),
   })
   .strict();
 
@@ -110,6 +179,8 @@ const normalizeSiteDetailRelated = (
   related: SiteDetailStoreRelated,
 ): SiteDetailRelated => ({
   contacts: (related.contacts ?? []) as SiteContactRow[],
+  scopes: (related.scopes ?? []) as SiteScopeRow[],
+  general_zones: (related.general_zones ?? []) as SiteZoneRow[],
 });
 
 export const projectSiteDetailRow = (
@@ -140,6 +211,14 @@ export const projectSiteDetailRow = (
 
   if (manifest.fields.contacts?.includes("read")) {
     dto.contacts = normalized.contacts;
+  }
+
+  if (manifest.fields.scopes?.includes("read")) {
+    dto.scopes = normalized.scopes;
+  }
+
+  if (manifest.fields.general_zones?.includes("read")) {
+    dto.general_zones = normalized.general_zones;
   }
 
   return dto;
@@ -187,12 +266,25 @@ export const siteDetailDescriptor: SurfaceDescriptor<
       related.contacts = typed.contacts;
     }
 
+    if (typed.scopes !== undefined) {
+      related.scopes = typed.scopes;
+    }
+
+    if (typed.general_zones !== undefined) {
+      related.general_zones = typed.general_zones;
+    }
+
     return Object.keys(related).length > 0 ? related : undefined;
   },
   auditSnapshot: formatSiteDetailRow,
-  deleteAuditSnapshot: (row, related) => ({
-    ...formatSiteDetailRow(row),
-    contacts: normalizeSiteDetailRelated(related).contacts,
-  }),
+  deleteAuditSnapshot: (row, related) => {
+    const normalized = normalizeSiteDetailRelated(related);
+    return {
+      ...formatSiteDetailRow(row),
+      contacts: normalized.contacts,
+      scopes: normalized.scopes,
+      general_zones: normalized.general_zones,
+    };
+  },
   canDelete: (ctx) => ctx.manifest.actions.includes("delete"),
 };

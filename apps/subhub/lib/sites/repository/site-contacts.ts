@@ -7,6 +7,7 @@ import type {
   SiteContactRow,
   SiteDetailRelated,
 } from "../descriptors/site-detail";
+import { loadSiteScopes } from "./site-scopes";
 import { isUniqueViolation } from "./sql-utils";
 
 const assertContactIdsBelongToSite = async (
@@ -172,6 +173,14 @@ export const loadSiteContacts = async (
 export const loadSiteDetailRelated = async (
   pool: Pool,
   siteId: string,
-): Promise<SiteDetailRelated> => ({
-  contacts: await loadSiteContacts(pool, siteId),
-});
+): Promise<SiteDetailRelated> => {
+  const [contacts, scopesData] = await Promise.all([
+    loadSiteContacts(pool, siteId),
+    loadSiteScopes(pool, siteId),
+  ]);
+
+  return {
+    contacts,
+    ...scopesData,
+  };
+};

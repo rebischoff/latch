@@ -8,7 +8,10 @@ export const surfaceDetailKey = (surfaceId: SurfaceId, id: string) =>
 
 export const estimateSitePickerKey = ["estimate", "site-picker"] as const;
 
-export const estimateSystemPickerKey = ["estimate", "system-picker"] as const;
+export const estimateSiteTreeKey = (siteId: string) =>
+  ["estimate", "site-tree", siteId] as const;
+
+export const categoryRootPickerKey = ["catalog", "category-root-picker"] as const;
 
 export const jobSitePickerKey = ["job", "site-picker"] as const;
 

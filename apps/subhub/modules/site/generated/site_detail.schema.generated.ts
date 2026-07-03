@@ -8,6 +8,8 @@ export const SiteDetailFieldIds = {
   customer_party: "customer_party",
   property_owner_party: "property_owner_party",
   contacts: "contacts",
+  scopes: "scopes",
+  general_zones: "general_zones",
 } as const;
 
 export type SiteDetailFieldId = (typeof SiteDetailFieldIds)[keyof typeof SiteDetailFieldIds];
@@ -17,6 +19,8 @@ export const siteDetailColumnMap = {
   customer_party: ["site.customer_party_id"],
   property_owner_party: ["site.property_owner_party_id"],
   contacts: [],
+  scopes: [],
+  general_zones: [],
 } as const satisfies Record<SiteDetailFieldId, readonly string[]>;
 
 /** Full read DTO keyed by Field id (narrow with `narrowSchema(..., manifest, 'read')`). */
@@ -33,6 +37,8 @@ export const SiteDetailSchema = z.object({
     property_owner_party_id: z.string().nullable(),
   }),
   contacts: z.array(z.object({ user_id: z.string() })),
+  scopes: z.array(z.object({ user_id: z.string() })),
+  general_zones: z.array(z.object({ user_id: z.string() })),
 });
 
 /** PATCH body keyed by Field id (narrow with `narrowSchema(..., manifest, 'write')`). */
@@ -54,6 +60,8 @@ export const SiteDetailPatchSchema = z.object({
     })
     .optional(),
   contacts: z.array(z.object({ user_id: z.string() })).optional(),
+  scopes: z.array(z.object({ user_id: z.string() })).optional(),
+  general_zones: z.array(z.object({ user_id: z.string() })).optional(),
 });
 
 export type SiteDetailDto = z.infer<typeof SiteDetailSchema>;

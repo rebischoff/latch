@@ -6,7 +6,7 @@
 
 **Amends** “estimate may create `proposed` rows inline” below.
 
-**Choice:** While quoting, estimate **reads** `site_system` / `site_area` / `site_asset` only. Quote geography is **`estimate_area`** only ([02-estimates.md](./02-estimates.md)) — no quote-level assets. **`site_asset`** is site registry only. **Win → job** reconciles quote areas → `site_area` (`proposed` where needed). **`job.complete`** publishes `proposed` → `active` and may create **`site_asset`** from installed scope (A2).
+**Choice:** While quoting, estimate **reads** `site_scope` / `site_zone` / `site_asset` only. Quote geography is **`estimate_area`** only ([02-estimates.md](./02-estimates.md)) — no quote-level assets. **`site_asset`** is site registry only. **Win → job** reconciles quote areas → `site_zone` (`proposed` where needed). **`job.complete`** publishes `proposed` → `active` and may create **`site_asset`** from installed scope (A2).
 
 ---
 
@@ -17,8 +17,8 @@
 | Entity | Table | Role |
 |--------|-------|------|
 | **Site** | `site` | Building / property anchor; portfolio FKs; optional `physical_address_id` |
-| **Site system** | `site_system` | Optional instance: `site_id` + **`system_id`** (catalog) + name/status |
-| **Site area** | `site_area` | Nested organizational nodes **per system** (or default bucket) |
+| **Site scope** | `site_scope` | Optional instance: `site_id` + **`root_category_id`** (catalog root) + name/status |
+| **Site zone** | `site_zone` | Nested organizational nodes **per scope** (or General bucket) |
 | **Site asset** | `site_asset` | Installed **serviceable device** — leaf only |
 
 **Supersedes** cross-trade `site_section` / `site_location` — rename/map to `site_area` / `site_asset` under per-system trees ([09-migration-notes.md](./09-migration-notes.md)).
@@ -47,8 +47,8 @@ Site
 | `site_id` | Required |
 | `site_system_id` | Nullable — null = default bucket |
 | `parent_area_id` | Nullable — nesting within same system/bucket |
-| `area_type` | **Free text v1** (locked S4) — e.g. `floor`, `door_group`, `corridor`, `riser` |
-| `name`, `code`, `sort_order`, `status` | `proposed` \| `active` \| `removed` \| `cancelled` |
+| `area_type` | ~~Free text v1 (locked S4)~~ **Dropped** — task 35; name-only `site_area` v1 |
+| `name`, `sort_order`, `status` | `proposed` \| `active` \| `removed` \| `cancelled` |
 
 **Option B pattern:** Access control uses `door_group` child areas (Door 101) with assets underneath (reader, strike, REX, contact). FA/CCTV usually shallower (floor area → device assets).
 

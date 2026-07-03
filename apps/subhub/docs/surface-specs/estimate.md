@@ -1,6 +1,6 @@
 # Estimates — `estimate_list` · `estimate_detail`
 
-> **Wave:** 4e · **Status:** backbone target spec (2026-06-29) · **Implementation:** [task 32](../tasks/32-estimate-wave-4e.md) wave 4e (amends [task 22](../tasks/22-estimate-wave-4a.md) 4a) · **Planning:** [`02-estimates.md`](../planning/02-estimates.md) · **Catalog:** [`surfaces.md`](../surfaces.md#estimate_list--estimate_detail) · **DBML:** `estimate`, `estimate_party`, `estimate_system`, `estimate_system_spec`, `estimate_line` · **Decisions:** [system tabs](../decisions/estimate.md#decision-estimate--estimate_system-tabs-system-specs-no-section-v1-2026-06-27), [quote geography](../planning/02-estimates.md#decision-quote-geography--estimate-owned-tree-reconcile-at-win-2026-06-29), [line editor UI](../decisions/estimate.md#decision-estimate-line-editor--expand-on-add-and-grouped-table-ui-2026-06-23) · **Spike:** [`estimate-line-editor.md`](../spikes/estimate-line-editor.md) (prior grouped spike — reference only)
+> **Wave:** 4e · **Status:** backbone + **37e scope tab** (2026-07-02) · **Implementation:** [task 32](../tasks/32-estimate-wave-4e.md) wave 4e; [task 37e](../tasks/37e-estimate-scope-tab.md) scope tab · **Planning:** [`02-estimates.md`](../planning/02-estimates.md) · **Catalog:** [`surfaces.md`](../surfaces.md#estimate_list--estimate_detail) · **DBML:** `estimate`, `estimate_party`, `estimate_scope`, `estimate_zone`, `estimate_line` · **Decisions:** [scope tab](../decisions/estimate.md#decision-estimate-scope-tab--junction-zones-general-scope-row-block-uncheck-2026-07-02), [site anchor](../decisions/estimate.md#decision-estimate-site-anchor--gate-lines-immutable-after-create-2026-06-30)
 
 **Related:** Site anchor via `profile.site_id` → [`site_detail`](./site.md). Stakeholder catalog: [`job-party-relation.md`](./job-party-relation.md). Win → job copy in wave **4b** → [`job.md`](./job.md). Catalog `system` / `system_spec_def` seeded in migration `031`.
 
@@ -22,6 +22,7 @@
 | 10 | **`site_system_id`** | Always **`null`** on create/patch in 4e. Link/copy deferred to 4c′ / win. |
 | 11 | **Win → job** | Reconcile quote **areas** → `site_area` at win (4b). `site_asset` on site at install / `job.complete` — not from quote asset rows. |
 | 12 | **List / create / delete** | Unchanged from 4a — list columns `title`, site name, `status`, `estimate_date`; POST `title` + `site_id`; hard delete `draft` only when allowed |
+| 13 | **Site anchor (task 33)** | `profile.site_id` required on create; **writable create only** — read-only + open icon after first save; DAL rejects PATCH `site_id` change; Line Items tab + `systems` picker gated on non-empty `site_id`; create: changing site clears `systems` + `line_items` |
 
 **Supersedes (4a):** flat-only line grid; `estimate_section_id` / `site_location_id` on lines; grouped-by-place toggle keyed off `site_section` / `site_location`; proposed `site_location` writes on estimate Save.
 
@@ -76,7 +77,7 @@
 
 | Field id | Type | Writable | Columns / child table | Notes |
 |----------|------|----------|-------------------------|-------|
-| `profile` | scalar | read + write | `title`, `site_id`, `status`, `estimate_date`, `valid_until`, `source_estimate_id`, `category_id` | `status` read-only except via `win`/`lose` actions |
+| `profile` | scalar | read + write | `title`, `site_id`, `status`, `estimate_date`, `valid_until`, `source_estimate_id`, `category_id` | `status` read-only except via `win`/`lose` actions; **`site_id` writable create only** — read-only + link after first save ([decision](../decisions/estimate.md#decision-estimate-site-anchor--gate-lines-immutable-after-create-2026-06-30)) |
 | `stakeholders` | collection | read + write | `estimate_party` | `party_id`, `relation_id`, `sort_order` |
 | `systems` | collection | read + write | `estimate_system` + nested `estimate_system_spec` | Logical Field — `columns: []` in YAML; see below |
 | `line_items` | collection | read + write | `estimate_line` | Flat persist; tree UI parents are not separate Fields |
@@ -100,7 +101,7 @@
 }
 ```
 
-Writable PATCH keys: manifest-narrowed subset of above; **`status`** not writable via PATCH body (actions only).
+Writable PATCH keys: manifest-narrowed subset of above; **`status`** not writable via PATCH body (actions only). **`site_id`** not patchable after estimate row exists — DAL `ConflictError` `{ code: "site_id_immutable" }`.
 
 ### Collection — `stakeholders` element
 
@@ -247,7 +248,7 @@ Read path merges catalog `system_spec_def` rows for each `system_id` with saved 
 | Operation | Body keys | Semantics |
 |-----------|-----------|-----------|
 | `create` | `profile` (`title`, `site_id`), optional `stakeholders`, optional `systems`, optional `line_items` | Insert `estimate` status `draft`; validate `site_id` exists |
-| `patch` | manifest-narrowed `profile`, `stakeholders`, `systems`, `line_items` | Scalar profile keys; collections replace-array |
+| `patch` | manifest-narrowed `profile`, `stakeholders`, `systems`, `line_items` | Scalar profile keys; collections replace-array; **`profile.site_id` immutable** — reject change with `ConflictError` `{ code: "site_id_immutable" }` |
 | `delete` | — | Hard delete when allowed; pre-check job reference when `won` |
 | `win` | — | Set `status = won`; create `job` + copy parties/lines (4b — when job slice ready) |
 | `lose` | — | Set `status = lost` |
@@ -294,7 +295,7 @@ Estimate PATCH **must not** INSERT/UPDATE `site_area`, `site_asset`, or `site_sy
 
 ## F — Domain rules
 
-- **Site anchor** — every estimate has `site_id`; quote structure uses optional **`estimate_system`** blocks keyed to catalog `system` ([`02-estimates.md`](../planning/02-estimates.md)).
+- **Site anchor** — every estimate has `site_id`; quote structure uses optional **`estimate_system`** blocks keyed to catalog `system` ([`02-estimates.md`](../planning/02-estimates.md)). **`site_id` locked after first POST** — quote scope is property-scoped; stricter than job site change.
 - **General bucket** — `estimate_system_id = null` for ROM, mobilization, and quote-wide lines.
 - **One block per catalog system** — at most one `estimate_system` row per `system_id` per estimate.
 - **Commercial vs system blocks** — `estimate_section` retired; do not confuse catalog `system` blocks with CSI commercial rollups (still deferred).
@@ -318,7 +319,7 @@ Master-detail: list in `estimates/layout.tsx`, detail in `[id]/page.tsx` ([`rout
 │ profile — title, site picker, dates, status (read-only)      │
 │ ── Stakeholders ──                                           │
 │ stakeholders (field array or compact table)                  │
-│ ── Line items (tree) ──                                      │
+│ ── Line items (tree) ──  *(tab hidden until site selected)*  │
 │ [ Add system ]                                               │
 │ antd Table treeData — General + system parents + line leaves │
 │ ── footer ── total ext sell                                  │
@@ -416,9 +417,12 @@ When `system_spec_def` rows exist for catalog `system`: **expand** system parent
 
 | Field | Add | Pickers | Empty state |
 |-------|-----|---------|-------------|
+| `profile.site_id` | — | [`LinkedSelectInput`](../../components/form/LinkedSelectInput.tsx) — site list; **`… Add site`** last option when `site_detail` `write` + field writable → `/sites/new` + picker return ([decision](../decisions/estimate.md#decision-estimate-site-anchor--gate-lines-immutable-after-create-2026-06-30), [linked picker](../decisions/general.md#decision-linked-picker-control-linkedselectinput--2026-06-24)); **create:** writable select; **edit:** read-only label + open icon when `site_detail` `read` | Required on create |
 | `stakeholders` | Add stakeholder | Any `party`; relation from `job_party_relation_table` | "No stakeholders" |
-| `systems` | Add system (toolbar) | Catalog `system` list | No system rows when ROM-only |
-| `line_items` | Add line on focused parent | Item catalog when `item_list` ships; `part_id` when manifest grants | "No lines" under General |
+| `systems` | Add system (toolbar) | Catalog `system` list — **hidden until `site_id` set** | No system rows when ROM-only |
+| `line_items` | Add line on focused parent | Item catalog when `item_list` ships; `part_id` when manifest grants — **Line Items tab hidden until `site_id` set** | "No lines" under General |
+
+**Site-first gating:** Line Items tab and `systems` picker appear only when `profile.site_id` is non-empty in form state (create) or loaded DTO (edit). Stakeholders are **not** gated. When line items read is granted but no site: secondary hint on General tab — *"Select a site to add line items."*
 
 **Stakeholders:** replace-array on Save; duplicate `(party_id, relation_id)` inline error.
 
@@ -435,6 +439,7 @@ When `system_spec_def` rows exist for catalog `system`: **expand** system parent
 | Event | Transition | Notes |
 |-------|------------|-------|
 | Create | POST | `draft`; `title` + `site_id` required |
+| Edit profile | PATCH | scalar keys; **`site_id` must not change** on existing row |
 | Edit lines / systems | PATCH | replace-array `systems`, `line_items` |
 | Send (manual) | PATCH `status` → `sent` | **Optional v1** |
 | Win | `win` action | `won` + job create (4b) |
@@ -448,7 +453,9 @@ When `system_spec_def` rows exist for catalog `system`: **expand** system parent
 
 | Topic | Handling |
 |-------|----------|
-| **ROM / no systems** | Valid — General parent only; all lines `estimate_system_id = null` |
+| **No site selected (create)** | Line Items tab absent; `systems` picker hidden; stakeholders still editable; hint on General tab when line items read granted |
+| **Site change on create** | Changing `profile.site_id` to a different id (or clearing to `""`) clears `systems` and `line_items` in form state; first pick from empty does not clear |
+| **ROM / no systems** | Valid once site selected — General parent only; all lines `estimate_system_id = null`; **site still required** on POST |
 | **Mixed quote** | General lines + one or more system blocks in same estimate |
 | **Line without catalog ids** | Valid — description + qty + cost + sell suffice |
 | **Assembly expand** | One PATCH may grow line count; client generates temp keys until save |
@@ -497,3 +504,12 @@ When `system_spec_def` rows exist for catalog `system`: **expand** system parent
 - [x] `job_line` DAL — `site_area_id` / `site_asset_id`; drop `site_location` (2026-06-29)
 - [x] ROM (General only) + mixed quote round-trip (2026-06-29)
 - [ ] `win` → job copy (4b)
+
+### Task 33 (site anchor)
+
+- [x] Line Items tab + systems picker gated on non-empty `profile.site_id` (2026-06-30)
+- [x] `profile.site_id` writable create only; read-only + open icon on edit (2026-06-30)
+- [x] DAL rejects PATCH `site_id` change — `ConflictError` `{ code: "site_id_immutable" }` (2026-06-30)
+- [x] `LinkedSelectInput` + `… Add site` picker return on create (2026-06-30)
+- [x] Create: changing or clearing site resets `systems` + `line_items` (2026-06-30)
+- [x] `codegen:check` + targeted tests + build (2026-06-30)

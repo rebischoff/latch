@@ -1,0 +1,20 @@
+# Categories — tree list pane for category_detail
+id: category_list
+displayName: Category list
+anchorTable: category
+
+fieldActions:
+  - read
+  - write
+
+surfaceActions:
+  - read
+  - create
+
+tables:
+  - category
+
+fields:
+  - id: tree
+    # logical — DAL maps nested category forest; see docs/surface-specs/category.md
+    columns: []

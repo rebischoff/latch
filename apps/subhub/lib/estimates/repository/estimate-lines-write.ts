@@ -4,12 +4,14 @@ import type { Pool, PoolClient } from "pg";
 
 import { tableExists } from "../../sites/repository/sql-utils";
 import type { EstimateLineItemPatchRow } from "../descriptors/estimate-detail";
+import type { CheckedZoneMembership } from "./estimate-scopes-write";
 
 const validateLineItems = async (
   client: PoolClient,
   siteId: string,
   rows: EstimateLineItemPatchRow[],
-  validSystemIds: Set<string>,
+  validScopeIds: Set<string>,
+  checkedZones: CheckedZoneMembership,
 ): Promise<Array<EstimateLineItemPatchRow & { id: string }>> => {
   const normalized = rows.map((row) => ({
     ...row,
@@ -64,13 +66,49 @@ const validateLineItems = async (
       }
     }
 
-    if (row.estimate_system_id !== null && row.estimate_system_id !== undefined) {
-      if (!validSystemIds.has(row.estimate_system_id)) {
-        throw new ValidationError("estimate_system_id must reference a system block in this estimate", {
+    if (row.estimate_scope_id !== null && row.estimate_scope_id !== undefined) {
+      if (!validScopeIds.has(row.estimate_scope_id)) {
+        throw new ValidationError("estimate_scope_id must reference a scope in this estimate", {
           field: "line_items",
-          code: "unknown_system_block",
+          code: "unknown_scope_block",
           id: row.id,
-          estimate_system_id: row.estimate_system_id,
+          estimate_scope_id: row.estimate_scope_id,
+        });
+      }
+    }
+
+    if (row.site_zone_id !== null && row.site_zone_id !== undefined) {
+      const scopeId = row.estimate_scope_id ?? null;
+      if (!scopeId) {
+        throw new ValidationError("site_zone_id requires estimate_scope_id", {
+          field: "line_items",
+          code: "zone_without_scope",
+          id: row.id,
+          site_zone_id: row.site_zone_id,
+        });
+      }
+
+      const checkedForScope = checkedZones.get(scopeId);
+      if (!checkedForScope?.has(row.site_zone_id)) {
+        throw new ValidationError("site_zone_id must be checked in matching scope", {
+          field: "line_items",
+          code: "unchecked_zone",
+          id: row.id,
+          site_zone_id: row.site_zone_id,
+          estimate_scope_id: scopeId,
+        });
+      }
+
+      const zoneResult = await client.query<{ id: string }>(
+        `SELECT id FROM site_zone WHERE id = $1 AND site_id = $2`,
+        [row.site_zone_id, siteId],
+      );
+      if (zoneResult.rows.length === 0) {
+        throw new ValidationError("Unknown site_zone_id for estimate site", {
+          field: "line_items",
+          code: "unknown_site_zone",
+          id: row.id,
+          site_zone_id: row.site_zone_id,
         });
       }
     }
@@ -84,9 +122,16 @@ export const replaceEstimateLineItemsTx = async (
   estimateId: string,
   siteId: string,
   rows: EstimateLineItemPatchRow[],
-  validSystemIds: Set<string>,
+  validScopeIds: Set<string>,
+  checkedZones: CheckedZoneMembership,
 ): Promise<void> => {
-  const normalized = await validateLineItems(client, siteId, rows, validSystemIds);
+  const normalized = await validateLineItems(
+    client,
+    siteId,
+    rows,
+    validScopeIds,
+    checkedZones,
+  );
 
   await client.query(`DELETE FROM estimate_line WHERE estimate_id = $1`, [
     estimateId,
@@ -100,7 +145,8 @@ export const replaceEstimateLineItemsTx = async (
       `INSERT INTO estimate_line (
          id,
          estimate_id,
-         estimate_system_id,
+         estimate_scope_id,
+         site_zone_id,
          parent_line_id,
          line_number,
          line_role,
@@ -117,11 +163,12 @@ export const replaceEstimateLineItemsTx = async (
          vendor_part_id,
          sort_order
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)`,
       [
         row.id,
         estimateId,
-        row.estimate_system_id ?? null,
+        row.estimate_scope_id ?? null,
+        row.site_zone_id ?? null,
         row.parent_line_id ?? null,
         lineNumber,
         row.line_role,
@@ -148,9 +195,17 @@ export const replaceEstimateLineItems = async (
   estimateId: string,
   siteId: string,
   rows: EstimateLineItemPatchRow[],
-  validSystemIds: Set<string>,
+  validScopeIds: Set<string>,
+  checkedZones: CheckedZoneMembership,
 ): Promise<void> => {
   await withPermissionDb(pool, actorId, async (client) => {
-    await replaceEstimateLineItemsTx(client, estimateId, siteId, rows, validSystemIds);
+    await replaceEstimateLineItemsTx(
+      client,
+      estimateId,
+      siteId,
+      rows,
+      validScopeIds,
+      checkedZones,
+    );
   });
 };

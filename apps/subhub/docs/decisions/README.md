@@ -21,6 +21,8 @@ _Operations backbone forks **resolved** (2026-06-27). Optional: [J3 phase weight
 | [07-open-decisions.md](../planning/07-open-decisions.md) | Open forks + glossary |
 | [08-supersedes.md](../planning/08-supersedes.md) | Prior decisions amended |
 | [09-migration-notes.md](../planning/09-migration-notes.md) | DBML / migration order |
+| [11-categories-scope-model.md](../planning/11-categories-scope-model.md) | Category roots replace catalog `system` |
+| [12-master-detail-chrome.md](../planning/12-master-detail-chrome.md) | Shared toolbar + create navigation (2026-07-01) |
 
 ## Domain files
 
@@ -41,6 +43,13 @@ _Operations backbone forks **resolved** (2026-06-27). Optional: [J3 phase weight
 
 | Decision | File | Date | Status |
 |----------|------|------|--------|
+| `spec_def` value types and part-matching rules | [catalog.md](./catalog.md) | 2026-07-02 | **locked** (DDL in 37f follow-on) |
+| Category spec participation — inherit, include, exclude | [catalog.md](./catalog.md) | 2026-07-02 | **locked** (37d amend + migration) |
+| Category-only scope — roots replace catalog `system` | [catalog.md](./catalog.md) | 2026-06-30 | **locked** |
+| Estimate scope — checkbox site tree, item-first lines | [estimate.md](./estimate.md) | 2026-06-30 | **locked** |
+| Site scopes & zones — category root instances | [site.md](./site.md) | 2026-06-30 | **locked** |
+| Site geography UI — systems & areas tree table | [site.md](./site.md) | 2026-06-30 | **locked** |
+| Estimate site anchor — gate lines, immutable after create | [estimate.md](./estimate.md) | 2026-06-30 | **locked** |
 | System specs + part compatibility (C2) | [catalog.md](./catalog.md) | 2026-06-27 | **locked** |
 | Location confidence — defer v1 (E4) | [estimate.md](./estimate.md) | 2026-06-27 | **locked** |
 | Estimate — estimate_system tabs | [estimate.md](./estimate.md) | 2026-06-27 | **locked** |
@@ -60,7 +69,7 @@ _Operations backbone forks **resolved** (2026-06-27). Optional: [J3 phase weight
 | `part_detail` — MPN catalog and vendor pricing | [catalog.md](./catalog.md) | 2026-06-19 | active |
 | picker return context — URL protocol | [general.md](./general.md) | 2026-06-24 | active |
 | picker return on SurfaceFormRoot — merge selectedId into defaults | [general.md](./general.md) | 2026-06-24 | active |
-| list+detail Surface create — toolbar and picker add-new | [general.md](./general.md) | 2026-06-19 | active (amended 2026-06-25) |
+| list+detail Surface create — toolbar and picker add-new | [general.md](./general.md) | 2026-06-19 | active (amended 2026-07-01) |
 | Surface create route — `/new` + DB-assigned id | [general.md](./general.md) | 2026-06-25 | active (retrofit task 27) |
 | linked picker control (`LinkedSelectInput`) | [general.md](./general.md) | 2026-06-24 | active |
 | picker navigate away — dirty form confirm (v1) | [general.md](./general.md) | 2026-06-24 | active |
@@ -97,6 +106,7 @@ _Operations backbone forks **resolved** (2026-06-27). Optional: [J3 phase weight
 | party profile Fields on type lenses | [party.md](./party.md) | 2026-06-17 | active |
 | `employee_detail` scope — marker now, HR later | [party.md](./party.md) | 2026-06-17 | active |
 | procurement — requisition layer and job-site inventory | [procurement.md](./procurement.md) | 2026-06-17 | active |
+| site geography UI — systems & areas tree table | [site.md](./site.md) | 2026-06-30 | active |
 | address vs site geography — rename and split | [site.md](./site.md) | 2026-06-17 | active |
 | site-owned sections and locations — lifecycle and history | [site.md](./site.md) | 2026-06-17 | active |
 | site geography — slim rows and `latch_audit` | [site.md](./site.md) | 2026-06-17 | active |

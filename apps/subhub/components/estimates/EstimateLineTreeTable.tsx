@@ -6,7 +6,6 @@ import {
   Button,
   Input,
   InputNumber,
-  Modal,
   Select,
   Space,
   Table,
@@ -26,27 +25,23 @@ import {
 import {
   buildLineTree,
   collectLineRemoveIndices,
-  collectSystemLineRemoveIndices,
-  estimateSystemIdForParentKey,
+  estimateScopeIdForParentKey,
   GENERAL_TREE_KEY,
   makeLine,
-  makeSpecRowsFromCatalog,
-  makeSystemBlock,
-  parentKeyForSystemId,
   type EstimateLineEditorFormValues,
   type EstimateLineFormRow,
   type EstimateLineKind,
   type EstimateLineRole,
   type EstimateLineTreeNode,
+  type EstimateScopeFormRow,
   type TreeRowKind,
 } from "@/components/estimates/estimate-line-tree";
-import { EstimateSystemSpecFields } from "@/components/estimates/EstimateSystemSpecFields";
 import { FormSection } from "@/components/form/FormSection";
 import { useFormUi } from "@/components/surface/useFormUi";
-import { useEstimateSystemPicker } from "@/lib/hooks/use-estimate-system-picker";
 
 type EstimateLineTreeTableProps = {
   manifest: Manifest;
+  siteSelected?: boolean;
 };
 
 const LINE_KIND_OPTIONS: Array<{ value: EstimateLineKind; label: string }> = [
@@ -230,35 +225,26 @@ const TotalSellFooter = () => {
 };
 
 const isParentRow = (rowKind: TreeRowKind): boolean =>
-  rowKind === "general" || rowKind === "system";
-
-const isFullSpanRow = (rowKind: TreeRowKind): boolean =>
-  rowKind === "general" || rowKind === "system" || rowKind === "specs";
+  rowKind === "general" || rowKind === "scope";
 
 const parentCellProps = (rowKind: TreeRowKind, columnCount: number) =>
-  isFullSpanRow(rowKind) ? { colSpan: columnCount } : {};
+  isParentRow(rowKind) ? { colSpan: columnCount } : {};
 
 const hiddenParentCellProps = (rowKind: TreeRowKind) =>
-  isFullSpanRow(rowKind) ? { colSpan: 0 } : {};
+  isParentRow(rowKind) ? { colSpan: 0 } : {};
 
 type ParentRowChromeProps = {
   label: string;
-  rowKind: TreeRowKind;
   disabled: boolean;
   writableLines: boolean;
-  allowRemoveSystem: boolean;
   onAddLine: () => void;
-  onRemove?: () => void;
 };
 
 const ParentRowChrome = ({
   label,
-  rowKind,
   disabled,
   writableLines,
-  allowRemoveSystem,
   onAddLine,
-  onRemove,
 }: ParentRowChromeProps) => (
   <div
     style={{
@@ -282,58 +268,40 @@ const ParentRowChrome = ({
           Line
         </Button>
       ) : null}
-      {rowKind === "system" && allowRemoveSystem && onRemove ? (
-        <Button
-          type="text"
-          danger
-          size="small"
-          icon={<DeleteOutlined />}
-          aria-label="Remove system block"
-          disabled={disabled}
-          onClick={onRemove}
-        />
-      ) : null}
     </Space>
   </div>
 );
 
-export const EstimateLineTreeTable = ({ manifest }: EstimateLineTreeTableProps) => {
-  const { control, getValues, setValue } = useFormContext<EstimateLineEditorFormValues>();
+export const EstimateLineTreeTable = ({
+  manifest,
+  siteSelected = true,
+}: EstimateLineTreeTableProps) => {
+  const { control, getValues } = useFormContext<EstimateLineEditorFormValues>();
   const {
     append: appendLine,
     insert: insertLine,
     remove: removeLines,
   } = useFieldArray({ control, name: "line_items" });
-  const { append: appendSystem, remove: removeSystem } = useFieldArray({
-    control,
-    name: "systems",
-  });
   const { disabled } = useFormUi();
 
-  const watchedSystems = useWatch({ control, name: "systems" }) as
-    | EstimateLineEditorFormValues["systems"]
+  const watchedScopes = useWatch({ control, name: "scopes" }) as
+    | EstimateScopeFormRow[]
     | undefined;
   const watchedLines = useWatch({ control, name: "line_items" }) as
     | EstimateLineFormRow[]
     | undefined;
 
-  const systems = watchedSystems ?? [];
+  const scopes = watchedScopes ?? [];
   const lineItems = watchedLines ?? [];
 
   const [focusedParentKey, setFocusedParentKey] = useState(GENERAL_TREE_KEY);
-  const [addSystemOpen, setAddSystemOpen] = useState(false);
-  const [pickedSystemId, setPickedSystemId] = useState<string | null>(null);
-
-  const { data: systemPicker, isLoading: systemPickerLoading } = useEstimateSystemPicker();
 
   const writableLines = fieldAllows(manifest, "line_items", "write");
-  const writableSystems = fieldAllows(manifest, "systems", "write");
   const allowRemoveLine = writableLines || surfaceAllows(manifest, "delete");
-  const allowRemoveSystem = writableSystems || surfaceAllows(manifest, "delete");
 
   const treeData = useMemo(
-    () => buildLineTree(systems, lineItems),
-    [lineItems, systems],
+    () => buildLineTree(scopes, lineItems),
+    [lineItems, scopes],
   );
 
   const lineIndexById = useMemo(() => {
@@ -344,46 +312,33 @@ export const EstimateLineTreeTable = ({ manifest }: EstimateLineTreeTableProps) 
     return map;
   }, [lineItems]);
 
-  const usedCatalogSystemIds = useMemo(
-    () => new Set(systems.map((system) => system.system_id)),
-    [systems],
-  );
-
-  const catalogSystemOptions = useMemo(
-    () =>
-      (systemPicker?.data.rows ?? [])
-        .filter((row) => !usedCatalogSystemIds.has(row.id))
-        .map((row) => ({ value: row.id, label: row.name })),
-    [systemPicker?.data.rows, usedCatalogSystemIds],
-  );
-
   const addLineUnderParent = useCallback(
     (parentKey: string) => {
-      const estimateSystemId = estimateSystemIdForParentKey(parentKey, systems);
-      appendLine(makeLine({ estimate_system_id: estimateSystemId }));
+      const estimateScopeId = estimateScopeIdForParentKey(parentKey, scopes);
+      appendLine(makeLine({ estimate_scope_id: estimateScopeId }));
       setFocusedParentKey(parentKey);
     },
-    [appendLine, systems],
+    [appendLine, scopes],
   );
 
   const addKitUnderParent = useCallback(
     (parentKey: string) => {
-      const estimateSystemId = estimateSystemIdForParentKey(parentKey, systems);
+      const estimateScopeId = estimateScopeIdForParentKey(parentKey, scopes);
       const header = makeLine({
-        estimate_system_id: estimateSystemId,
+        estimate_scope_id: estimateScopeId,
         line_role: "kit_header",
         description: "",
         unit: "kit",
       });
       const component = makeLine({
-        estimate_system_id: estimateSystemId,
+        estimate_scope_id: estimateScopeId,
         line_role: "kit_component",
         parent_line_id: header.id,
       });
       appendLine([header, component]);
       setFocusedParentKey(parentKey);
     },
-    [appendLine, systems],
+    [appendLine, scopes],
   );
 
   const addComponent = useCallback(
@@ -408,7 +363,7 @@ export const EstimateLineTreeTable = ({ manifest }: EstimateLineTreeTableProps) 
         makeLine({
           line_role: "kit_component",
           parent_line_id: header.id,
-          estimate_system_id: header.estimate_system_id,
+          estimate_scope_id: header.estimate_scope_id,
         }),
       );
     },
@@ -423,71 +378,16 @@ export const EstimateLineTreeTable = ({ manifest }: EstimateLineTreeTableProps) 
     [getValues, removeLines],
   );
 
-  const removeSystemBlock = useCallback(
-    (systemIndex: number) => {
-      const currentSystems = getValues("systems");
-      const system = currentSystems[systemIndex];
-      if (!system) {
-        return;
-      }
-
-      const lines = getValues("line_items");
-      removeLines(collectSystemLineRemoveIndices(lines, system.id));
-      removeSystem(systemIndex);
-
-      const nextSystems = getValues("systems").map((row, index) => ({
-        ...row,
-        sort_order: index + 1,
-      }));
-      setValue("systems", nextSystems, { shouldDirty: true });
-
-      if (focusedParentKey === parentKeyForSystemId(system.id)) {
-        setFocusedParentKey(GENERAL_TREE_KEY);
-      }
-    },
-    [focusedParentKey, getValues, removeLines, removeSystem, setValue],
-  );
-
-  const confirmAddSystem = useCallback(() => {
-    if (!pickedSystemId) {
-      return;
-    }
-
-    const catalogRow = systemPicker?.data.rows.find((row) => row.id === pickedSystemId);
-    if (!catalogRow) {
-      return;
-    }
-
-    const nextSortOrder = systems.length + 1;
-    const specs = makeSpecRowsFromCatalog(catalogRow.spec_defs ?? []);
-    const block = makeSystemBlock(
-      catalogRow.id,
-      catalogRow.name,
-      nextSortOrder,
-      specs,
-    );
-    appendSystem(block);
-    setFocusedParentKey(parentKeyForSystemId(block.id));
-    setPickedSystemId(null);
-    setAddSystemOpen(false);
-  }, [appendSystem, pickedSystemId, systemPicker?.data.rows, systems.length]);
-
   const showActionsColumn = writableLines || allowRemoveLine;
   const columnCount = showActionsColumn ? 8 : 7;
 
   const columns = useMemo((): ColumnsType<EstimateLineTreeNode> => {
-    const parentChrome = (
-      record: EstimateLineTreeNode,
-      onRemove?: () => void,
-    ): ReactNode => (
+    const parentChrome = (record: EstimateLineTreeNode): ReactNode => (
       <ParentRowChrome
         label={record.label ?? ""}
-        rowKind={record.rowKind}
         disabled={disabled}
         writableLines={writableLines}
-        allowRemoveSystem={allowRemoveSystem}
         onAddLine={() => addLineUnderParent(record.key)}
-        onRemove={onRemove}
       />
     );
 
@@ -497,25 +397,10 @@ export const EstimateLineTreeTable = ({ manifest }: EstimateLineTreeTableProps) 
         title: "Kind",
         width: 120,
         onCell: (record) =>
-          isFullSpanRow(record.rowKind) ? parentCellProps(record.rowKind, columnCount) : {},
+          isParentRow(record.rowKind) ? parentCellProps(record.rowKind, columnCount) : {},
         render: (_value, record) => {
-          if (record.rowKind === "specs" && record.systemIndex !== undefined) {
-            return (
-              <EstimateSystemSpecFields
-                systemIndex={record.systemIndex}
-                writable={writableSystems}
-                disabled={disabled}
-              />
-            );
-          }
-
           if (isParentRow(record.rowKind)) {
-            return parentChrome(
-              record,
-              record.rowKind === "system" && record.systemIndex !== undefined
-                ? () => removeSystemBlock(record.systemIndex as number)
-                : undefined,
-            );
+            return parentChrome(record);
           }
 
           const lineIndex = record.lineId ? lineIndexById.get(record.lineId) : undefined;
@@ -690,31 +575,20 @@ export const EstimateLineTreeTable = ({ manifest }: EstimateLineTreeTableProps) 
     addComponent,
     addLineUnderParent,
     allowRemoveLine,
-    allowRemoveSystem,
     columnCount,
     disabled,
     lineIndexById,
     removeLineAt,
-    removeSystemBlock,
     showActionsColumn,
     writableLines,
-    writableSystems,
   ]);
+
+  if (!siteSelected) {
+    return null;
+  }
 
   return (
     <FormSection title="Line items">
-      {writableSystems ? (
-        <Space style={{ marginBottom: 12 }}>
-          <Button
-            icon={<PlusOutlined />}
-            disabled={disabled || catalogSystemOptions.length === 0}
-            onClick={() => setAddSystemOpen(true)}
-          >
-            Add system
-          </Button>
-        </Space>
-      ) : null}
-
       <Table<EstimateLineTreeNode>
         columns={columns}
         dataSource={treeData}
@@ -726,18 +600,16 @@ export const EstimateLineTreeTable = ({ manifest }: EstimateLineTreeTableProps) 
         expandable={{ defaultExpandAllRows: true, indentSize: 20 }}
         onRow={(record) => ({
           onClick: () => {
-            if (record.rowKind === "general" || record.rowKind === "system") {
+            if (record.rowKind === "general" || record.rowKind === "scope") {
               setFocusedParentKey(record.key);
             }
           },
           style:
             isParentRow(record.rowKind) && record.key === focusedParentKey
               ? FOCUSED_PARENT_ROW_STYLE
-              : record.rowKind === "specs"
-                ? { background: "var(--ant-color-fill-quaternary, #fafafa)" }
-                : isParentRow(record.rowKind)
-                  ? PARENT_ROW_STYLE
-                  : undefined,
+              : isParentRow(record.rowKind)
+                ? PARENT_ROW_STYLE
+                : undefined,
         })}
       />
 
@@ -757,30 +629,6 @@ export const EstimateLineTreeTable = ({ manifest }: EstimateLineTreeTableProps) 
       ) : null}
 
       <TotalSellFooter />
-
-      <Modal
-        title="Add system"
-        open={addSystemOpen}
-        okText="Add"
-        okButtonProps={{ disabled: !pickedSystemId }}
-        onOk={confirmAddSystem}
-        onCancel={() => {
-          setAddSystemOpen(false);
-          setPickedSystemId(null);
-        }}
-      >
-        <Select
-          showSearch
-          allowClear
-          placeholder="Catalog system"
-          style={{ width: "100%" }}
-          loading={systemPickerLoading}
-          options={catalogSystemOptions}
-          value={pickedSystemId}
-          optionFilterProp="label"
-          onChange={(value) => setPickedSystemId(value ?? null)}
-        />
-      </Modal>
     </FormSection>
   );
 };
@@ -837,5 +685,5 @@ export type {
   EstimateLineFormRow,
   EstimateLineKind,
   EstimateLineRole,
-  EstimateSystemFormRow,
+  EstimateScopeFormRow,
 } from "@/components/estimates/estimate-line-tree";

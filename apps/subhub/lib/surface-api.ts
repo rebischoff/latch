@@ -97,6 +97,11 @@ export const SURFACE_API: Partial<Record<SurfaceId, SurfaceApiConfig>> = {
     detailPath: "/api/parts",
     listSurfaceId: "part_list",
   },
+  category_list: { listPath: "/api/categories/tree" },
+  category_detail: {
+    detailPath: "/api/categories",
+    listSurfaceId: "category_list",
+  },
 };
 
 export class SurfaceApiError extends Error {
@@ -162,34 +167,56 @@ export const fetchEstimateSitePicker = async (): Promise<
   return parseResponse<EstimateSitePickerData>(response);
 };
 
-export type EstimateSystemPickerSpecOption = {
-  display_name: string;
-  id: string;
+export type EstimateSiteTreePickerData = {
+  site_tree: {
+    general_zones: Array<{ id: string; name: string; zones?: unknown[] }>;
+    scopes: Array<{
+      id: string;
+      name: string;
+      root_category_id: string;
+      zones: Array<{ id: string; name: string; zones?: unknown[] }>;
+    }>;
+    spec_templates: Record<
+      string,
+      Array<{
+        def_display_name: string;
+        options?: Array<{ display_name: string; id: string }>;
+        spec_def_id: string;
+        spec_option_id: string | null;
+        option_display_name: string | null;
+        value_boolean: boolean | null;
+        value_text: string | null;
+        value_type: "enum" | "boolean" | "text";
+      }>
+    >;
+  };
 };
 
-export type EstimateSystemPickerSpecDef = {
-  def_display_name: string;
-  options: EstimateSystemPickerSpecOption[];
-  system_spec_def_id: string;
-  value_type: "enum" | "boolean" | "text";
+export const fetchEstimateSiteTree = async (
+  siteId: string,
+): Promise<ApiSuccessBody<EstimateSiteTreePickerData>> => {
+  const response = await fetch(
+    `/api/estimates/pickers/site-tree?site_id=${encodeURIComponent(siteId)}`,
+  );
+  return parseResponse<EstimateSiteTreePickerData>(response);
 };
 
-export type EstimateSystemPickerRow = {
+export type CategoryRootPickerRow = {
   id: string;
   name: string;
-  spec_defs: EstimateSystemPickerSpecDef[];
+  sort_order: number;
 };
 
-export type EstimateSystemPickerData = {
-  rows: EstimateSystemPickerRow[];
+export type CategoryRootPickerData = {
+  rows: CategoryRootPickerRow[];
   total: number;
 };
 
-export const fetchEstimateSystemPicker = async (): Promise<
-  ApiSuccessBody<EstimateSystemPickerData>
+export const fetchCategoryRootPicker = async (): Promise<
+  ApiSuccessBody<CategoryRootPickerData>
 > => {
-  const response = await fetch("/api/estimates/pickers/systems");
-  return parseResponse<EstimateSystemPickerData>(response);
+  const response = await fetch("/api/sites/pickers/category-roots");
+  return parseResponse<CategoryRootPickerData>(response);
 };
 
 export const fetchJobSitePicker = async (): Promise<

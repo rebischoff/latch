@@ -1,6 +1,5 @@
 "use client";
 
-import { DeleteOutlined, SaveOutlined, UndoOutlined } from "@ant-design/icons";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   fieldAllows,
@@ -9,10 +8,9 @@ import {
   surfaceAllows,
   type Manifest,
 } from "@latch/contracts";
-import { App, Space, Tag, Typography } from "antd";
-import Link from "next/link";
-import { notFound, useRouter } from "next/navigation";
-import { useMemo } from "react";
+import { App, Tabs, Tag, Typography } from "antd";
+import { notFound, usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useForm, type Resolver } from "react-hook-form";
 import { z } from "zod";
 
@@ -20,26 +18,35 @@ import { DatePickerInput } from "@/components/form/DatePickerInput";
 import {
   EstimateLineTreeTable,
   type EstimateLineFormRow,
-  type EstimateSystemFormRow,
+  type EstimateScopeFormRow,
 } from "@/components/estimates/EstimateLineTreeTable";
 import {
   orderLineItemsForPatch,
-  type EstimateSystemSpecFormRow,
+  type EstimateScopeSpecFormRow,
+  type EstimateSiteTreeFormRow,
 } from "@/components/estimates/estimate-line-tree";
+import { EstimateScopeTab } from "@/components/estimates/EstimateScopeTab";
 import {
   EstimateStakeholderFields,
   validateEstimateStakeholderDuplicates,
   type EstimateStakeholderFormRow,
 } from "@/components/estimates/EstimateStakeholderFields";
 import { FormSection } from "@/components/form/FormSection";
+import { FormFieldItem } from "@/components/form/FormFieldItem";
 import { SURFACE_FORM_MAX_WIDTH } from "@/components/form/formLayout";
-import { SelectInput } from "@/components/form/SelectInput";
+import {
+  LinkedSelectControl,
+  LinkedSelectInput,
+} from "@/components/form/LinkedSelectInput";
 import { TextInput } from "@/components/form/TextInput";
-import { useRegisterSurfaceActions } from "@/components/shell/SurfaceActionsProvider";
+import { useSurfaceFormChrome } from "@/components/surface/SurfaceFormChromeContext";
 import { SurfaceFormLayout } from "@/components/surface/SurfaceFormLayout";
 import { SurfaceFormRoot } from "@/components/surface/SurfaceFormRoot";
 import { useFieldMode } from "@/components/surface/useFieldMode";
+import { useApplyPickerReturn } from "@/lib/hooks/use-apply-picker-return";
 import { useEstimateSitePicker } from "@/lib/hooks/use-estimate-site-picker";
+import { useEstimateSiteTree } from "@/lib/hooks/use-estimate-site-tree";
+import { estimateSitePickerKey } from "@/lib/hooks/surface-query-keys";
 import { useSurfaceListCreate } from "@/lib/hooks/use-surface-list-create";
 import { useSurfaceDetail } from "@/lib/hooks/use-surface-detail";
 import { useSurfaceDelete, useSurfacePatch } from "@/lib/hooks/use-surface-patch";
@@ -48,6 +55,12 @@ import {
   EstimateDetailPatchSchema,
 } from "@/lib/estimates/descriptors/estimate-detail";
 import { routes } from "@/lib/nav-routes";
+import { buildPickerCreateUrl, parseReturnContext } from "@/lib/picker-return-context";
+import {
+  navigateAfterCreate,
+  navigateOnCancel,
+  sanitizeReturnTo,
+} from "@/lib/surface-navigation";
 import { SurfaceApiError } from "@/lib/surface-api";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -65,6 +78,7 @@ type EstimateDetailFormProps = {
   estimateId: string;
   manifest: Manifest;
   canNavigateSite: boolean;
+  canCreateSite: boolean;
 };
 
 type EstimateDetailFormValues = {
@@ -75,7 +89,8 @@ type EstimateDetailFormValues = {
     valid_until: string | null;
   };
   stakeholders: EstimateStakeholderFormRow[];
-  systems: EstimateSystemFormRow[];
+  scopes: EstimateScopeFormRow[];
+  site_tree: EstimateSiteTreeFormRow | null;
   line_items: EstimateLineFormRow[];
 };
 
@@ -98,72 +113,139 @@ const mapStakeholders = (rows: unknown): EstimateStakeholderFormRow[] => {
   });
 };
 
-const mapSystems = (rows: unknown): EstimateSystemFormRow[] => {
+const mapScopes = (rows: unknown): EstimateScopeFormRow[] => {
   if (!Array.isArray(rows)) {
     return [];
   }
 
   return rows.map((row, index) => {
     const item = row as Record<string, unknown>;
-    const specs: EstimateSystemSpecFormRow[] = Array.isArray(item.specs)
-      ? item.specs.map((specRow) => {
-          const spec = specRow as Record<string, unknown>;
-          const valueType =
-            spec.value_type === "enum" ||
-            spec.value_type === "boolean" ||
-            spec.value_type === "text"
-              ? spec.value_type
-              : undefined;
+    const mapSpecs = (specRows: unknown): EstimateScopeSpecFormRow[] =>
+      Array.isArray(specRows)
+        ? specRows.map((specRow) => {
+            const spec = specRow as Record<string, unknown>;
+            const valueType =
+              spec.value_type === "enum" ||
+              spec.value_type === "boolean" ||
+              spec.value_type === "text"
+                ? spec.value_type
+                : undefined;
 
-          return {
-            system_spec_def_id:
-              typeof spec.system_spec_def_id === "string" ? spec.system_spec_def_id : "",
-            def_display_name:
-              typeof spec.def_display_name === "string" ? spec.def_display_name : undefined,
-            value_type: valueType,
-            system_spec_option_id:
-              typeof spec.system_spec_option_id === "string"
-                ? spec.system_spec_option_id
-                : null,
-            option_display_name:
-              typeof spec.option_display_name === "string"
-                ? spec.option_display_name
+            return {
+              spec_def_id:
+                typeof spec.spec_def_id === "string" ? spec.spec_def_id : "",
+              def_display_name:
+                typeof spec.def_display_name === "string" ? spec.def_display_name : undefined,
+              value_type: valueType,
+              spec_option_id:
+                typeof spec.spec_option_id === "string" ? spec.spec_option_id : null,
+              option_display_name:
+                typeof spec.option_display_name === "string"
+                  ? spec.option_display_name
+                  : undefined,
+              value_text: typeof spec.value_text === "string" ? spec.value_text : null,
+              value_boolean:
+                typeof spec.value_boolean === "boolean" ? spec.value_boolean : null,
+              options: Array.isArray(spec.options)
+                ? spec.options
+                    .map((optionRow) => {
+                      const option = optionRow as Record<string, unknown>;
+                      if (
+                        typeof option.id !== "string" ||
+                        typeof option.display_name !== "string"
+                      ) {
+                        return null;
+                      }
+
+                      return {
+                        id: option.id,
+                        display_name: option.display_name,
+                      };
+                    })
+                    .filter((option): option is { id: string; display_name: string } =>
+                      Boolean(option),
+                    )
                 : undefined,
-            value_text: typeof spec.value_text === "string" ? spec.value_text : null,
-            value_boolean:
-              typeof spec.value_boolean === "boolean" ? spec.value_boolean : null,
-            options: Array.isArray(spec.options)
-              ? spec.options
-                  .map((optionRow) => {
-                    const option = optionRow as Record<string, unknown>;
-                    if (
-                      typeof option.id !== "string" ||
-                      typeof option.display_name !== "string"
-                    ) {
-                      return null;
-                    }
+            };
+          })
+        : [];
 
-                    return {
-                      id: option.id,
-                      display_name: option.display_name,
-                    };
-                  })
-                  .filter((option): option is { id: string; display_name: string } =>
-                    Boolean(option),
-                  )
-              : undefined,
+    const zones = Array.isArray(item.zones)
+      ? item.zones.map((zoneRow, zoneIndex) => {
+          const zone = zoneRow as Record<string, unknown>;
+          return {
+            site_zone_id:
+              typeof zone.site_zone_id === "string" ? zone.site_zone_id : "",
+            sort_order:
+              typeof zone.sort_order === "number" ? zone.sort_order : zoneIndex + 1,
+            specs: mapSpecs(zone.specs),
           };
         })
       : [];
 
     return {
       id: typeof item.id === "string" ? item.id : crypto.randomUUID(),
-      system_id: typeof item.system_id === "string" ? item.system_id : "",
-      system_name: typeof item.system_name === "string" ? item.system_name : "",
+      site_scope_id:
+        typeof item.site_scope_id === "string" ? item.site_scope_id : null,
+      root_category_id:
+        typeof item.root_category_id === "string" ? item.root_category_id : null,
+      root_category_name:
+        typeof item.root_category_name === "string" ? item.root_category_name : null,
+      site_scope_name:
+        typeof item.site_scope_name === "string" ? item.site_scope_name : null,
       sort_order: typeof item.sort_order === "number" ? item.sort_order : index + 1,
-      specs,
+      labor_context_type_id:
+        typeof item.labor_context_type_id === "string" ? item.labor_context_type_id : null,
+      markup_type_id: typeof item.markup_type_id === "string" ? item.markup_type_id : null,
+      specs: mapSpecs(item.specs),
+      zones,
     };
   });
+};
+
+const mapSiteTree = (value: unknown): EstimateSiteTreeFormRow | null => {
+  if (typeof value !== "object" || value === null) {
+    return null;
+  }
+
+  const tree = value as Record<string, unknown>;
+  const mapZones = (rows: unknown): EstimateSiteTreeFormRow["general_zones"] => {
+    if (!Array.isArray(rows)) {
+      return [];
+    }
+
+    return rows.map((row) => {
+      const zone = row as Record<string, unknown>;
+      const nested = mapZones(zone.zones);
+      return {
+        id: typeof zone.id === "string" ? zone.id : "",
+        name: typeof zone.name === "string" ? zone.name : "",
+        ...(nested.length > 0 ? { zones: nested } : {}),
+      };
+    });
+  };
+
+  const specTemplates =
+    typeof tree.spec_templates === "object" && tree.spec_templates !== null
+      ? (tree.spec_templates as EstimateSiteTreeFormRow["spec_templates"])
+      : undefined;
+
+  return {
+    scopes: Array.isArray(tree.scopes)
+      ? tree.scopes.map((scopeRow) => {
+          const scope = scopeRow as Record<string, unknown>;
+          return {
+            id: typeof scope.id === "string" ? scope.id : "",
+            name: typeof scope.name === "string" ? scope.name : "",
+            root_category_id:
+              typeof scope.root_category_id === "string" ? scope.root_category_id : "",
+            zones: mapZones(scope.zones),
+          };
+        })
+      : [],
+    general_zones: mapZones(tree.general_zones),
+    spec_templates: specTemplates,
+  };
 };
 
 const mapLineItems = (rows: unknown): EstimateLineFormRow[] => {
@@ -193,7 +275,8 @@ const mapLineItems = (rows: unknown): EstimateLineFormRow[] => {
       unit_cost: typeof item.unit_cost === "number" ? item.unit_cost : 0,
       unit_price: typeof item.unit_price === "number" ? item.unit_price : 0,
       parent_line_id: asString(item.parent_line_id),
-      estimate_system_id: asString(item.estimate_system_id),
+      estimate_scope_id: asString(item.estimate_scope_id),
+      site_zone_id: asString(item.site_zone_id),
       material_status: materialStatus,
       phase_id: asString(item.phase_id),
       item_id: asString(item.item_id),
@@ -223,7 +306,8 @@ const buildDefaultValues = (
       valid_until: profile?.valid_until ?? null,
     },
     stakeholders: mapStakeholders(data?.stakeholders),
-    systems: mapSystems(data?.systems),
+    scopes: mapScopes(data?.scopes),
+    site_tree: mapSiteTree(data?.site_tree),
     line_items: mapLineItems(data?.line_items),
   };
 };
@@ -257,9 +341,17 @@ export const EstimateDetailForm = ({
   estimateId,
   manifest,
   canNavigateSite,
+  canCreateSite,
 }: EstimateDetailFormProps) => {
   const isCreate = estimateId === "new";
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const pickerReturn = parseReturnContext(searchParams);
+  const persistedPickerSelectedIdRef = useRef<string | null>(null);
+  if (pickerReturn.selectedId) {
+    persistedPickerSelectedIdRef.current = pickerReturn.selectedId;
+  }
   const { message, modal } = App.useApp();
   const { data: detail, isLoading, isFetching, error } = useSurfaceDetail(
     "estimate_detail",
@@ -280,10 +372,22 @@ export const EstimateDetailForm = ({
       }
     | undefined;
 
-  const defaultValues = useMemo(
-    () => (isCreate ? buildDefaultValues(undefined) : buildDefaultValues(detail?.data)),
-    [detail?.data, isCreate],
-  );
+  const defaultValues = useMemo(() => {
+    const base = isCreate
+      ? buildDefaultValues(undefined)
+      : buildDefaultValues(detail?.data);
+    const pickedId = persistedPickerSelectedIdRef.current;
+    if (isCreate && pickedId) {
+      return {
+        ...base,
+        profile: {
+          ...base.profile,
+          site_id: pickedId,
+        },
+      };
+    }
+    return base;
+  }, [detail?.data, isCreate, pickerReturn.selectedId]);
 
   const resolver = useMemo(() => {
     const baseSchema = (isCreate
@@ -296,7 +400,8 @@ export const EstimateDetailForm = ({
     const narrowed = narrowPatchSchema(baseSchema, activeManifest) as z.ZodObject<z.ZodRawShape>;
     const loosened = narrowed.extend({
       stakeholders: z.array(z.object({}).passthrough()).optional(),
-      systems: z.array(z.object({}).passthrough()).optional(),
+      scopes: z.array(z.object({}).passthrough()).optional(),
+      site_tree: z.object({}).passthrough().nullable().optional(),
       line_items: z.array(z.object({}).passthrough()).optional(),
     });
 
@@ -308,10 +413,79 @@ export const EstimateDetailForm = ({
     defaultValues,
   });
 
+  const { setValue, watch } = form;
+
+  useApplyPickerReturn({
+    setValue,
+    returnField: "profile.site_id",
+    pickerQueryKey: estimateSitePickerKey,
+  });
+
+  const returnTo = useMemo(() => {
+    const query = searchParams.toString();
+    return query ? `${pathname}?${query}` : pathname;
+  }, [pathname, searchParams]);
+
+  const siteCreateUrl = useMemo(
+    () =>
+      buildPickerCreateUrl({
+        target: "site",
+        returnTo,
+        returnField: "profile.site_id",
+      }),
+    [returnTo],
+  );
+
+  const prevSiteIdRef = useRef<string | undefined>(undefined);
+  const siteId = watch("profile.site_id");
+  const { data: createSiteTreeResponse } = useEstimateSiteTree(
+    isCreate && siteId ? siteId : undefined,
+  );
+
+  useEffect(() => {
+    if (!isCreate) {
+      return;
+    }
+
+    if (!siteId) {
+      setValue("site_tree", null, { shouldDirty: false });
+      return;
+    }
+
+    const tree = createSiteTreeResponse?.data.site_tree;
+    if (!tree) {
+      return;
+    }
+
+    setValue("site_tree", mapSiteTree(tree), { shouldDirty: false });
+  }, [createSiteTreeResponse?.data.site_tree, isCreate, setValue, siteId]);
+
+  useEffect(() => {
+    if (!isCreate) {
+      return;
+    }
+
+    const prev = prevSiteIdRef.current;
+    if (prev === undefined) {
+      prevSiteIdRef.current = siteId;
+      return;
+    }
+
+    if (prev !== siteId && prev !== "") {
+      setValue("scopes", [], { shouldDirty: true });
+      setValue("site_tree", null, { shouldDirty: false });
+      setValue("line_items", [], { shouldDirty: true });
+    }
+
+    prevSiteIdRef.current = siteId;
+  }, [isCreate, setValue, siteId]);
+
   const siteOptions = useMemo(() => {
     const options = sitePickerOptions(sitePicker?.data.rows);
-    const currentId = profile?.site_id;
-    const currentName = profile?.site_display_name;
+    const currentId = siteId || profile?.site_id;
+    const currentName =
+      profile?.site_display_name ??
+      options.find((option) => option.value === currentId)?.label;
     if (
       currentId &&
       currentName &&
@@ -320,7 +494,7 @@ export const EstimateDetailForm = ({
       return [...options, { value: currentId, label: currentName }];
     }
     return options;
-  }, [profile?.site_display_name, profile?.site_id, sitePicker?.data.rows]);
+  }, [profile?.site_display_name, profile?.site_id, siteId, sitePicker?.data.rows]);
 
   const {
     formState: { isDirty },
@@ -329,113 +503,198 @@ export const EstimateDetailForm = ({
   const canSave = patchableFieldIds(activeManifest).length > 0;
   const canDelete = !isCreate && surfaceAllows(activeManifest, "delete");
   const saving = patch.isPending || create.isPending;
-  const siteId = form.watch("profile.site_id");
+  const showAddSite =
+    canCreateSite && fieldAllows(activeManifest, "profile", "write");
+  const showScopeTab =
+    fieldAllows(activeManifest, "scopes", "read") && Boolean(siteId);
+  const showLineItemsTab =
+    fieldAllows(activeManifest, "line_items", "read") && Boolean(siteId);
 
-  const onSave = form.handleSubmit(async (values) => {
-    const stakeholders = values.stakeholders ?? [];
+  const persistEstimate = useCallback(
+    async (values: EstimateDetailFormValues, afterCreate: "detail" | "reset") => {
+      const stakeholders = values.stakeholders ?? [];
 
-    if (
-      fieldAllows(activeManifest, "stakeholders", "write") &&
-      !validateEstimateStakeholderDuplicates(stakeholders, form.setError)
-    ) {
-      message.error("Fix duplicate stakeholders before saving");
-      return;
-    }
-
-    const body: Record<string, unknown> = {
-      profile: values.profile,
-    };
-
-    if (fieldAllows(activeManifest, "stakeholders", "write")) {
-      body.stakeholders = stakeholders.map((row) => ({
-        party_id: row.party_id,
-        relation_id: row.relation_id,
-      }));
-    }
-
-    if (fieldAllows(activeManifest, "systems", "write")) {
-      body.systems = (values.systems ?? []).map((row, index) => ({
-        id: row.id,
-        system_id: row.system_id,
-        sort_order: index + 1,
-        specs: row.specs.map((spec) => ({
-          system_spec_def_id: spec.system_spec_def_id,
-          system_spec_option_id: spec.system_spec_option_id,
-          value_text: spec.value_text,
-          value_boolean: spec.value_boolean,
-        })),
-      }));
-    }
-
-    if (fieldAllows(activeManifest, "line_items", "write")) {
-      const orderedLines = orderLineItemsForPatch(
-        values.systems ?? [],
-        values.line_items ?? [],
-      );
-
-      body.line_items = orderedLines.map((row) => ({
-        id: row.id,
-        line_role: row.line_role,
-        line_kind: row.line_kind,
-        description: row.description,
-        quantity: row.quantity,
-        unit: row.unit,
-        unit_cost: row.unit_cost,
-        unit_price: row.unit_price,
-        parent_line_id: row.parent_line_id,
-        estimate_system_id: row.estimate_system_id,
-        material_status: row.material_status,
-        phase_id: row.phase_id,
-        item_id: row.item_id,
-        part_id: row.part_id,
-        vendor_part_id: row.vendor_part_id,
-      }));
-    }
-
-    try {
-      if (isCreate) {
-        const result = await create.mutateAsync(body);
-        const newId = String(result.data.id);
-        message.success("Estimate created");
-        router.replace(routes.estimates.detail(newId));
-        router.refresh();
+      if (
+        fieldAllows(activeManifest, "stakeholders", "write") &&
+        !validateEstimateStakeholderDuplicates(stakeholders, form.setError)
+      ) {
+        message.error("Fix duplicate stakeholders before saving");
         return;
       }
 
-      await patch.mutateAsync(body);
-      message.success("Estimate saved");
-    } catch (saveError) {
-      if (saveError instanceof SurfaceApiError) {
-        const details = saveError.details as
-          | { field?: string; code?: string; party_id?: string; relation_id?: string }
-          | undefined;
-
-        if (details?.field === "stakeholders" && details.code === "duplicate") {
-          stakeholders.forEach((row, index) => {
-            if (
-              row.party_id === details.party_id &&
-              row.relation_id === details.relation_id
-            ) {
-              form.setError(`stakeholders.${index}.relation_id`, {
-                message: "This party already has this relation on the estimate",
-              });
-            }
-          });
-          message.error("Fix duplicate stakeholders before saving");
-          return;
+      const profileBody = (() => {
+        if (isCreate) {
+          return values.profile;
         }
+        const { site_id: _siteId, ...rest } = values.profile;
+        return rest;
+      })();
+
+      const body: Record<string, unknown> = {
+        profile: profileBody,
+      };
+
+      if (fieldAllows(activeManifest, "stakeholders", "write")) {
+        body.stakeholders = stakeholders.map((row) => ({
+          party_id: row.party_id,
+          relation_id: row.relation_id,
+        }));
       }
 
-      message.error(isCreate ? "Unable to create estimate" : "Unable to save estimate");
-    }
-  });
+      if (fieldAllows(activeManifest, "scopes", "write")) {
+        body.scopes = (values.scopes ?? []).map((row, index) => ({
+          id: row.id,
+          site_scope_id: row.site_scope_id,
+          root_category_id: row.root_category_id,
+          sort_order: index + 1,
+          labor_context_type_id: row.labor_context_type_id,
+          markup_type_id: row.markup_type_id,
+          specs: row.specs.map((spec) => ({
+            spec_def_id: spec.spec_def_id,
+            spec_option_id: spec.spec_option_id,
+            value_text: spec.value_text,
+            value_boolean: spec.value_boolean,
+          })),
+          zones: row.zones.map((zone, zoneIndex) => ({
+            site_zone_id: zone.site_zone_id,
+            sort_order: zoneIndex + 1,
+            specs: zone.specs.map((spec) => ({
+              spec_def_id: spec.spec_def_id,
+              spec_option_id: spec.spec_option_id,
+              value_text: spec.value_text,
+              value_boolean: spec.value_boolean,
+            })),
+          })),
+        }));
+      }
 
-  const onRevert = () => {
+      if (fieldAllows(activeManifest, "line_items", "write")) {
+        const orderedLines = orderLineItemsForPatch(
+          values.scopes ?? [],
+          values.line_items ?? [],
+        );
+
+        body.line_items = orderedLines.map((row) => ({
+          id: row.id,
+          line_role: row.line_role,
+          line_kind: row.line_kind,
+          description: row.description,
+          quantity: row.quantity,
+          unit: row.unit,
+          unit_cost: row.unit_cost,
+          unit_price: row.unit_price,
+          parent_line_id: row.parent_line_id,
+          estimate_scope_id: row.estimate_scope_id,
+          site_zone_id: row.site_zone_id,
+          material_status: row.material_status,
+          phase_id: row.phase_id,
+          item_id: row.item_id,
+          part_id: row.part_id,
+          vendor_part_id: row.vendor_part_id,
+        }));
+      }
+
+      try {
+        if (isCreate) {
+          const result = await create.mutateAsync(body);
+          const newId = String(result.data.id);
+          message.success("Estimate created");
+
+          if (afterCreate === "reset") {
+            form.reset(buildDefaultValues(undefined));
+            return;
+          }
+
+          if (pickerReturn.returnField && returnTo) {
+            navigateAfterCreate(router, {
+              returnTo: sanitizeReturnTo(returnTo, routes.estimates.list),
+              returnField: pickerReturn.returnField,
+              newId,
+              fallbackList: routes.estimates.list,
+              fallbackDetail: routes.estimates.detail,
+            });
+            return;
+          }
+
+          router.replace(routes.estimates.detail(newId));
+          router.refresh();
+          return;
+        }
+
+        await patch.mutateAsync(body);
+        message.success("Estimate saved");
+      } catch (saveError) {
+        if (saveError instanceof SurfaceApiError) {
+          const details = saveError.details as
+            | { field?: string; code?: string; party_id?: string; relation_id?: string }
+            | undefined;
+
+          if (details?.field === "stakeholders" && details.code === "duplicate") {
+            stakeholders.forEach((row, index) => {
+              if (
+                row.party_id === details.party_id &&
+                row.relation_id === details.relation_id
+              ) {
+                form.setError(`stakeholders.${index}.relation_id`, {
+                  message: "This party already has this relation on the estimate",
+                });
+              }
+            });
+            message.error("Fix duplicate stakeholders before saving");
+            return;
+          }
+        }
+
+        message.error(isCreate ? "Unable to create estimate" : "Unable to save estimate");
+      }
+    },
+    [
+      activeManifest,
+      create,
+      form,
+      isCreate,
+      message,
+      patch,
+      pickerReturn.returnField,
+      returnTo,
+      router,
+    ],
+  );
+
+  const onSave = form.handleSubmit((values) => persistEstimate(values, "detail"));
+
+  const onSaveAndNew = useMemo(
+    () =>
+      isCreate && !pickerReturn.returnField
+        ? form.handleSubmit((values) => persistEstimate(values, "reset"))
+        : undefined,
+    [form, isCreate, persistEstimate, pickerReturn.returnField],
+  );
+
+  const onCancel = useCallback(() => {
+    const navigate = () => {
+      navigateOnCancel(router, returnTo, routes.estimates.list);
+    };
+
+    if (isDirty) {
+      modal.confirm({
+        title: "Leave without saving?",
+        content: "Unsaved changes will be lost.",
+        okText: "Leave",
+        onOk: navigate,
+      });
+      return;
+    }
+
+    navigate();
+  }, [isDirty, modal, returnTo, router]);
+
+  const onRevert = useCallback(() => {
     form.reset(defaultValues);
     message.info("Reverted to last loaded values");
-  };
+  }, [defaultValues, form, message]);
 
-  const onDelete = () => {
+  const onDelete = useCallback(() => {
     modal.confirm({
       title: "Delete estimate?",
       content: "This permanently removes the draft estimate.",
@@ -452,63 +711,21 @@ export const EstimateDetailForm = ({
         }
       },
     });
-  };
+  }, [message, modal, remove, router]);
 
-  const toolbarActions = useMemo(
-    () => [
-      {
-        key: "save",
-        label: "Save",
-        icon: <SaveOutlined />,
-        priority: "primary" as const,
-        surfaceAction: "write" as const,
-        disabled: !canSave || (!isCreate && !isDirty),
-        loading: saving,
-        onClick: onSave,
-      },
-      ...(isCreate
-        ? []
-        : [
-            {
-              key: "revert",
-              label: "Revert",
-              icon: <UndoOutlined />,
-              priority: "secondary" as const,
-              surfaceAction: "write" as const,
-              disabled: !isDirty || saving,
-              onClick: onRevert,
-            },
-          ]),
-      ...(isCreate
-        ? []
-        : [
-            {
-              key: "delete",
-              label: "Delete",
-              icon: <DeleteOutlined />,
-              priority: "secondary" as const,
-              surfaceAction: "delete" as const,
-              danger: true,
-              disabled: !canDelete,
-              loading: remove.isPending,
-              onClick: onDelete,
-            },
-          ]),
-    ],
-    [
-      canDelete,
-      canSave,
-      isCreate,
-      isDirty,
-      onDelete,
-      onRevert,
-      onSave,
-      remove.isPending,
-      saving,
-    ],
-  );
-
-  useRegisterSurfaceActions(activeManifest, toolbarActions);
+  useSurfaceFormChrome({
+    mode: isCreate ? "create" : "edit",
+    manifest: activeManifest,
+    canSave,
+    saving,
+    onSave,
+    isDirty,
+    canDelete,
+    onDelete: isCreate ? undefined : onDelete,
+    onRevert: isCreate ? undefined : onRevert,
+    onCancel: isCreate ? onCancel : undefined,
+    onSaveAndNew,
+  });
 
   if (!isCreate && error instanceof SurfaceApiError && error.status === 404) {
     notFound();
@@ -517,9 +734,93 @@ export const EstimateDetailForm = ({
   const initialLoading = !isCreate && isLoading && !detail;
   const blocking = !isCreate && isFetching && Boolean(detail);
   const status = profile?.status ?? "draft";
-  const siteDisplayName =
-    profile?.site_display_name ??
-    siteOptions.find((option) => option.value === siteId)?.label;
+
+  const generalTab = (
+    <>
+      {fieldAllows(activeManifest, "profile", "read") ? (
+        <FormSection title="Profile">
+          <TextInput<EstimateDetailFormValues>
+            field="profile"
+            name="profile.title"
+            label="Title"
+          />
+          {isCreate ? (
+            <LinkedSelectInput<EstimateDetailFormValues>
+              field="profile"
+              name="profile.site_id"
+              label="Site"
+              options={siteOptions}
+              loading={sitePickerLoading}
+              canLink={canNavigateSite}
+              linkHref={routes.sites.detail}
+              canAddNew={showAddSite}
+              addNewHref={siteCreateUrl}
+              addNewLabel="Add site"
+              selectProps={{
+                showSearch: true,
+                optionFilterProp: "label",
+              }}
+            />
+          ) : (
+            <FormFieldItem label="Site">
+              <LinkedSelectControl
+                mode="read"
+                value={siteId}
+                options={siteOptions}
+                loading={sitePickerLoading}
+                canLink={canNavigateSite}
+                linkHref={routes.sites.detail}
+              />
+            </FormFieldItem>
+          )}
+          <DatePickerInput<EstimateDetailFormValues>
+            field="profile"
+            name="profile.estimate_date"
+            label="Estimate date"
+          />
+          <DatePickerInput<EstimateDetailFormValues>
+            field="profile"
+            name="profile.valid_until"
+            label="Valid until"
+          />
+          {!isCreate ? <ProfileStatus status={status} /> : null}
+        </FormSection>
+      ) : null}
+
+      {fieldAllows(activeManifest, "line_items", "read") && !siteId ? (
+        <Typography.Paragraph type="secondary" style={{ marginBottom: 16 }}>
+          Select a site to configure scopes and line items.
+        </Typography.Paragraph>
+      ) : null}
+
+      {fieldAllows(activeManifest, "stakeholders", "read") ? (
+        <EstimateStakeholderFields manifest={activeManifest} />
+      ) : null}
+    </>
+  );
+
+  const scopeTab = showScopeTab ? <EstimateScopeTab manifest={activeManifest} /> : null;
+
+  const lineItemsTab = showLineItemsTab ? (
+    <EstimateLineTreeTable
+      key={siteId}
+      manifest={activeManifest}
+      siteSelected={Boolean(siteId)}
+    />
+  ) : null;
+
+  const tabItems = [
+    ...(fieldAllows(activeManifest, "profile", "read") ||
+    fieldAllows(activeManifest, "stakeholders", "read")
+      ? [{ key: "general", label: "General", children: generalTab }]
+      : []),
+    ...(showScopeTab
+      ? [{ key: "scope", label: "Scope", children: scopeTab }]
+      : []),
+    ...(showLineItemsTab
+      ? [{ key: "line-items", label: "Line Items", children: lineItemsTab }]
+      : []),
+  ];
 
   return (
     <SurfaceFormRoot
@@ -537,61 +838,7 @@ export const EstimateDetailForm = ({
             {isCreate ? "New estimate" : (profile?.title ?? "Estimate")}
           </Typography.Title>
 
-          {fieldAllows(activeManifest, "profile", "read") ? (
-            <FormSection title="Profile">
-              <TextInput<EstimateDetailFormValues>
-                field="profile"
-                name="profile.title"
-                label="Title"
-              />
-              <SelectInput<EstimateDetailFormValues>
-                field="profile"
-                name="profile.site_id"
-                label="Site"
-                options={siteOptions}
-                loading={sitePickerLoading}
-                selectProps={{
-                  showSearch: true,
-                  optionFilterProp: "label",
-                }}
-              />
-              {siteId ? (
-                <div style={{ marginBottom: 16 }}>
-                  <Space>
-                    <Typography.Text type="secondary">Open:</Typography.Text>
-                    {canNavigateSite ? (
-                      <Link href={routes.sites.detail(siteId)}>
-                        {siteDisplayName ?? siteId}
-                      </Link>
-                    ) : (
-                      <Typography.Text type="secondary">
-                        {siteDisplayName ?? siteId}
-                      </Typography.Text>
-                    )}
-                  </Space>
-                </div>
-              ) : null}
-              <DatePickerInput<EstimateDetailFormValues>
-                field="profile"
-                name="profile.estimate_date"
-                label="Estimate date"
-              />
-              <DatePickerInput<EstimateDetailFormValues>
-                field="profile"
-                name="profile.valid_until"
-                label="Valid until"
-              />
-              {!isCreate ? <ProfileStatus status={status} /> : null}
-            </FormSection>
-          ) : null}
-
-          {fieldAllows(activeManifest, "stakeholders", "read") ? (
-            <EstimateStakeholderFields manifest={activeManifest} />
-          ) : null}
-
-          {fieldAllows(activeManifest, "line_items", "read") ? (
-            <EstimateLineTreeTable manifest={activeManifest} />
-          ) : null}
+          {tabItems.length > 0 ? <Tabs items={tabItems} /> : null}
         </SurfaceFormLayout>
       </form>
     </SurfaceFormRoot>

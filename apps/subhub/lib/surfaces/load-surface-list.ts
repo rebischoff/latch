@@ -24,7 +24,8 @@ const isSurfaceListId = (surfaceId: SurfaceId): surfaceId is SurfaceListId =>
   surfaceId === "job_party_relation_table" ||
   surfaceId === "estimate_list" ||
   surfaceId === "job_list" ||
-  surfaceId === "part_list";
+  surfaceId === "part_list" ||
+  surfaceId === "category_list";
 
 export const loadSurfaceListQuery = async (
   surfaceId: SurfaceListId,

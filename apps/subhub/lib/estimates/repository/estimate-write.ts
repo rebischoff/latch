@@ -9,16 +9,32 @@ import {
 } from "../../sites/repository/sql-utils";
 import type {
   EstimateDetailRelatedPatch,
+  EstimateDetailRow,
   EstimateDetailWriteRow,
 } from "../descriptors/estimate-detail";
 import { replaceEstimateLineItemsTx } from "./estimate-lines-write";
 import { replaceEstimateStakeholdersTx } from "./estimate-stakeholders";
 import {
-  loadEstimateSystemBlockIds,
-  replaceEstimateSystemsTx,
-} from "./estimate-systems-write";
+  buildCheckedZoneMembership,
+  loadEstimateScopeBlockIds,
+  replaceEstimateScopesTx,
+} from "./estimate-scopes-write";
 
-const assertSiteExists = async (
+export const assertSiteIdUnchanged = (
+  existing: Pick<EstimateDetailRow, "site_id">,
+  nextSiteId: string,
+): void => {
+  if (nextSiteId === existing.site_id) {
+    return;
+  }
+
+  throw new ConflictError("Cannot change site_id after estimate is created", {
+    field: "profile",
+    code: "site_id_immutable",
+  });
+};
+
+export const assertSiteExists = async (
   client: Pool | PoolClient,
   siteId: string,
 ): Promise<void> => {
@@ -63,7 +79,12 @@ const assertSourceEstimateExists = async (
 const validateEstimateWriteRow = async (
   client: Pool | PoolClient,
   row: EstimateDetailWriteRow,
+  existing?: Pick<EstimateDetailRow, "site_id">,
 ): Promise<void> => {
+  if (existing !== undefined) {
+    assertSiteIdUnchanged(existing, row.site_id);
+  }
+
   await assertSiteExists(client, row.site_id);
 
   if (row.source_estimate_id !== null) {
@@ -75,18 +96,39 @@ export const replaceEstimateCollectionsTx = async (
   client: PoolClient,
   estimateId: string,
   siteId: string,
-  related: Pick<EstimateDetailRelatedPatch, "systems" | "line_items">,
+  related: Pick<EstimateDetailRelatedPatch, "scopes" | "line_items">,
 ): Promise<void> => {
-  let validSystemIds: Set<string>;
+  let validScopeIds: Set<string>;
+  let checkedZones = new Map<string, Set<string>>();
 
-  if (related.systems !== undefined) {
-    validSystemIds = await replaceEstimateSystemsTx(
+  if (related.scopes !== undefined) {
+    validScopeIds = await replaceEstimateScopesTx(
       client,
       estimateId,
-      related.systems,
+      siteId,
+      related.scopes,
+      related.line_items,
     );
+    checkedZones = buildCheckedZoneMembership(related.scopes);
   } else {
-    validSystemIds = await loadEstimateSystemBlockIds(client, estimateId);
+    validScopeIds = await loadEstimateScopeBlockIds(client, estimateId);
+
+    const zoneRows = await client.query<{
+      estimate_scope_id: string;
+      site_zone_id: string;
+    }>(
+      `SELECT ez.estimate_scope_id, ez.site_zone_id
+       FROM estimate_zone ez
+       INNER JOIN estimate_scope es ON es.id = ez.estimate_scope_id
+       WHERE es.estimate_id = $1`,
+      [estimateId],
+    );
+
+    for (const row of zoneRows.rows) {
+      const zones = checkedZones.get(row.estimate_scope_id) ?? new Set<string>();
+      zones.add(row.site_zone_id);
+      checkedZones.set(row.estimate_scope_id, zones);
+    }
   }
 
   if (related.line_items !== undefined) {
@@ -95,7 +137,8 @@ export const replaceEstimateCollectionsTx = async (
       estimateId,
       siteId,
       related.line_items,
-      validSystemIds,
+      validScopeIds,
+      checkedZones,
     );
   }
 };
@@ -105,7 +148,7 @@ export const replaceEstimateCollections = async (
   actorId: string,
   estimateId: string,
   siteId: string,
-  related: Pick<EstimateDetailRelatedPatch, "systems" | "line_items">,
+  related: Pick<EstimateDetailRelatedPatch, "scopes" | "line_items">,
 ): Promise<void> => {
   await withPermissionDb(pool, actorId, async (client) => {
     await replaceEstimateCollectionsTx(client, estimateId, siteId, related);
@@ -171,11 +214,11 @@ export const insertEstimate = async (
       }
 
       if (
-        related?.systems !== undefined ||
+        related?.scopes !== undefined ||
         related?.line_items !== undefined
       ) {
         await replaceEstimateCollectionsTx(client, row.id, row.site_id, {
-          systems: related.systems,
+          scopes: related.scopes,
           line_items: related.line_items,
         });
       }
@@ -192,9 +235,10 @@ export const updateEstimate = async (
   pool: Pool,
   actorId: string,
   row: EstimateDetailWriteRow,
+  existing: Pick<EstimateDetailRow, "site_id">,
 ): Promise<void> => {
   await withPermissionDb(pool, actorId, async (client) => {
-    await validateEstimateWriteRow(client, row);
+    await validateEstimateWriteRow(client, row, existing);
     await client.query(
       `UPDATE estimate
        SET title = $2,

@@ -24,7 +24,7 @@ type SurfaceActionsContextValue = {
   registration: SurfaceActionsRegistration | null;
   registrationRef: React.RefObject<SurfaceActionsRegistration | null>;
   register: (registration: SurfaceActionsRegistration) => void;
-  unregister: () => void;
+  unregister: (expected?: SurfaceActionsRegistration) => void;
 };
 
 const SurfaceActionsContext = createContext<SurfaceActionsContextValue | null>(
@@ -41,7 +41,10 @@ const actionsRenderEqual = (
 
   return prev.every((prevAction, index) => {
     const nextAction = next[index];
+    const prevVariant = "variant" in prevAction ? prevAction.variant : "button";
+    const nextVariant = "variant" in nextAction ? nextAction.variant : "button";
     return (
+      prevVariant === nextVariant &&
       prevAction.key === nextAction.key &&
       prevAction.label === nextAction.label &&
       prevAction.priority === nextAction.priority &&
@@ -90,7 +93,15 @@ export const SurfaceActionsProvider = ({ children }: { children: ReactNode }) =>
     });
   }, []);
 
-  const unregister = useCallback(() => {
+  const unregister = useCallback((expected?: SurfaceActionsRegistration) => {
+    if (
+      expected &&
+      registrationRef.current &&
+      !registrationRenderEqual(registrationRef.current, expected)
+    ) {
+      return;
+    }
+
     registrationRef.current = null;
     setRegistration((prev) => (prev === null ? prev : null));
   }, []);
@@ -120,14 +131,33 @@ const useSurfaceActionsContext = (): SurfaceActionsContextValue => {
 export const useRegisterSurfaceActions = (
   manifest: Manifest,
   actions: ToolbarAction[],
+  enabled = true,
 ) => {
   const { register, unregister } = useSurfaceActionsContext();
+  const ownedRef = useRef<SurfaceActionsRegistration | null>(null);
 
   useLayoutEffect(() => {
-    register({ manifest, actions });
-  }, [actions, manifest, register]);
+    if (!enabled) {
+      if (ownedRef.current) {
+        unregister(ownedRef.current);
+        ownedRef.current = null;
+      }
+      return;
+    }
 
-  useEffect(() => unregister, [unregister]);
+    const next = { manifest, actions };
+    ownedRef.current = next;
+    register(next);
+  }, [enabled, actions, manifest, register, unregister]);
+
+  useEffect(() => {
+    return () => {
+      if (ownedRef.current) {
+        unregister(ownedRef.current);
+        ownedRef.current = null;
+      }
+    };
+  }, [unregister]);
 };
 
 export const HeaderSurfaceToolbar = () => {

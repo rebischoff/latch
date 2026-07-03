@@ -11,7 +11,8 @@ export type EstimateLineFormRow = {
   unit_cost: number;
   unit_price: number;
   parent_line_id: string | null;
-  estimate_system_id: string | null;
+  estimate_scope_id: string | null;
+  site_zone_id: string | null;
   material_status: "generic" | "suggested" | "verified" | null;
   phase_id: string | null;
   item_id: string | null;
@@ -19,36 +20,67 @@ export type EstimateLineFormRow = {
   vendor_part_id: string | null;
 };
 
-export type EstimateSystemSpecOptionFormRow = {
+export type EstimateScopeSpecOptionFormRow = {
   display_name: string;
   id: string;
 };
 
-export type EstimateSystemSpecFormRow = {
-  system_spec_def_id: string;
+export type EstimateScopeSpecFormRow = {
+  spec_def_id: string;
   def_display_name?: string;
   value_type?: "enum" | "boolean" | "text";
-  system_spec_option_id: string | null;
+  spec_option_id: string | null;
   option_display_name?: string | null;
   value_text: string | null;
   value_boolean: boolean | null;
-  options?: EstimateSystemSpecOptionFormRow[];
+  options?: EstimateScopeSpecOptionFormRow[];
 };
 
-export type EstimateSystemFormRow = {
-  id: string;
-  system_id: string;
-  system_name: string;
+export type EstimateScopeZoneFormRow = {
+  site_zone_id: string;
   sort_order: number;
-  specs: EstimateSystemSpecFormRow[];
+  specs: EstimateScopeSpecFormRow[];
+};
+
+export type EstimateScopeFormRow = {
+  id: string;
+  site_scope_id: string | null;
+  root_category_id: string | null;
+  root_category_name: string | null;
+  site_scope_name: string | null;
+  sort_order: number;
+  labor_context_type_id: string | null;
+  markup_type_id: string | null;
+  specs: EstimateScopeSpecFormRow[];
+  zones: EstimateScopeZoneFormRow[];
+};
+
+export type EstimateSiteZoneTreeFormRow = {
+  id: string;
+  name: string;
+  zones?: EstimateSiteZoneTreeFormRow[];
+};
+
+export type EstimateSiteScopeTreeFormRow = {
+  id: string;
+  name: string;
+  root_category_id: string;
+  zones: EstimateSiteZoneTreeFormRow[];
+};
+
+export type EstimateSiteTreeFormRow = {
+  general_zones: EstimateSiteZoneTreeFormRow[];
+  scopes: EstimateSiteScopeTreeFormRow[];
+  spec_templates?: Record<string, EstimateScopeSpecFormRow[]>;
 };
 
 export type EstimateLineEditorFormValues = {
-  systems: EstimateSystemFormRow[];
+  scopes: EstimateScopeFormRow[];
   line_items: EstimateLineFormRow[];
+  site_tree?: EstimateSiteTreeFormRow | null;
 };
 
-export type TreeRowKind = "general" | "system" | "specs" | "line";
+export type TreeRowKind = "general" | "scope" | "line";
 
 export type EstimateLineTreeNode = {
   children?: EstimateLineTreeNode[];
@@ -56,8 +88,8 @@ export type EstimateLineTreeNode = {
   label?: string;
   lineId?: string;
   rowKind: TreeRowKind;
-  systemId?: string;
-  systemIndex?: number;
+  scopeId?: string;
+  scopeIndex?: number;
 };
 
 export const GENERAL_TREE_KEY = "__general__";
@@ -74,7 +106,8 @@ export const makeLine = (
   unit_cost: 0,
   unit_price: 0,
   parent_line_id: null,
-  estimate_system_id: null,
+  estimate_scope_id: null,
+  site_zone_id: null,
   material_status: null,
   phase_id: null,
   item_id: null,
@@ -83,59 +116,27 @@ export const makeLine = (
   ...overrides,
 });
 
-export const makeSpecRowsFromCatalog = (
-  specDefs: Array<{
-    def_display_name: string;
-    options?: EstimateSystemSpecOptionFormRow[];
-    system_spec_def_id: string;
-    value_type: "enum" | "boolean" | "text";
-  }>,
-): EstimateSystemSpecFormRow[] =>
-  specDefs.map((def) => ({
-    system_spec_def_id: def.system_spec_def_id,
-    def_display_name: def.def_display_name,
-    value_type: def.value_type,
-    system_spec_option_id: null,
-    option_display_name: null,
-    value_text: null,
-    value_boolean: null,
-    options: def.options ?? [],
-  }));
-
-export const makeSystemBlock = (
-  systemId: string,
-  systemName: string,
-  sortOrder: number,
-  specs: EstimateSystemSpecFormRow[] = [],
-): EstimateSystemFormRow => ({
-  id: crypto.randomUUID(),
-  system_id: systemId,
-  system_name: systemName,
-  sort_order: sortOrder,
-  specs,
-});
-
 const linesForParent = (
   lineItems: EstimateLineFormRow[],
-  estimateSystemId: string | null,
+  estimateScopeId: string | null,
 ): EstimateLineFormRow[] =>
-  lineItems.filter((line) => (line.estimate_system_id ?? null) === estimateSystemId);
+  lineItems.filter((line) => (line.estimate_scope_id ?? null) === estimateScopeId);
 
 const lineTreeNodes = (
   lineItems: EstimateLineFormRow[],
-  estimateSystemId: string | null,
+  estimateScopeId: string | null,
 ): EstimateLineTreeNode[] =>
-  linesForParent(lineItems, estimateSystemId).map((line) => ({
+  linesForParent(lineItems, estimateScopeId).map((line) => ({
     key: `line:${line.id}`,
     rowKind: "line",
     lineId: line.id,
   }));
 
 export const buildLineTree = (
-  systems: EstimateSystemFormRow[],
+  scopes: EstimateScopeFormRow[],
   lineItems: EstimateLineFormRow[],
 ): EstimateLineTreeNode[] => {
-  const sortedSystems = [...systems].sort((left, right) => left.sort_order - right.sort_order);
+  const sortedScopes = [...scopes].sort((left, right) => left.sort_order - right.sort_order);
 
   const generalNode: EstimateLineTreeNode = {
     key: GENERAL_TREE_KEY,
@@ -144,40 +145,33 @@ export const buildLineTree = (
     children: lineTreeNodes(lineItems, null),
   };
 
-  const systemNodes: EstimateLineTreeNode[] = sortedSystems.map((system, systemIndex) => {
-    const lineChildren = lineTreeNodes(lineItems, system.id);
-    const specChildren: EstimateLineTreeNode[] =
-      system.specs.length > 0
-        ? [
-            {
-              key: `specs:${system.id}`,
-              rowKind: "specs",
-              systemIndex,
-            },
-          ]
-        : [];
+  const scopeNodes: EstimateLineTreeNode[] = sortedScopes.map((scope, scopeIndex) => {
+    const label =
+      scope.site_scope_name ??
+      scope.root_category_name ??
+      (scope.site_scope_id === null ? "General" : "Scope");
 
     return {
-      key: `system:${system.id}`,
-      rowKind: "system",
-      label: system.system_name,
-      systemId: system.id,
-      systemIndex,
-      children: [...specChildren, ...lineChildren],
+      key: `scope:${scope.id}`,
+      rowKind: "scope",
+      label,
+      scopeId: scope.id,
+      scopeIndex,
+      children: lineTreeNodes(lineItems, scope.id),
     };
   });
 
-  return [generalNode, ...systemNodes];
+  return [generalNode, ...scopeNodes];
 };
 
 export const orderLineItemsForPatch = (
-  systems: EstimateSystemFormRow[],
+  scopes: EstimateScopeFormRow[],
   lineItems: EstimateLineFormRow[],
 ): EstimateLineFormRow[] => {
   const buckets = new Map<string | null, EstimateLineFormRow[]>();
 
   for (const line of lineItems) {
-    const key = line.estimate_system_id ?? null;
+    const key = line.estimate_scope_id ?? null;
     const bucket = buckets.get(key) ?? [];
     bucket.push(line);
     buckets.set(key, bucket);
@@ -186,9 +180,9 @@ export const orderLineItemsForPatch = (
   const ordered: EstimateLineFormRow[] = [];
   ordered.push(...(buckets.get(null) ?? []));
 
-  const sortedSystems = [...systems].sort((left, right) => left.sort_order - right.sort_order);
-  for (const system of sortedSystems) {
-    ordered.push(...(buckets.get(system.id) ?? []));
+  const sortedScopes = [...scopes].sort((left, right) => left.sort_order - right.sort_order);
+  for (const scope of sortedScopes) {
+    ordered.push(...(buckets.get(scope.id) ?? []));
   }
 
   return ordered;
@@ -215,14 +209,14 @@ export const collectLineRemoveIndices = (
   return [...new Set(indices)].sort((left, right) => right - left);
 };
 
-export const collectSystemLineRemoveIndices = (
+export const collectScopeLineRemoveIndices = (
   lineItems: EstimateLineFormRow[],
-  systemId: string,
+  scopeId: string,
 ): number[] => {
   const indices: number[] = [];
 
   lineItems.forEach((line, index) => {
-    if (line.estimate_system_id === systemId) {
+    if (line.estimate_scope_id === scopeId) {
       indices.push(index);
       if (line.line_role === "kit_header") {
         lineItems.forEach((child, childIndex) => {
@@ -242,17 +236,21 @@ export const findLineIndex = (
   lineId: string,
 ): number => lineItems.findIndex((line) => line.id === lineId);
 
-export const parentKeyForSystemId = (systemId: string | null): string =>
-  systemId === null ? GENERAL_TREE_KEY : `system:${systemId}`;
+export const parentKeyForScopeId = (scopeId: string | null): string =>
+  scopeId === null ? GENERAL_TREE_KEY : `scope:${scopeId}`;
 
-export const estimateSystemIdForParentKey = (
+export const estimateScopeIdForParentKey = (
   parentKey: string,
-  systems: EstimateSystemFormRow[],
+  scopes: EstimateScopeFormRow[],
 ): string | null => {
   if (parentKey === GENERAL_TREE_KEY) {
     return null;
   }
 
-  const systemId = parentKey.replace(/^system:/, "");
-  return systems.some((system) => system.id === systemId) ? systemId : null;
+  const scopeId = parentKey.replace(/^scope:/, "");
+  return scopes.some((scope) => scope.id === scopeId) ? scopeId : null;
 };
+
+// Legacy aliases for gradual migration in tests/docs
+export type EstimateSystemFormRow = EstimateScopeFormRow;
+export type EstimateSystemSpecFormRow = EstimateScopeSpecFormRow;

@@ -6,7 +6,53 @@
 
 ---
 
+### Decision: estimate site anchor — gate lines, immutable after create (2026-06-30)
+
+**Choice:**
+
+- `profile.site_id` required on create; **not patchable** after estimate row exists.
+- Line Items tab + **Scope** tab gated on non-empty `site_id` in form (create) or loaded DTO (edit).
+- **Create only:** changing `site_id` clears `scopes` and `line_items` client-side.
+- Site field: `LinkedSelectInput` pattern (`… Add site` → `/sites/new` + picker return).
+
+**Rationale:** Quote scope is property-scoped; moving site after save invalidates scope buckets and line placement. Stricter than job site change (estimate always anchored at create).
+
+**Spec:** [`estimate.md`](../surface-specs/estimate.md) · **Task:** [33](../tasks/33-estimate-site-anchor.md).
+
+---
+
+### Decision: estimate scope tab — junction zones, General scope row, block uncheck (2026-07-02)
+
+**Choice:**
+
+- **`estimate_zone`** junction (PK `estimate_scope_id`, `site_zone_id`) — zone checkbox persistence; no `use` boolean.
+- **Synthetic General `estimate_scope`** — `site_scope_id` and `root_category_id` both null; migration **035** (`035_estimate_zone.sql`; plan [035-estimate-zone-plan.md](../migrations/035-estimate-zone-plan.md)).
+- **Uncheck** scope/zone blocked when `line_items` reference bucket/zone.
+- **37e** Scope tab + minimal line retarget; **37f** zone line parents + item picker + costing.
+
+**Task:** [37e](../tasks/37e-estimate-scope-tab.md) · **Planning:** [11](../planning/11-categories-scope-model.md).
+
+---
+
+### Decision: estimate scope — category roots, checkbox site tree, item-first lines (2026-06-30)
+
+**Status:** **Locked.** Supersedes wave **4c′** (`estimate_area` snapshots, Import from site) and [estimate_system tabs (2026-06-27)](#decision-estimate--estimate_system-tabs-system-specs-no-section-v1-2026-06-27) **as implemented**.
+
+**Choice:**
+
+- **Scope tab** — read-only **Scopes & zones** site tree + checkboxes; check zone → auto-check parent **`site_scope`**.
+- **Spec chart** on checked scope/zone — **`estimate_scope_spec`** / **`estimate_zone_spec`**; **`spec_def`** per root category; **`category_spec_def`** filters part resolution.
+- **Lines** — **`item_id`** + optional **`part_id`** pin; **`unit_material` / `unit_labor` / `unit_incidental`** snapshotted; labor/incidental **not** separate line rows.
+- **Item picker** — scoped bucket: root category **TreeSelect**; Estimate General: full catalog.
+- **Commercial** — **`labor_context_type`** + type FKs on scope bucket; dollar rates (37g).
+
+**Planning:** [11-categories-scope-model.md](../planning/11-categories-scope-model.md) · **Task:** [37a](../tasks/37a-category-scope-decision-dbml-migration.md) · **Apply:** [37b](../tasks/37b-category-scope-migration-apply.md).
+
+---
+
 ### Decision: estimate — `estimate_system` tabs, system specs, no section v1 (2026-06-27)
+
+**Status:** **Superseded (implementation)** by [estimate scope (2026-06-30)](#decision-estimate-scope--category-roots-checkbox-site-tree-item-first-lines-2026-06-30).
 
 **Status:** **C2 locked.** [`02-estimates.md`](../planning/02-estimates.md), [`06-catalog-trade-system.md`](../planning/06-catalog-trade-system.md).
 

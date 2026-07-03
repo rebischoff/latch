@@ -28,6 +28,18 @@ describe("buildPickerCreateUrl", () => {
 
     expect(url).toBe("/manufacturers/new?returnTo=%2Fparts%2Fpart-1");
   });
+
+  it("builds site create URL with encoded return context", () => {
+    const url = buildPickerCreateUrl({
+      target: "site",
+      returnTo: "/estimates/new",
+      returnField: "profile.site_id",
+    });
+
+    expect(url).toBe(
+      "/sites/new?returnTo=%2Festimates%2Fnew&returnField=profile.site_id",
+    );
+  });
 });
 
 describe("parseReturnContext", () => {

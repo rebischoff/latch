@@ -116,7 +116,8 @@ flowchart TD
 | **29** | [29-backbone-dbml-pass.md](./29-backbone-dbml-pass.md) | Planning → amended `current.dbml` — **complete** (2026-06-29) |
 | **30** | [30-backbone-surfaces-review.md](./30-backbone-surfaces-review.md) | `codegen:check` + impact matrix + schema README — **complete** (2026-06-29) |
 | **31** | [31-estimate-backbone-migrations.md](./31-estimate-backbone-migrations.md) | Estimate-minimal DDL + discussed dev seeds (`028`–`031`) — **complete** (2026-06-29) |
-| **32** | [32-estimate-wave-4e.md](./32-estimate-wave-4e.md) | Estimate `estimate_system` tabs + backbone DAL/UI — **active** |
+| **32** | [32-estimate-wave-4e.md](./32-estimate-wave-4e.md) | Estimate `estimate_system` tabs + backbone DAL/UI — **complete** |
+| **33** | [33-estimate-site-anchor.md](./33-estimate-site-anchor.md) | Site anchor — gate lines, immutable site, Add site picker return — **complete** |
 
 ---
 
@@ -191,8 +192,11 @@ flowchart LR
 
 | # | Task | Delivers |
 |---|------|----------|
+| **34** | [34-site-geography-ui.md](./34-site-geography-ui.md) | `systems` + `default_areas` DAL + Geography tab (**table** interim UI) ✅ |
+| **35** | [35-site-geography-drop-area-metadata.md](./35-site-geography-drop-area-metadata.md) | Drop `site_area.area_type` / `code`; name-only PATCH ✅ |
+| **36** | [36-site-geography-tree-ui.md](./36-site-geography-tree-ui.md) | **antd `Tree`** editor; deleted `SiteGeographyTreeTable` — **complete** |
 | *TBD* | | `addresses` on `{role}_detail` lenses |
-| *TBD* | | `systems`, `areas`, `assets` on `site_detail` — **amended** from legacy `sections`/`locations` ([planning/01-site-as-built.md](../planning/01-site-as-built.md)) |
+| *TBD* | | `parent_site`, `physical_address` on `site_detail` — remainder of legacy [`site-geography.md`](../surface-specs/site-geography.md) |
 
 ### Wave 4 — Estimates (flat) — **task 22** — **complete**
 
@@ -218,7 +222,20 @@ flowchart LR
   t22 --> mig --> yaml --> dal --> ui --> gate
 ```
 
-**Follow-on (not 4a):** wave **4e** backbone alignment ([task 32](./32-estimate-wave-4e.md)) — **complete**; wave **4c′** quote geography (`estimate_area`); wave **4b** `win`/`lose`; wave **4c** grouped editor polish; wave **4d′** shared line editor retrofit (after wave **3** + **3e** spike) — [job wave 5 decision](../decisions/job.md#decision-job-wave-5--implementation-order-2026-06-23).
+**Follow-on (not 4a):** wave **4e** backbone alignment ([task 32](./32-estimate-wave-4e.md)) — **complete**; **category scope** ([37a](./37a-category-scope-decision-dbml-migration.md) ✅ → [37b](./37b-category-scope-migration-apply.md) ✅ → **37c** site → 37d–37h); wave **4b** `win`/`lose`; wave **4c** grouped editor polish; wave **4d′** shared line editor retrofit — [job wave 5 decision](../decisions/job.md#decision-job-wave-5--implementation-order-2026-06-23).
+
+### Category scope — tasks 37a–37h
+
+| # | Task | Delivers |
+|---|------|----------|
+| **37a** | [37a-category-scope-decision-dbml-migration.md](./37a-category-scope-decision-dbml-migration.md) | Decision + DBML + `033` migration plan — **complete** |
+| **37b** | [37b-category-scope-migration-apply.md](./37b-category-scope-migration-apply.md) | Apply `033` on dev; FK smoke — **complete** |
+| **37c** | [37c-site-scopes-zones.md](./37c-site-scopes-zones.md) | Site `site_scope` / `site_zone` DAL + Scopes & zones UI — **complete** |
+| **37d** | [37d-category-catalog-dal-surfaces.md](./37d-category-catalog-dal-surfaces.md) | `category_list` / `category_detail` — tree list pane, spec DAL — **complete** |
+| **37d2** | [37d2-category-spec-inheritance.md](./37d2-category-spec-inheritance.md) | Spec participation inherit + exclude; migration `036`; scope panel union — **complete** |
+| **37e** | [37e-estimate-scope-tab.md](./37e-estimate-scope-tab.md) | Estimate Scope tab DAL/UI + migration 035 + minimal line retarget — **complete** |
+| **37f** | [37f-estimate-line-costing.md](./37f-estimate-line-costing.md) *(TBD)* | Line costing, TreeSelect, part filter — **next** |
+| **37g–37h** | *(see 37a chain)* | Commercial types, job FKs |
 
 ### Backbone pass (estimate finish) — tasks 29–32
 
@@ -294,7 +311,7 @@ flowchart LR
 | — IAM role CRUD | Create/save/delete app roles | `role_list` / `role_detail` — **task 26 complete** |
 | — Employee detail | Staff lens + identity provision | `employee_*` — **task 28 complete** |
 | 3b Items | Items composed of parts | `item_*` — **after task 25** |
-| 3c Catalog tables | Progressive setup | `category_table`, `labor_class_table`, `phase_table` |
+| 3c Catalog tables | Progressive setup | `category_list` / `category_detail`, `labor_class_table`, `phase_table` |
 | 3e Line editor | Shared line-item component spike | estimate + job Scope; later PO/invoice |
 | 5 Jobs | Shell → Scope → field → COs | `job_*` wave **5a**–**5d** ([decision](../decisions/job.md#decision-job-wave-5--implementation-order-2026-06-23)) |
 | 6a Procurement | Requisition → PO → receipts | `requested_order_*`, `purchase_order_*`, `material_receipt_*` |
@@ -394,6 +411,17 @@ When a task completes:
 | IAM sketch | [`user_roles_detail`](../../../../packages/_docs/phases/03-identity-iam/decisions.md) |
 | CRM master-detail precedent | Phase 02 task 16 (patterns only — SubHub uses `/[id]` paths) |
 | Scaffold runbook | [`scaffold-runbook.md`](../../../../packages/codegen/docs/scaffold-runbook.md) |
+
+## Cross-cutting — UI chrome
+
+| # | Task | Delivers |
+|---|------|----------|
+| 38 | [38-master-detail-chrome.md](./38-master-detail-chrome.md) | Shared toolbar + `returnTo` create navigation — **complete** |
+| 39 | [39-toolbar-chrome-slots.md](./39-toolbar-chrome-slots.md) | Slot-based list/form → toolbar; category **New child** parent fix |
+
+**Planning:** [12-master-detail-chrome.md](../planning/12-master-detail-chrome.md) · [13-toolbar-chrome.md](../planning/13-toolbar-chrome.md).
+
+---
 
 ## Out of scope (all slices)
 

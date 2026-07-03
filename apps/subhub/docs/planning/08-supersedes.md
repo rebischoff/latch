@@ -2,6 +2,14 @@
 
 > **Status:** Planning (2026-06-27). When implementing, add **superseded** notes to the source decision files and dated **Decision** blocks pointing here.
 
+## Catalog / scope (2026-06-30)
+
+| Prior decision | File | Disposition |
+|----------------|------|-------------|
+| C2 catalog **`system`** + `system_spec_def.system_id` | [catalog.md](../decisions/catalog.md) | **Superseded** — **`category` roots** + `spec_def.root_category_id` ([11-categories-scope-model.md](./11-categories-scope-model.md)) |
+| `site_system` / `site_area` | site.md | **Superseded (DDL)** — **`site_scope` / `site_zone`** (migration 033) |
+| `estimate_system` + 4c′ `estimate_area` snapshots | estimate.md, [02-estimates.md](./02-estimates.md) | **Superseded** — **`estimate_scope`** + live site checkbox tree |
+
 ## Site geography
 
 | Prior decision | File | Disposition |

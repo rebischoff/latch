@@ -1,0 +1,45 @@
+# Category profile + root spec definitions + nested spec participation
+id: category_detail
+displayName: Category detail
+anchorTable: category
+
+fieldActions:
+  - read
+  - write
+
+surfaceActions:
+  - read
+  - write
+  - delete
+
+tables:
+  - category
+  - spec_def
+  - spec_option
+  - category_spec_def
+  - category_spec_exclude
+
+fields:
+  - id: profile
+    columns:
+      - column: category.id
+        type: string
+      - column: category.name
+        type: string
+      - column: category.parent_id
+        type: string
+        nullable: true
+      - column: category.sort_order
+        type: number
+      - column: category.csi_code
+        type: string
+        nullable: true
+      - column: category.default_phase_template_id
+        type: string
+        nullable: true
+  - id: spec_definitions
+    # logical — DAL maps spec_def + spec_option for scope roots
+    columns: []
+  - id: spec_participation
+    # logical — DAL maps category_spec_def joined to spec_def
+    columns: []

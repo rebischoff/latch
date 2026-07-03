@@ -1,13 +1,11 @@
 "use client";
 
-import { PlusOutlined } from "@ant-design/icons";
-import { fieldAllows, surfaceAllows, type Manifest } from "@latch/contracts";
 import { Input, Table, Typography } from "antd";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 
-import { useRegisterSurfaceActions } from "@/components/shell/SurfaceActionsProvider";
+import { fieldAllows } from "@latch/contracts";
 import { useSurfaceList } from "@/lib/hooks/use-surface-list";
 import { routes } from "@/lib/nav-routes";
 
@@ -20,18 +18,13 @@ type EmployeeListRow = {
   summary?: EmployeeListSummary;
 };
 
-type EmployeeListProps = {
-  detailWriteManifest: Manifest;
-};
-
 const employeeLabel = (row: {
   summary?: EmployeeListSummary;
   id: string;
 }): string => row.summary?.display_name ?? row.id;
 
-export const EmployeeList = ({ detailWriteManifest }: EmployeeListProps) => {
+export const EmployeeList = () => {
   const pathname = usePathname();
-  const router = useRouter();
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
@@ -49,33 +42,7 @@ export const EmployeeList = ({ detailWriteManifest }: EmployeeListProps) => {
     listQuery,
   );
 
-  const onListRoute = pathname === routes.employees.list;
   const listManifest = data?.manifest;
-  const canCreate = surfaceAllows(detailWriteManifest, "write");
-
-  const onCreate = useCallback(() => {
-    router.push(routes.employees.new);
-  }, [router]);
-
-  const toolbarActions = useMemo(
-    () =>
-      onListRoute && canCreate
-        ? [
-            {
-              key: "new",
-              label: "New",
-              icon: <PlusOutlined />,
-              priority: "secondary" as const,
-              surfaceAction: "write" as const,
-              onClick: onCreate,
-            },
-          ]
-        : [],
-    [canCreate, onCreate, onListRoute],
-  );
-
-  useRegisterSurfaceActions(detailWriteManifest, toolbarActions);
-
   const showSearch =
     listManifest !== undefined && fieldAllows(listManifest, "summary", "read");
 
