@@ -9,7 +9,6 @@ import { Controller, useFieldArray, useFormContext, useWatch } from "react-hook-
 
 import {
   buildScopesTree,
-  GENERAL_TREE_KEY,
   getZoneById,
   insertZoneChild,
   makeScopeRow,
@@ -22,6 +21,7 @@ import {
   toAntdTreeData,
   updateZoneById,
   type SiteScopesAntdTreeNode,
+  type SiteZoneFormRow,
   type SiteScopesFormValues,
 } from "@/components/sites/site-scopes-tree";
 import { SURFACE_CONTROL_MAX_WIDTH } from "@/components/form/formLayout";
@@ -180,9 +180,6 @@ export const SiteScopesZonesTree = ({ manifest }: SiteScopesZonesTreeProps) => {
   const watchedScopes = useWatch({ control, name: "scopes" }) as
     | SiteScopesFormValues["scopes"]
     | undefined;
-  const watchedGeneralZones = useWatch({ control, name: "general_zones" }) as
-    | SiteScopesFormValues["general_zones"]
-    | undefined;
 
   const scopes = useMemo(
     () =>
@@ -192,7 +189,6 @@ export const SiteScopesZonesTree = ({ manifest }: SiteScopesZonesTreeProps) => {
       })),
     [watchedScopes],
   );
-  const generalZones = watchedGeneralZones ?? [];
 
   const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
   const [editingKey, setEditingKey] = useState<string | null>(null);
@@ -200,18 +196,11 @@ export const SiteScopesZonesTree = ({ manifest }: SiteScopesZonesTreeProps) => {
   const { data: rootPicker, isLoading: rootPickerLoading } = useCategoryRootPicker();
 
   const writableScopes = fieldAllows(manifest, "scopes", "write");
-  const writableZones = fieldAllows(manifest, "general_zones", "write");
-  const writable = writableScopes || writableZones;
+  const writable = writableScopes;
 
-  const scopesValues = useMemo(
-    () => ({ scopes, general_zones: generalZones }),
-    [generalZones, scopes],
-  );
+  const scopesValues = useMemo(() => ({ scopes }), [scopes]);
 
-  const treeData = useMemo(
-    () => toAntdTreeData(buildScopesTree(scopes, generalZones)),
-    [generalZones, scopes],
-  );
+  const treeData = useMemo(() => toAntdTreeData(buildScopesTree(scopes)), [scopes]);
 
   const rootCategoryOptions = useMemo(
     () =>
@@ -231,7 +220,6 @@ export const SiteScopesZonesTree = ({ manifest }: SiteScopesZonesTreeProps) => {
   const applyScopes = useCallback(
     (next: SiteScopesFormValues) => {
       setValue("scopes", next.scopes, { shouldDirty: true });
-      setValue("general_zones", next.general_zones, { shouldDirty: true });
     },
     [setValue],
   );
@@ -243,7 +231,6 @@ export const SiteScopesZonesTree = ({ manifest }: SiteScopesZonesTreeProps) => {
       focusEditKeyRef.current = rowKey;
       const current = {
         scopes: getValues("scopes") ?? [],
-        general_zones: getValues("general_zones") ?? [],
       };
       applyScopes(insertZoneChild(current, parentKey, row));
       setSelectedKeys([rowKey]);
@@ -299,7 +286,6 @@ export const SiteScopesZonesTree = ({ manifest }: SiteScopesZonesTreeProps) => {
     (zoneId: string) => {
       const current = {
         scopes: getValues("scopes") ?? [],
-        general_zones: getValues("general_zones") ?? [],
       };
       const zone = getZoneById(current, zoneId);
       if (zone && !zone.can_delete) {
@@ -320,10 +306,9 @@ export const SiteScopesZonesTree = ({ manifest }: SiteScopesZonesTreeProps) => {
   );
 
   const onZoneFieldChange = useCallback(
-    (zoneId: string, patch: Partial<SiteScopesFormValues["general_zones"][number]>) => {
+    (zoneId: string, patch: Partial<SiteZoneFormRow>) => {
       const current = {
         scopes: getValues("scopes") ?? [],
-        general_zones: getValues("general_zones") ?? [],
       };
       applyScopes(
         updateZoneById(current, zoneId, (zone) => ({
@@ -339,9 +324,7 @@ export const SiteScopesZonesTree = ({ manifest }: SiteScopesZonesTreeProps) => {
 
   const canAddZone =
     selectedKey !== null &&
-    (selectedKey === GENERAL_TREE_KEY ||
-      selectedKey.startsWith("scope:") ||
-      selectedKey.startsWith("zone:"));
+    (selectedKey.startsWith("scope:") || selectedKey.startsWith("zone:"));
 
   const handleAddZone = () => {
     if (!canAddZone || !selectedKey) {
@@ -425,23 +408,6 @@ export const SiteScopesZonesTree = ({ manifest }: SiteScopesZonesTreeProps) => {
       const depth = node.depth ?? 0;
       const nodeKey = String(node.key);
 
-      if (node.rowKind === "general") {
-        return (
-          <ScopesNameRow depth={depth} deleteLabel="">
-            <Input
-              readOnly
-              variant="borderless"
-              value="General"
-              style={{ fontWeight: 600, cursor: "pointer" }}
-              onClick={(event) => {
-                event.stopPropagation();
-                selectRow(GENERAL_TREE_KEY);
-              }}
-            />
-          </ScopesNameRow>
-        );
-      }
-
       if (node.rowKind === "scope") {
         const scopeId = nodeKey.replace(/^scope:/, "");
         const rhfIndex = (watchedScopes ?? []).findIndex((row) => row.id === scopeId);
@@ -493,13 +459,13 @@ export const SiteScopesZonesTree = ({ manifest }: SiteScopesZonesTreeProps) => {
         <ScopesNameRow
           depth={depth}
           deleteLabel="Remove zone"
-          deleteDisabled={disabled || !writableZones || zone?.can_delete === false}
+          deleteDisabled={disabled || !writableScopes || zone?.can_delete === false}
           onDelete={() => removeZone(zoneId)}
         >
           <ScopesNameInput
             rowKey={rowKey}
             value={zone?.name ?? ""}
-            disabled={disabled || !writableZones}
+            disabled={disabled || !writableScopes}
             placeholder="Zone name"
             editingKey={editingKey}
             setEditingKey={setEditingKey}
@@ -520,7 +486,7 @@ export const SiteScopesZonesTree = ({ manifest }: SiteScopesZonesTreeProps) => {
       selectRow,
       watchedScopes,
       writableScopes,
-      writableZones,
+      writableScopes,
     ],
   );
 
@@ -542,7 +508,7 @@ export const SiteScopesZonesTree = ({ manifest }: SiteScopesZonesTreeProps) => {
               </Button>
             </Dropdown>
           ) : null}
-          {writableZones ? (
+          {writableScopes ? (
             <Button icon={<PlusOutlined />} disabled={disabled || !canAddZone} onClick={handleAddZone}>
               Add zone
             </Button>

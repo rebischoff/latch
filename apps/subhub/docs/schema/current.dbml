@@ -594,7 +594,6 @@ TableGroup catalog [color: #e67e22] {
   trade
   spec_def
   spec_option
-  category_spec_def
   category_spec_exclude
   manufacturer_part_spec
   phase_template
@@ -624,7 +623,7 @@ Table trade {
 
 Table spec_def {
   id uuid [pk, default: `gen_random_uuid()`]
-  root_category_id text [not null, note: 'FK → category (scope root)']
+  category_id text [not null, note: 'FK → category — owning category (root or nested); def inherits to all descendants until a category_spec_exclude']
   code text [note: 'nullable stable slug — e.g. slc_protocol; not PK']
   display_name text [not null]
   value_type text [not null, default: 'enum', note: 'CHECK: enum | boolean | text']
@@ -632,8 +631,10 @@ Table spec_def {
   sort_order int [not null, default: 0]
 
   Note: '''
-    One spec dimension per **scope root category** (UUID PK). Renamed from `system_spec_def`.
-    Estimate and part rows FK to `spec_option` for enums — not loose strings.
+    One spec dimension owned by a single **category** (`category_id`), root or nested. The namespace
+    scope root is derived by walking `category.parent_id` to the root ancestor. Owner-column model
+    supersedes `category_spec_def`; see catalog decision spec ownership (2026-07-04). Renamed from
+    `system_spec_def`. Estimate and part rows FK to `spec_option` for enums — not loose strings.
   '''
 }
 
@@ -698,24 +699,8 @@ Table category {
 
   Note: '''
     **Scope roots** (`parent_id IS NULL`) replace catalog `system`. Nested categories classify
-    items/parts (M:N). Leaf categories carry most `category_spec_def` expectations. Optional
+    items/parts (M:N). Categories own spec dimensions via `spec_def.category_id`. Optional
     `csi_code` when org uses CSI MasterFormat.
-  '''
-}
-
-Table category_spec_def {
-  category_id text [not null]
-  spec_def_id uuid [not null]
-  sort_order int [not null, default: 0]
-
-  indexes {
-    (category_id, spec_def_id) [pk]
-  }
-
-  Note: '''
-    **Include** — add `spec_def_id` to this category node's effective participation set (in addition
-    to inherited). Root rows = base set for the namespace. See catalog decision inherit/include/exclude
-    (2026-07-02).
   '''
 }
 
@@ -729,8 +714,8 @@ Table category_spec_exclude {
   }
 
   Note: '''
-    **Exclude** — remove `spec_def_id` from inherited effective set (opt-out). Migration follow-on
-    (2026-07-02 decision). Nested nodes only in v1 UI.
+    **Branch exclude** — def no longer applies at this node or any descendant (no re-include below).
+    See catalog decision assign-once (2026-07-03).
   '''
 }
 
@@ -863,6 +848,7 @@ Table item {
   labor_class_id text [note: 'nullable FK → labor_class — required when kind = labor (app/DAL)']
   default_part_id text [note: 'nullable FK → manufacturer_part — primary part for costing']
   default_vendor_part_id text [note: 'nullable FK → vendor_part — default buy path for costing']
+  fallback_unit_cost numeric [not null, default: 0, note: 'estimate UOM — when part/vendor resolver cannot determine material $ (37f)']
   phase_template_id text [note: 'nullable FK → phase_template — overrides system default (J5)']
   created_at timestamptz [not null, default: `now()`]
   updated_at timestamptz [not null, default: `now()`]
@@ -1034,15 +1020,17 @@ Table estimate_line {
   unit text [not null, default: 'ea', note: 'snapshotted UOM — from manufacturer_part.unit or labor/expense default']
   unit_cost numeric [not null, default: 0]
   unit_price numeric [not null, default: 0]
+  unit_price_target numeric [note: 'nullable — policy sell from markup at calc; 37f']
   unit_material numeric [not null, default: 0]
   unit_labor numeric [not null, default: 0]
   unit_incidental numeric [not null, default: 0]
   site_zone_id text [note: 'nullable FK → site_zone — zone bucket placement']
   site_asset_id text [note: 'nullable FK → site_asset — device-level scope']
-  material_status text [note: 'nullable — generic | suggested | verified | …']
+  material_status text [note: 'nullable — generic | suggested | verified']
   phase_id text [note: 'nullable FK → phase — labor lines only; bridges to phase_template_step on win']
-  item_id text [note: 'nullable FK → item — primary catalog attachment']
-  part_id text [note: 'nullable FK → manufacturer_part — optional pin when MPN known']
+  item_id text [not null, note: 'FK → item — required on product lines (37f)']
+  part_id text [note: 'nullable FK → manufacturer_part — when PN determined or user-picked']
+  part_locked boolean [not null, default: false, note: 'true when user confirmed PN — recalc must not change part_id']
   vendor_part_id text [note: 'nullable FK → vendor_part — cost source when pinned']
   sort_order int [not null, default: 0]
 
@@ -1051,8 +1039,9 @@ Table estimate_line {
   }
 
   Note: '''
-    Quote line — item-first; optional part pin. Material/labor/incidental $ snapshotted internally
-    (not separate labor rows). Flat persisted array; UI groups by zone within checked scope.
+    Quote line — **item_id** required on product lines; **part_id** optional when exact PN is known.
+    **part_locked** — user-confirmed PN; resolver must not overwrite. Material/labor/incidental $
+    snapshotted internally (not separate labor rows). Flat array; UI groups by zone within scope.
   '''
 }
 
@@ -1720,11 +1709,9 @@ Ref: site_contact.relation_id > site_contact_relation.id [delete: restrict]
 
 Ref: category.parent_id > category.id [delete: set null]
 Ref: category.default_phase_template_id > phase_template.id [delete: set null]
-Ref: category_spec_def.category_id > category.id [delete: cascade]
-Ref: category_spec_def.spec_def_id > spec_def.id [delete: cascade]
 Ref: category_spec_exclude.category_id > category.id [delete: cascade]
 Ref: category_spec_exclude.spec_def_id > spec_def.id [delete: cascade]
-Ref: spec_def.root_category_id > category.id [delete: cascade]
+Ref: spec_def.category_id > category.id [delete: cascade]
 Ref: spec_option.spec_def_id > spec_def.id [delete: cascade]
 Ref: manufacturer_part_spec.manufacturer_part_id > manufacturer_part.id [delete: cascade]
 Ref: manufacturer_part_spec.spec_def_id > spec_def.id [delete: cascade]

@@ -8,7 +8,6 @@ import {
 } from "./category-write";
 import { nestCategoryTree, resolveRootCategoryId } from "./category-tree";
 import {
-  assertRootSpecParticipationExcludes,
   assertSpecDefsBelongToRoot,
 } from "./category-spec-participation-write";
 import { assertRootSpecDefinitionsPatch } from "./spec-def-write";
@@ -96,24 +95,30 @@ describe("assertParentCategoryExists", () => {
 });
 
 describe("assertNestedProfileFields", () => {
-  it("rejects default_phase_template_id on nested nodes", () => {
+  it("rejects default_phase_template_id changes on nested nodes", () => {
     expect(() =>
-      assertNestedProfileFields(false, { default_phase_template_id: "phase-1" }),
+      assertNestedProfileFields(
+        false,
+        { default_phase_template_id: "phase-1" },
+        { default_phase_template_id: null },
+      ),
     ).toThrow(ValidationError);
+  });
+
+  it("allows nested update when default_phase_template_id is unchanged", () => {
+    expect(() =>
+      assertNestedProfileFields(
+        false,
+        { default_phase_template_id: null },
+        { default_phase_template_id: null },
+      ),
+    ).not.toThrow();
   });
 });
 
 describe("assertRootSpecDefinitionsPatch", () => {
   it("rejects spec_definitions on nested nodes", () => {
     expect(() => assertRootSpecDefinitionsPatch(false)).toThrow(ValidationError);
-  });
-});
-
-describe("assertRootSpecParticipationExcludes", () => {
-  it("rejects excludes on root nodes", () => {
-    expect(() =>
-      assertRootSpecParticipationExcludes(true, [{ spec_def_id: "def-1" }]),
-    ).toThrow(ValidationError);
   });
 });
 

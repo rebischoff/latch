@@ -68,7 +68,7 @@ describe("assertNoReferencedZoneDeletes", () => {
     ]);
 
     expect(() =>
-      assertNoReferencedZoneDeletes(["zone-1"], references, "general_zones"),
+      assertNoReferencedZoneDeletes(["zone-1"], references, "scopes"),
     ).toThrow(ConflictError);
 
     try {
@@ -90,7 +90,7 @@ describe("assertNoReferencedZoneDeletes", () => {
     const references = new Map<string, "estimate" | "job" | "asset">();
 
     expect(() =>
-      assertNoReferencedZoneDeletes(["zone-1"], references, "general_zones"),
+      assertNoReferencedZoneDeletes(["zone-1"], references, "scopes"),
     ).not.toThrow();
   });
 });

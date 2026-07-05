@@ -4,6 +4,7 @@ import type { Pool, PoolClient } from "pg";
 
 import { tableExists } from "../../sites/repository/sql-utils";
 import type { EstimateLineItemPatchRow } from "../descriptors/estimate-detail";
+import { recalcLineItems } from "./estimate-line-recalc";
 import type { CheckedZoneMembership } from "./estimate-scopes-write";
 
 const validateLineItems = async (
@@ -66,28 +67,33 @@ const validateLineItems = async (
       }
     }
 
-    if (row.estimate_scope_id !== null && row.estimate_scope_id !== undefined) {
-      if (!validScopeIds.has(row.estimate_scope_id)) {
-        throw new ValidationError("estimate_scope_id must reference a scope in this estimate", {
-          field: "line_items",
-          code: "unknown_scope_block",
-          id: row.id,
-          estimate_scope_id: row.estimate_scope_id,
-        });
-      }
+    if (!row.estimate_scope_id) {
+      throw new ValidationError("estimate_scope_id is required on every line", {
+        field: "line_items",
+        code: "missing_scope",
+        id: row.id,
+      });
+    }
+
+    if (!validScopeIds.has(row.estimate_scope_id)) {
+      throw new ValidationError("estimate_scope_id must reference a scope in this estimate", {
+        field: "line_items",
+        code: "unknown_scope_block",
+        id: row.id,
+        estimate_scope_id: row.estimate_scope_id,
+      });
+    }
+
+    if (row.line_kind === "product" && !row.item_id) {
+      throw new ValidationError("item_id is required on product lines", {
+        field: "line_items",
+        code: "missing_item",
+        id: row.id,
+      });
     }
 
     if (row.site_zone_id !== null && row.site_zone_id !== undefined) {
-      const scopeId = row.estimate_scope_id ?? null;
-      if (!scopeId) {
-        throw new ValidationError("site_zone_id requires estimate_scope_id", {
-          field: "line_items",
-          code: "zone_without_scope",
-          id: row.id,
-          site_zone_id: row.site_zone_id,
-        });
-      }
-
+      const scopeId = row.estimate_scope_id;
       const checkedForScope = checkedZones.get(scopeId);
       if (!checkedForScope?.has(row.site_zone_id)) {
         throw new ValidationError("site_zone_id must be checked in matching scope", {
@@ -124,6 +130,7 @@ export const replaceEstimateLineItemsTx = async (
   rows: EstimateLineItemPatchRow[],
   validScopeIds: Set<string>,
   checkedZones: CheckedZoneMembership,
+  existingLineIds?: Set<string>,
 ): Promise<void> => {
   const normalized = await validateLineItems(
     client,
@@ -133,11 +140,31 @@ export const replaceEstimateLineItemsTx = async (
     checkedZones,
   );
 
+  const priorIds =
+    existingLineIds ??
+    new Set(
+      (
+        await client.query<{ id: string }>(
+          `SELECT id FROM estimate_line WHERE estimate_id = $1`,
+          [estimateId],
+        )
+      ).rows.map((row) => row.id),
+    );
+
+  const recalculated = await recalcLineItems(
+    client,
+    normalized.map((row) => ({
+      ...row,
+      part_locked: row.part_locked ?? false,
+    })),
+    priorIds,
+  );
+
   await client.query(`DELETE FROM estimate_line WHERE estimate_id = $1`, [
     estimateId,
   ]);
 
-  for (const [index, row] of normalized.entries()) {
+  for (const [index, row] of recalculated.entries()) {
     const lineNumber = index + 1;
     const sortOrder = index + 1;
 
@@ -156,18 +183,23 @@ export const replaceEstimateLineItemsTx = async (
          unit,
          unit_cost,
          unit_price,
+         unit_material,
+         unit_labor,
+         unit_incidental,
+         unit_price_target,
          material_status,
          phase_id,
          item_id,
          part_id,
+         part_locked,
          vendor_part_id,
          sort_order
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)`,
       [
         row.id,
         estimateId,
-        row.estimate_scope_id ?? null,
+        row.estimate_scope_id,
         row.site_zone_id ?? null,
         row.parent_line_id ?? null,
         lineNumber,
@@ -178,10 +210,15 @@ export const replaceEstimateLineItemsTx = async (
         row.unit,
         row.unit_cost,
         row.unit_price,
+        row.unit_material,
+        row.unit_labor,
+        row.unit_incidental,
+        row.unit_price_target,
         row.material_status ?? null,
         row.phase_id ?? null,
         row.item_id ?? null,
         row.part_id ?? null,
+        row.part_locked ?? false,
         row.vendor_part_id ?? null,
         sortOrder,
       ],

@@ -1,6 +1,6 @@
 # 37d2 — Category spec participation: inherit, include, exclude
 
-> **Status:** Complete (2026-07-02). **Next:** [37f-estimate-line-costing.md](./37f-estimate-line-costing.md) *(TBD)*.
+> **Status:** Complete (2026-07-02). **Superseded (algorithm + UI):** [37d3](./37d3-category-spec-participation-simplify.md) — assign-once participation. **Next:** [37d3](./37d3-category-spec-participation-simplify.md) then [37f](./37f-estimate-line-costing.md).
 >
 > **Prerequisites:** [37d](./37d-category-catalog-dal-surfaces.md) ✅ (flat `spec_participation` shipped); [37e](./37e-estimate-scope-tab.md) ✅ (scope spec panel — retarget in Step 6).
 >

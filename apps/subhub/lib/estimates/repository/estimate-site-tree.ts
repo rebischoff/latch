@@ -79,7 +79,6 @@ export const loadEstimateSiteTree = async (
 
   return {
     scopes,
-    general_zones: nestZones(zonesByScopeId.get(null) ?? [], null),
     spec_templates: await loadSpecTemplatesForRoots(
       pool,
       scopesResult.rows.map((scope) => scope.root_category_id),

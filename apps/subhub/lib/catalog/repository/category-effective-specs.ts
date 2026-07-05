@@ -14,25 +14,103 @@ export type EffectiveSpecDef = {
 };
 
 type ParticipationMaps = {
+  assignByDef: Map<string, string>;
   excludesByCategory: Map<string, Set<string>>;
-  includesByCategory: Map<string, Set<string>>;
+};
+
+export const isAncestorOrSelf = (
+  ancestorId: string,
+  nodeId: string,
+  categoriesById: Map<string, CategoryFlatRow>,
+): boolean => {
+  let current = categoriesById.get(nodeId);
+  while (current) {
+    if (current.id === ancestorId) {
+      return true;
+    }
+    if (current.parent_id === null) {
+      return false;
+    }
+    current = categoriesById.get(current.parent_id);
+  }
+  return false;
+};
+
+export const pathFromAncestorToNode = (
+  ancestorId: string,
+  nodeId: string,
+  categoriesById: Map<string, CategoryFlatRow>,
+): string[] => {
+  const path: string[] = [];
+  let current = categoriesById.get(nodeId);
+  while (current) {
+    path.unshift(current.id);
+    if (current.id === ancestorId) {
+      return path;
+    }
+    if (current.parent_id === null) {
+      return [];
+    }
+    current = categoriesById.get(current.parent_id);
+  }
+  return [];
+};
+
+export const hasExcludeOnAssignPath = (
+  assignCategoryId: string,
+  nodeId: string,
+  specDefId: string,
+  excludesByCategory: Map<string, Set<string>>,
+  categoriesById: Map<string, CategoryFlatRow>,
+): boolean => {
+  const path = pathFromAncestorToNode(assignCategoryId, nodeId, categoriesById);
+  for (const categoryId of path) {
+    const excludes = excludesByCategory.get(categoryId);
+    if (excludes?.has(specDefId)) {
+      return true;
+    }
+  }
+  return false;
+};
+
+export const isEffectiveSpecDef = (
+  categoryId: string,
+  specDefId: string,
+  assignCategoryId: string | undefined,
+  participation: ParticipationMaps,
+  categoriesById: Map<string, CategoryFlatRow>,
+): boolean => {
+  if (!assignCategoryId) {
+    return false;
+  }
+  if (
+    !isAncestorOrSelf(assignCategoryId, categoryId, categoriesById) &&
+    assignCategoryId !== categoryId
+  ) {
+    return false;
+  }
+  return !hasExcludeOnAssignPath(
+    assignCategoryId,
+    categoryId,
+    specDefId,
+    participation.excludesByCategory,
+    categoriesById,
+  );
 };
 
 const loadParticipationMaps = async (pool: Pool): Promise<ParticipationMaps> => {
-  const [includesResult, excludesResult] = await Promise.all([
+  const [assignResult, excludesResult] = await Promise.all([
     pool.query<{ category_id: string; spec_def_id: string }>(
-      `SELECT category_id, spec_def_id FROM category_spec_def`,
+      `SELECT id AS spec_def_id, category_id FROM spec_def`,
     ),
     pool.query<{ category_id: string; spec_def_id: string }>(
       `SELECT category_id, spec_def_id FROM category_spec_exclude`,
     ),
   ]);
 
-  const includesByCategory = new Map<string, Set<string>>();
-  for (const row of includesResult.rows) {
-    const bucket = includesByCategory.get(row.category_id) ?? new Set<string>();
-    bucket.add(row.spec_def_id);
-    includesByCategory.set(row.category_id, bucket);
+  const assignByDef = new Map<string, string>();
+  for (const row of assignResult.rows) {
+    assignByDef.set(row.spec_def_id, row.category_id);
   }
 
   const excludesByCategory = new Map<string, Set<string>>();
@@ -42,7 +120,7 @@ const loadParticipationMaps = async (pool: Pool): Promise<ParticipationMaps> => 
     excludesByCategory.set(row.category_id, bucket);
   }
 
-  return { includesByCategory, excludesByCategory };
+  return { assignByDef, excludesByCategory };
 };
 
 export const computeEffectiveSpecDefIds = (
@@ -56,33 +134,18 @@ export const computeEffectiveSpecDefIds = (
     return cached;
   }
 
-  const category = categoriesById.get(categoryId);
-  if (!category) {
-    return new Set();
-  }
-
-  let effective: Set<string>;
-  if (category.parent_id === null) {
-    effective = new Set(participation.includesByCategory.get(categoryId) ?? []);
-  } else {
-    const inherited = computeEffectiveSpecDefIds(
-      category.parent_id,
-      categoriesById,
-      participation,
-      cache,
-    );
-    const includes = participation.includesByCategory.get(categoryId) ?? new Set<string>();
-    const excludes = participation.excludesByCategory.get(categoryId) ?? new Set<string>();
-    effective = new Set<string>();
-    for (const specDefId of inherited) {
-      if (!excludes.has(specDefId)) {
-        effective.add(specDefId);
-      }
-    }
-    for (const specDefId of includes) {
-      if (!excludes.has(specDefId)) {
-        effective.add(specDefId);
-      }
+  const effective = new Set<string>();
+  for (const [specDefId, assignCategoryId] of participation.assignByDef) {
+    if (
+      isEffectiveSpecDef(
+        categoryId,
+        specDefId,
+        assignCategoryId,
+        participation,
+        categoriesById,
+      )
+    ) {
+      effective.add(specDefId);
     }
   }
 

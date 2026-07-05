@@ -42,6 +42,3 @@ fields:
   - id: scopes
     # logical — DAL maps to site_scope + nested site_zone
     columns: []
-  - id: general_zones
-    # logical — site_zone rows with site_scope_id null (General bucket)
-    columns: []

@@ -37,11 +37,17 @@ export const assertParentCategoryExists = async (
 
 export const assertNestedProfileFields = (
   isRoot: boolean,
-  patch: {
-    default_phase_template_id?: string | null;
+  next: {
+    default_phase_template_id: string | null;
+  },
+  existing: {
+    default_phase_template_id: string | null;
   },
 ): void => {
-  if (!isRoot && patch.default_phase_template_id !== undefined) {
+  if (
+    !isRoot &&
+    next.default_phase_template_id !== existing.default_phase_template_id
+  ) {
     throw new ValidationError("default_phase_template_id is root-only", {
       field: "profile",
       code: "root_only_field",
@@ -143,10 +149,15 @@ export const loadCategoryDeleteBlockers = async (
   }
 
   const partSpecCountResult = await pool.query<{ count: number }>(
-    `SELECT COUNT(*)::int AS count
+    `WITH RECURSIVE subtree AS (
+       SELECT id FROM category WHERE id = $1
+       UNION ALL
+       SELECT c.id FROM category c JOIN subtree s ON c.parent_id = s.id
+     )
+     SELECT COUNT(*)::int AS count
      FROM manufacturer_part_spec mps
      INNER JOIN spec_def sd ON sd.id = mps.spec_def_id
-     WHERE sd.root_category_id = $1`,
+     WHERE sd.category_id IN (SELECT id FROM subtree)`,
     [categoryId],
   );
   const partSpecCount = partSpecCountResult.rows[0]?.count ?? 0;
@@ -189,9 +200,11 @@ export const updateCategory = async (
   row: CategoryWriteRow,
   existing: CategoryDetailRow,
 ): Promise<void> => {
-  assertNestedProfileFields(existing.is_root, {
-    default_phase_template_id: row.default_phase_template_id,
-  });
+  assertNestedProfileFields(
+    existing.is_root,
+    { default_phase_template_id: row.default_phase_template_id },
+    { default_phase_template_id: existing.default_phase_template_id },
+  );
 
   await withPermissionDb(pool, actorId, async (client) => {
     await client.query(

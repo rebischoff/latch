@@ -2,37 +2,11 @@ import { ValidationError } from "@latch/contracts";
 import type { PoolClient } from "pg";
 
 import type { SpecParticipationPatchRow } from "../descriptors/category-detail";
-
-export const assertRootSpecParticipationExcludes = (
-  isRoot: boolean,
-  excludes: SpecParticipationPatchRow[] | undefined,
-): void => {
-  if (isRoot && excludes !== undefined) {
-    throw new ValidationError("excludes on root category are not allowed", {
-      field: "spec_participation",
-      code: "root_excludes_rejected",
-    });
-  }
-};
-
-export const assertIncludesExcludesNoOverlap = (
-  includes: SpecParticipationPatchRow[],
-  excludes: SpecParticipationPatchRow[],
-): void => {
-  const includeIds = new Set(includes.map((row) => row.spec_def_id));
-  for (const row of excludes) {
-    if (includeIds.has(row.spec_def_id)) {
-      throw new ValidationError(
-        "spec_def_id cannot appear in both includes and excludes",
-        {
-          field: "spec_participation",
-          code: "include_exclude_overlap",
-          spec_def_id: row.spec_def_id,
-        },
-      );
-    }
-  }
-};
+import {
+  isAncestorOrSelf,
+  pathFromAncestorToNode,
+} from "./category-effective-specs";
+import type { CategoryFlatRow } from "./category-tree";
 
 export const assertSpecDefsBelongToRoot = async (
   client: PoolClient,
@@ -44,9 +18,14 @@ export const assertSpecDefsBelongToRoot = async (
   }
 
   const result = await client.query<{ id: string }>(
-    `SELECT id
+    `WITH RECURSIVE subtree AS (
+       SELECT id FROM category WHERE id = $1
+       UNION ALL
+       SELECT c.id FROM category c JOIN subtree s ON c.parent_id = s.id
+     )
+     SELECT id
      FROM spec_def
-     WHERE root_category_id = $1 AND id = ANY($2::uuid[])`,
+     WHERE category_id IN (SELECT id FROM subtree) AND id = ANY($2::uuid[])`,
     [rootCategoryId, specDefIds],
   );
 
@@ -59,37 +38,140 @@ export const assertSpecDefsBelongToRoot = async (
   }
 };
 
-export const replaceCategorySpecIncludesTx = async (
+const loadOwnerByDef = async (
+  client: PoolClient,
+  specDefIds: string[],
+): Promise<Map<string, string>> => {
+  if (specDefIds.length === 0) {
+    return new Map();
+  }
+
+  const result = await client.query<{ category_id: string; spec_def_id: string }>(
+    `SELECT id AS spec_def_id, category_id
+     FROM spec_def
+     WHERE id = ANY($1::uuid[])`,
+    [specDefIds],
+  );
+
+  return new Map(result.rows.map((row) => [row.spec_def_id, row.category_id]));
+};
+
+/** True when a `category_spec_exclude` sits on the owner→node path **above** `nodeId`. */
+const hasExcludeStrictlyAbove = (
+  ownerCategoryId: string,
+  nodeId: string,
+  specDefId: string,
+  excludesByCategory: Map<string, Set<string>>,
+  categoriesById: Map<string, CategoryFlatRow>,
+): boolean => {
+  const path = pathFromAncestorToNode(ownerCategoryId, nodeId, categoriesById);
+  for (const categoryId of path.slice(0, -1)) {
+    if (excludesByCategory.get(categoryId)?.has(specDefId)) {
+      return true;
+    }
+  }
+  return false;
+};
+
+const loadExcludeIdsAtNode = async (
+  client: PoolClient,
+  categoryId: string,
+): Promise<Set<string>> => {
+  const result = await client.query<{ spec_def_id: string }>(
+    `SELECT spec_def_id FROM category_spec_exclude WHERE category_id = $1`,
+    [categoryId],
+  );
+
+  return new Set(result.rows.map((row) => row.spec_def_id));
+};
+
+const loadExcludesByCategory = async (client: PoolClient): Promise<Map<string, Set<string>>> => {
+  const result = await client.query<{ category_id: string; spec_def_id: string }>(
+    `SELECT category_id, spec_def_id FROM category_spec_exclude`,
+  );
+
+  const excludesByCategory = new Map<string, Set<string>>();
+  for (const row of result.rows) {
+    const bucket = excludesByCategory.get(row.category_id) ?? new Set<string>();
+    bucket.add(row.spec_def_id);
+    excludesByCategory.set(row.category_id, bucket);
+  }
+
+  return excludesByCategory;
+};
+
+export const applyCategorySpecParticipationTx = async (
   client: PoolClient,
   categoryId: string,
   rootCategoryId: string,
   rows: SpecParticipationPatchRow[],
+  allCategories: CategoryFlatRow[],
 ): Promise<void> => {
   const specDefIds = rows.map((row) => row.spec_def_id);
   await assertSpecDefsBelongToRoot(client, rootCategoryId, specDefIds);
 
-  await client.query(`DELETE FROM category_spec_def WHERE category_id = $1`, [
-    categoryId,
-  ]);
+  const categoriesById = new Map(allCategories.map((row) => [row.id, row]));
+  const ownerByDef = await loadOwnerByDef(client, specDefIds);
+  const excludeHere = await loadExcludeIdsAtNode(client, categoryId);
+  const excludesByCategory = await loadExcludesByCategory(client);
 
-  for (const [index, row] of rows.entries()) {
-    await client.query(
-      `INSERT INTO category_spec_def (category_id, spec_def_id, sort_order)
-       VALUES ($1, $2, $3)`,
-      [categoryId, row.spec_def_id, index + 1],
-    );
-  }
-};
+  for (const row of rows) {
+    const { spec_def_id: specDefId, active } = row;
+    // Owner lives on `spec_def.category_id`; participation only toggles excludes.
+    const ownerCategoryId = ownerByDef.get(specDefId) ?? null;
+    const isOwnerHere = ownerCategoryId === categoryId;
+    const isInheritedHere =
+      ownerCategoryId !== null &&
+      !isOwnerHere &&
+      isAncestorOrSelf(ownerCategoryId, categoryId, categoriesById);
+    const hasExcludeHere = excludeHere.has(specDefId);
 
-/** @deprecated Use replaceCategorySpecIncludesTx */
-export const replaceCategorySpecParticipationTx = replaceCategorySpecIncludesTx;
+    if (active) {
+      if (
+        ownerCategoryId &&
+        !isOwnerHere &&
+        hasExcludeStrictlyAbove(
+          ownerCategoryId,
+          categoryId,
+          specDefId,
+          excludesByCategory,
+          categoriesById,
+        )
+      ) {
+        throw new ValidationError("cannot re-include below ancestor exclude", {
+          field: "spec_participation",
+          code: "reinclude_below_exclude",
+          spec_def_id: specDefId,
+        });
+      }
 
-/** @deprecated Use assertRootSpecParticipationExcludes */
-export const assertNestedSpecParticipationPatch = (isRoot: boolean): void => {
-  if (isRoot) {
-    throw new ValidationError("spec_participation is nested-only", {
-      field: "spec_participation",
-      code: "nested_only_field",
-    });
+      if (hasExcludeHere) {
+        await client.query(
+          `DELETE FROM category_spec_exclude WHERE category_id = $1 AND spec_def_id = $2`,
+          [categoryId, specDefId],
+        );
+        excludeHere.delete(specDefId);
+        excludesByCategory.get(categoryId)?.delete(specDefId);
+      }
+    } else if (isInheritedHere) {
+      if (!hasExcludeHere) {
+        await client.query(
+          `INSERT INTO category_spec_exclude (category_id, spec_def_id, sort_order)
+           VALUES ($1, $2, $3)`,
+          [categoryId, specDefId, 1],
+        );
+        excludeHere.add(specDefId);
+        const bucket = excludesByCategory.get(categoryId) ?? new Set<string>();
+        bucket.add(specDefId);
+        excludesByCategory.set(categoryId, bucket);
+      }
+    } else if (hasExcludeHere) {
+      await client.query(
+        `DELETE FROM category_spec_exclude WHERE category_id = $1 AND spec_def_id = $2`,
+        [categoryId, specDefId],
+      );
+      excludeHere.delete(specDefId);
+      excludesByCategory.get(categoryId)?.delete(specDefId);
+    }
   }
 };

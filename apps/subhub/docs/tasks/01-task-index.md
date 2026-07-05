@@ -232,10 +232,14 @@ flowchart LR
 | **37b** | [37b-category-scope-migration-apply.md](./37b-category-scope-migration-apply.md) | Apply `033` on dev; FK smoke — **complete** |
 | **37c** | [37c-site-scopes-zones.md](./37c-site-scopes-zones.md) | Site `site_scope` / `site_zone` DAL + Scopes & zones UI — **complete** |
 | **37d** | [37d-category-catalog-dal-surfaces.md](./37d-category-catalog-dal-surfaces.md) | `category_list` / `category_detail` — tree list pane, spec DAL — **complete** |
-| **37d2** | [37d2-category-spec-inheritance.md](./37d2-category-spec-inheritance.md) | Spec participation inherit + exclude; migration `036`; scope panel union — **complete** |
+| **37d2** | [37d2-category-spec-inheritance.md](./37d2-category-spec-inheritance.md) | Spec participation tables + scope panel union — **complete** (superseded by 37d3) |
+| **37d3** | [37d3-category-spec-participation-simplify.md](./37d3-category-spec-participation-simplify.md) | Assign-once participation + UI; migration `037` — **complete** (visibility superseded by 37d4) |
+| **37d4** | [37d4-category-spec-visibility.md](./37d4-category-spec-visibility.md) | Owner-branch spec visibility + category UI — **complete** (storage superseded by 37d5) |
+| **37d5** | [37d5-category-spec-owner-column.md](./37d5-category-spec-owner-column.md) | `spec_def.category_id` owner column; drop `category_spec_def`; migration `038` — **complete** |
 | **37e** | [37e-estimate-scope-tab.md](./37e-estimate-scope-tab.md) | Estimate Scope tab DAL/UI + migration 035 + minimal line retarget — **complete** |
-| **37f** | [37f-estimate-line-costing.md](./37f-estimate-line-costing.md) *(TBD)* | Line costing, TreeSelect, part filter — **next** |
-| **37g–37h** | *(see 37a chain)* | Commercial types, job FKs |
+| **37f** | [37f-estimate-line-costing.md](./37f-estimate-line-costing.md) | Scope required; zone parents; TreeSelect; part filter; material snapshot — **complete** |
+| **37g** | [37g-commercial-costing.md](./37g-commercial-costing.md) | Org rate tables; category commercial; full costing engine |
+| **37h** | *(see 37a chain)* | Job `site_zone_id` FK renames |
 
 ### Backbone pass (estimate finish) — tasks 29–32
 

@@ -27,4 +27,4 @@ VALUES ('<estimate_id>', NULL, NULL, 0);
 
 ## Follow-on
 
-- **37f** — zone line parents, item TreeSelect, costing snapshots.
+- **37f** — zone line parents, item TreeSelect, costing snapshots; **039** retire General ([plan](./039-retire-general-scope-plan.md)).

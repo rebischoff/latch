@@ -11,25 +11,11 @@ import type {
   EstimateScopeZonePatchRow,
 } from "../descriptors/estimate-detail";
 
-const isGeneralScope = (row: Pick<EstimateScopePatchRow, "site_scope_id" | "root_category_id">) =>
-  (row.site_scope_id ?? null) === null && (row.root_category_id ?? null) === null;
-
 const assertNoDuplicateSiteScopeIds = (rows: EstimateScopePatchRow[]): void => {
   const seen = new Set<string | null>();
 
   for (const row of rows) {
-    if (isGeneralScope(row)) {
-      if (seen.has(null)) {
-        throw new ValidationError("At most one General scope row per estimate", {
-          field: "scopes",
-          code: "duplicate_general",
-        });
-      }
-      seen.add(null);
-      continue;
-    }
-
-    const siteScopeId = row.site_scope_id as string;
+    const siteScopeId = row.site_scope_id;
     if (seen.has(siteScopeId)) {
       throw new ValidationError("Duplicate site_scope_id in scopes", {
         field: "scopes",
@@ -314,57 +300,55 @@ export const replaceEstimateScopesTx = async (
   const normalized = rows.map((row) => ({
     ...row,
     id: row.id ?? crypto.randomUUID(),
-    site_scope_id: row.site_scope_id ?? null,
-    root_category_id: row.root_category_id ?? null,
     labor_context_type_id: row.labor_context_type_id ?? null,
     markup_type_id: row.markup_type_id ?? null,
   }));
 
   for (const row of normalized) {
-    if (isGeneralScope(row)) {
-      if (row.specs.length > 0) {
-        throw new ValidationError("General scope cannot have scope-level specs", {
-          field: "scopes",
-          code: "general_scope_specs",
-          id: row.id,
-        });
-      }
-    } else if (!row.site_scope_id) {
+    if (!row.site_scope_id) {
       throw new ValidationError("Scoped row requires site_scope_id", {
         field: "scopes",
         code: "missing_site_scope",
         id: row.id,
       });
-    } else {
-      const siteScope = await assertSiteScopeBelongsToSite(
+    }
+
+    if (!row.root_category_id) {
+      throw new ValidationError("Scoped row requires root_category_id", {
+        field: "scopes",
+        code: "missing_root_category",
+        id: row.id,
+      });
+    }
+
+    const siteScope = await assertSiteScopeBelongsToSite(
+      client,
+      siteId,
+      row.site_scope_id,
+    );
+
+    if (row.root_category_id !== siteScope.root_category_id) {
+      throw new ValidationError("root_category_id must match site scope root", {
+        field: "scopes",
+        code: "root_mismatch",
+        site_scope_id: row.site_scope_id,
+        root_category_id: row.root_category_id,
+      });
+    }
+
+    assertNoDuplicateSpecDefs(row.specs, row.id);
+    for (const spec of row.specs) {
+      await assertSpecDefInScopePanel(
         client,
-        siteId,
-        row.site_scope_id,
+        siteScope.root_category_id,
+        spec.spec_def_id,
       );
-
-      if (row.root_category_id !== siteScope.root_category_id) {
-        throw new ValidationError("root_category_id must match site scope root", {
-          field: "scopes",
-          code: "root_mismatch",
-          site_scope_id: row.site_scope_id,
-          root_category_id: row.root_category_id,
-        });
-      }
-
-      assertNoDuplicateSpecDefs(row.specs, row.id);
-      for (const spec of row.specs) {
-        await assertSpecDefInScopePanel(
+      if (spec.spec_option_id !== null && spec.spec_option_id !== undefined) {
+        await assertSpecOptionBelongsToDef(
           client,
-          siteScope.root_category_id,
           spec.spec_def_id,
+          spec.spec_option_id,
         );
-        if (spec.spec_option_id !== null && spec.spec_option_id !== undefined) {
-          await assertSpecOptionBelongsToDef(
-            client,
-            spec.spec_def_id,
-            spec.spec_option_id,
-          );
-        }
       }
     }
 
@@ -376,30 +360,27 @@ export const replaceEstimateScopesTx = async (
       await assertScopeOwnedByEstimate(client, estimateId, row.id);
     }
 
-    const bucketSiteScopeId = isGeneralScope(row) ? null : row.site_scope_id;
     for (const zone of row.zones) {
       await assertZoneBelongsToScopeBucket(
         client,
         siteId,
         zone.site_zone_id,
-        bucketSiteScopeId,
+        row.site_scope_id,
       );
 
-      if (!isGeneralScope(row)) {
-        assertNoDuplicateSpecDefs(zone.specs, `${row.id}:${zone.site_zone_id}`);
-        for (const spec of zone.specs) {
-          await assertSpecDefInScopePanel(
+      assertNoDuplicateSpecDefs(zone.specs, `${row.id}:${zone.site_zone_id}`);
+      for (const spec of zone.specs) {
+        await assertSpecDefInScopePanel(
+          client,
+          row.root_category_id,
+          spec.spec_def_id,
+        );
+        if (spec.spec_option_id !== null && spec.spec_option_id !== undefined) {
+          await assertSpecOptionBelongsToDef(
             client,
-            row.root_category_id as string,
             spec.spec_def_id,
+            spec.spec_option_id,
           );
-          if (spec.spec_option_id !== null && spec.spec_option_id !== undefined) {
-            await assertSpecOptionBelongsToDef(
-              client,
-              spec.spec_def_id,
-              spec.spec_option_id,
-            );
-          }
         }
       }
     }

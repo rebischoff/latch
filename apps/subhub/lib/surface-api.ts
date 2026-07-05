@@ -169,7 +169,6 @@ export const fetchEstimateSitePicker = async (): Promise<
 
 export type EstimateSiteTreePickerData = {
   site_tree: {
-    general_zones: Array<{ id: string; name: string; zones?: unknown[] }>;
     scopes: Array<{
       id: string;
       name: string;
@@ -190,6 +189,63 @@ export type EstimateSiteTreePickerData = {
       }>
     >;
   };
+};
+
+export type ItemTreePickerNode = {
+  children?: ItemTreePickerNode[];
+  id: string;
+  label: string;
+  selectable: boolean;
+  type: "category" | "item";
+  value: string;
+};
+
+export type EstimateItemPickerData = {
+  tree: ItemTreePickerNode[];
+};
+
+export const fetchEstimateItemPicker = async (
+  rootCategoryId: string,
+  searchQuery?: string,
+): Promise<ApiSuccessBody<EstimateItemPickerData>> => {
+  const params = new URLSearchParams({ root_category_id: rootCategoryId });
+  if (searchQuery) {
+    params.set("q", searchQuery);
+  }
+  const response = await fetch(`/api/estimates/pickers/items?${params.toString()}`);
+  return parseResponse<EstimateItemPickerData>(response);
+};
+
+export type EstimatePartPickerRow = {
+  description: string;
+  id: string;
+  max_vendor_price: number;
+  mpn: string;
+};
+
+export type EstimatePartPickerData = {
+  parts: EstimatePartPickerRow[];
+};
+
+export const fetchEstimatePartPicker = async (params: {
+  itemId: string;
+  estimateScopeId: string;
+  siteZoneId?: string | null;
+  estimateId?: string;
+  lineId?: string;
+}): Promise<ApiSuccessBody<EstimatePartPickerData>> => {
+  const search = new URLSearchParams({ item_id: params.itemId });
+  if (params.estimateId && params.lineId) {
+    search.set("estimate_id", params.estimateId);
+    search.set("line_id", params.lineId);
+  } else {
+    search.set("estimate_scope_id", params.estimateScopeId);
+    if (params.siteZoneId) {
+      search.set("site_zone_id", params.siteZoneId);
+    }
+  }
+  const response = await fetch(`/api/estimates/pickers/parts?${search.toString()}`);
+  return parseResponse<EstimatePartPickerData>(response);
 };
 
 export const fetchEstimateSiteTree = async (

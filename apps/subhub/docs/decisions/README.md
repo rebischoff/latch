@@ -43,6 +43,10 @@ _Operations backbone forks **resolved** (2026-06-27). Optional: [J3 phase weight
 
 | Decision | File | Date | Status |
 |----------|------|------|--------|
+| Line item part pin — `item_id`, `part_id`, `part_locked` | [37f](../tasks/37f-estimate-line-costing.md) | 2026-07-04 | **locked** |
+| Ambiguous part material cost — fallback + max vendor | [37f](../tasks/37f-estimate-line-costing.md) | 2026-07-04 | **locked** |
+| Commercial costing — org tables, category defaults, estimate overrides | [catalog.md](./catalog.md) | 2026-07-04 | **locked** |
+| Estimate scope required + pricing overrides | [estimate.md](./estimate.md) | 2026-07-04 | **locked** |
 | `spec_def` value types and part-matching rules | [catalog.md](./catalog.md) | 2026-07-02 | **locked** (DDL in 37f follow-on) |
 | Category spec participation — inherit, include, exclude | [catalog.md](./catalog.md) | 2026-07-02 | **locked** (37d amend + migration) |
 | Category-only scope — roots replace catalog `system` | [catalog.md](./catalog.md) | 2026-06-30 | **locked** |

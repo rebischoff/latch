@@ -98,6 +98,18 @@ export const replaceEstimateCollectionsTx = async (
   siteId: string,
   related: Pick<EstimateDetailRelatedPatch, "scopes" | "line_items">,
 ): Promise<void> => {
+  if (
+    related.line_items !== undefined &&
+    related.line_items.length > 0 &&
+    related.scopes !== undefined &&
+    related.scopes.length === 0
+  ) {
+    throw new ValidationError("At least one scope is required when line_items are present", {
+      field: "scopes",
+      code: "scope_required",
+    });
+  }
+
   let validScopeIds: Set<string>;
   let checkedZones = new Map<string, Set<string>>();
 

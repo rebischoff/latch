@@ -83,7 +83,7 @@ describe("replaceEstimateScopesTx", () => {
     });
   });
 
-  it("requires General row to have null root_category_id", async () => {
+  it("requires site_scope_id on scoped rows", async () => {
     const client = makeClient({
       "FROM estimate_scope WHERE estimate_id": { rows: [] },
       "FROM estimate_zone ez": { rows: [] },
@@ -94,7 +94,7 @@ describe("replaceEstimateScopesTx", () => {
     await expect(
       replaceEstimateScopesTx(client, "est-1", "site-1", [
         {
-          site_scope_id: null,
+          site_scope_id: "",
           root_category_id: "cat-1",
           sort_order: 1,
           specs: [],
@@ -102,7 +102,7 @@ describe("replaceEstimateScopesTx", () => {
         },
       ]),
     ).rejects.toMatchObject({
-      details: { code: "missing_site_scope" },
+      details: { field: "scopes", code: "missing_site_scope" },
     });
   });
 });

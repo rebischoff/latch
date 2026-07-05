@@ -12,15 +12,10 @@ import {
   loadCategoryDetail,
   loadCategoryDetailRelated,
 } from "../repository/category-detail";
-import { replaceCategorySpecExcludesTx } from "../repository/category-spec-exclude-write";
+import { applyCategorySpecParticipationTx } from "../repository/category-spec-participation-write";
+import { loadAllCategories } from "../repository/category-tree";
 import {
-  assertIncludesExcludesNoOverlap,
-  assertRootSpecParticipationExcludes,
-  replaceCategorySpecIncludesTx,
-} from "../repository/category-spec-participation-write";
-import {
-  assertRootSpecDefinitionsPatch,
-  replaceSpecDefinitionsTx,
+  applyCategorySpecDefinitionsTx,
 } from "../repository/spec-def-write";
 import {
   deleteCategory,
@@ -71,12 +66,7 @@ export const createCategoryDetailStore = (
 
     await withPermissionDb(pool, actorId, async (client) => {
       if (patch.spec_definitions !== undefined) {
-        assertRootSpecDefinitionsPatch(category.is_root);
-        await replaceSpecDefinitionsTx(
-          client,
-          categoryId,
-          patch.spec_definitions,
-        );
+        await applyCategorySpecDefinitionsTx(client, category, patch.spec_definitions);
       }
 
       if (patch.spec_participation !== undefined) {
@@ -87,29 +77,14 @@ export const createCategoryDetailStore = (
           return;
         }
 
-        const includes = patch.spec_participation.includes ?? [];
-        const excludes = patch.spec_participation.excludes ?? [];
-
-        assertRootSpecParticipationExcludes(category.is_root, patch.spec_participation.excludes);
-        assertIncludesExcludesNoOverlap(includes, excludes);
-
-        if (patch.spec_participation.includes !== undefined) {
-          await replaceCategorySpecIncludesTx(
-            client,
-            categoryId,
-            rootCategoryId,
-            includes,
-          );
-        }
-
-        if (!category.is_root && patch.spec_participation.excludes !== undefined) {
-          await replaceCategorySpecExcludesTx(
-            client,
-            categoryId,
-            rootCategoryId,
-            excludes,
-          );
-        }
+        const allCategories = await loadAllCategories(pool);
+        await applyCategorySpecParticipationTx(
+          client,
+          categoryId,
+          rootCategoryId,
+          patch.spec_participation.participates,
+          allCategories,
+        );
       }
     });
   },

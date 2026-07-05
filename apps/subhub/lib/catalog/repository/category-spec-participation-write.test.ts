@@ -2,32 +2,179 @@ import { ValidationError } from "@latch/contracts";
 import type { PoolClient } from "pg";
 import { describe, expect, it, vi } from "vitest";
 
+import type { CategoryFlatRow } from "./category-tree";
 import {
-  assertIncludesExcludesNoOverlap,
-  assertRootSpecParticipationExcludes,
+  applyCategorySpecParticipationTx,
   assertSpecDefsBelongToRoot,
 } from "./category-spec-participation-write";
 
-describe("assertRootSpecParticipationExcludes", () => {
-  it("allows includes-only patch on root", () => {
-    expect(() => assertRootSpecParticipationExcludes(true, undefined)).not.toThrow();
+const chainCategories: CategoryFlatRow[] = [
+  {
+    id: "a",
+    name: "a",
+    parent_id: null,
+    sort_order: 1,
+    csi_code: null,
+    default_phase_template_id: null,
+  },
+  {
+    id: "b",
+    name: "b",
+    parent_id: "a",
+    sort_order: 1,
+    csi_code: null,
+    default_phase_template_id: null,
+  },
+  {
+    id: "c",
+    name: "c",
+    parent_id: "b",
+    sort_order: 1,
+    csi_code: null,
+    default_phase_template_id: null,
+  },
+  {
+    id: "d",
+    name: "d",
+    parent_id: "c",
+    sort_order: 1,
+    csi_code: null,
+    default_phase_template_id: null,
+  },
+];
+
+const def1 = "00000000-0000-4000-8000-000000000001";
+
+const createMockClient = (state: {
+  owners: Array<{ category_id: string; spec_def_id: string }>;
+  excludes: Array<{ category_id: string; spec_def_id: string }>;
+}) => {
+  const queries: string[] = [];
+
+  const client = {
+    query: vi.fn(async (sql: string, params?: unknown[]) => {
+      queries.push(sql);
+
+      if (sql.startsWith("INSERT INTO category_spec_exclude")) {
+        state.excludes.push({
+          category_id: params?.[0] as string,
+          spec_def_id: params?.[1] as string,
+        });
+        return { rows: [] };
+      }
+
+      if (sql.startsWith("DELETE FROM category_spec_exclude")) {
+        const categoryId = params?.[0] as string;
+        const specDefId = params?.[1] as string;
+        state.excludes = state.excludes.filter(
+          (row) => !(row.category_id === categoryId && row.spec_def_id === specDefId),
+        );
+        return { rows: [] };
+      }
+
+      // assertSpecDefsBelongToRoot — owner in subtree of root.
+      if (sql.includes("FROM spec_def") && sql.includes("subtree")) {
+        const ids = (params?.[1] as string[]) ?? [];
+        return { rows: ids.map((id) => ({ id })) };
+      }
+
+      // loadOwnerByDef — owner column on spec_def.
+      if (sql.includes("FROM spec_def") && sql.includes("category_id")) {
+        const ids = (params?.[0] as string[]) ?? [];
+        return {
+          rows: state.owners.filter((row) => ids.includes(row.spec_def_id)),
+        };
+      }
+
+      if (sql.includes("FROM category_spec_exclude WHERE category_id = $1")) {
+        const categoryId = params?.[0] as string;
+        return {
+          rows: state.excludes
+            .filter((row) => row.category_id === categoryId)
+            .map((row) => ({ spec_def_id: row.spec_def_id })),
+        };
+      }
+
+      if (sql.includes("FROM category_spec_exclude") && !sql.includes("category_id = $1")) {
+        return { rows: state.excludes };
+      }
+
+      return { rows: [] };
+    }),
+  } as unknown as PoolClient;
+
+  return { client, queries, state };
+};
+
+describe("applyCategorySpecParticipationTx", () => {
+  it("excludes an inherited def when participation turned off", async () => {
+    const { client, state } = createMockClient({
+      owners: [{ category_id: "b", spec_def_id: def1 }],
+      excludes: [],
+    });
+
+    await applyCategorySpecParticipationTx(
+      client,
+      "c",
+      "a",
+      [{ spec_def_id: def1, active: false }],
+      chainCategories,
+    );
+
+    expect(state.excludes).toEqual([{ category_id: "c", spec_def_id: def1 }]);
   });
 
-  it("rejects excludes on root category", () => {
-    expect(() =>
-      assertRootSpecParticipationExcludes(true, [{ spec_def_id: "def-1" }]),
-    ).toThrow(ValidationError);
-  });
-});
+  it("does not write an assignment row (assign lives on spec_def)", async () => {
+    const { client, queries } = createMockClient({
+      owners: [{ category_id: "b", spec_def_id: def1 }],
+      excludes: [],
+    });
 
-describe("assertIncludesExcludesNoOverlap", () => {
-  it("rejects the same spec_def_id in includes and excludes", () => {
-    expect(() =>
-      assertIncludesExcludesNoOverlap(
-        [{ spec_def_id: "def-1" }],
-        [{ spec_def_id: "def-1" }],
+    await applyCategorySpecParticipationTx(
+      client,
+      "c",
+      "a",
+      [{ spec_def_id: def1, active: true }],
+      chainCategories,
+    );
+
+    expect(queries.some((sql) => sql.includes("category_spec_def"))).toBe(false);
+  });
+
+  it("re-includes at the excluding node by removing the local exclude", async () => {
+    const { client, state } = createMockClient({
+      owners: [{ category_id: "b", spec_def_id: def1 }],
+      excludes: [{ category_id: "c", spec_def_id: def1 }],
+    });
+
+    await applyCategorySpecParticipationTx(
+      client,
+      "c",
+      "a",
+      [{ spec_def_id: def1, active: true }],
+      chainCategories,
+    );
+
+    expect(state.excludes).toEqual([]);
+  });
+
+  it("rejects re-include below ancestor exclude", async () => {
+    const { client } = createMockClient({
+      owners: [{ category_id: "b", spec_def_id: def1 }],
+      excludes: [{ category_id: "c", spec_def_id: def1 }],
+    });
+
+    await expect(
+      applyCategorySpecParticipationTx(
+        client,
+        "d",
+        "a",
+        [{ spec_def_id: def1, active: true }],
+        chainCategories,
       ),
-    ).toThrow(ValidationError);
+    ).rejects.toMatchObject({
+      details: { code: "reinclude_below_exclude" },
+    });
   });
 });
 

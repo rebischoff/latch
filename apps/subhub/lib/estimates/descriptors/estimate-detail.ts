@@ -29,8 +29,8 @@ const EstimateScopeZonePatchElementSchema = z
 const EstimateScopePatchElementSchema = z
   .object({
     id: z.string().optional(),
-    site_scope_id: z.string().nullable().optional(),
-    root_category_id: z.string().nullable().optional(),
+    site_scope_id: z.string(),
+    root_category_id: z.string(),
     sort_order: z.number(),
     labor_context_type_id: z.string().nullable().optional(),
     markup_type_id: z.string().nullable().optional(),
@@ -49,7 +49,11 @@ const EstimateLineItemPatchElementSchema = z
     unit: z.string(),
     unit_cost: z.number(),
     unit_price: z.number(),
-    estimate_scope_id: z.string().nullable().optional(),
+    unit_material: z.number().optional(),
+    unit_labor: z.number().optional(),
+    unit_incidental: z.number().optional(),
+    unit_price_target: z.number().optional(),
+    estimate_scope_id: z.string(),
     site_zone_id: z.string().nullable().optional(),
     material_status: z
       .enum(["generic", "suggested", "verified"])
@@ -58,6 +62,7 @@ const EstimateLineItemPatchElementSchema = z
     phase_id: z.string().nullable().optional(),
     item_id: z.string().nullable().optional(),
     part_id: z.string().nullable().optional(),
+    part_locked: z.boolean().optional(),
     vendor_part_id: z.string().nullable().optional(),
     parent_line_id: z.string().nullable().optional(),
   })
@@ -138,7 +143,6 @@ export type EstimateSiteScopeTreeRow = {
 };
 
 export type EstimateSiteTreeRow = {
-  general_zones: EstimateSiteZoneTreeRow[];
   scopes: EstimateSiteScopeTreeRow[];
   spec_templates: Record<string, EstimateScopeSpecRow[]>;
 };
@@ -164,9 +168,9 @@ export type EstimateScopeRow = {
   id: string;
   labor_context_type_id: string | null;
   markup_type_id: string | null;
-  root_category_id: string | null;
+  root_category_id: string;
   root_category_name: string | null;
-  site_scope_id: string | null;
+  site_scope_id: string;
   site_scope_name: string | null;
   sort_order: number;
   specs: EstimateScopeSpecRow[];
@@ -175,7 +179,7 @@ export type EstimateScopeRow = {
 
 export type EstimateLineItemRow = {
   description: string;
-  estimate_scope_id: string | null;
+  estimate_scope_id: string;
   id: string;
   item_id: string | null;
   line_kind: string;
@@ -184,13 +188,18 @@ export type EstimateLineItemRow = {
   material_status: string | null;
   parent_line_id: string | null;
   part_id: string | null;
+  part_locked: boolean;
   phase_id: string | null;
   quantity: number;
   site_zone_id: string | null;
   sort_order: number;
   unit: string;
   unit_cost: number;
+  unit_incidental: number;
+  unit_labor: number;
+  unit_material: number;
   unit_price: number;
+  unit_price_target: number | null;
   vendor_part_id: string | null;
 };
 

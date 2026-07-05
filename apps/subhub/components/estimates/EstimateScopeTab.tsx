@@ -13,7 +13,6 @@ import {
 import { EstimateScopeSpecFields } from "@/components/estimates/EstimateScopeSpecFields";
 import {
   buildEstimateScopeTree,
-  findGeneralScopeIndex,
   findScopeIndexBySiteScopeId,
   isScopeChecked,
   isZoneChecked,
@@ -56,8 +55,8 @@ export const EstimateScopeTab = ({ manifest }: EstimateScopeTabProps) => {
 
   const ensureScopeChecked = useCallback(
     (
-      siteScopeId: string | null,
-      rootCategoryId: string | null,
+      siteScopeId: string,
+      rootCategoryId: string,
       rootCategoryName: string | null,
       siteScopeName: string | null,
     ): EstimateScopeFormRow[] => {
@@ -84,8 +83,8 @@ export const EstimateScopeTab = ({ manifest }: EstimateScopeTabProps) => {
   );
 
   const toggleScope = useCallback(
-    (siteScopeId: string | null, checked: boolean, meta: {
-      rootCategoryId: string | null;
+    (siteScopeId: string, checked: boolean, meta: {
+      rootCategoryId: string;
       rootCategoryName: string | null;
       siteScopeName: string | null;
     }) => {
@@ -97,7 +96,7 @@ export const EstimateScopeTab = ({ manifest }: EstimateScopeTabProps) => {
         }
 
         const next = current.filter(
-          (scope) => (scope.site_scope_id ?? null) !== siteScopeId,
+          (scope) => scope.site_scope_id !== siteScopeId,
         );
         replaceScopes(next.map((scope, index) => ({ ...scope, sort_order: index + 1 })));
         setSelection({});
@@ -117,11 +116,11 @@ export const EstimateScopeTab = ({ manifest }: EstimateScopeTabProps) => {
 
   const toggleZone = useCallback(
     (
-      siteScopeId: string | null,
+      siteScopeId: string,
       zoneId: string,
       checked: boolean,
       meta: {
-        rootCategoryId: string | null;
+        rootCategoryId: string;
         rootCategoryName: string | null;
         siteScopeName: string | null;
       },
@@ -147,7 +146,7 @@ export const EstimateScopeTab = ({ manifest }: EstimateScopeTabProps) => {
         const next = [...current];
         next[scopeIndex] = { ...scope, zones: nextZones };
 
-        if (nextZones.length === 0 && siteScopeId !== null) {
+        if (nextZones.length === 0) {
           next.splice(scopeIndex, 1);
         }
 
@@ -215,43 +214,29 @@ export const EstimateScopeTab = ({ manifest }: EstimateScopeTabProps) => {
   const renderTreeTitle = useCallback(
     (node: EstimateScopeAntdTreeNode) => {
       const label = labelByKey.get(String(node.key)) ?? "";
-      if (node.rowKind === "general" || node.rowKind === "scope") {
-        const siteScopeId = node.siteScopeId ?? null;
+      if (node.rowKind === "scope") {
+        const siteScopeId = node.siteScopeId as string;
         const checked = isScopeChecked(scopes, siteScopeId);
         const scopeBlocked =
           checked && scopeReferencedByLines(scopes, lineItems, siteScopeId);
 
-        const siteScopeMeta =
-          node.rowKind === "general"
-            ? {
-                rootCategoryId: null as string | null,
-                rootCategoryName: null as string | null,
-                siteScopeName: "General" as string | null,
-              }
-            : {
-                rootCategoryId:
-                  siteTree?.scopes.find((scope) => scope.id === siteScopeId)?.root_category_id ??
-                  null,
-                rootCategoryName: null as string | null,
-                siteScopeName: label,
-              };
+        const siteScopeMeta = {
+          rootCategoryId:
+            siteTree?.scopes.find((scope) => scope.id === siteScopeId)?.root_category_id ??
+            "",
+          rootCategoryName: null as string | null,
+          siteScopeName: label,
+        };
 
         return (
           <div
             style={{ display: "flex", alignItems: "center", gap: 8 }}
             onClick={(event) => {
               event.stopPropagation();
-              if (node.rowKind === "scope" && node.scopeIndex !== undefined) {
+              if (node.scopeIndex !== undefined) {
                 const scopeIndex = findScopeIndexBySiteScopeId(scopes, siteScopeId);
                 if (scopeIndex >= 0) {
                   setSelection({ scopeIndex });
-                }
-              } else if (node.rowKind === "general") {
-                const generalIndex = findGeneralScopeIndex(scopes);
-                if (generalIndex >= 0) {
-                  setSelection({ scopeIndex: generalIndex });
-                } else {
-                  setSelection({});
                 }
               }
             }}
@@ -264,33 +249,24 @@ export const EstimateScopeTab = ({ manifest }: EstimateScopeTabProps) => {
               }}
               onClick={(event) => event.stopPropagation()}
             />
-            <Typography.Text strong={node.rowKind === "general"}>
-              {label}
-            </Typography.Text>
+            <Typography.Text strong>{label}</Typography.Text>
           </div>
         );
       }
 
       if (node.rowKind === "zone" && node.zoneId) {
-        const siteScopeId = node.siteScopeId ?? null;
+        const siteScopeId = node.siteScopeId as string;
         const checked = isZoneChecked(scopes, siteScopeId, node.zoneId);
         const zoneBlocked = checked && zoneReferencedByLines(lineItems, node.zoneId);
 
-        const siteScopeMeta =
-          siteScopeId === null
-            ? {
-                rootCategoryId: null as string | null,
-                rootCategoryName: null as string | null,
-                siteScopeName: "General" as string | null,
-              }
-            : {
-                rootCategoryId:
-                  siteTree?.scopes.find((scope) => scope.id === siteScopeId)?.root_category_id ??
-                  null,
-                rootCategoryName: null as string | null,
-                siteScopeName:
-                  siteTree?.scopes.find((scope) => scope.id === siteScopeId)?.name ?? null,
-              };
+        const siteScopeMeta = {
+          rootCategoryId:
+            siteTree?.scopes.find((scope) => scope.id === siteScopeId)?.root_category_id ??
+            "",
+          rootCategoryName: null as string | null,
+          siteScopeName:
+            siteTree?.scopes.find((scope) => scope.id === siteScopeId)?.name ?? null,
+        };
 
         return (
           <div
@@ -332,13 +308,9 @@ export const EstimateScopeTab = ({ manifest }: EstimateScopeTabProps) => {
   const selectedScope =
     selectedScopeIndex !== undefined ? scopes[selectedScopeIndex] : undefined;
   const showScopeSpecs =
-    selectedScope !== undefined &&
-    selectedScope.root_category_id !== null &&
-    selection.zoneIndex === undefined;
+    selectedScope !== undefined && selection.zoneIndex === undefined;
   const showZoneSpecs =
-    selectedScope !== undefined &&
-    selection.zoneIndex !== undefined &&
-    selectedScope.root_category_id !== null;
+    selectedScope !== undefined && selection.zoneIndex !== undefined;
 
   if (!siteTree) {
     return (
@@ -394,7 +366,7 @@ export const EstimateScopeTab = ({ manifest }: EstimateScopeTabProps) => {
 
       {scopeFields.length === 0 ? (
         <Typography.Paragraph type="secondary" style={{ marginTop: 12, marginBottom: 0 }}>
-          No scopes checked — ROM lines use the General parent on the Line Items tab.
+          No scopes checked — check at least one scope before adding line items.
         </Typography.Paragraph>
       ) : null}
     </FormSection>

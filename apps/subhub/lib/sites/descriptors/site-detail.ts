@@ -57,13 +57,11 @@ export type SiteScopePatchRow = {
 };
 
 export type SiteScopesPatch = {
-  general_zones?: SiteZonePatchRow[];
   scopes?: SiteScopePatchRow[];
 };
 
 export type SiteDetailRelated = {
   contacts: SiteContactRow[];
-  general_zones: SiteZoneRow[];
   scopes: SiteScopeRow[];
 };
 
@@ -75,7 +73,6 @@ export type SiteContactPatchRow = {
 
 export type SiteDetailRelatedPatch = {
   contacts?: SiteContactPatchRow[];
-  general_zones?: SiteZonePatchRow[];
   scopes?: SiteScopePatchRow[];
 };
 
@@ -136,7 +133,6 @@ export const SiteDetailPatchSchema = z
       .optional(),
     contacts: z.array(SiteContactPatchElementSchema).optional(),
     scopes: z.array(SiteScopePatchElementSchema).optional(),
-    general_zones: z.array(SiteZonePatchElementSchema).optional(),
   })
   .strict();
 
@@ -162,7 +158,6 @@ export const SiteDetailCreateSchema = z
       .optional(),
     contacts: z.array(SiteContactPatchElementSchema).optional(),
     scopes: z.array(SiteScopePatchElementSchema).optional(),
-    general_zones: z.array(SiteZonePatchElementSchema).optional(),
   })
   .strict();
 
@@ -180,7 +175,6 @@ const normalizeSiteDetailRelated = (
 ): SiteDetailRelated => ({
   contacts: (related.contacts ?? []) as SiteContactRow[],
   scopes: (related.scopes ?? []) as SiteScopeRow[],
-  general_zones: (related.general_zones ?? []) as SiteZoneRow[],
 });
 
 export const projectSiteDetailRow = (
@@ -215,10 +209,6 @@ export const projectSiteDetailRow = (
 
   if (manifest.fields.scopes?.includes("read")) {
     dto.scopes = normalized.scopes;
-  }
-
-  if (manifest.fields.general_zones?.includes("read")) {
-    dto.general_zones = normalized.general_zones;
   }
 
   return dto;
@@ -270,10 +260,6 @@ export const siteDetailDescriptor: SurfaceDescriptor<
       related.scopes = typed.scopes;
     }
 
-    if (typed.general_zones !== undefined) {
-      related.general_zones = typed.general_zones;
-    }
-
     return Object.keys(related).length > 0 ? related : undefined;
   },
   auditSnapshot: formatSiteDetailRow,
@@ -283,7 +269,6 @@ export const siteDetailDescriptor: SurfaceDescriptor<
       ...formatSiteDetailRow(row),
       contacts: normalized.contacts,
       scopes: normalized.scopes,
-      general_zones: normalized.general_zones,
     };
   },
   canDelete: (ctx) => ctx.manifest.actions.includes("delete"),

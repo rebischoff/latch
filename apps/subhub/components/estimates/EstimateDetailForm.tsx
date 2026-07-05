@@ -23,6 +23,7 @@ import {
 import {
   orderLineItemsForPatch,
   type EstimateScopeSpecFormRow,
+  type EstimateSiteScopeTreeFormRow,
   type EstimateSiteTreeFormRow,
 } from "@/components/estimates/estimate-line-tree";
 import { EstimateScopeTab } from "@/components/estimates/EstimateScopeTab";
@@ -186,9 +187,9 @@ const mapScopes = (rows: unknown): EstimateScopeFormRow[] => {
     return {
       id: typeof item.id === "string" ? item.id : crypto.randomUUID(),
       site_scope_id:
-        typeof item.site_scope_id === "string" ? item.site_scope_id : null,
+        typeof item.site_scope_id === "string" ? item.site_scope_id : "",
       root_category_id:
-        typeof item.root_category_id === "string" ? item.root_category_id : null,
+        typeof item.root_category_id === "string" ? item.root_category_id : "",
       root_category_name:
         typeof item.root_category_name === "string" ? item.root_category_name : null,
       site_scope_name:
@@ -209,7 +210,7 @@ const mapSiteTree = (value: unknown): EstimateSiteTreeFormRow | null => {
   }
 
   const tree = value as Record<string, unknown>;
-  const mapZones = (rows: unknown): EstimateSiteTreeFormRow["general_zones"] => {
+  const mapZones = (rows: unknown): EstimateSiteScopeTreeFormRow["zones"] => {
     if (!Array.isArray(rows)) {
       return [];
     }
@@ -243,7 +244,6 @@ const mapSiteTree = (value: unknown): EstimateSiteTreeFormRow | null => {
           };
         })
       : [],
-    general_zones: mapZones(tree.general_zones),
     spec_templates: specTemplates,
   };
 };
@@ -274,6 +274,11 @@ const mapLineItems = (rows: unknown): EstimateLineFormRow[] => {
       unit: typeof item.unit === "string" ? item.unit : "ea",
       unit_cost: typeof item.unit_cost === "number" ? item.unit_cost : 0,
       unit_price: typeof item.unit_price === "number" ? item.unit_price : 0,
+      unit_material: typeof item.unit_material === "number" ? item.unit_material : 0,
+      unit_labor: typeof item.unit_labor === "number" ? item.unit_labor : 0,
+      unit_incidental: typeof item.unit_incidental === "number" ? item.unit_incidental : 0,
+      unit_price_target:
+        typeof item.unit_price_target === "number" ? item.unit_price_target : 0,
       parent_line_id: asString(item.parent_line_id),
       estimate_scope_id: asString(item.estimate_scope_id),
       site_zone_id: asString(item.site_zone_id),
@@ -281,6 +286,7 @@ const mapLineItems = (rows: unknown): EstimateLineFormRow[] => {
       phase_id: asString(item.phase_id),
       item_id: asString(item.item_id),
       part_id: asString(item.part_id),
+      part_locked: item.part_locked === true,
       vendor_part_id: asString(item.vendor_part_id),
     };
   });

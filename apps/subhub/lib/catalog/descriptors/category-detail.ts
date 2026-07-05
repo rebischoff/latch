@@ -26,13 +26,13 @@ const SpecDefinitionPatchElementSchema = z
 const SpecParticipationPatchElementSchema = z
   .object({
     spec_def_id: z.string(),
+    active: z.boolean(),
   })
   .strict();
 
 const SpecParticipationPatchSchema = z
   .object({
-    includes: z.array(SpecParticipationPatchElementSchema).optional(),
-    excludes: z.array(SpecParticipationPatchElementSchema).optional(),
+    participates: z.array(SpecParticipationPatchElementSchema),
   })
   .strict();
 
@@ -103,20 +103,18 @@ export type SpecDefinitionRow = {
   value_type: "boolean" | "enum" | "text";
 };
 
-export type SpecParticipationDefRow = {
-  display_name: string;
-  spec_def_id: string;
-  value_type: "boolean" | "enum" | "text";
-};
-
-export type SpecParticipationActiveRow = SpecParticipationDefRow & {
-  active: boolean;
-};
+export type SpecParticipationState = "assigned" | "excluded" | "inherited" | "inactive";
 
 export type SpecParticipationRow = {
-  excludes: SpecParticipationActiveRow[];
-  includes: SpecParticipationActiveRow[];
-  inherited: SpecParticipationDefRow[];
+  participates: Array<{
+    active: boolean;
+    assign_category_id: string | null;
+    display_name: string;
+    excluded_here: boolean;
+    spec_def_id: string;
+    state: SpecParticipationState;
+    value_type: "boolean" | "enum" | "text";
+  }>;
 };
 
 export type CategoryDetailRelated = {
@@ -162,9 +160,7 @@ const formatCategoryDetailRow = (row: CategoryDetailRow): Record<string, unknown
 });
 
 const emptySpecParticipation = (): SpecParticipationRow => ({
-  inherited: [],
-  includes: [],
-  excludes: [],
+  participates: [],
 });
 
 const normalizeCategoryDetailRelated = (
@@ -198,7 +194,7 @@ export const projectCategoryDetailRow = (
     };
   }
 
-  if (manifest.fields.spec_definitions?.includes("read") && row.is_root) {
+  if (manifest.fields.spec_definitions?.includes("read")) {
     dto.spec_definitions = normalized.spec_definitions;
   }
 

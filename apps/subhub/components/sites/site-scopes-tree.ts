@@ -21,11 +21,10 @@ export type SiteScopeFormRow = {
 };
 
 export type SiteScopesFormValues = {
-  general_zones: SiteZoneFormRow[];
   scopes: SiteScopeFormRow[];
 };
 
-export type ScopesRowKind = "general" | "scope" | "zone";
+export type ScopesRowKind = "scope" | "zone";
 
 export type SiteScopesTreeNode = {
   children?: SiteScopesTreeNode[];
@@ -60,13 +59,11 @@ export const toAntdTreeData = (
       zoneId: node.zoneId,
       scopeIndex: node.scopeIndex,
       depth,
-      draggable: node.rowKind !== "general",
+      draggable: true,
       isLeaf: childNodes === undefined ? true : undefined,
       children: childNodes,
     };
   });
-
-export const GENERAL_TREE_KEY = "__general__";
 
 export const makeZoneRow = (
   overrides: Partial<SiteZoneFormRow> = {},
@@ -104,22 +101,12 @@ const zoneTreeNodes = (zones: SiteZoneFormRow[] | undefined): SiteScopesTreeNode
     children: zoneTreeNodes(zone.zones),
   }));
 
-export const buildScopesTree = (
-  scopes: SiteScopeFormRow[],
-  generalZones: SiteZoneFormRow[],
-): SiteScopesTreeNode[] => {
+export const buildScopesTree = (scopes: SiteScopeFormRow[]): SiteScopesTreeNode[] => {
   const sortedScopes = [...scopes].sort(
     (left, right) => left.sort_order - right.sort_order,
   );
 
-  const generalNode: SiteScopesTreeNode = {
-    key: GENERAL_TREE_KEY,
-    rowKind: "general",
-    label: "General",
-    children: zoneTreeNodes(generalZones),
-  };
-
-  const scopeNodes: SiteScopesTreeNode[] = sortedScopes
+  return sortedScopes
     .filter((scope) => Boolean(scope.id))
     .map((scope) => ({
       key: `scope:${scope.id}`,
@@ -128,8 +115,6 @@ export const buildScopesTree = (
       scopeIndex: scopes.findIndex((row) => row.id === scope.id),
       children: zoneTreeNodes(scope.zones),
     }));
-
-  return [generalNode, ...scopeNodes];
 };
 
 export const parentKeyForScopeId = (scopeId: string): string => `scope:${scopeId}`;
@@ -138,17 +123,11 @@ export const scopeIdForParentKey = (
   parentKey: string,
   scopes: SiteScopeFormRow[],
 ): string | null => {
-  if (parentKey === GENERAL_TREE_KEY) {
-    return null;
-  }
-
   const scopeId = parentKey.replace(/^scope:/, "");
   return scopes.some((scope) => scope.id === scopeId) ? scopeId : null;
 };
 
-export type ZoneLocation =
-  | { bucket: "general"; path: number[] }
-  | { bucket: "scope"; path: number[]; scopeIndex: number };
+export type ZoneLocation = { path: number[]; scopeIndex: number };
 
 const findZoneInList = (
   zones: SiteZoneFormRow[],
@@ -176,14 +155,8 @@ const findZoneInList = (
 
 export const findZoneLocation = (
   scopes: SiteScopeFormRow[],
-  generalZones: SiteZoneFormRow[],
   zoneId: string,
 ): ZoneLocation | null => {
-  const generalPath = findZoneInList(generalZones, zoneId, []);
-  if (generalPath) {
-    return { bucket: "general", path: generalPath };
-  }
-
   for (let scopeIndex = 0; scopeIndex < scopes.length; scopeIndex += 1) {
     const scope = scopes[scopeIndex];
     if (!scope) {
@@ -192,7 +165,7 @@ export const findZoneLocation = (
 
     const path = findZoneInList(scope.zones, zoneId, []);
     if (path) {
-      return { bucket: "scope", scopeIndex, path };
+      return { scopeIndex, path };
     }
   }
 
@@ -328,13 +301,6 @@ export const insertZoneChild = (
   parentKey: string,
   row: SiteZoneFormRow,
 ): SiteScopesFormValues => {
-  if (parentKey === GENERAL_TREE_KEY) {
-    return {
-      ...values,
-      general_zones: insertZoneAtPath(values.general_zones, [], row),
-    };
-  }
-
   if (parentKey.startsWith("scope:")) {
     const scopeId = parentKey.replace(/^scope:/, "");
     const scopeIndex = values.scopes.findIndex((scope) => scope.id === scopeId);
@@ -358,16 +324,9 @@ export const insertZoneChild = (
 
   if (parentKey.startsWith("zone:")) {
     const zoneId = parentKey.replace(/^zone:/, "");
-    const location = findZoneLocation(values.scopes, values.general_zones, zoneId);
+    const location = findZoneLocation(values.scopes, zoneId);
     if (!location) {
       return values;
-    }
-
-    if (location.bucket === "general") {
-      return {
-        ...values,
-        general_zones: insertZoneAtPath(values.general_zones, location.path, row),
-      };
     }
 
     const scopes = [...values.scopes];
@@ -391,16 +350,9 @@ export const removeZoneById = (
   values: SiteScopesFormValues,
   zoneId: string,
 ): SiteScopesFormValues => {
-  const location = findZoneLocation(values.scopes, values.general_zones, zoneId);
+  const location = findZoneLocation(values.scopes, zoneId);
   if (!location) {
     return values;
-  }
-
-  if (location.bucket === "general") {
-    return {
-      ...values,
-      general_zones: removeZoneAtPath(values.general_zones, location.path),
-    };
   }
 
   const scopes = [...values.scopes];
@@ -422,18 +374,14 @@ export const reorderZoneSiblings = (
   zoneId: string,
   toSiblingId: string,
 ): SiteScopesFormValues => {
-  const location = findZoneLocation(values.scopes, values.general_zones, zoneId);
-  const targetLocation = findZoneLocation(values.scopes, values.general_zones, toSiblingId);
+  const location = findZoneLocation(values.scopes, zoneId);
+  const targetLocation = findZoneLocation(values.scopes, toSiblingId);
   if (!location || !targetLocation) {
     return values;
   }
 
   const sameParent =
-    location.bucket === targetLocation.bucket &&
-    (location.bucket === "general" ||
-      (location.bucket === "scope" &&
-        targetLocation.bucket === "scope" &&
-        location.scopeIndex === targetLocation.scopeIndex)) &&
+    location.scopeIndex === targetLocation.scopeIndex &&
     location.path.slice(0, -1).join(".") === targetLocation.path.slice(0, -1).join(".");
 
   if (!sameParent) {
@@ -443,13 +391,6 @@ export const reorderZoneSiblings = (
   const parentPath = location.path.slice(0, -1);
   const fromIndex = location.path[location.path.length - 1] ?? -1;
   const toIndex = targetLocation.path[targetLocation.path.length - 1] ?? -1;
-
-  if (location.bucket === "general") {
-    return {
-      ...values,
-      general_zones: reorderSiblingsAtPath(values.general_zones, parentPath, fromIndex, toIndex),
-    };
-  }
 
   const scopes = [...values.scopes];
   const scope = scopes[location.scopeIndex];
@@ -495,7 +436,6 @@ export const orderScopesForPatch = (
       sort_order: index + 1,
       zones: reindexZones(scope.zones),
     })),
-    general_zones: reindexZones(values.general_zones),
   };
 };
 
@@ -509,7 +449,6 @@ type StrippedZonePatchRow = {
 export const stripScopesForPatch = (
   values: SiteScopesFormValues,
 ): {
-  general_zones: StrippedZonePatchRow[];
   scopes: Array<{
     id: string;
     name: string;
@@ -535,7 +474,6 @@ export const stripScopesForPatch = (
       sort_order: scope.sort_order,
       zones: scope.zones.map(stripZone),
     })),
-    general_zones: ordered.general_zones.map(stripZone),
   };
 };
 
@@ -543,13 +481,9 @@ export const getZoneById = (
   values: SiteScopesFormValues,
   zoneId: string,
 ): SiteZoneFormRow | undefined => {
-  const location = findZoneLocation(values.scopes, values.general_zones, zoneId);
+  const location = findZoneLocation(values.scopes, zoneId);
   if (!location) {
     return undefined;
-  }
-
-  if (location.bucket === "general") {
-    return getZoneAtPath(values.general_zones, location.path);
   }
 
   const scope = values.scopes[location.scopeIndex];
@@ -561,16 +495,9 @@ export const updateZoneById = (
   zoneId: string,
   updater: (zone: SiteZoneFormRow) => SiteZoneFormRow,
 ): SiteScopesFormValues => {
-  const location = findZoneLocation(values.scopes, values.general_zones, zoneId);
+  const location = findZoneLocation(values.scopes, zoneId);
   if (!location) {
     return values;
-  }
-
-  if (location.bucket === "general") {
-    return {
-      ...values,
-      general_zones: setZoneAtPath(values.general_zones, location.path, updater),
-    };
   }
 
   const scopes = [...values.scopes];
@@ -591,21 +518,12 @@ export const siblingZoneIds = (
   values: SiteScopesFormValues,
   zoneId: string,
 ): string[] => {
-  const location = findZoneLocation(values.scopes, values.general_zones, zoneId);
+  const location = findZoneLocation(values.scopes, zoneId);
   if (!location) {
     return [];
   }
 
   const parentPath = location.path.slice(0, -1);
-
-  if (location.bucket === "general") {
-    const parent =
-      parentPath.length === 0
-        ? values.general_zones
-        : getZoneAtPath(values.general_zones, parentPath)?.zones ?? [];
-    return parent.map((zone) => zone.id);
-  }
-
   const scope = values.scopes[location.scopeIndex];
   if (!scope) {
     return [];

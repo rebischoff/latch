@@ -23,10 +23,12 @@
 
 ### Decision: estimate scope tab — junction zones, General scope row, block uncheck (2026-07-02)
 
+**Status:** **Partially superseded (2026-07-04)** — [scope required + no ROM General](./estimate.md#decision-estimate-scope-required--pricing-overrides-2026-07-04). **Retained:** `estimate_zone` junction, block uncheck when lines reference scope/zone, Scope tab UX.
+
 **Choice:**
 
 - **`estimate_zone`** junction (PK `estimate_scope_id`, `site_zone_id`) — zone checkbox persistence; no `use` boolean.
-- **Synthetic General `estimate_scope`** — `site_scope_id` and `root_category_id` both null; migration **035** (`035_estimate_zone.sql`; plan [035-estimate-zone-plan.md](../migrations/035-estimate-zone-plan.md)).
+- ~~**Synthetic General `estimate_scope`**~~ — **superseded**; no ROM / site-General scope rows (2026-07-04).
 - **Uncheck** scope/zone blocked when `line_items` reference bucket/zone.
 - **37e** Scope tab + minimal line retarget; **37f** zone line parents + item picker + costing.
 
@@ -34,17 +36,34 @@
 
 ---
 
+### Decision: estimate scope required + pricing overrides (2026-07-04)
+
+**Status:** **Locked.** **Supersedes** ROM General bucket and optional scopes from [estimate scope (2026-06-30)](#decision-estimate-scope--category-roots-checkbox-site-tree-item-first-lines-2026-06-30) and General row from [scope tab (2026-07-02)](#decision-estimate-scope-tab--junction-zones-general-scope-row-block-uncheck-2026-07-02). **Commercial resolution:** [catalog commercial costing](./catalog.md#decision-commercial-costing--org-tables-category-defaults-estimate-overrides-2026-07-04).
+
+**Choice:**
+
+- **≥1 checked `estimate_scope`** required before Line Items (every line has non-null `estimate_scope_id`).
+- **No ROM General** — no `estimate_scope_id = null` lines; no full-catalog item picker.
+- **Site** — every **`site_zone`** belongs to a **`site_scope`** (no site General zones).
+- **Item picker** — always **`root_category_id` subtree** of the line’s checked scope.
+- **Pricing** — org + category define **`unit_price_target`**; estimator edits **`unit_price`** only — **not** rate type pickers ([commercial decision](./catalog.md#decision-commercial-costing--org-tables-category-defaults-estimate-overrides-2026-07-04)).
+- **Complexity** — from **category** inherit walk only (not scope/zone override).
+
+**Task:** [37f](../tasks/37f-estimate-line-costing.md) · **Planning:** [11](../planning/11-categories-scope-model.md).
+
+---
+
 ### Decision: estimate scope — category roots, checkbox site tree, item-first lines (2026-06-30)
 
-**Status:** **Locked.** Supersedes wave **4c′** (`estimate_area` snapshots, Import from site) and [estimate_system tabs (2026-06-27)](#decision-estimate--estimate_system-tabs-system-specs-no-section-v1-2026-06-27) **as implemented**.
+**Status:** **Locked**; **amended (2026-07-04)** by [scope required](#decision-estimate-scope-required--pricing-overrides-2026-07-04) and [commercial costing](./catalog.md#decision-commercial-costing--org-tables-category-defaults-estimate-overrides-2026-07-04). Supersedes wave **4c′** (`estimate_area` snapshots, Import from site) and [estimate_system tabs (2026-06-27)](#decision-estimate--estimate_system-tabs-system-specs-no-section-v1-2026-06-27) **as implemented**.
 
 **Choice:**
 
 - **Scope tab** — read-only **Scopes & zones** site tree + checkboxes; check zone → auto-check parent **`site_scope`**.
-- **Spec chart** on checked scope/zone — **`estimate_scope_spec`** / **`estimate_zone_spec`**; **`spec_def`** per root category; **`category_spec_def`** filters part resolution.
-- **Lines** — **`item_id`** + optional **`part_id`** pin; **`unit_material` / `unit_labor` / `unit_incidental`** snapshotted; labor/incidental **not** separate line rows.
-- **Item picker** — scoped bucket: root category **TreeSelect**; Estimate General: full catalog.
-- **Commercial** — **`labor_context_type`** + type FKs on scope bucket; dollar rates (37g).
+- **Spec chart** on checked scope/zone — **`estimate_scope_spec`** / **`estimate_zone_spec`**; **`spec_def`** per root category; effective participation filters part resolution.
+- **Lines** — **`item_id`** + optional **`part_id`** pin; cost + target/actual sell snapshotted on line.
+- **Item picker** — root category **TreeSelect** for line’s scope (**amended:** no full-catalog General).
+- **Commercial** — org + category defaults; scope/zone overrides ([commercial decision](./catalog.md#decision-commercial-costing--org-tables-category-defaults-estimate-overrides-2026-07-04)).
 
 **Planning:** [11-categories-scope-model.md](../planning/11-categories-scope-model.md) · **Task:** [37a](../tasks/37a-category-scope-decision-dbml-migration.md) · **Apply:** [37b](../tasks/37b-category-scope-migration-apply.md).
 

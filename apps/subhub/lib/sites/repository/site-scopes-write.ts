@@ -32,7 +32,7 @@ export const flattenZoneTree = (
 ): FlatZoneRow[] => {
   if (depth > MAX_ZONE_DEPTH) {
     throw new ValidationError("Zone tree exceeds maximum depth", {
-      field: siteScopeId === null ? "general_zones" : "scopes",
+      field: "scopes",
       code: "max_depth",
     });
   }
@@ -44,7 +44,7 @@ export const flattenZoneTree = (
 
     if (seenIds.has(id)) {
       throw new ValidationError("Duplicate zone id in scopes patch", {
-        field: siteScopeId === null ? "general_zones" : "scopes",
+        field: "scopes",
         code: "duplicate_zone_id",
         id,
       });
@@ -90,7 +90,7 @@ const assertCollectionPatchIdsValid = async (
   table: "site_zone" | "site_scope",
   siteId: string,
   ids: string[],
-  field: "general_zones" | "scopes",
+  field: "scopes",
 ): Promise<void> => {
   if (ids.length === 0) {
     return;
@@ -151,7 +151,7 @@ export const loadReferencedZonesForSite = async (
 export const assertNoReferencedZoneDeletes = (
   omittedZoneIds: string[],
   references: Map<string, ReferenceHit["blocker"]>,
-  field: "general_zones" | "scopes",
+  field: "scopes",
 ): void => {
   for (const zoneId of omittedZoneIds) {
     const blocker = references.get(zoneId);
@@ -197,15 +197,11 @@ export const replaceSiteScopesTx = async (
   siteId: string,
   patch: SiteScopesPatch,
 ): Promise<void> => {
-  const hasScopes = patch.scopes !== undefined;
-  const hasGeneralZones = patch.general_zones !== undefined;
-
-  if (!hasScopes && !hasGeneralZones) {
+  if (patch.scopes === undefined) {
     return;
   }
 
-  const scopes = patch.scopes ?? [];
-  const generalZones = patch.general_zones ?? [];
+  const scopes = patch.scopes;
 
   const normalizedScopes = scopes.map((row, index) => ({
     ...row,
@@ -224,14 +220,12 @@ export const replaceSiteScopesTx = async (
   await assertCollectionPatchIdsValid(client, "site_scope", siteId, scopeKeepIds, "scopes");
 
   const seenZoneIds = new Set<string>();
-  const flatGeneralZones = flattenZoneTree(generalZones, null, null, 0, seenZoneIds);
-  const flatScopeZones = normalizedScopes.flatMap((scope) =>
+  const flatZones = normalizedScopes.flatMap((scope) =>
     flattenZoneTree(scope.zones, scope.id, null, 0, seenZoneIds),
   );
-  const flatZones = [...flatGeneralZones, ...flatScopeZones];
 
   const zoneKeepIds = flatZones.map((row) => row.id);
-  await assertCollectionPatchIdsValid(client, "site_zone", siteId, zoneKeepIds, "general_zones");
+  await assertCollectionPatchIdsValid(client, "site_zone", siteId, zoneKeepIds, "scopes");
 
   const existingScopes = await client.query<{ id: string }>(
     `SELECT id FROM site_scope WHERE site_id = $1`,
@@ -255,7 +249,7 @@ export const replaceSiteScopesTx = async (
   const references = await loadReferencedZonesForSite(client, siteId);
 
   const zonesToDeleteSubtree = await collectSubtreeZoneIds(client, siteId, zonesToDelete);
-  assertNoReferencedZoneDeletes([...zonesToDeleteSubtree], references, "general_zones");
+  assertNoReferencedZoneDeletes([...zonesToDeleteSubtree], references, "scopes");
 
   for (const scopeId of scopesToDelete) {
     const scopeZoneIds = existingZones.rows

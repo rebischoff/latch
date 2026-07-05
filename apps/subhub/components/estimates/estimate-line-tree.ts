@@ -10,6 +10,10 @@ export type EstimateLineFormRow = {
   unit: string;
   unit_cost: number;
   unit_price: number;
+  unit_material: number;
+  unit_labor: number;
+  unit_incidental: number;
+  unit_price_target: number;
   parent_line_id: string | null;
   estimate_scope_id: string | null;
   site_zone_id: string | null;
@@ -17,6 +21,7 @@ export type EstimateLineFormRow = {
   phase_id: string | null;
   item_id: string | null;
   part_id: string | null;
+  part_locked: boolean;
   vendor_part_id: string | null;
 };
 
@@ -44,8 +49,8 @@ export type EstimateScopeZoneFormRow = {
 
 export type EstimateScopeFormRow = {
   id: string;
-  site_scope_id: string | null;
-  root_category_id: string | null;
+  site_scope_id: string;
+  root_category_id: string;
   root_category_name: string | null;
   site_scope_name: string | null;
   sort_order: number;
@@ -69,7 +74,6 @@ export type EstimateSiteScopeTreeFormRow = {
 };
 
 export type EstimateSiteTreeFormRow = {
-  general_zones: EstimateSiteZoneTreeFormRow[];
   scopes: EstimateSiteScopeTreeFormRow[];
   spec_templates?: Record<string, EstimateScopeSpecFormRow[]>;
 };
@@ -80,7 +84,7 @@ export type EstimateLineEditorFormValues = {
   site_tree?: EstimateSiteTreeFormRow | null;
 };
 
-export type TreeRowKind = "general" | "scope" | "line";
+export type TreeRowKind = "scope" | "zone" | "line";
 
 export type EstimateLineTreeNode = {
   children?: EstimateLineTreeNode[];
@@ -90,9 +94,8 @@ export type EstimateLineTreeNode = {
   rowKind: TreeRowKind;
   scopeId?: string;
   scopeIndex?: number;
+  siteZoneId?: string | null;
 };
-
-export const GENERAL_TREE_KEY = "__general__";
 
 export const makeLine = (
   overrides: Partial<EstimateLineFormRow> = {},
@@ -105,6 +108,10 @@ export const makeLine = (
   unit: "ea",
   unit_cost: 0,
   unit_price: 0,
+  unit_material: 0,
+  unit_labor: 0,
+  unit_incidental: 0,
+  unit_price_target: 0,
   parent_line_id: null,
   estimate_scope_id: null,
   site_zone_id: null,
@@ -112,44 +119,89 @@ export const makeLine = (
   phase_id: null,
   item_id: null,
   part_id: null,
+  part_locked: false,
   vendor_part_id: null,
   ...overrides,
 });
 
 const linesForParent = (
   lineItems: EstimateLineFormRow[],
-  estimateScopeId: string | null,
+  estimateScopeId: string,
+  siteZoneId: string | null,
 ): EstimateLineFormRow[] =>
-  lineItems.filter((line) => (line.estimate_scope_id ?? null) === estimateScopeId);
+  lineItems.filter(
+    (line) =>
+      line.estimate_scope_id === estimateScopeId &&
+      (line.site_zone_id ?? null) === siteZoneId,
+  );
 
 const lineTreeNodes = (
   lineItems: EstimateLineFormRow[],
-  estimateScopeId: string | null,
+  estimateScopeId: string,
+  siteZoneId: string | null,
 ): EstimateLineTreeNode[] =>
-  linesForParent(lineItems, estimateScopeId).map((line) => ({
+  linesForParent(lineItems, estimateScopeId, siteZoneId).map((line) => ({
     key: `line:${line.id}`,
     rowKind: "line",
     lineId: line.id,
+    scopeId: estimateScopeId,
+    siteZoneId,
   }));
+
+const zoneTreeNodes = (
+  lineItems: EstimateLineFormRow[],
+  estimateScopeId: string,
+  zones: EstimateScopeZoneFormRow[],
+  siteTreeZones: EstimateSiteZoneTreeFormRow[] | undefined,
+  labelByZoneId: Map<string, string>,
+): EstimateLineTreeNode[] =>
+  zones.map((zone) => ({
+    key: `zone:${estimateScopeId}:${zone.site_zone_id}`,
+    rowKind: "zone",
+    label: labelByZoneId.get(zone.site_zone_id) ?? "Zone",
+    scopeId: estimateScopeId,
+    siteZoneId: zone.site_zone_id,
+    children: lineTreeNodes(lineItems, estimateScopeId, zone.site_zone_id),
+  }));
+
+const buildZoneLabelMap = (
+  zones: EstimateSiteZoneTreeFormRow[] | undefined,
+  map = new Map<string, string>(),
+): Map<string, string> => {
+  for (const zone of zones ?? []) {
+    map.set(zone.id, zone.name);
+    buildZoneLabelMap(zone.zones, map);
+  }
+  return map;
+};
 
 export const buildLineTree = (
   scopes: EstimateScopeFormRow[],
   lineItems: EstimateLineFormRow[],
+  siteTree?: EstimateSiteTreeFormRow | null,
 ): EstimateLineTreeNode[] => {
   const sortedScopes = [...scopes].sort((left, right) => left.sort_order - right.sort_order);
 
-  const generalNode: EstimateLineTreeNode = {
-    key: GENERAL_TREE_KEY,
-    rowKind: "general",
-    label: "General",
-    children: lineTreeNodes(lineItems, null),
-  };
-
-  const scopeNodes: EstimateLineTreeNode[] = sortedScopes.map((scope, scopeIndex) => {
+  return sortedScopes.map((scope, scopeIndex) => {
     const label =
       scope.site_scope_name ??
       scope.root_category_name ??
-      (scope.site_scope_id === null ? "General" : "Scope");
+      "Scope";
+
+    const siteScopeTree = siteTree?.scopes.find(
+      (row) => row.id === scope.site_scope_id,
+    );
+    const labelByZoneId = buildZoneLabelMap(siteScopeTree?.zones);
+
+    const zoneNodes = zoneTreeNodes(
+      lineItems,
+      scope.id,
+      scope.zones,
+      siteScopeTree?.zones,
+      labelByZoneId,
+    );
+
+    const unzonedLines = lineTreeNodes(lineItems, scope.id, null);
 
     return {
       key: `scope:${scope.id}`,
@@ -157,32 +209,36 @@ export const buildLineTree = (
       label,
       scopeId: scope.id,
       scopeIndex,
-      children: lineTreeNodes(lineItems, scope.id),
+      children: [...zoneNodes, ...unzonedLines],
     };
   });
-
-  return [generalNode, ...scopeNodes];
 };
 
 export const orderLineItemsForPatch = (
   scopes: EstimateScopeFormRow[],
   lineItems: EstimateLineFormRow[],
 ): EstimateLineFormRow[] => {
-  const buckets = new Map<string | null, EstimateLineFormRow[]>();
+  const buckets = new Map<string, EstimateLineFormRow[]>();
 
   for (const line of lineItems) {
-    const key = line.estimate_scope_id ?? null;
+    if (!line.estimate_scope_id) {
+      continue;
+    }
+    const zoneKey = line.site_zone_id ?? "__unzoned__";
+    const key = `${line.estimate_scope_id}:${zoneKey}`;
     const bucket = buckets.get(key) ?? [];
     bucket.push(line);
     buckets.set(key, bucket);
   }
 
   const ordered: EstimateLineFormRow[] = [];
-  ordered.push(...(buckets.get(null) ?? []));
-
   const sortedScopes = [...scopes].sort((left, right) => left.sort_order - right.sort_order);
+
   for (const scope of sortedScopes) {
-    ordered.push(...(buckets.get(scope.id) ?? []));
+    ordered.push(...(buckets.get(`${scope.id}:__unzoned__`) ?? []));
+    for (const zone of scope.zones) {
+      ordered.push(...(buckets.get(`${scope.id}:${zone.site_zone_id}`) ?? []));
+    }
   }
 
   return ordered;
@@ -236,19 +292,50 @@ export const findLineIndex = (
   lineId: string,
 ): number => lineItems.findIndex((line) => line.id === lineId);
 
-export const parentKeyForScopeId = (scopeId: string | null): string =>
-  scopeId === null ? GENERAL_TREE_KEY : `scope:${scopeId}`;
+export const parentKeyForScopeId = (scopeId: string): string => `scope:${scopeId}`;
 
-export const estimateScopeIdForParentKey = (
+export const parentKeyForZone = (scopeId: string, siteZoneId: string): string =>
+  `zone:${scopeId}:${siteZoneId}`;
+
+export type ParentTarget = {
+  estimate_scope_id: string;
+  site_zone_id: string | null;
+};
+
+export const parentTargetForKey = (
+  parentKey: string,
+  scopes: EstimateScopeFormRow[],
+): ParentTarget | null => {
+  if (parentKey.startsWith("zone:")) {
+    const [, scopeId, siteZoneId] = parentKey.split(":");
+    if (!scopeId || !siteZoneId) {
+      return null;
+    }
+    return scopes.some((scope) => scope.id === scopeId)
+      ? { estimate_scope_id: scopeId, site_zone_id: siteZoneId }
+      : null;
+  }
+
+  if (parentKey.startsWith("scope:")) {
+    const scopeId = parentKey.replace(/^scope:/, "");
+    return scopes.some((scope) => scope.id === scopeId)
+      ? { estimate_scope_id: scopeId, site_zone_id: null }
+      : null;
+  }
+
+  return null;
+};
+
+export const rootCategoryIdForParentKey = (
   parentKey: string,
   scopes: EstimateScopeFormRow[],
 ): string | null => {
-  if (parentKey === GENERAL_TREE_KEY) {
+  const target = parentTargetForKey(parentKey, scopes);
+  if (!target) {
     return null;
   }
 
-  const scopeId = parentKey.replace(/^scope:/, "");
-  return scopes.some((scope) => scope.id === scopeId) ? scopeId : null;
+  return scopes.find((scope) => scope.id === target.estimate_scope_id)?.root_category_id ?? null;
 };
 
 // Legacy aliases for gradual migration in tests/docs

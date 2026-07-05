@@ -15,8 +15,8 @@
 | 1 | **Scope roots** | `category.parent_id IS NULL` — Fire Alarm, Intrusion, HVAC, … |
 | 2 | **List pane** | **Tree**, not flat table — full org category forest in list-detail **left pane** |
 | 3 | **Detail — all nodes** | **`name`**, `sort_order` editable; **`parent_id`** read-only (reparent deferred v1) |
-| 4 | **Detail — nested nodes** | **`spec_participation`** — **inherit** parent effective set; **include** / **exclude** deltas → `category_spec_def` / `category_spec_exclude` ([decision](../decisions/catalog.md#decision-category-spec-participation--inherit-include-exclude-2026-07-02)) |
-| 5 | **Detail — root nodes** | **`spec_definitions`** — CRUD `spec_def` + nested `spec_option`; **`spec_participation`** — base includes on root (`category_spec_def`) |
+| 4 | **Detail — nested nodes** | **`spec_participation`** — visible defs per [owner-branch knowledge](../decisions/catalog.md#decision-category-spec-visibility--owner-branch-knowledge-2026-07-03); read-only def unless owner; participates toggle on inherited / exclude |
+| 5 | **Detail — root nodes** | **`spec_definitions`** — CRUD for defs visible at root (owned here + unassigned namespace); defs assigned only on descendant branches hidden |
 | 6 | **Create** | Toolbar **New root** + **New child** (child requires selected tree node) |
 | 7 | **Delete** | Block when referenced (`site_scope`, `estimate_scope`, `item_category`, `part_category`, `manufacturer_part_spec`, children) — structured `ConflictError` |
 | 8 | **Search** | Filter tree by **`name`** contains (client-side or `q` param flattening matches — v1 client filter OK) |
@@ -94,7 +94,7 @@
 |----------|------|----------|------|-------|
 | `profile` | scalar | read + write | always | `name`, `sort_order`, `parent_id` (read), `csi_code`, `default_phase_template_id` (**root only**) |
 | `spec_definitions` | collection | read + write | **`is_root`** | Replace-array `spec_def[]` with nested `options[]` for enum defs |
-| `spec_participation` | collection | read + write | always | **Root:** base includes → `category_spec_def`. **Nested:** read inherited + write includes / excludes ([decision](../decisions/catalog.md#decision-category-spec-participation--inherit-include-exclude-2026-07-02)) |
+| `spec_participation` | collection | read + write | nested (+ optional root) | **Participates** per root-namespace def → `category_spec_def` (assign) / `category_spec_exclude` (branch cut). [Decision](../decisions/catalog.md#decision-category-spec-participation--assign-once-branch-exclude-2026-07-03) |
 
 **Omit on detail v1:** `item_category` / `part_category` assignment UI (separate item/part surfaces); drag reparent; duplicate subtree.
 
@@ -144,29 +144,48 @@
 - **`value_type`:** `enum` \| `boolean` \| `text` \| **`number`** — enum uses `options[]`; boolean/text/number omit options. **`number`** requires `unit` ([decision](../decisions/catalog.md#decision-spec_def-value-types-and-part-matching-rules-2026-07-02)).
 - **`filter_mode`:** stored; when bucket value is non-blank, participating defs must match ([C10](../planning/11-categories-scope-model.md)); `prefer` scoring deferred.
 
-### `spec_participation` element (root + nested)
+### `spec_participation` element (nested; optional on root)
 
-**Read DTO** (nested example):
+**Read DTO** — one row per root-namespace def (nested shows read-only def fields + participates):
 
 ```json
 {
-  "inherited": [
-    { "spec_def_id": "<uuid>", "display_name": "SLC protocol", "value_type": "enum" }
-  ],
-  "includes": [
-    { "spec_def_id": "<uuid>", "display_name": "Color", "value_type": "enum", "active": true }
-  ],
-  "excludes": [
-    { "spec_def_id": "<uuid>", "display_name": "SLC protocol", "value_type": "enum", "active": true }
+  "participates": [
+    {
+      "spec_def_id": "<uuid>",
+      "display_name": "SLC protocol",
+      "value_type": "enum",
+      "active": true,
+      "state": "inherited"
+    },
+    {
+      "spec_def_id": "<uuid>",
+      "display_name": "Color",
+      "value_type": "enum",
+      "active": false,
+      "state": "excluded"
+    }
   ]
 }
 ```
 
-**PATCH (nested):** `includes[]` and `excludes[]` replace-array → `category_spec_def` / `category_spec_exclude`. Each `spec_def_id` must belong to **`root_category_id`**. Cannot list the same def in both arrays.
+- **`active`:** participates in **effective** set at this node.
+- **`state`:** `assigned` \| `inherited` \| `excluded` \| `inactive` — UI hint only; not persisted. **Visibility:** GET returns only defs the node [knows](../decisions/catalog.md#decision-category-spec-visibility--owner-branch-knowledge-2026-07-03) (owner branch; exclude node; not below exclude; unassigned namespace at scope root only).
 
-**PATCH (root):** `includes[]` only → base `category_spec_def` on root; `excludes[]` rejected v1 unless manifest extended.
+**Per-node visibility (37d4):**
 
-**Effective set:** computed per [inheritance decision](../decisions/catalog.md#decision-category-spec-participation--inherit-include-exclude-2026-07-02) — not persisted.
+| Node vs def `D` | In GET response? | Def editable? |
+|-----------------|------------------|---------------|
+| Owner | yes | yes |
+| Descendant on path (uses) | yes | read-only |
+| Exclude node (knows, does not use) | yes | read-only; participates toggle |
+| Below exclude | no | — |
+| Ancestor / sibling / other branch | no | — |
+| Unassigned namespace def | scope root only | yes at root |
+
+**PATCH:** `participates[]` replace-array — each `{ spec_def_id, active }`. Maps to assign (`category_spec_def`), exclude (`category_spec_exclude`), or delete rows per [assign-once decision](../decisions/catalog.md#decision-category-spec-participation--assign-once-branch-exclude-2026-07-03). At most one assignment per `spec_def_id` globally. **No re-include** below an ancestor exclude.
+
+**Effective set:** computed — not persisted.
 
 ---
 
@@ -197,8 +216,8 @@
 ### `category_detail`
 
 - **`get(ctx, id)`** — load category row; compute `is_root`, `root_category_id`, labels walking ancestors.
-- **If root:** load `spec_def` + `spec_option` for `root_category_id = id`.
-- **If nested:** load `category_spec_def` joined to `spec_def` for labels; load root’s defs for participation picker source (read-only list on client or second query).
+- **If root:** load visible `spec_def` + `spec_option` for `root_category_id = id` (owner-branch filter).
+- **If nested:** load visible root-namespace defs + computed `participates[]` per assign-once algorithm.
 
 **Picker API (37c):** **`listRoots(ctx)`** — `SELECT id, name FROM category WHERE parent_id IS NULL ORDER BY sort_order` — may live on same route module or `GET /api/categories/roots`.
 
@@ -216,9 +235,9 @@
 
 **Create child:** POST with `profile.name`, `profile.parent_id` = selected node (must exist).
 
-**PATCH `spec_definitions`:** root only — replace-array `spec_def` + nested `options`; cascade delete removed defs/options not in payload (when unreferenced).
+**PATCH `spec_definitions`:** scope root or **owning** nested category only — replace-array `spec_def` + nested `options`; cascade delete removed defs only when owner or unassigned; reject edits to defs owned elsewhere (`owner_only`).
 
-**PATCH `spec_participation`:** root — `includes[]` only (base `category_spec_def`); nested — `includes[]` + `excludes[]` replace-array; reject overlap and `spec_def_id` not under root namespace; reject `excludes` on root.
+**PATCH `spec_participation`:** `participates[]` replace-array — assign-once + branch exclude; reject duplicate assign, re-include below exclude, overlap on same node.
 
 **Strict writable schemas:** `.strict()` on POST/PATCH.
 
@@ -244,8 +263,8 @@
 | Rule | Server |
 |------|--------|
 | Nested node PATCH `spec_definitions` | **Reject** — 400 |
-| Root PATCH `spec_participation` `excludes` | **Reject** — 400 |
-| Root PATCH `spec_participation` `includes` | Allowed — base set |
+| Assign same `spec_def_id` at second category | **Reject** — 400 (`assign_once_violation`) |
+| Re-include def below ancestor exclude | **Reject** — 400 |
 | Nested PATCH `default_phase_template_id` | **Reject** — 400 |
 
 ### Audit
@@ -283,9 +302,9 @@ Master-detail per [routing-and-libraries.md](../routing-and-libraries.md). **Lis
 
 **Empty detail:** placeholder *“Select a category”* when no selection.
 
-**Root detail — spec definitions:** inline table or sub-form — `display_name`, `value_type`, enum options editor (minimal v1: name + options list).
+**Root detail — spec definitions:** inline table — `display_name`, `value_type`, enum options editor.
 
-**Nested detail — spec participation:** checklist of root’s `spec_def` rows (participating defs for part filter on items in this category).
+**Nested detail — spec participation:** read-only copy of root def table + **Participates** checkbox per row.
 
 **Pattern reuse:** Tree chrome similar to [`SiteGeographyTree`](../../components/sites/SiteGeographyTree.tsx) but **read-only structure in list** with **select** (not site PATCH); detail is standard `SurfaceFormRoot`.
 

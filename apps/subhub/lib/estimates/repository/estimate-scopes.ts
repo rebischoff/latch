@@ -12,9 +12,9 @@ type EstimateScopeBaseRow = {
   id: string;
   labor_context_type_id: string | null;
   markup_type_id: string | null;
-  root_category_id: string | null;
+  root_category_id: string;
   root_category_name: string | null;
-  site_scope_id: string | null;
+  site_scope_id: string;
   site_scope_name: string | null;
   sort_order: number;
 };

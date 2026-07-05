@@ -6,7 +6,7 @@ import type {
   EstimateSiteZoneTreeFormRow,
 } from "@/components/estimates/estimate-line-tree";
 
-export type EstimateScopeTreeRowKind = "general" | "scope" | "zone";
+export type EstimateScopeTreeRowKind = "scope" | "zone";
 
 export type EstimateScopeTreeNode = {
   children?: EstimateScopeTreeNode[];
@@ -14,7 +14,7 @@ export type EstimateScopeTreeNode = {
   label?: string;
   rowKind: EstimateScopeTreeRowKind;
   scopeIndex?: number;
-  siteScopeId?: string | null;
+  siteScopeId?: string;
   zoneId?: string;
 };
 
@@ -22,19 +22,17 @@ export type EstimateScopeAntdTreeNode = DataNode & {
   depth: number;
   rowKind: EstimateScopeTreeRowKind;
   scopeIndex?: number;
-  siteScopeId?: string | null;
+  siteScopeId?: string;
   zoneId?: string;
 };
-
-export const GENERAL_TREE_KEY = "__general__";
 
 const zoneTreeNodes = (
   zones: EstimateSiteZoneTreeFormRow[] | undefined,
   scopeIndex: number | undefined,
-  siteScopeId: string | null,
+  siteScopeId: string,
 ): EstimateScopeTreeNode[] =>
   (zones ?? []).map((zone) => ({
-    key: `zone:${siteScopeId ?? "general"}:${zone.id}`,
+    key: `zone:${siteScopeId}:${zone.id}`,
     rowKind: "zone",
     label: zone.name,
     zoneId: zone.id,
@@ -53,15 +51,7 @@ export const buildEstimateScopeTree = (
     return [];
   }
 
-  const generalNode: EstimateScopeTreeNode = {
-    key: GENERAL_TREE_KEY,
-    rowKind: "general",
-    label: "General",
-    siteScopeId: null,
-    children: zoneTreeNodes(siteTree.general_zones, undefined, null),
-  };
-
-  const scopeNodes: EstimateScopeTreeNode[] = siteTree.scopes.map((scope, scopeIndex) => ({
+  return siteTree.scopes.map((scope, scopeIndex) => ({
     key: `scope:${scope.id}`,
     rowKind: "scope",
     label: scope.name,
@@ -69,8 +59,6 @@ export const buildEstimateScopeTree = (
     scopeIndex,
     children: zoneTreeNodes(scope.zones, scopeIndex, scope.id),
   }));
-
-  return [generalNode, ...scopeNodes];
 };
 
 export const toAntdScopeTreeData = (
@@ -98,23 +86,17 @@ export const toAntdScopeTreeData = (
 
 export const findScopeIndexBySiteScopeId = (
   scopes: EstimateScopeFormRow[],
-  siteScopeId: string | null,
-): number =>
-  scopes.findIndex((scope) => (scope.site_scope_id ?? null) === siteScopeId);
-
-export const findGeneralScopeIndex = (scopes: EstimateScopeFormRow[]): number =>
-  scopes.findIndex(
-    (scope) => scope.site_scope_id === null && scope.root_category_id === null,
-  );
+  siteScopeId: string,
+): number => scopes.findIndex((scope) => scope.site_scope_id === siteScopeId);
 
 export const isScopeChecked = (
   scopes: EstimateScopeFormRow[],
-  siteScopeId: string | null,
+  siteScopeId: string,
 ): boolean => findScopeIndexBySiteScopeId(scopes, siteScopeId) >= 0;
 
 export const isZoneChecked = (
   scopes: EstimateScopeFormRow[],
-  siteScopeId: string | null,
+  siteScopeId: string,
   zoneId: string,
 ): boolean => {
   const scopeIndex = findScopeIndexBySiteScopeId(scopes, siteScopeId);
@@ -128,7 +110,7 @@ export const isZoneChecked = (
 export const scopeReferencedByLines = (
   scopes: EstimateScopeFormRow[],
   lineItems: Array<{ estimate_scope_id: string | null }>,
-  siteScopeId: string | null,
+  siteScopeId: string,
 ): boolean => {
   const scopeIndex = findScopeIndexBySiteScopeId(scopes, siteScopeId);
   if (scopeIndex < 0) {
@@ -149,8 +131,8 @@ export const zoneReferencedByLines = (
 ): boolean => lineItems.some((line) => line.site_zone_id === zoneId);
 
 export const makeScopeRow = (
-  siteScopeId: string | null,
-  rootCategoryId: string | null,
+  siteScopeId: string,
+  rootCategoryId: string,
   rootCategoryName: string | null,
   siteScopeName: string | null,
   sortOrder: number,

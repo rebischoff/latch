@@ -6,6 +6,148 @@
 
 ---
 
+### Decision: commercial costing — org tables, category defaults, estimate overrides (2026-07-04)
+
+**Status:** **Locked.** **Supersedes** [C14 in planning 11](../planning/11-categories-scope-model.md) (commercial types primary on scope bucket) and **`labor_context_type`** as a costing input. **Amends** [estimate scope (2026-06-30)](./estimate.md#decision-estimate-scope--category-roots-checkbox-site-tree-item-first-lines-2026-06-30) (no ROM General bucket). **Tasks:** [37f](../tasks/37f-estimate-line-costing.md) (part filter + material snapshot) · [37g](../tasks/37g-commercial-costing.md) (org surfaces + full engine).
+
+**Choice:**
+
+#### Layer 1 — Org rate tables (list surfaces; no detail pane)
+
+| Table | v1 shape | Notes |
+|-------|----------|--------|
+| **`labor_rate_type`** | `name`, `rate_cents`, optional `labor_class_id` | Trades: low-voltage installer, FA programmer, pipe fitter, … |
+| **`incidental_rate_type`** | `name`, `kind` (`percent_of_material` v1), `percent` | Freight / incidental = **% of material only** v1 |
+| **`markup_type`** | `name`, `markup_percent` | % on cost (M+L+I); split material vs labor markup **deferred** |
+| **`complexity_factor`** | `name`, `factor_percent` | 100 = normal; 125 = difficult retrofit, … |
+
+**No `sales_commission` table v1** — commission is back-office / analytics, not a line costing input.
+
+**`labor_context_type`** — retained in DDL from `033` but **not** used in costing v1 (may repurpose or drop in migration follow-on).
+
+#### Layer 2 — Category (primary assignment; inherit walk up tree)
+
+**Not** the spec participation exclude model. Walk **node → parent → root**; first non-null FK wins.
+
+| On category | Purpose |
+|-------------|---------|
+| **`phase_template_id`** | Ordered steps: `phase` + `labor_rate_type_id` + **hours per unit** |
+| **`markup_type_id`** | Default margin profile for items in subtree |
+| **`incidental_rate_type_id`** | Default freight/incidental profile |
+| **`complexity_factor_id`** | Default labor difficulty multiplier for subtree |
+
+**Item commercial override — deferred v1** (revisit when assemblies break category defaults).
+
+#### Layer 3 — Estimate (line sell override only)
+
+**Amended (2026-07-04):** Estimator **cannot** override which org **rate types** apply (`markup_type`, `labor_rate_type`, `incidental_rate_type`, `complexity_factor`) on scope, zone, or line. Those resolve from **category inherit walk** only. Estimator may override the **actual sell rate** — **`unit_price`** on the line (vs system-computed **`unit_price_target`**).
+
+| On estimate | Purpose |
+|-------------|---------|
+| **`estimate_line.unit_price`** | **Actual sell** — estimator sharpens pencil here |
+| **`estimate_line.unit_price_target`** | **Policy sell** snapshot from resolver (audit / manager review) |
+
+**Not on estimate v1:** `estimate_scope.markup_type_id` override UI; `estimate_scope` / `estimate_zone` **`complexity_factor_id`** pickers. Columns from migration `033` on `estimate_scope` are **unused for costing** (may drop in follow-on migration).
+
+**Line snapshots (`estimate_line`):**
+
+```text
+unit_material, unit_labor, unit_incidental  ← cost components at save/recalc
+unit_cost                                   ← M + L + I
+unit_price_target                           ← policy sell from catalog rate types (snapshot)
+unit_price                                  ← actual sell (estimator override allowed)
+```
+
+#### Resolution (at line save / recalc)
+
+```text
+markup_type, incidental_type, complexity, labor_rate_type (per phase)
+  ← category.walk_up(...) only — estimator cannot change type selection on quote
+
+unit_price_target ← f(resolved cost components, markup_type from category)
+unit_price        ← estimator edit; set to target on **new line** first calc; **never** overwritten on recalc v1 ([sell lock deferred](../tasks/37f-estimate-line-costing.md#decision-o4--sell-lock-deferred-2026-07-04))
+```
+
+**Rationale:** Org tables define rate **cards**; category assigns **which card** applies; quote captures **policy vs actual sell** for margin review — not a second rate-card picker on the estimate.
+
+**Planning:** [11-categories-scope-model.md](../planning/11-categories-scope-model.md).
+
+---
+
+### Decision: spec ownership — `spec_def.category_id`, drop `category_spec_def` (2026-07-04)
+
+**Status:** **Locked.** **Supersedes** the **storage** of [assign-once, branch exclude (2026-07-03)](#decision-category-spec-participation--assign-once-branch-exclude-2026-07-03) — the separate `category_spec_def` assignment table. **Retains:** the `effective(N, D)` algorithm, [owner-branch visibility (2026-07-03)](#decision-category-spec-visibility--owner-branch-knowledge-2026-07-03), `category_spec_exclude`, `scopePanelDefs` subtree union, estimate/part consumers (all FK `spec_def.id`, unchanged).
+
+**Problem:** `category_spec_def` had `UNIQUE (spec_def_id)` — a 1:1 join table, which is really a **column**. The split between `spec_def.root_category_id` (namespace) and `category_spec_def` (owner) let a def exist with **no owner row** (visible only at root, invisible on descendants — the "SLC not inherited" bug).
+
+**Choice:**
+
+#### Ownership is a column on `spec_def`
+
+| Concept | Before | After |
+|---------|--------|-------|
+| **Namespace root** | `spec_def.root_category_id` (flat equality) | Derived — root ancestor of `category_id` |
+| **Owner (assignment)** | `category_spec_def` row, `UNIQUE (spec_def_id)` | **`spec_def.category_id`** — the one owning category |
+| **Branch cut** | `category_spec_exclude` | `category_spec_exclude` (unchanged) |
+
+**`spec_def.category_id`** is the single owning category. It may be a **root or nested** category — root is not special. Assign-once is now **structural** (one row = one owner; double-assign impossible). No separate assignment step to forget.
+
+#### Storage
+
+| Table | Semantics | Constraint |
+|-------|-----------|------------|
+| **`spec_def`** | `category_id` = owner; def flows to all descendants of owner | FK `category_id → category` (`delete: cascade`) |
+| **`category_spec_exclude`** | Branch cut — def no longer applies at this node **or any descendant** | PK `(category_id, spec_def_id)`; **no re-include** below |
+
+**`category_spec_def` dropped.** `spec_def.root_category_id` dropped (renamed conceptually into `category_id`).
+
+#### Rules (unchanged intent, restated on new storage)
+
+| # | Rule | Enforcement |
+|---|------|-------------|
+| R1 | A spec is owned by **exactly one** category (root or nested) | Structural — `spec_def.category_id` single column |
+| R2 | Owned spec is available on **all descendants** unless excluded; exclude cuts that node **and** its descendants | `effective(N,D)`: `category_id` ancestor-or-self of `N`, no exclude on path |
+| R3 | Excluded spec **cannot** be re-included further down | Any exclude on path blocks; nothing re-includes |
+| R4 | Editable **only** on the owning category; descendants show a checkbox to **exclude**; nodes below an exclude do **not** render the spec | Owner = `category_id === node`; checkbox writes/removes `category_spec_exclude`; below-exclude filtered out |
+
+#### Effective participation algorithm (unchanged)
+
+```text
+owner(D) = spec_def.category_id for D
+
+effective(N, D):
+  A = owner(D)
+  if A is not an ancestor of N and A ≠ N:            return false
+  if ∃ exclude (X, D) where X on path A → N (incl.): return false
+  return true
+```
+
+**Namespace query change:** "all defs for scope root R" moves from `WHERE root_category_id = R` (flat) to **owner in subtree of R** (defs whose `category_id` is R or a descendant of R). Category counts are modest (C9) — recursive walk is fine.
+
+#### Worked example — Fire Alarm
+
+```text
+Fire Alarm          ← spec_def.category_id = Fire Alarm  (SLC protocol)
+├── Initiating      ← spec_def.category_id = Initiating   (Spec B)
+│   └── test 4
+│       └── test 5
+├── Test 1
+└── Test 3
+```
+
+| Def | Owner (`spec_def.category_id`) | `category_spec_exclude` |
+|-----|-------------------------------|-------------------------|
+| SLC protocol | Fire Alarm (root) | — |
+| Spec B | Initiating | — |
+
+**Effective:** SLC on Fire Alarm + all descendants (Initiating, test 4, test 5, Test 1, Test 3). Spec B on Initiating, test 4, test 5. This is the behavior the prior storage failed to deliver for SLC.
+
+**Migration:** [038 plan](../migrations/038-category-spec-owner-column-plan.md) — backfill `category_id` from `category_spec_def` where present, else `root_category_id` (auto-fixes unassigned defs like SLC).
+
+**Planning:** [11-categories-scope-model.md](../planning/11-categories-scope-model.md) · **Spec:** [`category.md`](../surface-specs/category.md).
+
+---
+
 ### Decision: `spec_def` value types and part-matching rules (2026-07-02)
 
 **Status:** **Locked** (pending DDL migration in task **37f** follow-on). **Amends** [C10 in planning 11](../planning/11-categories-scope-model.md) (`filter_mode` behavior). **Supersedes** enum-only assumptions in [system specs C2 (2026-06-27)](#decision-system-specs-and-part-compatibility-c2-locked-2026-06-27) for **storage shape** only — FK-based defs unchanged.
@@ -41,11 +183,11 @@
 | Zone | `estimate_zone_spec` | Same; overrides scope for lines in that zone |
 | Line | `estimate_line_spec` | Same; overrides zone (37f) |
 
-**Scope spec panel:** show the **union of effective `spec_def` ids** for the checked scope’s root subtree — see [category spec participation (2026-07-02)](#decision-category-spec-participation--inherit-include-exclude-2026-07-02). Values may be left blank.
+**Scope spec panel:** show the **union of effective `spec_def` ids** for the checked scope’s root subtree — see [category spec participation (2026-07-03)](#decision-category-spec-participation--assign-once-branch-exclude-2026-07-03). Values may be left blank.
 
 #### Part-matching algorithm (37f resolver)
 
-**Inputs:** merged **bucket** values (resolve line → zone → scope), **effective participation** per [inheritance rules](#decision-category-spec-participation--inherit-include-exclude-2026-07-02), catalog `manufacturer_part` candidates in item’s category subtree.
+**Inputs:** merged **bucket** values (resolve line → zone → scope), **effective participation** per [assign-once rules](#decision-category-spec-participation--assign-once-branch-exclude-2026-07-03), catalog `manufacturer_part` candidates in item’s category subtree.
 
 For each `spec_def_id` in the **effective participation** set for the line’s item:
 
@@ -67,11 +209,15 @@ For each `spec_def_id` in the **effective participation** set for the line’s i
 
 | Matches | Line behavior |
 |---------|----------------|
-| **0** | Keep `item_id`; `part_id` null; `material_status = generic`; item default cost; UI alert |
-| **1** | Suggest / auto-fill `part_id`; `material_status = suggested` or `verified` when user confirms |
-| **Many** | Generic description; `part_id` null unless user picks from **filtered PN list**; costing uses org default-part rule until pin |
+| **0** | Keep `item_id`; `part_id` null; `part_locked` false; `material_status = generic`; **`unit_material` ← `item.fallback_unit_cost`**; UI alert |
+| **1** | Set `part_id` from match; `part_locked` false (system may update on recalc); `material_status = suggested`; `unit_material` ← matched part vendor |
+| **Many** | `part_id` null until user picks from **filtered PN list**; `part_locked` true when user picks; **`unit_material` ← max vendor among filtered** or **`item.fallback_unit_cost`** |
 
-User may always **override** to a `part_id` in the filtered set (manifest-gated).
+**Line shape:** **`item_id`** required on product lines; **`part_id`** optional — set when filter yields exactly one PN or when user selects from filtered list. **`part_locked`** — when `true`, resolver/recalc **must not** change `part_id` (user-confirmed PN); when `false`, system may set/clear `part_id` on item/bucket change.
+
+**Material price resolution (v1):** pinned `part_id` → that part’s vendor path; else match-count rules in [O1](../tasks/37f-estimate-line-costing.md#decision-o1--ambiguous-part-material-cost-2026-07-04).
+
+User may **override** `part_id` only to a value in the **filtered set** (manifest-gated). User override sets **`part_locked = true`**.
 
 #### Worked example — HVAC evaporator coil
 
@@ -111,7 +257,7 @@ User may always **override** to a `part_id` in the filtered set (manifest-gated)
 
 ### Decision: category spec participation — inherit, include, exclude (2026-07-02)
 
-**Status:** **Locked** (pending migration + **37d amend**). **Amends** [37d](../tasks/37d-category-catalog-dal-surfaces.md) flat `spec_participation` checkboxes and [C9 in planning 11](../planning/11-categories-scope-model.md). **Pairs with** [spec_def value types (2026-07-02)](#decision-spec_def-value-types-and-part-matching-rules-2026-07-02).
+**Status:** **Superseded (algorithm + UI)** by [assign-once, branch exclude (2026-07-03)](#decision-category-spec-participation--assign-once-branch-exclude-2026-07-03). **Retained** for history: table split (`category_spec_def` / `category_spec_exclude`), `scopePanelDefs` union, estimate bucket wiring. **Do not implement** the delta algorithm or Inherited/Include/Exclude UI from this block.
 
 **Choice:**
 
@@ -210,6 +356,193 @@ Existing **`category_spec_def`** rows on nested nodes → reinterpret as **inclu
 **Rationale:** Inheritance matches how admins think about category trees; opt-out covers branches that share most but not all parent specs (notification vs initiating). Union on scope panel collects every dimension needed anywhere in the trade; per-item effective set avoids over-filtering lines. Normalized include/exclude rows stay manifest- and audit-friendly.
 
 **Planning:** [11-categories-scope-model.md](../planning/11-categories-scope-model.md) · **Tasks:** [37d](../tasks/37d-category-catalog-dal-surfaces.md) amend · [37f](../tasks/37f-estimate-line-costing.md) *(TBD)* · **Spec:** [`category.md`](../surface-specs/category.md).
+
+---
+
+### Decision: category spec participation — assign-once, branch exclude (2026-07-03)
+
+**Status:** **Locked.** **Supersedes** [inherit / include / exclude (2026-07-02)](#decision-category-spec-participation--inherit-include-exclude-2026-07-02) **algorithm, storage semantics, and category admin UI.** **Retains:** `spec_def` namespace per scope root; `category_spec_def` + `category_spec_exclude` tables; `scopePanelDefs(R)` subtree union; Policy A root participation; estimate/part consumers unchanged at API shape.
+
+**Choice:**
+
+#### Definitions vs participation (unchanged split)
+
+| Layer | Table | Who | Purpose |
+|-------|-------|-----|---------|
+| **Definitions** | `spec_def` + `spec_option` | **Scope root only** (CRUD) | Namespace of dimensions (SLC, Color, Series, …) — **not** assigned per category |
+| **Participation** | `category_spec_def` + `category_spec_exclude` | Any node in root’s tree | Which defs **apply** when classifying / quoting under a node |
+
+**Ancestry rule:** participation flows only along **ancestor → descendant** lines in the **same** scope-root tree. Siblings do not share participation. Different scope roots (`a` vs `b`) never share `spec_def` rows.
+
+#### Storage
+
+| Table | Semantics | Constraint |
+|-------|-----------|------------|
+| **`category_spec_def`** | **Assignment** — the **one** category where this def is introduced in the tree | **`UNIQUE (spec_def_id)`** — at most one assignment row per def |
+| **`category_spec_exclude`** | **Branch cut** — def no longer applies at this node **or any descendant** | PK `(category_id, spec_def_id)`; **no re-include** below an exclude |
+
+A def cannot appear in both tables on the **same** node (DAL rejects).
+
+**Policy A (root):** a def participates at the scope root only when `category_spec_def` assigns it to the root row (no automatic “all defs active at root”).
+
+#### Effective participation algorithm
+
+```text
+assign(D) = category_id from category_spec_def where spec_def_id = D
+            (null if no row — def exists in namespace but is inactive everywhere)
+
+effective(N, D):
+  A = assign(D)
+  if A is null:                         return false
+  if A is not an ancestor of N
+     and A ≠ N:                        return false
+  if ∃ exclude row (X, D) where X is on the path
+     from A down to N (inclusive):     return false
+  return true
+
+effective(N) = { D | effective(N, D) }
+```
+
+**No re-include:** an exclude on node `c` removes def `D` for `c` and **all descendants**. A descendant **cannot** restore `D` via `category_spec_def`.
+
+**Item / part with multiple category links:** `effective(item) = ⋃ effective(category)` across `item_category` / `part_category` links (unchanged).
+
+#### Estimate scope spec panel (unchanged intent)
+
+```text
+scopePanelDefs(R) = ⋃ effective(C) for all category nodes C in subtree rooted at R
+```
+
+PATCH rejects `spec_def_id` not in `scopePanelDefs(R)` (`invalid_scope_panel_spec`).
+
+#### Category admin UI
+
+| Node | Show |
+|------|------|
+| **Root** | **`spec_definitions`** only — CRUD defs + enum options. **No** separate “base includes” section. |
+| **Nested** | **Read-only** `spec_definitions` table (root namespace) + one **Participates** checkbox per def |
+
+**Checkbox → DB (nested):**
+
+| UI state | DB action |
+|----------|-----------|
+| Participates, def unassigned | `INSERT category_spec_def (this category, def)` — fails if def already assigned elsewhere |
+| Participates, assigned at ancestor, inherited | no rows (implicit) |
+| Does not participate, would inherit | `INSERT category_spec_exclude (this category, def)` |
+| Does not participate, not inherited | no rows |
+
+**Root participation:** optional — same checkbox column if root shows participation; assignment row on root when checked (Policy A).
+
+Creating a child **does not** copy rows — inheritance is implicit until admin assigns or excludes ([planning 12](../planning/12-master-detail-chrome.md) seeding deferred).
+
+#### Migration from 37d2 delta model
+
+| Situation | Action |
+|-----------|--------|
+| Multiple `category_spec_def` rows per `spec_def_id` | **Data pass** before `UNIQUE` — keep one assignment (shallowest / admin choice); drop redundant rows |
+| Nested rows that only duplicated inheritance | Delete — effective set unchanged under assign-once |
+| `category_spec_exclude` rows | Keep — semantics tighten (no re-include below) |
+
+DDL follow-on: migration **037** — `UNIQUE (spec_def_id)` on `category_spec_def`. See [037 plan](../migrations/037-category-spec-assign-once-plan.md).
+
+#### Worked example — Fire Alarm
+
+**Definitions** on root **Fire Alarm:** `slc_protocol`, `color`, `series`.
+
+**Assignment + exclude (DB rows):**
+
+| Def | `category_spec_def` (assign) | `category_spec_exclude` |
+|-----|------------------------------|-------------------------|
+| `slc_protocol` | Fire Alarm (root) | Notification appliances |
+| `color` | Notification appliances | — |
+| `series` | Notification appliances | — |
+
+**Effective (computed):**
+
+| Category | Effective defs |
+|----------|----------------|
+| Fire Alarm (root) | `{ slc_protocol }` |
+| Initiating devices | `{ slc_protocol }` *(assigned at root, on path)* |
+| Modules | `{ slc_protocol }` |
+| Notification appliances | `{ color, series }` *(slc cut by exclude)* |
+
+**Estimate** — scope **Fire Alarm** checked: scope panel `{ slc_protocol, color, series }`. Line filter participation per `effective(item)` on linked category — same outcomes as prior Fire Alarm example.
+
+**Rationale:** One assignment per def matches “introduced here, inferred downhill.” Exclude is a branch guillotine — simpler than delta includes + re-include. UI is one checklist on descendants; definitions stay root-editable only.
+
+**Planning:** [11-categories-scope-model.md](../planning/11-categories-scope-model.md) · **Tasks:** [37d3](../tasks/37d3-category-spec-participation-simplify.md) · [37f](../tasks/37f-estimate-line-costing.md) · **Spec:** [`category.md`](../surface-specs/category.md).
+
+**UI visibility:** **Superseded (admin per-node visibility)** by [owner-branch knowledge (2026-07-03)](#decision-category-spec-visibility--owner-branch-knowledge-2026-07-03). **Retains:** assign-once storage, branch exclude, `effective()` / `scopePanelDefs` algorithms.
+
+---
+
+### Decision: category spec visibility — owner-branch knowledge (2026-07-03)
+
+**Status:** **Locked.** **Supersedes** [assign-once UI table (2026-07-03)](#decision-category-spec-participation--assign-once-branch-exclude-2026-07-03) **category admin visibility only.** **Retains:** `category_spec_def` assign-once, `category_spec_exclude` branch cut, `effective(N, D)` participation algorithm, `scopePanelDefs` subtree union, estimate/part consumers. **Shipped:** task [37d4](../tasks/37d4-category-spec-visibility.md) (2026-07-04).
+
+**Choice:**
+
+#### Concepts
+
+| Term | Meaning |
+|------|---------|
+| **Owner** | The single category with `category_spec_def` for def `D` |
+| **Knowledge** | Category admin (and DAL read for that node) is aware `D` exists |
+| **Use** | `D` is in `effective(N)` — participates for quoting, part matching, etc. |
+
+Knowledge and use can diverge only at an **exclude** node: the node that wrote `category_spec_exclude` **knows** `D` but does **not** use it.
+
+#### Rules
+
+| # | Rule |
+|---|------|
+| R1 | Each def is **assigned to exactly one** category (owner). |
+| R2 | Every **descendant** of the owner **knows** and **uses** `D` unless R2.1 applies. |
+| R2.1 | If category `X` on the path owner → `N` **excludes** `D`, then `X` **knows** but does **not** use `D`; every **descendant of `X`** has **no knowledge** of `D` (branch cut for visibility and participation). |
+| R3 | Only the **owner** may **edit or delete** the def (display name, type, enum options). All other nodes: read-only at most, or invisible per R2.1. |
+| R4 | Any **descendant** of the owner may **exclude** an ancestral assignment (exclude row only — not a second assign). |
+
+**Not inherited upward:** ancestors and siblings of the owner have **no knowledge** of `D`.
+
+**Storage unchanged:** `spec_def` rows remain namespaced by scope root (`root_category_id`); assignment and exclude tables carry owner-branch semantics. Implementation maps owner → edit rights; visibility filter is per-node.
+
+#### Worked example — generic tree
+
+```text
+1
+└── 1-1          ← assign(D) here (owner)
+    ├── 1-1-1    ← exclude(D) here
+    │   └── 1-1-1-1
+    └── 1-1-2
+2
+3
+├── 3-1
+└── 3-2
+```
+
+| Category | Knows `D`? | Uses `D`? | Notes |
+|----------|------------|-----------|-------|
+| `1` | no | no | ancestor of owner — not on owner branch |
+| `1-1` | yes | yes | owner; edit/delete |
+| `1-1-1` | yes | no | exclude node — toggle exclude only |
+| `1-1-1-1` | no | no | below exclude — branch cut |
+| `1-1-2` | yes | yes | descendant of owner, no exclude on path |
+| `2`, `3-1`, `3-2` | no | no | other branches |
+
+#### Category admin UI (target)
+
+| Node vs def `D` | Show in admin? | Editable? | Participates control |
+|-----------------|----------------|-----------|----------------------|
+| Owner | yes | yes (def CRUD) | n/a — always uses |
+| Descendant, on path, not excluded | yes | no (read-only def) | inherited — no row; uses implicitly |
+| Descendant, exclude node | yes | no | exclude toggle (active = false) |
+| Below exclude | **no** | — | — |
+| Ancestor / sibling / other branch | **no** | — | — |
+| Unassigned def (namespace only) | scope **root** only | yes (def CRUD) | assign when first introduced |
+
+**Task:** [37d4](../tasks/37d4-category-spec-visibility.md) — DAL visibility filter + category UI amend.
+
+**Planning:** [11-categories-scope-model.md](../planning/11-categories-scope-model.md) · **Spec:** [`category.md`](../surface-specs/category.md).
 
 ---
 

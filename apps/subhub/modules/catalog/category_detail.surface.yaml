@@ -16,7 +16,6 @@ tables:
   - category
   - spec_def
   - spec_option
-  - category_spec_def
   - category_spec_exclude
 
 fields:
@@ -41,5 +40,5 @@ fields:
     # logical — DAL maps spec_def + spec_option for scope roots
     columns: []
   - id: spec_participation
-    # logical — DAL maps category_spec_def joined to spec_def
+    # logical — DAL maps category_spec_exclude joined to spec_def owners
     columns: []

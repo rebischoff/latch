@@ -154,7 +154,6 @@ const buildDefaultValues = (
     },
     contacts: mapContacts(data?.contacts),
     scopes: mapScopes(data?.scopes),
-    general_zones: mapZones(data?.general_zones),
   };
 };
 
@@ -250,7 +249,6 @@ export const SiteDetailForm = ({
     const loosened = narrowed.extend({
       contacts: z.array(z.object({}).passthrough()).optional(),
       scopes: z.array(z.object({}).passthrough()).optional(),
-      general_zones: z.array(z.object({}).passthrough()).optional(),
     });
 
     return zodResolver(loosened);
@@ -327,23 +325,11 @@ export const SiteDetailForm = ({
         }));
       }
 
-      if (
-        !isCreate &&
-        (fieldAllows(activeManifest, "scopes", "write") ||
-          fieldAllows(activeManifest, "general_zones", "write"))
-      ) {
+      if (!isCreate && fieldAllows(activeManifest, "scopes", "write")) {
         const scopesPatch = stripScopesForPatch({
           scopes: values.scopes,
-          general_zones: values.general_zones,
         });
-
-        if (fieldAllows(activeManifest, "scopes", "write")) {
-          body.scopes = scopesPatch.scopes;
-        }
-
-        if (fieldAllows(activeManifest, "general_zones", "write")) {
-          body.general_zones = scopesPatch.general_zones;
-        }
+        body.scopes = scopesPatch.scopes;
       }
 
       try {
@@ -402,7 +388,7 @@ export const SiteDetailForm = ({
           }
 
           if (
-            (details?.field === "scopes" || details?.field === "general_zones") &&
+            details?.field === "scopes" &&
             details.code === "referenced"
           ) {
             message.error(
@@ -559,7 +545,7 @@ export const SiteDetailForm = ({
     { key: "general", label: "General", children: generalTab },
     ...(!isCreate &&
     (fieldAllows(activeManifest, "scopes", "read") ||
-      fieldAllows(activeManifest, "general_zones", "read"))
+      fieldAllows(activeManifest, "scopes", "read"))
       ? [
           {
             key: "scopes-zones",

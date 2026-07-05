@@ -88,7 +88,7 @@ const loadReferencedZoneIds = async (
 export const loadSiteScopes = async (
   pool: Pool,
   siteId: string,
-): Promise<{ scopes: SiteScopeRow[]; general_zones: SiteZoneRow[] }> => {
+): Promise<{ scopes: SiteScopeRow[] }> => {
   const [scopesResult, zonesResult, references] = await Promise.all([
     pool.query<SiteScopeBaseRow>(
       `SELECT
@@ -144,13 +144,7 @@ export const loadSiteScopes = async (
     zones: nestZones(zonesByScopeId.get(scope.id) ?? [], null, references.ids),
   }));
 
-  const general_zones = nestZones(
-    zonesByScopeId.get(null) ?? [],
-    null,
-    references.ids,
-  );
-
-  return { scopes, general_zones };
+  return { scopes };
 };
 
 export const toZonePatchRow = (row: SiteZoneRow): SiteZonePatchRow => ({

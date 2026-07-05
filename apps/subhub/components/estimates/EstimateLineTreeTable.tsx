@@ -10,10 +10,12 @@ import {
   Space,
   Table,
   Tag,
+  TreeSelect,
   Typography,
 } from "antd";
+import type { TreeSelectProps } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   Controller,
   useFieldArray,
@@ -25,8 +27,7 @@ import {
 import {
   buildLineTree,
   collectLineRemoveIndices,
-  estimateScopeIdForParentKey,
-  GENERAL_TREE_KEY,
+  parentTargetForKey,
   makeLine,
   type EstimateLineEditorFormValues,
   type EstimateLineFormRow,
@@ -36,6 +37,11 @@ import {
   type EstimateScopeFormRow,
   type TreeRowKind,
 } from "@/components/estimates/estimate-line-tree";
+import {
+  useEstimateItemPicker,
+  useEstimatePartPicker,
+  type ItemTreeNode,
+} from "@/lib/hooks/use-estimate-item-picker";
 import { FormSection } from "@/components/form/FormSection";
 import { useFormUi } from "@/components/surface/useFormUi";
 
@@ -102,6 +108,133 @@ const KindCell = ({ index, writable, disabled }: CellProps) => (
     }
   />
 );
+
+const toAntdItemTree = (nodes: ItemTreeNode[]): TreeSelectProps["treeData"] =>
+  nodes.map((node) => ({
+    value: node.value,
+    title: node.label,
+    selectable: node.selectable,
+    children: node.children ? toAntdItemTree(node.children) : undefined,
+  }));
+
+const ItemCell = ({
+  index,
+  writable,
+  disabled,
+  scopes,
+}: CellProps & { scopes: EstimateScopeFormRow[] }) => {
+  const lineKind = useWatch({
+    name: lineFieldPath(index, "line_kind"),
+  }) as EstimateLineKind | undefined;
+  const estimateScopeId = useWatch({
+    name: lineFieldPath(index, "estimate_scope_id"),
+  }) as string | null | undefined;
+  const rootCategoryId =
+    scopes.find((scope) => scope.id === estimateScopeId)?.root_category_id ?? null;
+  const { data: itemTree, isLoading } = useEstimateItemPicker(
+    rootCategoryId,
+    lineKind === "product" && Boolean(rootCategoryId),
+  );
+
+  if (lineKind !== "product") {
+    return <Typography.Text type="secondary">—</Typography.Text>;
+  }
+
+  return (
+    <Controller<EstimateLineEditorFormValues>
+      name={lineFieldPath(index, "item_id")}
+      render={({ field: { value, onChange } }) =>
+        writable ? (
+          <TreeSelect
+            size="small"
+            style={{ width: "100%" }}
+            loading={isLoading}
+            treeData={toAntdItemTree(itemTree ?? [])}
+            value={value ?? undefined}
+            disabled={disabled || !rootCategoryId}
+            placeholder={rootCategoryId ? "Select item" : "Scope required"}
+            onChange={onChange}
+            treeDefaultExpandAll
+          />
+        ) : (
+          <Typography.Text>{String(value ?? "—")}</Typography.Text>
+        )
+      }
+    />
+  );
+};
+
+const PartCell = ({
+  index,
+  writable,
+  disabled,
+  scopes,
+}: CellProps & { scopes: EstimateScopeFormRow[] }) => {
+  const lineKind = useWatch({
+    name: lineFieldPath(index, "line_kind"),
+  }) as EstimateLineKind | undefined;
+  const itemId = useWatch({ name: lineFieldPath(index, "item_id") }) as string | null;
+  const estimateScopeId = useWatch({
+    name: lineFieldPath(index, "estimate_scope_id"),
+  }) as string | null;
+  const siteZoneId = useWatch({ name: lineFieldPath(index, "site_zone_id") }) as string | null;
+  const { setValue } = useFormContext<EstimateLineEditorFormValues>();
+
+  const { data: parts } = useEstimatePartPicker(
+    itemId,
+    estimateScopeId,
+    siteZoneId,
+    lineKind === "product" && Boolean(itemId && estimateScopeId),
+  );
+
+  if (lineKind !== "product") {
+    return <Typography.Text type="secondary">—</Typography.Text>;
+  }
+
+  if (!parts || parts.length <= 1) {
+    const single = parts?.[0];
+    return (
+      <Typography.Text type="secondary">
+        {single ? single.mpn : parts?.length === 0 ? "No match" : "—"}
+      </Typography.Text>
+    );
+  }
+
+  return (
+    <Controller<EstimateLineEditorFormValues>
+      name={lineFieldPath(index, "part_id")}
+      render={({ field: { value, onChange } }) =>
+        writable ? (
+          <Select
+            size="small"
+            style={{ width: "100%" }}
+            allowClear
+            placeholder="Pick PN"
+            value={value ?? undefined}
+            disabled={disabled}
+            options={parts.map((part) => ({
+              value: part.id,
+              label: part.mpn,
+            }))}
+            onChange={(next) => {
+              onChange(next ?? null);
+              setValue(lineFieldPath(index, "part_locked"), Boolean(next), {
+                shouldDirty: true,
+              });
+              if (next) {
+                setValue(lineFieldPath(index, "material_status"), "verified", {
+                  shouldDirty: true,
+                });
+              }
+            }}
+          />
+        ) : (
+          <Typography.Text>{String(value ?? "—")}</Typography.Text>
+        )
+      }
+    />
+  );
+};
 
 const DescriptionCell = ({ index, writable, disabled }: CellProps) => {
   const role = useWatch({
@@ -180,11 +313,15 @@ const MoneyCell = ({
   field,
   writable,
   disabled,
-}: CellProps & { field: "unit_cost" | "unit_price" }) => (
+  readOnly = false,
+}: CellProps & {
+  field: "unit_cost" | "unit_price" | "unit_material" | "unit_price_target";
+  readOnly?: boolean;
+}) => (
   <Controller<EstimateLineEditorFormValues>
     name={lineFieldPath(index, field)}
     render={({ field: { value, onChange } }) =>
-      writable ? (
+      writable && !readOnly ? (
         <InputNumber
           size="small"
           min={0}
@@ -196,7 +333,7 @@ const MoneyCell = ({
           onChange={(next) => onChange(next ?? 0)}
         />
       ) : (
-        <Typography.Text>${Number(value).toFixed(2)}</Typography.Text>
+        <Typography.Text>${Number(value ?? 0).toFixed(2)}</Typography.Text>
       )
     }
   />
@@ -225,7 +362,7 @@ const TotalSellFooter = () => {
 };
 
 const isParentRow = (rowKind: TreeRowKind): boolean =>
-  rowKind === "general" || rowKind === "scope";
+  rowKind === "scope" || rowKind === "zone";
 
 const parentCellProps = (rowKind: TreeRowKind, columnCount: number) =>
   isParentRow(rowKind) ? { colSpan: columnCount } : {};
@@ -291,31 +428,40 @@ export const EstimateLineTreeTable = ({
     | EstimateLineFormRow[]
     | undefined;
 
+  const watchedSiteTree = useWatch({ control, name: "site_tree" });
   const scopes = watchedScopes ?? [];
   const lineItems = watchedLines ?? [];
 
-  const [focusedParentKey, setFocusedParentKey] = useState(GENERAL_TREE_KEY);
+  const [focusedParentKey, setFocusedParentKey] = useState("");
 
   const writableLines = fieldAllows(manifest, "line_items", "write");
   const allowRemoveLine = writableLines || surfaceAllows(manifest, "delete");
+  const canAddLines = scopes.length > 0;
 
   const treeData = useMemo(
-    () => buildLineTree(scopes, lineItems),
-    [lineItems, scopes],
+    () => buildLineTree(scopes, lineItems, watchedSiteTree),
+    [lineItems, scopes, watchedSiteTree],
   );
 
-  const lineIndexById = useMemo(() => {
-    const map = new Map<string, number>();
-    lineItems.forEach((line, index) => {
-      map.set(line.id, index);
-    });
-    return map;
-  }, [lineItems]);
+  useEffect(() => {
+    if (!focusedParentKey && treeData[0]?.key) {
+      setFocusedParentKey(treeData[0].key);
+    }
+  }, [focusedParentKey, treeData]);
 
   const addLineUnderParent = useCallback(
     (parentKey: string) => {
-      const estimateScopeId = estimateScopeIdForParentKey(parentKey, scopes);
-      appendLine(makeLine({ estimate_scope_id: estimateScopeId }));
+      const target = parentTargetForKey(parentKey, scopes);
+      if (!target) {
+        return;
+      }
+
+      appendLine(
+        makeLine({
+          estimate_scope_id: target.estimate_scope_id,
+          site_zone_id: target.site_zone_id,
+        }),
+      );
       setFocusedParentKey(parentKey);
     },
     [appendLine, scopes],
@@ -323,15 +469,21 @@ export const EstimateLineTreeTable = ({
 
   const addKitUnderParent = useCallback(
     (parentKey: string) => {
-      const estimateScopeId = estimateScopeIdForParentKey(parentKey, scopes);
+      const target = parentTargetForKey(parentKey, scopes);
+      if (!target) {
+        return;
+      }
+
       const header = makeLine({
-        estimate_scope_id: estimateScopeId,
+        estimate_scope_id: target.estimate_scope_id,
+        site_zone_id: target.site_zone_id,
         line_role: "kit_header",
         description: "",
         unit: "kit",
       });
       const component = makeLine({
-        estimate_scope_id: estimateScopeId,
+        estimate_scope_id: target.estimate_scope_id,
+        site_zone_id: target.site_zone_id,
         line_role: "kit_component",
         parent_line_id: header.id,
       });
@@ -370,6 +522,14 @@ export const EstimateLineTreeTable = ({
     [getValues, insertLine],
   );
 
+  const lineIndexById = useMemo(() => {
+    const map = new Map<string, number>();
+    lineItems.forEach((line, index) => {
+      map.set(line.id, index);
+    });
+    return map;
+  }, [lineItems]);
+
   const removeLineAt = useCallback(
     (lineIndex: number) => {
       const lines = getValues("line_items");
@@ -379,7 +539,7 @@ export const EstimateLineTreeTable = ({
   );
 
   const showActionsColumn = writableLines || allowRemoveLine;
-  const columnCount = showActionsColumn ? 8 : 7;
+  const columnCount = showActionsColumn ? 12 : 11;
 
   const columns = useMemo((): ColumnsType<EstimateLineTreeNode> => {
     const parentChrome = (record: EstimateLineTreeNode): ReactNode => (
@@ -409,6 +569,56 @@ export const EstimateLineTreeTable = ({
           }
 
           return <KindCell index={lineIndex} writable={writableLines} disabled={disabled} />;
+        },
+      },
+      {
+        key: "item_id",
+        title: "Item",
+        width: 160,
+        onCell: (record) => hiddenParentCellProps(record.rowKind),
+        render: (_value, record) => {
+          if (isParentRow(record.rowKind)) {
+            return null;
+          }
+
+          const lineIndex = record.lineId ? lineIndexById.get(record.lineId) : undefined;
+          if (lineIndex === undefined) {
+            return null;
+          }
+
+          return (
+            <ItemCell
+              index={lineIndex}
+              writable={writableLines}
+              disabled={disabled}
+              scopes={scopes}
+            />
+          );
+        },
+      },
+      {
+        key: "part_id",
+        title: "Part",
+        width: 130,
+        onCell: (record) => hiddenParentCellProps(record.rowKind),
+        render: (_value, record) => {
+          if (isParentRow(record.rowKind)) {
+            return null;
+          }
+
+          const lineIndex = record.lineId ? lineIndexById.get(record.lineId) : undefined;
+          if (lineIndex === undefined) {
+            return null;
+          }
+
+          return (
+            <PartCell
+              index={lineIndex}
+              writable={writableLines}
+              disabled={disabled}
+              scopes={scopes}
+            />
+          );
         },
       },
       {
@@ -469,9 +679,61 @@ export const EstimateLineTreeTable = ({
         },
       },
       {
+        key: "unit_material",
+        title: "Material",
+        width: 110,
+        onCell: (record) => hiddenParentCellProps(record.rowKind),
+        render: (_value, record) => {
+          if (isParentRow(record.rowKind)) {
+            return null;
+          }
+
+          const lineIndex = record.lineId ? lineIndexById.get(record.lineId) : undefined;
+          if (lineIndex === undefined) {
+            return null;
+          }
+
+          return (
+            <MoneyCell
+              index={lineIndex}
+              field="unit_material"
+              writable={writableLines}
+              disabled={disabled}
+              readOnly
+            />
+          );
+        },
+      },
+      {
+        key: "unit_price_target",
+        title: "Target",
+        width: 110,
+        onCell: (record) => hiddenParentCellProps(record.rowKind),
+        render: (_value, record) => {
+          if (isParentRow(record.rowKind)) {
+            return null;
+          }
+
+          const lineIndex = record.lineId ? lineIndexById.get(record.lineId) : undefined;
+          if (lineIndex === undefined) {
+            return null;
+          }
+
+          return (
+            <MoneyCell
+              index={lineIndex}
+              field="unit_price_target"
+              writable={writableLines}
+              disabled={disabled}
+              readOnly
+            />
+          );
+        },
+      },
+      {
         key: "unit_cost",
         title: "Cost",
-        width: 120,
+        width: 110,
         onCell: (record) => hiddenParentCellProps(record.rowKind),
         render: (_value, record) => {
           if (isParentRow(record.rowKind)) {
@@ -489,6 +751,7 @@ export const EstimateLineTreeTable = ({
               field="unit_cost"
               writable={writableLines}
               disabled={disabled}
+              readOnly
             />
           );
         },
@@ -581,10 +844,21 @@ export const EstimateLineTreeTable = ({
     removeLineAt,
     showActionsColumn,
     writableLines,
+    scopes,
   ]);
 
   if (!siteSelected) {
     return null;
+  }
+
+  if (!canAddLines) {
+    return (
+      <FormSection title="Line items">
+        <Typography.Paragraph type="secondary">
+          Check at least one scope on the Scope tab before adding line items.
+        </Typography.Paragraph>
+      </FormSection>
+    );
   }
 
   return (
@@ -600,7 +874,7 @@ export const EstimateLineTreeTable = ({
         expandable={{ defaultExpandAllRows: true, indentSize: 20 }}
         onRow={(record) => ({
           onClick: () => {
-            if (record.rowKind === "general" || record.rowKind === "scope") {
+            if (record.rowKind === "scope" || record.rowKind === "zone") {
               setFocusedParentKey(record.key);
             }
           },
@@ -617,7 +891,7 @@ export const EstimateLineTreeTable = ({
         <Space style={{ marginTop: 12 }}>
           <Button
             icon={<PlusOutlined />}
-            disabled={disabled}
+            disabled={disabled || !canAddLines || !focusedParentKey}
             onClick={() => addLineUnderParent(focusedParentKey)}
           >
             Add line

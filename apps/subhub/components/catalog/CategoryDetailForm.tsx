@@ -8,14 +8,13 @@ import {
   surfaceAllows,
   type Manifest,
 } from "@latch/contracts";
-import { App, Typography } from "antd";
+import { App } from "antd";
 import { notFound, useRouter } from "next/navigation";
 import { useCallback, useMemo, useRef } from "react";
 import { useForm, type Resolver } from "react-hook-form";
 import { z } from "zod";
 
 import { CategorySpecDefinitionsField } from "@/components/catalog/CategorySpecDefinitionsField";
-import { CategorySpecParticipationField } from "@/components/catalog/CategorySpecParticipationField";
 import { FormSection } from "@/components/form/FormSection";
 import { SURFACE_FORM_MAX_WIDTH } from "@/components/form/formLayout";
 import { InputNumberInput } from "@/components/form/InputNumberInput";
@@ -73,30 +72,20 @@ export type CategoryDetailFormValues = {
     }>;
   }>;
   spec_participation: {
-    inherited: Array<{
-      spec_def_id: string;
-      display_name: string;
-      value_type: "boolean" | "enum" | "text";
-    }>;
-    includes: Array<{
+    participates: Array<{
       spec_def_id: string;
       display_name: string;
       value_type: "boolean" | "enum" | "text";
       active: boolean;
-    }>;
-    excludes: Array<{
-      spec_def_id: string;
-      display_name: string;
-      value_type: "boolean" | "enum" | "text";
-      active: boolean;
+      assign_category_id: string | null;
+      excluded_here: boolean;
+      state: "assigned" | "inherited" | "excluded" | "inactive";
     }>;
   };
 };
 
 const emptySpecParticipation = (): CategoryDetailFormValues["spec_participation"] => ({
-  inherited: [],
-  includes: [],
-  excludes: [],
+  participates: [],
 });
 
 const buildDefaultValues = (
@@ -142,10 +131,35 @@ const buildDefaultValues = (
   };
 };
 
+const specDefinitionOwnerId = (
+  values: CategoryDetailFormValues,
+  row: CategoryDetailFormValues["spec_definitions"][number],
+): string | null | undefined => {
+  if (!row.id) {
+    return undefined;
+  }
+  return values.spec_participation.participates.find((participation) => participation.spec_def_id === row.id)
+    ?.assign_category_id;
+};
+
+/** Only defs owned by this category (or new rows at root) belong in the patch body. */
+const patchableSpecDefinitions = (
+  values: CategoryDetailFormValues,
+  categoryId: string,
+  isRoot: boolean,
+): CategoryDetailFormValues["spec_definitions"] =>
+  values.spec_definitions.filter((row) => {
+    if (!row.id) {
+      return isRoot;
+    }
+    return specDefinitionOwnerId(values, row) === categoryId;
+  });
+
 const toPatchBody = (
   values: CategoryDetailFormValues,
   manifest: Manifest,
   isRoot: boolean,
+  categoryId: string,
 ): Record<string, unknown> => {
   const patchable = patchableFieldIds(manifest);
   const body: Record<string, unknown> = {};
@@ -161,38 +175,35 @@ const toPatchBody = (
     };
   }
 
-  if (patchable.includes("spec_definitions") && isRoot) {
-    body.spec_definitions = values.spec_definitions.map((row, index) => ({
-      ...(row.id ? { id: row.id } : {}),
-      code: row.code ?? null,
-      display_name: row.display_name,
-      value_type: row.value_type,
-      filter_mode: row.filter_mode ?? "required",
-      sort_order: row.sort_order ?? index + 1,
-      options:
-        row.value_type === "enum"
-          ? row.options.map((option, optionIndex) => ({
-              ...(option.id ? { id: option.id } : {}),
-              code: option.code ?? null,
-              display_name: option.display_name,
-              sort_order: option.sort_order ?? optionIndex + 1,
-            }))
-          : [],
-    }));
+  if (patchable.includes("spec_definitions")) {
+    const ownedRows = patchableSpecDefinitions(values, categoryId, isRoot);
+    if (ownedRows.length > 0) {
+      body.spec_definitions = ownedRows.map((row, index) => ({
+        ...(row.id ? { id: row.id } : {}),
+        code: row.code ?? null,
+        display_name: row.display_name,
+        value_type: row.value_type,
+        filter_mode: row.filter_mode ?? "required",
+        sort_order: row.sort_order ?? index + 1,
+        options:
+          row.value_type === "enum"
+            ? row.options.map((option, optionIndex) => ({
+                ...(option.id ? { id: option.id } : {}),
+                code: option.code ?? null,
+                display_name: option.display_name,
+                sort_order: option.sort_order ?? optionIndex + 1,
+              }))
+            : [],
+      }));
+    }
   }
 
   if (patchable.includes("spec_participation")) {
     body.spec_participation = {
-      includes: values.spec_participation.includes
-        .filter((row) => row.active)
-        .map((row) => ({ spec_def_id: row.spec_def_id })),
-      ...(!isRoot
-        ? {
-            excludes: values.spec_participation.excludes
-              .filter((row) => row.active)
-              .map((row) => ({ spec_def_id: row.spec_def_id })),
-          }
-        : {}),
+      participates: values.spec_participation.participates.map((row) => ({
+        spec_def_id: row.spec_def_id,
+        active: row.active,
+      })),
     };
   }
 
@@ -300,7 +311,7 @@ export const CategoryDetailForm = ({
           return;
         }
 
-        const body = toPatchBody(values, activeManifest, isRoot);
+        const body = toPatchBody(values, activeManifest, isRoot, categoryId);
         await patchMutation.mutateAsync(body);
         message.success("Category saved");
         form.reset(values);
@@ -431,16 +442,6 @@ export const CategoryDetailForm = ({
                 name="profile.csi_code"
                 label="CSI code"
               />
-              {!isCreate && !isRoot && form.getValues("profile.parent_name") ? (
-                <Typography.Text type="secondary">
-                  Parent: {form.getValues("profile.parent_name")}
-                </Typography.Text>
-              ) : null}
-              {!isCreate && !isRoot && form.getValues("profile.root_category_name") ? (
-                <Typography.Text type="secondary">
-                  Root: {form.getValues("profile.root_category_name")}
-                </Typography.Text>
-              ) : null}
               {isRoot && fieldAllows(activeManifest, "profile", "write") ? (
                 <TextInput<CategoryDetailFormValues>
                   field="profile"
@@ -452,14 +453,11 @@ export const CategoryDetailForm = ({
           ) : null}
         </FormSection>
 
-        {isRoot ? (
-          <>
-            <CategorySpecDefinitionsField manifest={activeManifest} />
-            <CategorySpecParticipationField isRoot manifest={activeManifest} />
-          </>
-        ) : (
-          <CategorySpecParticipationField isRoot={false} manifest={activeManifest} />
-        )}
+        <CategorySpecDefinitionsField
+          categoryId={categoryId}
+          isCreate={isCreate}
+          manifest={activeManifest}
+        />
         </SurfaceFormLayout>
       </form>
     </SurfaceFormRoot>

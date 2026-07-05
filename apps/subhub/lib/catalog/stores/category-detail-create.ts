@@ -19,16 +19,8 @@ import {
 } from "../descriptors/category-detail";
 import { loadCategoryDetail } from "../repository/category-detail";
 import { loadAllCategories, resolveRootCategoryId } from "../repository/category-tree";
-import { replaceCategorySpecExcludesTx } from "../repository/category-spec-exclude-write";
-import {
-  assertIncludesExcludesNoOverlap,
-  assertRootSpecParticipationExcludes,
-  replaceCategorySpecIncludesTx,
-} from "../repository/category-spec-participation-write";
-import {
-  assertRootSpecDefinitionsPatch,
-  replaceSpecDefinitionsTx,
-} from "../repository/spec-def-write";
+import { applyCategorySpecParticipationTx } from "../repository/category-spec-participation-write";
+import { applyCategorySpecDefinitionsTx } from "../repository/spec-def-write";
 import { insertCategory } from "../repository/category-write";
 
 export const parseCategoryCreateBody = (
@@ -77,19 +69,14 @@ const applySpecParticipationCreate = async (
     return;
   }
 
-  const includes = specParticipation.includes ?? [];
-  const excludes = specParticipation.excludes ?? [];
-
-  assertRootSpecParticipationExcludes(isRoot, specParticipation.excludes);
-  assertIncludesExcludesNoOverlap(includes, excludes);
-
   await withPermissionDb(pool, actorId, async (client) => {
-    if (specParticipation.includes !== undefined) {
-      await replaceCategorySpecIncludesTx(client, categoryId, rootCategoryId, includes);
-    }
-    if (!isRoot && specParticipation.excludes !== undefined) {
-      await replaceCategorySpecExcludesTx(client, categoryId, rootCategoryId, excludes);
-    }
+    await applyCategorySpecParticipationTx(
+      client,
+      categoryId,
+      rootCategoryId,
+      specParticipation.participates,
+      allRows,
+    );
   });
 };
 
@@ -111,21 +98,6 @@ export const extendCategoryDetailDal = (
       return categoryDetailBaseDal.get(ctx, id);
     }
 
-    const typed = body as z.infer<typeof categoryDetailDescriptor.patchSchema>;
-    if (typed.spec_definitions !== undefined) {
-      assertRootSpecDefinitionsPatch(existing.is_root);
-    }
-    if (typed.spec_participation !== undefined) {
-      assertRootSpecParticipationExcludes(
-        existing.is_root,
-        typed.spec_participation.excludes,
-      );
-      assertIncludesExcludesNoOverlap(
-        typed.spec_participation.includes ?? [],
-        typed.spec_participation.excludes ?? [],
-      );
-    }
-
     await categoryDetailBaseDal.patch(ctx, id, body);
     return categoryDetailBaseDal.get(ctx, id);
   },
@@ -141,10 +113,12 @@ export const extendCategoryDetailDal = (
     await insertCategory(pool, actorId, row);
 
     if (input.spec_definitions !== undefined) {
-      assertRootSpecDefinitionsPatch(row.parent_id === null);
-      await withPermissionDb(pool, actorId, async (client) => {
-        await replaceSpecDefinitionsTx(client, id, input.spec_definitions!);
-      });
+      const created = await loadCategoryDetail(pool, id);
+      if (created) {
+        await withPermissionDb(pool, actorId, async (client) => {
+          await applyCategorySpecDefinitionsTx(client, created, input.spec_definitions!);
+        });
+      }
     }
 
     if (input.spec_participation !== undefined) {
