@@ -179,6 +179,10 @@ const mapScopes = (rows: unknown): EstimateScopeFormRow[] => {
               typeof zone.site_zone_id === "string" ? zone.site_zone_id : "",
             sort_order:
               typeof zone.sort_order === "number" ? zone.sort_order : zoneIndex + 1,
+            complexity_factor_id:
+              typeof zone.complexity_factor_id === "string"
+                ? zone.complexity_factor_id
+                : null,
             specs: mapSpecs(zone.specs),
           };
         })
@@ -188,16 +192,15 @@ const mapScopes = (rows: unknown): EstimateScopeFormRow[] => {
       id: typeof item.id === "string" ? item.id : crypto.randomUUID(),
       site_scope_id:
         typeof item.site_scope_id === "string" ? item.site_scope_id : "",
-      root_category_id:
-        typeof item.root_category_id === "string" ? item.root_category_id : "",
-      root_category_name:
-        typeof item.root_category_name === "string" ? item.root_category_name : null,
+      root_item_id:
+        typeof item.root_item_id === "string" ? item.root_item_id : "",
+      root_item_name:
+        typeof item.root_item_name === "string" ? item.root_item_name : null,
       site_scope_name:
         typeof item.site_scope_name === "string" ? item.site_scope_name : null,
       sort_order: typeof item.sort_order === "number" ? item.sort_order : index + 1,
-      labor_context_type_id:
-        typeof item.labor_context_type_id === "string" ? item.labor_context_type_id : null,
-      markup_type_id: typeof item.markup_type_id === "string" ? item.markup_type_id : null,
+      complexity_factor_id:
+        typeof item.complexity_factor_id === "string" ? item.complexity_factor_id : null,
       specs: mapSpecs(item.specs),
       zones,
     };
@@ -238,8 +241,8 @@ const mapSiteTree = (value: unknown): EstimateSiteTreeFormRow | null => {
           return {
             id: typeof scope.id === "string" ? scope.id : "",
             name: typeof scope.name === "string" ? scope.name : "",
-            root_category_id:
-              typeof scope.root_category_id === "string" ? scope.root_category_id : "",
+            root_item_id:
+              typeof scope.root_item_id === "string" ? scope.root_item_id : "",
             zones: mapZones(scope.zones),
           };
         })
@@ -258,17 +261,9 @@ const mapLineItems = (rows: unknown): EstimateLineFormRow[] => {
     const asString = (value: unknown): string | null =>
       typeof value === "string" ? value : null;
 
-    const materialStatus =
-      item.material_status === "generic" ||
-      item.material_status === "suggested" ||
-      item.material_status === "verified"
-        ? item.material_status
-        : null;
-
     return {
       id: typeof item.id === "string" ? item.id : crypto.randomUUID(),
       line_role: (item.line_role as EstimateLineFormRow["line_role"]) ?? "standalone",
-      line_kind: (item.line_kind as EstimateLineFormRow["line_kind"]) ?? "product",
       description: typeof item.description === "string" ? item.description : "",
       quantity: typeof item.quantity === "number" ? item.quantity : 0,
       unit: typeof item.unit === "string" ? item.unit : "ea",
@@ -276,17 +271,20 @@ const mapLineItems = (rows: unknown): EstimateLineFormRow[] => {
       unit_price: typeof item.unit_price === "number" ? item.unit_price : 0,
       unit_material: typeof item.unit_material === "number" ? item.unit_material : 0,
       unit_labor: typeof item.unit_labor === "number" ? item.unit_labor : 0,
+      unit_freight: typeof item.unit_freight === "number" ? item.unit_freight : 0,
       unit_incidental: typeof item.unit_incidental === "number" ? item.unit_incidental : 0,
       unit_price_target:
         typeof item.unit_price_target === "number" ? item.unit_price_target : 0,
       parent_line_id: asString(item.parent_line_id),
       estimate_scope_id: asString(item.estimate_scope_id),
       site_zone_id: asString(item.site_zone_id),
-      material_status: materialStatus,
+      lock:
+        item.lock === "line" || item.lock === "sell" || item.lock === "none"
+          ? item.lock
+          : "none",
       phase_id: asString(item.phase_id),
       item_id: asString(item.item_id),
       part_id: asString(item.part_id),
-      part_locked: item.part_locked === true,
       vendor_part_id: asString(item.vendor_part_id),
     };
   });
@@ -551,10 +549,9 @@ export const EstimateDetailForm = ({
         body.scopes = (values.scopes ?? []).map((row, index) => ({
           id: row.id,
           site_scope_id: row.site_scope_id,
-          root_category_id: row.root_category_id,
+          root_item_id: row.root_item_id,
           sort_order: index + 1,
-          labor_context_type_id: row.labor_context_type_id,
-          markup_type_id: row.markup_type_id,
+          complexity_factor_id: row.complexity_factor_id,
           specs: row.specs.map((spec) => ({
             spec_def_id: spec.spec_def_id,
             spec_option_id: spec.spec_option_id,
@@ -564,6 +561,7 @@ export const EstimateDetailForm = ({
           zones: row.zones.map((zone, zoneIndex) => ({
             site_zone_id: zone.site_zone_id,
             sort_order: zoneIndex + 1,
+            complexity_factor_id: zone.complexity_factor_id,
             specs: zone.specs.map((spec) => ({
               spec_def_id: spec.spec_def_id,
               spec_option_id: spec.spec_option_id,
@@ -583,7 +581,6 @@ export const EstimateDetailForm = ({
         body.line_items = orderedLines.map((row) => ({
           id: row.id,
           line_role: row.line_role,
-          line_kind: row.line_kind,
           description: row.description,
           quantity: row.quantity,
           unit: row.unit,
@@ -592,7 +589,7 @@ export const EstimateDetailForm = ({
           parent_line_id: row.parent_line_id,
           estimate_scope_id: row.estimate_scope_id,
           site_zone_id: row.site_zone_id,
-          material_status: row.material_status,
+          lock: row.lock,
           phase_id: row.phase_id,
           item_id: row.item_id,
           part_id: row.part_id,

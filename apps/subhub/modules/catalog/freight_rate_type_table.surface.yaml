@@ -1,0 +1,36 @@
+# Org freight add-on catalog (editable table page; cost_add_on_type kind=freight)
+id: freight_rate_type_table
+displayName: Freight rates
+anchorTable: cost_add_on_type
+
+fieldActions:
+  - read
+  - write
+
+surfaceActions:
+  - read
+  - write
+  - delete
+
+tables:
+  - cost_add_on_type
+
+fields:
+  - id: name
+    columns:
+      - column: cost_add_on_type.id
+        type: string
+      - column: cost_add_on_type.name
+        type: string
+  - id: percent
+    columns:
+      - column: cost_add_on_type.percent
+        type: number
+  - id: amount_cents
+    columns:
+      - column: cost_add_on_type.amount_cents
+        type: number
+  - id: sort_order
+    columns:
+      - column: cost_add_on_type.sort_order
+        type: number

@@ -24,6 +24,8 @@ import {
   zoneReferencedByLines,
 } from "@/components/estimates/estimate-scope-tree";
 import { FormSection } from "@/components/form/FormSection";
+import { LinkedSelectInput } from "@/components/form/LinkedSelectInput";
+import { useSurfaceList } from "@/lib/hooks/use-surface-list";
 import { useFormUi } from "@/components/surface/useFormUi";
 
 type EstimateScopeTabProps = {
@@ -33,6 +35,11 @@ type EstimateScopeTabProps = {
 type SelectionState = {
   scopeIndex?: number;
   zoneIndex?: number;
+};
+
+const unwrapCatalogName = (row: Record<string, unknown>): string => {
+  const nameField = row.name as { name?: string } | undefined;
+  return nameField?.name ?? "";
 };
 
 export const EstimateScopeTab = ({ manifest }: EstimateScopeTabProps) => {
@@ -49,6 +56,17 @@ export const EstimateScopeTab = ({ manifest }: EstimateScopeTabProps) => {
 
   const [selection, setSelection] = useState<SelectionState>({});
 
+  const { data: complexityFactors, isLoading: complexityLoading } =
+    useSurfaceList("complexity_factor_table");
+  const complexityOptions = useMemo(
+    () =>
+      (complexityFactors?.data.rows ?? []).map((row) => ({
+        value: String(row.id),
+        label: unwrapCatalogName(row as Record<string, unknown>),
+      })),
+    [complexityFactors?.data.rows],
+  );
+
   const writable = fieldAllows(manifest, "scopes", "write");
   const treeNodes = useMemo(() => buildEstimateScopeTree(siteTree), [siteTree]);
   const antdTreeData = useMemo(() => toAntdScopeTreeData(treeNodes), [treeNodes]);
@@ -56,7 +74,7 @@ export const EstimateScopeTab = ({ manifest }: EstimateScopeTabProps) => {
   const ensureScopeChecked = useCallback(
     (
       siteScopeId: string,
-      rootCategoryId: string,
+      rootItemId: string,
       rootCategoryName: string | null,
       siteScopeName: string | null,
     ): EstimateScopeFormRow[] => {
@@ -68,12 +86,12 @@ export const EstimateScopeTab = ({ manifest }: EstimateScopeTabProps) => {
 
       const nextScope = makeScopeRow(
         siteScopeId,
-        rootCategoryId,
+        rootItemId,
         rootCategoryName,
         siteScopeName,
         current.length + 1,
-        rootCategoryId && siteTree?.spec_templates?.[rootCategoryId]
-          ? siteTree.spec_templates[rootCategoryId].map((spec) => ({ ...spec }))
+        rootItemId && siteTree?.spec_templates?.[rootItemId]
+          ? siteTree.spec_templates[rootItemId].map((spec) => ({ ...spec }))
           : [],
       );
 
@@ -84,7 +102,7 @@ export const EstimateScopeTab = ({ manifest }: EstimateScopeTabProps) => {
 
   const toggleScope = useCallback(
     (siteScopeId: string, checked: boolean, meta: {
-      rootCategoryId: string;
+      rootItemId: string;
       rootCategoryName: string | null;
       siteScopeName: string | null;
     }) => {
@@ -105,7 +123,7 @@ export const EstimateScopeTab = ({ manifest }: EstimateScopeTabProps) => {
 
       const next = ensureScopeChecked(
         siteScopeId,
-        meta.rootCategoryId,
+        meta.rootItemId,
         meta.rootCategoryName,
         meta.siteScopeName,
       );
@@ -120,7 +138,7 @@ export const EstimateScopeTab = ({ manifest }: EstimateScopeTabProps) => {
       zoneId: string,
       checked: boolean,
       meta: {
-        rootCategoryId: string;
+        rootItemId: string;
         rootCategoryName: string | null;
         siteScopeName: string | null;
       },
@@ -157,7 +175,7 @@ export const EstimateScopeTab = ({ manifest }: EstimateScopeTabProps) => {
 
       current = ensureScopeChecked(
         siteScopeId,
-        meta.rootCategoryId,
+        meta.rootItemId,
         meta.rootCategoryName,
         meta.siteScopeName,
       );
@@ -184,8 +202,8 @@ export const EstimateScopeTab = ({ manifest }: EstimateScopeTabProps) => {
           {
             ...makeZoneMembership(zoneId, scope.zones.length + 1),
             specs:
-              meta.rootCategoryId && siteTree?.spec_templates?.[meta.rootCategoryId]
-                ? siteTree.spec_templates[meta.rootCategoryId].map((spec) => ({ ...spec }))
+              meta.rootItemId && siteTree?.spec_templates?.[meta.rootItemId]
+                ? siteTree.spec_templates[meta.rootItemId].map((spec) => ({ ...spec }))
                 : [],
           },
         ],
@@ -221,8 +239,8 @@ export const EstimateScopeTab = ({ manifest }: EstimateScopeTabProps) => {
           checked && scopeReferencedByLines(scopes, lineItems, siteScopeId);
 
         const siteScopeMeta = {
-          rootCategoryId:
-            siteTree?.scopes.find((scope) => scope.id === siteScopeId)?.root_category_id ??
+          rootItemId:
+            siteTree?.scopes.find((scope) => scope.id === siteScopeId)?.root_item_id ??
             "",
           rootCategoryName: null as string | null,
           siteScopeName: label,
@@ -260,8 +278,8 @@ export const EstimateScopeTab = ({ manifest }: EstimateScopeTabProps) => {
         const zoneBlocked = checked && zoneReferencedByLines(lineItems, node.zoneId);
 
         const siteScopeMeta = {
-          rootCategoryId:
-            siteTree?.scopes.find((scope) => scope.id === siteScopeId)?.root_category_id ??
+          rootItemId:
+            siteTree?.scopes.find((scope) => scope.id === siteScopeId)?.root_item_id ??
             "",
           rootCategoryName: null as string | null,
           siteScopeName:
@@ -340,6 +358,14 @@ export const EstimateScopeTab = ({ manifest }: EstimateScopeTabProps) => {
           <Typography.Text strong style={{ display: "block", marginBottom: 8 }}>
             Scope specs
           </Typography.Text>
+          <LinkedSelectInput<EstimateLineEditorFormValues>
+            field="scopes"
+            name={`scopes.${selectedScopeIndex}.complexity_factor_id`}
+            label="Complexity factor"
+            options={complexityOptions}
+            loading={complexityLoading}
+            selectProps={{ allowClear: true, disabled: disabled || !writable }}
+          />
           <EstimateScopeSpecFields
             scopeIndex={selectedScopeIndex}
             writable={writable}
@@ -355,6 +381,14 @@ export const EstimateScopeTab = ({ manifest }: EstimateScopeTabProps) => {
           <Typography.Text strong style={{ display: "block", marginBottom: 8 }}>
             Zone specs
           </Typography.Text>
+          <LinkedSelectInput<EstimateLineEditorFormValues>
+            field="scopes"
+            name={`scopes.${selectedScopeIndex}.zones.${selection.zoneIndex}.complexity_factor_id`}
+            label="Complexity factor"
+            options={complexityOptions}
+            loading={complexityLoading}
+            selectProps={{ allowClear: true, disabled: disabled || !writable }}
+          />
           <EstimateScopeSpecFields
             scopeIndex={selectedScopeIndex}
             zoneIndex={selection.zoneIndex}

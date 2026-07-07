@@ -12,8 +12,8 @@ type SiteScopeBaseRow = {
   name: string;
   sort_order: number;
   status: string;
-  root_category_id: string;
-  root_category_name: string;
+  root_item_id: string;
+  root_item_name: string;
 };
 
 type SiteZoneFlatRow = {
@@ -93,13 +93,13 @@ export const loadSiteScopes = async (
     pool.query<SiteScopeBaseRow>(
       `SELECT
          ss.id,
-         ss.root_category_id,
-         c.name AS root_category_name,
+         ss.root_item_id,
+         c.name AS root_item_name,
          ss.name,
          ss.sort_order,
          ss.status
        FROM site_scope ss
-       INNER JOIN category c ON c.id = ss.root_category_id
+       INNER JOIN item c ON c.id = ss.root_item_id
        WHERE ss.site_id = $1
        ORDER BY ss.sort_order ASC, ss.id ASC`,
       [siteId],
@@ -135,8 +135,8 @@ export const loadSiteScopes = async (
 
   const scopes: SiteScopeRow[] = scopesResult.rows.map((scope) => ({
     id: scope.id,
-    root_category_id: scope.root_category_id,
-    root_category_name: scope.root_category_name,
+    root_item_id: scope.root_item_id,
+    root_item_name: scope.root_item_name,
     name: scope.name,
     sort_order: scope.sort_order,
     status: scope.status,
@@ -156,7 +156,7 @@ export const toZonePatchRow = (row: SiteZoneRow): SiteZonePatchRow => ({
 
 export const toScopePatchRow = (row: SiteScopeRow): SiteScopePatchRow => ({
   id: row.id,
-  root_category_id: row.root_category_id,
+  root_item_id: row.root_item_id,
   name: row.name,
   sort_order: row.sort_order,
   zones: row.zones.map(toZonePatchRow),

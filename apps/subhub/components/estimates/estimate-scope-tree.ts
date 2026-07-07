@@ -132,7 +132,7 @@ export const zoneReferencedByLines = (
 
 export const makeScopeRow = (
   siteScopeId: string,
-  rootCategoryId: string,
+  rootItemId: string,
   rootCategoryName: string | null,
   siteScopeName: string | null,
   sortOrder: number,
@@ -140,12 +140,11 @@ export const makeScopeRow = (
 ): EstimateScopeFormRow => ({
   id: crypto.randomUUID(),
   site_scope_id: siteScopeId,
-  root_category_id: rootCategoryId,
-  root_category_name: rootCategoryName,
+  root_item_id: rootItemId,
+  root_item_name: rootCategoryName,
   site_scope_name: siteScopeName,
   sort_order: sortOrder,
-  labor_context_type_id: null,
-  markup_type_id: null,
+  complexity_factor_id: null,
   specs,
   zones: [],
 });
@@ -153,5 +152,6 @@ export const makeScopeRow = (
 export const makeZoneMembership = (siteZoneId: string, sortOrder: number) => ({
   site_zone_id: siteZoneId,
   sort_order: sortOrder,
+  complexity_factor_id: null,
   specs: [],
 });

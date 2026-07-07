@@ -38,7 +38,7 @@ export const createEstimateDetailStore = (
       estimate_date: row.estimate_date,
       valid_until: row.valid_until,
       source_estimate_id: row.source_estimate_id,
-      category_id: row.category_id,
+      item_id: row.item_id,
     };
     await updateEstimate(pool, actorId, writeRow, existing);
   },

@@ -51,14 +51,14 @@ const validateLineItems = async (
       });
     }
 
-    if (row.line_kind === "labor" && row.phase_id) {
+    if (row.phase_id) {
       if (await tableExists(client, "phase")) {
         const phaseResult = await client.query<{ id: string }>(
           `SELECT id FROM phase WHERE id = $1`,
           [row.phase_id],
         );
         if (phaseResult.rows.length === 0) {
-          throw new ValidationError("Unknown phase_id on labor line", {
+          throw new ValidationError("Unknown phase_id on line", {
             field: "line_items",
             code: "unknown_phase",
             id: row.id,
@@ -84,11 +84,24 @@ const validateLineItems = async (
       });
     }
 
-    if (row.line_kind === "product" && !row.item_id) {
-      throw new ValidationError("item_id is required on product lines", {
+    if (!row.item_id) {
+      throw new ValidationError("item_id is required on lines", {
         field: "line_items",
         code: "missing_item",
         id: row.id,
+      });
+    }
+
+    const { rows: nodeRows } = await client.query<{ node_type: string }>(
+      `SELECT node_type FROM item WHERE id = $1`,
+      [row.item_id],
+    );
+    if (nodeRows[0]?.node_type !== "item") {
+      throw new ValidationError("item_id must reference a quotable item (leaf)", {
+        field: "line_items",
+        code: "item_not_selectable",
+        id: row.id,
+        item_id: row.item_id,
       });
     }
 
@@ -155,7 +168,7 @@ export const replaceEstimateLineItemsTx = async (
     client,
     normalized.map((row) => ({
       ...row,
-      part_locked: row.part_locked ?? false,
+      lock: row.lock ?? "none",
     })),
     priorIds,
   );
@@ -177,7 +190,6 @@ export const replaceEstimateLineItemsTx = async (
          parent_line_id,
          line_number,
          line_role,
-         line_kind,
          description,
          quantity,
          unit,
@@ -185,17 +197,17 @@ export const replaceEstimateLineItemsTx = async (
          unit_price,
          unit_material,
          unit_labor,
+         unit_freight,
          unit_incidental,
          unit_price_target,
-         material_status,
+         lock,
          phase_id,
          item_id,
          part_id,
-         part_locked,
          vendor_part_id,
          sort_order
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)`,
       [
         row.id,
         estimateId,
@@ -204,7 +216,6 @@ export const replaceEstimateLineItemsTx = async (
         row.parent_line_id ?? null,
         lineNumber,
         row.line_role,
-        row.line_kind,
         row.description,
         row.quantity,
         row.unit,
@@ -212,13 +223,13 @@ export const replaceEstimateLineItemsTx = async (
         row.unit_price,
         row.unit_material,
         row.unit_labor,
+        row.unit_freight,
         row.unit_incidental,
         row.unit_price_target,
-        row.material_status ?? null,
+        row.lock ?? "none",
         row.phase_id ?? null,
         row.item_id ?? null,
         row.part_id ?? null,
-        row.part_locked ?? false,
         row.vendor_part_id ?? null,
         sortOrder,
       ],

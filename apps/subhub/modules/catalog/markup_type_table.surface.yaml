@@ -1,0 +1,36 @@
+# Org markup type catalog (editable table page)
+id: markup_type_table
+displayName: Markup types
+anchorTable: markup_type
+
+fieldActions:
+  - read
+  - write
+
+surfaceActions:
+  - read
+  - write
+  - delete
+
+tables:
+  - markup_type
+
+fields:
+  - id: name
+    columns:
+      - column: markup_type.id
+        type: string
+      - column: markup_type.name
+        type: string
+  - id: material_markup_percent
+    columns:
+      - column: markup_type.material_markup_percent
+        type: number
+  - id: labor_markup_percent
+    columns:
+      - column: markup_type.labor_markup_percent
+        type: number
+  - id: sort_order
+    columns:
+      - column: markup_type.sort_order
+        type: number

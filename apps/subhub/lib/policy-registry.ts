@@ -20,8 +20,14 @@ import { jobDetailSurfacePolicyDef } from "../modules/job/generated/job_detail.s
 import { jobListSurfacePolicyDef } from "../modules/job/generated/job_list.schema.generated";
 import { partDetailSurfacePolicyDef } from "../modules/part/generated/part_detail.schema.generated";
 import { partListSurfacePolicyDef } from "../modules/part/generated/part_list.schema.generated";
-import { categoryDetailSurfacePolicyDef } from "../modules/catalog/generated/category_detail.schema.generated";
-import { categoryListSurfacePolicyDef } from "../modules/catalog/generated/category_list.schema.generated";
+import { itemDetailSurfacePolicyDef } from "../modules/catalog/generated/item_detail.schema.generated";
+import { itemListSurfacePolicyDef } from "../modules/catalog/generated/item_list.schema.generated";
+import { complexityFactorTableSurfacePolicyDef } from "../modules/catalog/generated/complexity_factor_table.schema.generated";
+import { freightRateTypeTableSurfacePolicyDef } from "../modules/catalog/generated/freight_rate_type_table.schema.generated";
+import { incidentalRateTypeTableSurfacePolicyDef } from "../modules/catalog/generated/incidental_rate_type_table.schema.generated";
+import { laborPhaseTableSurfacePolicyDef } from "../modules/catalog/generated/labor_phase_table.schema.generated";
+import { laborRateTypeTableSurfacePolicyDef } from "../modules/catalog/generated/labor_rate_type_table.schema.generated";
+import { markupTypeTableSurfacePolicyDef } from "../modules/catalog/generated/markup_type_table.schema.generated";
 import { siteContactRelationTableSurfacePolicyDef } from "../modules/site/generated/site_contact_relation_table.schema.generated";
 import { siteDetailSurfacePolicyDef } from "../modules/site/generated/site_detail.schema.generated";
 import { siteListSurfacePolicyDef } from "../modules/site/generated/site_list.schema.generated";
@@ -50,6 +56,12 @@ export const subhubRegistry = definePolicyRegistry(
   jobDetailSurfacePolicyDef,
   partListSurfacePolicyDef,
   partDetailSurfacePolicyDef,
-  categoryListSurfacePolicyDef,
-  categoryDetailSurfacePolicyDef,
+  itemListSurfacePolicyDef,
+  itemDetailSurfacePolicyDef,
+  laborRateTypeTableSurfacePolicyDef,
+  freightRateTypeTableSurfacePolicyDef,
+  incidentalRateTypeTableSurfacePolicyDef,
+  markupTypeTableSurfacePolicyDef,
+  complexityFactorTableSurfacePolicyDef,
+  laborPhaseTableSurfacePolicyDef,
 );

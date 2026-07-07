@@ -15,6 +15,11 @@ surfaceActions:
 tables:
   - manufacturer_part
   - vendor_part
+  - part_item
+  - manufacturer_part_spec
+  - spec_def
+  - spec_option
+  - item
   - party
 
 fields:
@@ -37,4 +42,10 @@ fields:
         type: number
   - id: vendor_pricing
     # logical — DAL maps to vendor_part; see docs/child-collections.md
+    columns: []
+  - id: item_links
+    # logical — DAL maps to part_item; see docs/child-collections.md
+    columns: []
+  - id: part_specs
+    # logical — DAL maps to manufacturer_part_spec; see docs/child-collections.md
     columns: []

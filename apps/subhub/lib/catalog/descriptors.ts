@@ -1,2 +1,2 @@
-export * from "./descriptors/category-detail";
-export * from "./descriptors/category-list";
+export * from "./descriptors/item-detail";
+export * from "./descriptors/item-list";

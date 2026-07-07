@@ -6,9 +6,336 @@
 
 ---
 
+### Decision: part spec lifecycle (2026-07-06)
+
+**Status:** **Locked** (2026-07-06). **Task:** [37k](../tasks/37k-part-spec-lifecycle.md). **Amends:** [`part.md`](../surface-specs/part.md) § K; [`item.md`](../surface-specs/item.md) `spec_definitions` writes.
+
+**Choice:**
+
+| # | Topic | Choice |
+|---|--------|--------|
+| **K1** | Prune trigger | On **`item_links` replace** — delete `manufacturer_part_spec` rows whose `spec_def_id` ∉ contextual union for current links |
+| **K1b** | Participation-only shrink | **Defer v1** — prune on link replace only |
+| **K2** | `spec_option` delete policy | **Protect referenced options** — diff-based upsert; block removal when `manufacturer_part_spec` references the option (`spec_option_in_use`) |
+| **K3** | FK documentation | Shipped DDL (`028`) uses **`ON DELETE CASCADE`** on `manufacturer_part_spec.spec_option_id`; DBML aligned; runtime policy is DAL guard, not silent CASCADE reliance |
+| **K4** | Prune without part save | Server **always prunes** on `item_links` replace — clients cannot leave orphans via links-only PATCH |
+| **K5** | Part UI | **Inform, don't block** — helper/banner when links dirty or saved rows outside union |
+| **K6** | Item UI | Surface `spec_option_in_use` with actionable message |
+| **K7** | Empty enum on part save | **Unchanged** — `expandPartSpecsForPatch` omits blank rows (37j J7) |
+
+**Rationale:** 37j shipped replace-array authoring but left orphan `manufacturer_part_spec` rows when links shrank without a `part_specs` PATCH, and item enum saves could CASCADE-delete referenced options. Prune + option diff close hygiene gaps without resolver changes.
+
+---
+
+### Decision: catalog part authoring UI (2026-07-06)
+
+**Status:** **Locked** (2026-07-06). **Task:** [37j](../tasks/37j-catalog-part-authoring.md). **Amends:** [`part.md`](../surface-specs/part.md) deferred `specs`; item assignment omitted on `item_detail` v1.
+
+**Choice:**
+
+| # | Topic | Choice |
+|---|--------|--------|
+| **J1** | Link table | **`part_item`** only — not `item_part_link` (assemblies v2 / D7) |
+| **J2** | Authoring Surface | **`part_detail` only** — Field `item_links`; no writable part pool on `item_detail` v1 |
+| **J3** | Linkable nodes | **Any** item tree node (root, branch, leaf) |
+| **J4** | `item_links` UX | Replace-array + item tree picker |
+| **J5** | Part specs | **`part_specs`** on `part_detail` (same form) |
+| **J6** | Visible spec defs | **Contextual union** — defs effective on scope roots of linked items |
+| **J7** | Enum on part | **One row per `spec_option_id`** per [matching rules](#decision-spec_def-value-types-and-part-matching-rules-2026-07-02) |
+| **J8** | `number` type | **Deferred** — 37j ships enum / boolean / text; migration `044` + UI follow-up |
+
+**Rationale:** Estimators consume `part_item` + `manufacturer_part_spec` via the existing resolver (37f/37i). Admins maintain both from the part form — assign MPN → items, set compatibility rows — without editing pools on `/items`. Fire-alarm path is enum-heavy; number specs can land when HVAC-style catalog needs them.
+
+---
+
+### Decision: unified item tree — merge `category` + `item`, node-anchored estimate lines (2026-07-05)
+
+**Status:** **Locked** (2026-07-05). Review decisions **D1–D10** locked 2026-07-05 (§ [Locked decisions](#locked-decisions-review-2026-07-05)). **Next:** implement [37i migration plan](../migrations/040a-unified-item-tree-plan.md) ([task](../tasks/37i-unified-item-tree-apply.md)), then **040b**.
+
+**Amended (2026-07-06 — task 37l, leaf-quotable):** Estimate lines anchor to **quotable leaves only** (`item.node_type = 'item'`), not to branches.
+- **D1 (amend):** `estimate_line.item_id` FK constrained to `node_type = 'item'`. A stored `item.node_type` (`scope` | `category` | `item`) replaces the "any depth" rule. Not a revival of `item.kind` (D2) — this is structural role, not material shape.
+- **D4 (amend):** `resolveRate` drops the **descendant-max** step → `self → ancestry walk-up → neutral`. Because selection is leaf-only, cost (material/labor on the leaf) resolves via `self`, and margin policy (markup/freight/incidental authored high) resolves via ancestry. The mixed-UOM branch-material guard (Q2.2) is retired — no branch material fan-out remains.
+- **D8c (reverse):** Item picker offers **quotable leaves only**; scopes + categories render expandable but **non-selectable**.
+- **ROM:** rough quoting uses explicit quotable **allowance items** authored under a category (own `fallback_unit_cost` / labor group), not `descendantMax`. Keeps ROM deterministic, auditable, and node+PN reportable (D10).
+- **Labor:** resolves as an **atomic group** — the leaf's `item_labor_phase` set, else the first ancestor's whole set. No per-phase merge/override across levels (v2 if needed).
+
+**On lock, supersedes / amends:**
+
+- Planning [11-categories-scope-model.md](../planning/11-categories-scope-model.md) **C3** (items/parts M:N on a *separate* category tree), **C7** (item picker = leaf items only), **C8/C11** (line `item_id`).
+- Task [37g](../tasks/37g-commercial-costing.md) **I1–I5** (single `item.category_id`, drop `item_category`) — **re-scoped**: instead of tightening the `item → category` FK, `item` and `category` become **one table**.
+- [commercial costing (2026-07-04)](#decision-commercial-costing--org-tables-category-defaults-estimate-overrides-2026-07-04) — commercial FKs + labor phases anchor on the **node**, not on a separate `item.category_id`.
+- Planning **C23** + commercial costing **complexity** — **reversed:** `complexity_factor` is **no longer an item/category property**; it moves to an **estimate `scope` / `zone` choice** (see [Complexity](#complexity--estimatesite-choice-not-item-q3-correction)).
+- Retires `item.kind` (`product | labor | assembly | expense`).
+
+---
+
+#### Locked decisions (review 2026-07-05)
+
+| # | Topic | Status | Choice |
+|---|--------|--------|--------|
+| **D1** | Structural merge — one `item` tree | **Locked** · [amended 37l](#decision-unified-item-tree--merge-category--item-node-anchored-estimate-lines-2026-07-05) | Merge `category` + `item` into one self-referential table renamed **`item`**; estimate lines anchor to **quotable leaves** (`item.node_type = 'item'`) via `estimate_line.item_id`; stored `node_type` (`scope` \| `category` \| `item`); drop `item_category`, `item.kind`, `line_kind`. Scope roots excluded from line picker. |
+| **D2** | Drop `item.kind` — emergent composition | **Locked** | Remove `item.kind` and `estimate_line.line_kind`. Material + labor derived from what's attached (part pool + specs, `fallback_unit_cost`, `item_labor_phase`) — not a stored enum. Three shapes: discrete device, bulk/consumable, none (labor-only). |
+| **D3** | Specs narrow parts (separate from rates) | **Locked** | Spec defs inherit **down** (additive + branch-exclude). Spec **values** tier on estimate: scope → zone → line (line > zone > scope). Specs filter `part_item` pool only — never drive labor, markup, or freight. `estimate_line_spec` UI deferred v1. |
+| **D4** | Unified `resolveRate` | **Locked** · [amended 37l](#decision-unified-item-tree--merge-category--item-node-anchored-estimate-lines-2026-07-05) | One algorithm for labor, markup, freight, incidental: **`self → ancestry walk-up → neutral`** (descendant-max dropped — leaf-only selection). Complexity + specs excluded. ROM uses explicit quotable allowance leaves with `fallback_unit_cost`. |
+| **D5** | Complexity on estimate scope/zone | **Locked** | `complexity_factor_id` on `estimate_scope` and/or `estimate_zone` only — **not** on item tree. Zone > scope > 100% default. Applies to `unit_labor` only. Estimator/PM may set. Reverses planning C23. |
+| **D6a** | Estimate `status` — lifecycle freeze | **Locked** | **`sent`** = customer issued → **full structural freeze** (lines, scopes, scope/zone specs, complexity); **no recalc** (snapshots are the record). **`draft`** = fluid recalc per line-lock rules (D6b). **`won`** = immutable (existing); extends freeze to job handoff. Amends [estimate lifecycle](./estimate.md). |
+| **D6b** | Line `lock` enum (draft only) | **Locked** | `estimate_line.lock`: **`none` \| `sell` \| `line`** (hierarchy: `line` supersedes `sell`). `none` = full fluid recalc incl. sell; `sell` = freeze `unit_price` only; `line` = skip recalc entirely. Manual sell edit → `sell`; lock line → `line`; sync to target → `none`. Drops `part_locked` / `sell_locked`. |
+| **D6c** | Qty on `lock = line` | **Locked** | **Allow** `quantity` edits — operational, not policy. Unit snapshots stay frozen; ext sell = `qty × unit_price`. Changing item/scope/specs on locked line → block or force unlock (Q4). |
+| **D6d** | PN pick + structural edits | **Locked** | **Q4a:** PN pick alone does **not** lock — `part_id` may change on recalc while `lock = none` (fluid). User sets `lock = line` to freeze PN. **Q4b:** **`lock = line`** → **block** item / scope / zone changes in UI + DAL (no force-unlock prompt v1). |
+| **D6e** | `material_status` | **Locked — drop** | Remove column. UI derives part-resolution hint from `part_id` presence + filtered match count + `lock` — not persisted. |
+| **D6f** | `estimate_scope_id` | **Locked — keep** | **NOT NULL** — every line under a checked `estimate_scope`; drives item picker root + scope spec bucket. Block change when `lock = line` (D6d). |
+| **D6g** | `site_zone_id` | **Locked — keep** | **Nullable** — zone placement within scope; merges zone specs + zone complexity (D5) when set. Block change when `lock = line` (D6d). |
+| **D6h** | `unit` | **Locked — keep** | Snapshot on line (quote UOM). **Default from `manufacturer_part.unit`** when `part_id` set; else from item node or estimator (`ea`/`lf`/…). Canonical UOM remains on part catalog only. Editable when no part; allow edit when `lock = line` (like qty). |
+| **D6i** | `unit_material` | **Locked — keep** | Per-unit material cost snapshot; recalc from part/vendor, filtered max, or `fallback_unit_cost`. Part of M/L/freight/incidental breakdown. Frozen when `lock = line` or `sent`. |
+| **D7** | Assemblies | **Locked — defer v2** | **No assembly/kit work in v1** unified-tree pass. **Principle locked now:** tree parent → child = classification only; assemblies (*composed of*) **must not** be tree children (reject Option C). v2 delivers estimate kit lines (Option A) + catalog BOM expand (Option B) together — design D7a–c then. Existing `line_role` / `parent_line_id` columns may remain in DDL; v1 UI/DAL scope = **standalone lines only**. |
+| **D8** | Migration split — 040a / 040b | **Locked** · **D8c** [reversed 37l](#decision-unified-item-tree--merge-category--item-node-anchored-estimate-lines-2026-07-05) | **040a** = structural merge/rename only (prereq **039**); **040b** = commercial engine — **blocked until 040a green**. **D8a:** `item_category` → single `parent_id` in 040a; **deepest** linked category wins; **fail** if zero links. **D8b:** `lock` enum + drop `part_locked` / `sell_locked` / `material_status` in **040b**. **D8c:** **leaf-only** estimate item picker (**044** / 37l). |
+| **D9** | Presets / favorites | **Locked — defer v2** | No saved quote presets or catalog favorites in v1. Ships with catalog assemblies + `item_component` BOM (D7). |
+| **D10** | Reporting identity | **Locked** | v1 report/group dimensions = **(a)** item tree **node** (`estimate_line.item_id`) and **(b)** **`manufacturer_part` / PN** when pinned. No curated mid-level house-standard SKU dimension until D9 v2. |
+
+#### Problem
+
+Two blurred concepts and a dead layer:
+
+1. **`category`** (self-referential tree) already owns everything load-bearing: scope roots (`parent_id IS NULL`), spec ownership (`spec_def.category_id`), the part pool (`part_category`), and (37g) commercial policy.
+2. **`item`** contributes almost nothing on a product line — the material resolver keys off the item's **category** part pool + specs, not the item itself (see `estimate-part-resolver.ts` `filterPartsForItem`). Two items in one category with the same specs resolve to the **same** parts.
+3. Estimators want to quote at **any depth** (ROM at a branch → specific part at a leaf), and many nodes (Test & Inspect, commissioning) have **no material at all** — so a fixed `product | labor | expense` **`kind`** enum is a poor fit across trades.
+
+Multi-trade check (fire alarm, sprinkler, plumbing, HVAC/R, electrical) confirms: material takes **three shapes** — discrete device (part pool + specs), bulk/measured/consumable (flat cost per UOM, e.g. refrigerant/wire/pipe), or none (labor-only) — and labor is always **phase-based**, sometimes the whole line.
+
+#### Choice
+
+**Merge `category` and `item` into one self-referential tree.** Fold the useful `item` columns into `category`, then **rename the table to `item`**. An estimate line **anchors to a node at any depth** (`estimate_line.item_id`) plus an optional pinned `part_id`.
+
+##### Naming (question 1)
+
+**Recommended term: `item`.** Rationale:
+
+- The estimate deliverable is a **line item**; every quotable node is an item.
+- **Scope roots** (`parent_id IS NULL`) stay conceptual **scopes / trades** (Fire Alarm) and are **excluded from the line picker** (already true in `item-tree.ts` — the picker returns the root's *descendants*). So "item" never has to describe a root; it describes the quotable subtree, which reads naturally ("pick items from the Fire Alarm scope").
+- `csi_code`, `sort_order`, `parent_id`, spec ownership, part pool, commercial FKs all live on the node regardless of altitude.
+
+**Cost:** rename churn — `category` → `item`; `root_category_id` → `root_item_id` on `site_scope` / `estimate_scope`; `spec_def.category_id` → `spec_def.item_id`; `part_category` → `part_item` (or keep name, retarget FK); `category_spec_exclude` → `item_spec_exclude`. Large but mechanical, and this is Phase 0 (docs + dev DB only).
+
+**Alternative (lower churn, rejected):** keep the table named `category` and treat leaves as "items" in UI only. Rejected — it perpetuates the two-word mental model this decision is trying to kill.
+
+##### The cost families (questions 2 & 3)
+
+There are **four** cost families, resolved by **four different mechanisms** — do not conflate:
+
+| Family | Purpose | Inputs | Lookup / direction | Estimator control |
+|------|---------|--------|--------|-------------------|
+| **Specs → material** (Q2) | **Narrow to the correct `manufacturer_part`** | `spec_def` (owned by node) + spec **values** in the bucket (`estimate_scope_spec` → `zone` → `line`) | Defs inherit **down**; match bucket values against `manufacturer_part_spec`; filter the node's `part_item` pool | Estimator **sets spec values** (scope/zone/line) |
+| **Node cost (material + labor)** | Material $ **and** labor (rate type **+** hours together) | `part_item` price / `fallback_unit_cost`; `item_labor_phase` rows (`labor_rate_type_id` + `hours_per_unit`) | **Unified resolve** (below) — authored on leaves, so it resolves **down** | none |
+| **Margin policy** (Q3) | Freight, incidental, **markup** | `cost_add_on_type`, `markup_type` (org tables) bound to node via FK | **Unified resolve** (below) — authored high, so it resolves **up** | **None** — estimator can't repoint; only overrides `unit_price` |
+| **Complexity** (Q3 correction) | Labor difficulty multiplier | `complexity_factor` (org table) | **Estimate `scope` / `zone` choice** — *not* an item property (see [below](#complexity--estimatesite-choice-not-item-q3-correction)) | Estimator/PM **picks per scope or zone** |
+
+**So yes to Q3:** margin policy and complexity are **separate lookups from specs**. Specs + node cost decide *which part and what it costs to buy + install*. Markup / freight are node policy. **Complexity is neither** — it's a property of the **job**, chosen on the estimate scope/zone. None share a table with specs.
+
+##### Unified rate resolution — one algorithm for every cost rate (Q2 / Q2.1)
+
+**Do not hard-code where a rate lives.** All cost rates — **labor, markup, freight, incidental** — resolve through the **same** order from the picked node `N`:
+
+```text
+resolveRate(N, R):
+  1. self     — N defines R?                     → use it
+  2. descend  — N is a branch? max(descendants)  → worst-case (ROM)
+  3. ascend   — walk N → root, first non-null    → inherited policy
+  4. neutral  — nothing anywhere                 → 0 / skip
+```
+
+Answering Q2 (a)–(d):
+
+- **(a) self** wins first.
+- **(b) descendants next, not ancestry** — a branch pick is a ROM ("what could this become?"), so we look at what it *contains*. A **leaf has no descendants**, so it falls straight through to ancestry — the leaf case degrades to self → walk-up automatically.
+- **(c) descendants = most expensive (`max`).** Well-defined for **every** rate because they are **monotonic** — a higher labor $, material $, markup %, or freight % always raises the price. "Most expensive" = max raw value.
+- **(d) then ancestry walk-up**, then neutral (0 / skip).
+
+**Key property — order rarely matters.** Descendant-first and ancestor-first return the **same value** *unless* a rate is authored in **both** a descendant *and* an ancestor of the picked node. That collision only happens if the same rate is defined twice on one path.
+
+**Why this still yields "cost down, margin up" without assuming direction:** it follows from **where each rate is authored**, not from a hard-coded rule —
+
+- **Material / labor** are authored on **leaves** → step 2 (descend) catches them; ancestry has none.
+- **Markup / freight / incidental** are authored on **branch / root** → descendants have none, so step 3 (ascend) catches them.
+
+**Authoring guidance (removes all ambiguity):** author **cost quantities low** (material + labor on leaves) and **margin policy high** (markup/freight on branch or root). Then the two-level collision never arises and resolution is deterministic regardless of traversal order. This is guidance, not a schema constraint — the algorithm is safe either way.
+
+**Excluded from this algorithm:** **complexity** (estimate scope/zone choice, below) and **specs** (definitions inherit down with branch-exclude; values tier on the estimate — a different mechanism entirely).
+
+**Q2.1 answer — "child overrides ancestors":** the phrase applies to **spec *values*** on the estimate (line > zone > scope) and to **complexity** (zone > scope). For **tree rates** there is no "override" — there is one resolution order (self → descend-max → ascend). A deeper node doesn't *override* an ancestor; it simply supplies a value the ancestor may not have. Spec **definitions** likewise inherit additively down with branch-exclude — a child excludes or adds, never replaces.
+
+##### Material — three shapes (emergent, no `kind`)
+
+The node's cost composition is **derived from what's attached**, not from a stored enum:
+
+| Node has… | Material $ | Example |
+|-----------|-----------|---------|
+| Part pool + specs | resolved part / vendor price (0/1/many per [O1](../tasks/37f-estimate-line-costing.md#decision-o1--ambiguous-part-material-cost-2026-07-04)) | Smoke Detector → MPN |
+| Flat node unit cost (bulk/consumable) | node `fallback_unit_cost` per line UOM | Refrigerant (LB), wire (LF) |
+| Neither | **0** | Fire Alarm Test & Inspect |
+
+Labor comes from `item_labor_phase` rows on the node (rate type + hours together; leaf-defined, rolls down). `unit_material = 0` is a valid, common outcome. **`item.kind` is dropped.** (A lightweight presentation grouping may be re-derived for the PDF if needed — deferred.)
+
+##### Is the unified rule affordable for the DAL/DB? (Q2.2)
+
+**Yes, with one guard.** Catalog node counts are modest and the tree is shallow, so every step is cheap **except** descendant-max for material, which needs a proxy:
+
+| Step | Cost | Notes |
+|------|------|-------|
+| Ancestry walk-up | trivial | already implemented (`resolveRootCategoryId` walks `parent_id`); a handful of hops |
+| Descendant subtree | cheap | already implemented (`collectSubtreeIds` in `item-tree.ts`) |
+| Descendant-max for **labor / % rates** | one aggregate query | `Σ hours × rate` (or the %) per descendant, take `max` — single grouped query per rate |
+| Descendant-max for **material** | **guard required** | full spec-filtered part resolution per leaf would fan out (N part-filter passes). **Branch ROM material uses each descendant leaf's `fallback_unit_cost`** (one column, `max` in one query). Full per-part spec resolution runs **only when the estimator drills to a leaf.** |
+
+**Determinism + caching:** resolution is a pure function of catalog state, which changes rarely — resolved rates per node can be **memoized** and invalidated on catalog write. Net: standard shallow-tree walks over a small table plus one aggregate per rate; the only trap (material fan-out) is sidestepped by the `fallback_unit_cost` proxy for ROM.
+
+**Branch ROM outputs:** `material_status = generic`, no `part_id`; mixed-UOM descendants excluded from the material max (comparing $/ft to $/ea is meaningless). Refining the line to a leaf (or pinning a PN) replaces the ROM snapshot on recalc.
+
+##### Complexity — estimate/site choice, not item (Q3 correction)
+
+**Reverses** planning **C23** and the "complexity on category, walk-up, not overridable on estimate" clause of the [commercial costing decision](#decision-commercial-costing--org-tables-category-defaults-estimate-overrides-2026-07-04).
+
+**Rationale:** complexity (occupied building, high ceilings, difficult retrofit, hazardous area) is a property of **where the work happens**, not of the catalog item. A smoke detector is not inherently "complex"; installing it on a 30-ft ceiling in a live facility is. So complexity belongs to the **job geography**, chosen per estimate **scope** and/or **zone**.
+
+| Aspect | Choice |
+|--------|--------|
+| **Stored on** | `estimate_scope.complexity_factor_id` and/or `estimate_zone.complexity_factor_id` (FK → `complexity_factor`) |
+| **Resolution** | **zone value overrides scope value**; if neither set → **100%** (no effect) |
+| **Applies to** | `unit_labor` of every line in that scope/zone: `unit_labor = base_labor × (factor_percent / 100)` |
+| **Item tree** | Carries **no** `complexity_factor_id` |
+| **Estimator control** | **Yes** — this is a deliberate estimator/PM knob (unlike markup/rate types, which stay category policy) |
+
+This makes complexity the **second** estimator-controlled input (alongside spec values and the `unit_price` sell override); rate **types** and **markup** remain non-overridable category/root policy.
+
+##### Estimate `status` and recalc policy (D6a — locked 2026-07-05)
+
+**Amends** 37f O4 and [estimate scope required](./estimate.md#decision-estimate-scope-required--pricing-overrides-2026-07-04).
+
+| `estimate.status` | Edit policy | Recalc on save |
+|-------------------|-------------|----------------|
+| **`draft`** | Full edit — lines, scopes, scope/zone specs, complexity, profile | **Yes** — per [line locking (D6b)](#estimate-line-locking-d6b--draft-only) |
+| **`sent`** | **Frozen** — no PATCH to `line_items`, `scopes`, scope/zone specs, or complexity; profile/stakeholders per manifest (v1: **freeze all** quote inputs) | **No** — snapshots are the issued quote |
+| **`won`** | Immutable — lines + scopes blocked (shipped); same snapshot discipline as `sent` | **No** |
+| **`lost` / `expired`** | Read-only (v1: same freeze as `sent`) | **No** |
+
+**Q1 answers (locked):** **`sent` = structural freeze** (customer has quote). **Full freeze** on quote-driving fields — not profile-only exceptions in v1. **No recalc** once `sent` — values at send time are the record.
+
+Estimate-level freeze **supersedes** per-line lock — `lock` matters only while `status = draft`.
+
+##### Estimate line locking (D6b — locked 2026-07-05)
+
+**Replaces** `part_locked`, `sell_locked`, and 37f O4 implicit sell stickiness.
+
+**One column:** `estimate_line.lock` — `none` | `sell` | `line` (CHECK constraint). Hierarchy: **`none` < `sell` < `line`** (`line` is the superset).
+
+| `lock` | Recalc while `draft` | What stays frozen |
+|--------|----------------------|-------------------|
+| **`none`** | Full fluidity | nothing — costs, target, **and sell** all update from catalog/specs |
+| **`sell`** | Partial | **`unit_price` only** — costs + `unit_price_target` still recalc |
+| **`line`** | Skip line entirely | item, `part_id`, all cost snapshots, **and** `unit_price` |
+
+```text
+if estimate.status !== 'draft':
+  skip recalc for all lines
+
+else switch (line.lock):
+  line:  skip recalc — preserve all snapshots + item + part_id + unit_price
+  sell:  recalc costs + unit_price_target; keep unit_price
+  none:  recalc everything; unit_price = unit_price_target
+```
+
+**Transitions (draft only):**
+
+| Event | `lock` becomes |
+|-------|----------------|
+| User edits `unit_price` manually | **`sell`** (auto) |
+| User clicks **Lock line** | **`line`** |
+| User clicks **Sync sell to target** | **`none`** (if was `sell`; does not unlock `line`) |
+| User clicks **Unlock line** | **`none`** |
+
+**UI:** one control — e.g. lock icon cycling `none → sell → line` or a small dropdown; show `sell` state when sell was manually edited even before explicit lock.
+
+**Qty on `lock = line` (D6c — locked):** **`quantity` remains editable** — ext sell recalculates as `qty × unit_price`; unit snapshots (`unit_material`, `unit_labor`, …, `unit_price`) do not. Description edits allowed.
+
+**PN pick (D6d — Q4a):** Selecting a PN does **not** set `lock`. While `lock = none`, recalc may change or clear `part_id` when specs/item change. To freeze PN + costing, user sets **`lock = line`**.
+
+**Structural edits (D6d — Q4b):** When **`lock = line`**, changing **`item_id`**, **`estimate_scope_id`**, or **`site_zone_id`** is **blocked** (UI disabled + DAL rejects). User must unlock (`lock = none`) first.
+
+| Field | Role |
+|-------|------|
+| `lock` | `none` \| `sell` \| `line` — recalc policy while `draft` |
+| ~~`part_locked`~~ | **drop** |
+| ~~`sell_locked`~~ | **drop** — use `lock = sell` |
+
+##### Estimate line storage
+
+| Field | Role |
+|-------|------|
+| `item_id` | node anchor, **any depth**, NOT NULL |
+| `part_id` | optional PN pin |
+| `lock` | `none` \| `sell` \| `line` — recalc policy while `draft` (D6b); default `none` |
+| `estimate_scope_id` | **NOT NULL** — checked scope bucket (D6f); block change when `lock = line` |
+| `site_zone_id` | **Nullable** — zone bucket; zone specs + complexity when set (D6g); block change when `lock = line` |
+| ~~`material_status`~~ | **dropped** (D6e) — derive in UI from `part_id` + match count + `lock` |
+| `unit` | Quote UOM snapshot (D6h); default from `manufacturer_part.unit` when `part_id` set |
+| `quantity` | per-line qty; editable when `lock = line` (D6c) |
+| cost snapshots | `unit_material` (D6i) + `unit_labor` / `unit_freight` / `unit_incidental` / `unit_cost` / `unit_price_target` / `unit_price` — recalc unless `lock` / `sent` |
+| ~~`line_kind`~~ | **removed** |
+
+#### Assemblies (question 4) — **D7: defer v2**
+
+**Locked principle (now):** in the merged tree, a **parent → child** edge means *"is a more specific kind of"* (classification; pick **one**; branch rollup = max). An **assembly** is *"is composed of"* (a **sum** of distinct components). These are **different relationships** — assemblies **must not** be modeled as tree children (**Option C — rejected**).
+
+**Feature scope — deferred v2 (D7):** estimate kit lines, catalog BOM expand, and kit `lock`/recalc rules (D7a–c) are **out of v1**. The unified-tree migration (040a/040b) and line editor work target **standalone** `estimate_line` rows only. Existing `line_role` / `parent_line_id` may stay in DDL from prior spikes; do not extend or regression-test kit paths in v1.
+
+**v2 options (design when we pick up D7):**
+
+| Option | What | Schema |
+|--------|------|--------|
+| **A — estimate kit lines** | Estimator builds on quote: `kit_header` + `kit_component` (`parent_line_id`) | none (columns exist) |
+| **B — catalog assembly (node-BOM)** | Reusable BOM (`item_component`) expands into kit lines on add | new `item_component` |
+| **C — tree children as BOM** | Children = components | **Rejected** |
+
+**v2 recommendation (tentative):** ship **A + B** together; reserve `item_component` shape so catalog expand is additive to manual kits.
+
+#### Implementation impact (when locked)
+
+**D8 — two migrations** (split to reduce blast radius):
+
+- **040a — structural merge/rename** (D8a, D8c): fold legacy `item` columns into `category` → rename `category` → `item`; **`item_category` backfill** → each legacy item gets one `parent_id` (deepest linked category wins; fail if zero links); drop `item.kind`, `item_category`; retarget `site_scope.root_item_id`, `estimate_scope.root_item_id`, `spec_def.item_id`, `part_item`, `item_spec_exclude`; `estimate_line.item_id` = node FK at any depth (drop `line_kind`); **branch nodes selectable** in picker. **No costing changes.**
+- **040b — commercial engine** (D8b; was monolithic 040): rate tables, `category_labor_phase` → `item_labor_phase`, `cost_add_on_type`, `markup_type`, `resolveRate` recalc, `complexity_factor_id` on **`estimate_scope` / `estimate_zone`** (not item), **`estimate_line.lock`** enum (drops `part_locked` / `sell_locked` / `material_status`). Lands **only after 040a is green.**
+
+**040a stop gate:** app boots; catalog CRUD on unified tree; estimate lines save at branch or leaf; 37f material snapshot paths green (renamed FKs); `codegen:check` clean; no `item_category` / `category` table.
+
+**040b stop gate:** 37g verify — recalc, lock rules, complexity picker, admin rate surfaces.
+
+Other:
+
+- **37g** rate engine re-anchored on the node tree; **one `resolveRate(N, R)`** (self → descendant-max → ancestry → neutral) for labor/markup/freight/incidental; complexity read from estimate scope/zone; picks up 040b.
+- **Picker:** branch nodes selectable in **040a** (D8c); full `resolveRate` in **040b** (D4).
+- **Estimate scope/zone:** add `complexity_factor_id` picker UI + FK (reverses the O3 "no complexity picker on estimate" clause).
+- **`estimate_line_spec`** write/UI still needed for line-level spec override (deferred read-merge exists) — this is the tier that makes Q2.1 "line overrides zone/scope" real at the line.
+
+#### Red-line answers (2026-07-05)
+
+| # | Question | Answer |
+|---|----------|--------|
+| **1** | Unified term | **`item`.** Table renamed `category` → `item`; roots are scope anchors excluded from the picker. |
+| **2** | Rate resolution | **One unified algorithm for all cost rates** (labor, markup, freight, incidental): `self → descendant-max → ancestry walk-up → neutral` (Q2 a–d). No hard-coded direction — cost quantities authored on leaves resolve **down**, margin authored high resolves **up**; order only matters on a two-level collision (discouraged). **Complexity** excluded — an **estimate scope/zone** choice (Q3), zone > scope, else 100%. Spec **defs** inherit down (additive + exclude); spec **values** tier on estimate (line > zone > scope). |
+| **2.1** | Same pattern for all rates? | **Yes** — one `resolveRate(N, R)` parameterized per rate; "most expensive" = `max` raw value (monotonic). Complexity + specs excluded. |
+| **2.2** | Too complex for DAL/DB? | **No, with one guard** — ancestry walk + subtree already exist; labor/% descendant-max = one aggregate query; **material descendant-max uses `fallback_unit_cost` proxy** (not per-leaf part resolution). Deterministic + cacheable. |
+| **3** | Saved preset / favorite in v1 | **Defer to v2** (with catalog assemblies, Option B). |
+| **4** | Reporting identity | **Node + PN is sufficient for v1** — see below. |
+| **5** | Migration split | **Yes** — 040a structural rename/merge, then 040b commercial engine. |
+
+**Q4 detail — what "node + PN reporting" means, and what it gives up.** Today an `item` row is a durable mid-level **SKU identity** you could group reports by ("we quoted 4,200 of *Item: House-Standard Ceiling Smoke* this year"). After the merge, the durable identities become **(a) the item tree node** (e.g. node *Smoke Detector* — "quantity quoted/sold under this node") and **(b) the `manufacturer_part` / PN** ("units of MPN 12345 sold"). What you lose is the **curated identity in between** — a named house-standard package that is neither a raw PN nor a broad tree node. That curated identity is exactly the **preset/favorite** from Q3. So Q3 and Q4 are the same coin: **deferring presets (Q3) means accepting node + PN as the only v1 report dimensions (Q4)**, and the curated-SKU dimension arrives with presets/assemblies in v2. Confirmed acceptable for v1.
+
+**Planning:** [11-categories-scope-model.md](../planning/11-categories-scope-model.md) · **Migration:** [040a plan](../migrations/040a-unified-item-tree-plan.md) · **Task:** [37g](../tasks/37g-commercial-costing.md) (040b).
+
+---
+
 ### Decision: commercial costing — org tables, category defaults, estimate overrides (2026-07-04)
 
-**Status:** **Locked.** **Supersedes** [C14 in planning 11](../planning/11-categories-scope-model.md) (commercial types primary on scope bucket) and **`labor_context_type`** as a costing input. **Amends** [estimate scope (2026-06-30)](./estimate.md#decision-estimate-scope--category-roots-checkbox-site-tree-item-first-lines-2026-06-30) (no ROM General bucket). **Tasks:** [37f](../tasks/37f-estimate-line-costing.md) (part filter + material snapshot) · [37g](../tasks/37g-commercial-costing.md) (org surfaces + full engine).
+**Status:** **Locked.** **Amended (2026-07-05)** by [unified item tree](#decision-unified-item-tree--merge-category--item-node-anchored-estimate-lines-2026-07-05): commercial FKs + `item_labor_phase` anchor on **unified `item` node**; **`resolveRate(N, R)`** (D4) replaces category inherit-walk for labor/markup/freight/incidental; **`complexity_factor_id` on `estimate_scope` / `estimate_zone` only** (D5 — not on item tree; reverses planning C23 and Layer 2 `complexity_factor_id` on category); migration lands in **040b** after **040a** (D8). Line **`lock`** enum + recalc policy (D6b) supersedes 37f O4 sell stickiness. **Supersedes** [C14 in planning 11](../planning/11-categories-scope-model.md) (commercial types primary on scope bucket) and **`labor_context_type`** as a costing input. **Amends** [estimate scope (2026-06-30)](./estimate.md#decision-estimate-scope--category-roots-checkbox-site-tree-item-first-lines-2026-06-30) (no ROM General bucket). **Tasks:** [37f](../tasks/37f-estimate-line-costing.md) (part filter + material snapshot) · [37g](../tasks/37g-commercial-costing.md) (org surfaces + full engine; re-scoped to 040b).
 
 **Choice:**
 

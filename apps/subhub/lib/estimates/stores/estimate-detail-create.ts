@@ -48,7 +48,7 @@ export const createEstimateRowFromBody = (
   estimate_date: body.profile.estimate_date ?? null,
   valid_until: body.profile.valid_until ?? null,
   source_estimate_id: body.profile.source_estimate_id ?? null,
-  category_id: body.profile.category_id ?? null,
+  item_id: body.profile.item_id ?? null,
 });
 
 const hasLineItemsPatch = (body: unknown): boolean => {
@@ -114,7 +114,7 @@ export const extendEstimateDetailDal = (
       estimate_date: row.estimate_date,
       valid_until: row.valid_until,
       source_estimate_id: row.source_estimate_id,
-      category_id: row.category_id,
+      item_id: row.item_id,
     };
     const actorId = await getActorId();
     await insertEstimate(pool, actorId, writeRow, {

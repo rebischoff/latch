@@ -10,7 +10,7 @@ describe("resolveChildParentId", () => {
       resolveChildParentId({
         selectionId: "tree-selected",
         entityId: "stale-path-id",
-        config: MASTER_DETAIL_SURFACES.categories,
+        config: MASTER_DETAIL_SURFACES.items,
       }),
     ).toBe("tree-selected");
   });
@@ -20,7 +20,7 @@ describe("resolveChildParentId", () => {
       resolveChildParentId({
         selectionId: null,
         entityId: "deep-link-id",
-        config: MASTER_DETAIL_SURFACES.categories,
+        config: MASTER_DETAIL_SURFACES.items,
       }),
     ).toBe("deep-link-id");
   });
@@ -30,7 +30,7 @@ describe("resolveChildParentId", () => {
       resolveChildParentId({
         selectionId: null,
         entityId: null,
-        config: MASTER_DETAIL_SURFACES.categories,
+        config: MASTER_DETAIL_SURFACES.items,
       }),
     ).toBeNull();
   });

@@ -1,0 +1,28 @@
+# Org labor phase catalog (editable table page)
+id: labor_phase_table
+displayName: Labor phases
+anchorTable: labor_phase
+
+fieldActions:
+  - read
+  - write
+
+surfaceActions:
+  - read
+  - write
+  - delete
+
+tables:
+  - labor_phase
+
+fields:
+  - id: name
+    columns:
+      - column: labor_phase.id
+        type: string
+      - column: labor_phase.name
+        type: string
+  - id: sort_order
+    columns:
+      - column: labor_phase.sort_order
+        type: number

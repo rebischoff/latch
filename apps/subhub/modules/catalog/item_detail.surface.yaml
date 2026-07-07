@@ -1,0 +1,59 @@
+# Item profile + root spec definitions + nested spec participation
+id: item_detail
+displayName: Item detail
+anchorTable: item
+
+fieldActions:
+  - read
+  - write
+
+surfaceActions:
+  - read
+  - write
+  - delete
+
+tables:
+  - item
+  - spec_def
+  - spec_option
+  - item_spec_exclude
+
+fields:
+  - id: profile
+    columns:
+      - column: item.id
+        type: string
+      - column: item.name
+        type: string
+      - column: item.parent_id
+        type: string
+        nullable: true
+      - column: item.node_type
+        type: string
+      - column: item.sort_order
+        type: number
+      - column: item.csi_code
+        type: string
+        nullable: true
+  - id: commercial
+    columns:
+      - column: item.freight_rate_type_id
+        type: string
+        nullable: true
+      - column: item.incidental_rate_type_id
+        type: string
+        nullable: true
+      - column: item.markup_type_id
+        type: string
+        nullable: true
+      - column: item.fallback_unit_cost
+        type: number
+  - id: item_labor_phase
+    # logical — DAL maps item_labor_phase junction rows
+    columns: []
+  - id: spec_definitions
+    # logical — DAL maps spec_def + spec_option for scope roots
+    columns: []
+  - id: spec_participation
+    # logical — DAL maps item_spec_exclude joined to spec_def owners
+    columns: []

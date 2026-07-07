@@ -22,7 +22,7 @@ const isSurfaceDetailId = (surfaceId: SurfaceId): surfaceId is SurfaceDetailId =
   surfaceId === "estimate_detail" ||
   surfaceId === "job_detail" ||
   surfaceId === "part_detail" ||
-  surfaceId === "category_detail";
+  surfaceId === "item_detail";
 
 export const loadSurfaceDetailQuery = async (
   surfaceId: SurfaceDetailId,

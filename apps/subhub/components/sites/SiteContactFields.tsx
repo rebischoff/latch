@@ -1,12 +1,10 @@
 "use client";
 
-import { UserAddOutlined } from "@ant-design/icons";
 import { fieldAllows, type Manifest } from "@latch/contracts";
 import { FieldControl } from "@latch/react";
-import { App, Button, Input, Modal, Select, Space, Typography } from "antd";
+import { Select, Typography } from "antd";
 import Link from "next/link";
-import { useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import {
   Controller,
   useFieldArray,
@@ -20,10 +18,9 @@ import { FieldArrayTable } from "@/components/form/FieldArrayTable";
 import type { FieldArrayTableColumn } from "@/components/form/FieldArrayTable";
 import { FormSection } from "@/components/form/FormSection";
 import { findSelectLabel } from "@/components/form/optionHelpers";
-import { useSitePartyPicker, sitePartyPickerKey } from "@/lib/hooks/use-site-party-picker";
+import { useSitePartyPicker } from "@/lib/hooks/use-site-party-picker";
 import { useSurfaceList } from "@/lib/hooks/use-surface-list";
 import { routes } from "@/lib/nav-routes";
-import { createSiteContactPerson } from "@/lib/surface-api";
 
 export type SiteContactFormRow = {
   display_name: string;
@@ -200,124 +197,9 @@ const RelationCell = ({
   );
 };
 
-type QuickCreatePersonModalProps = {
-  open: boolean;
-  relationOptions: RelationOption[];
-  onClose: () => void;
-  onCreated: (row: {
-    party_id: string;
-    display_name: string;
-    relation_id: string;
-    kind: string;
-  }) => void;
-};
-
-const QuickCreatePersonModal = ({
-  open,
-  relationOptions,
-  onClose,
-  onCreated,
-}: QuickCreatePersonModalProps) => {
-  const { message } = App.useApp();
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [relationId, setRelationId] = useState<string | undefined>(
-    relationOptions[0]?.value,
-  );
-  const [submitting, setSubmitting] = useState(false);
-
-  const reset = () => {
-    setName("");
-    setPhone("");
-    setRelationId(relationOptions[0]?.value);
-  };
-
-  const handleClose = () => {
-    reset();
-    onClose();
-  };
-
-  const handleOk = async () => {
-    const displayName = name.trim();
-    if (!displayName) {
-      message.error("Name is required");
-      return;
-    }
-    if (!relationId) {
-      message.error("Relation is required");
-      return;
-    }
-
-    setSubmitting(true);
-    try {
-      const response = await createSiteContactPerson({
-        display_name: displayName,
-        ...(phone.trim() ? { phone: phone.trim() } : {}),
-      });
-      onCreated({
-        party_id: response.data.row.id,
-        display_name: response.data.row.display_name,
-        relation_id: relationId,
-        kind: response.data.row.kind,
-      });
-      message.success("Person created");
-      handleClose();
-    } catch {
-      message.error("Unable to create person");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <Modal
-      title="Quick-create person"
-      open={open}
-      onCancel={handleClose}
-      onOk={() => {
-        void handleOk();
-      }}
-      confirmLoading={submitting}
-      destroyOnHidden
-    >
-      <Space orientation="vertical" style={{ width: "100%" }} size="middle">
-        <div>
-          <Typography.Text type="secondary">Name</Typography.Text>
-          <Input
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            placeholder="Pat Superintendent"
-            autoFocus
-          />
-        </div>
-        <div>
-          <Typography.Text type="secondary">Phone (optional)</Typography.Text>
-          <Input
-            value={phone}
-            onChange={(event) => setPhone(event.target.value)}
-            placeholder="555-0100"
-          />
-        </div>
-        <div>
-          <Typography.Text type="secondary">Relation</Typography.Text>
-          <Select
-            style={{ width: "100%" }}
-            options={relationOptions}
-            value={relationId}
-            onChange={setRelationId}
-          />
-        </div>
-      </Space>
-    </Modal>
-  );
-};
-
 export const SiteContactFields = ({ manifest }: SiteContactFieldsProps) => {
-  const queryClient = useQueryClient();
   const { watch } = useFormContext<SiteContactsFormValues>();
-  const { append } = useFieldArray({ name: "contacts" });
   const contacts = watch("contacts") ?? [];
-  const [quickCreateOpen, setQuickCreateOpen] = useState(false);
 
   const { data: partyPicker, isLoading: partiesLoading } = useSitePartyPicker("any");
   const { data: relationList, isLoading: relationsLoading } = useSurfaceList(
@@ -342,19 +224,6 @@ export const SiteContactFields = ({ manifest }: SiteContactFieldsProps) => {
   >(
     () => [
       {
-        key: "party",
-        title: "Party",
-        render: ({ index, writable: rowWritable, disabled }) => (
-          <PartyCell
-            index={index}
-            writable={rowWritable}
-            disabled={disabled}
-            options={partyOptions}
-            loading={pickerLoading}
-          />
-        ),
-      },
-      {
         key: "relation",
         title: "Relation",
         render: ({ index, writable: rowWritable, disabled }) => (
@@ -367,31 +236,37 @@ export const SiteContactFields = ({ manifest }: SiteContactFieldsProps) => {
           />
         ),
       },
+      {
+        key: "party",
+        title: "Party",
+        render: ({ index, writable: rowWritable, disabled }) => (
+          <PartyCell
+            index={index}
+            writable={rowWritable}
+            disabled={disabled}
+            options={partyOptions}
+            loading={pickerLoading}
+          />
+        ),
+      },
     ],
     [partyOptions, pickerLoading, relationOptions],
   );
 
-  const appendContact = (row: Omit<SiteContactFormRow, "sort_order">) => {
-    append({
-      ...row,
-      sort_order: contacts.length + 1,
-    });
-  };
-
   const emptyState = catalogEmpty ? (
     <Typography.Paragraph type="secondary">
-      Add contact relations before standing contacts can be added.{" "}
-      <Link href={routes.contactRelations}>Manage contact relations</Link>
+      Add site relations before contacts can be added.{" "}
+      <Link href={routes.contactRelations}>Manage site relations</Link>
     </Typography.Paragraph>
   ) : contacts.length === 0 ? (
     <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
-      No standing contacts
+      No contacts
     </Typography.Paragraph>
   ) : null;
 
   return (
     <FieldControl manifest={manifest} field="contacts">
-      <FormSection title="Standing contacts">
+      <FormSection title="Contacts">
         {emptyState}
         <FieldArrayTable<SiteContactsFormValues, "contacts">
           field="contacts"
@@ -406,32 +281,6 @@ export const SiteContactFields = ({ manifest }: SiteContactFieldsProps) => {
           addLabel="Add contact"
           allowAdd={writable && !catalogEmpty}
           orderable={writable}
-        />
-        {writable && !catalogEmpty ? (
-          <div style={{ marginTop: 12 }}>
-            <Button
-              icon={<UserAddOutlined />}
-              onClick={() => setQuickCreateOpen(true)}
-            >
-              Quick-create person
-            </Button>
-          </div>
-        ) : null}
-        <QuickCreatePersonModal
-          open={quickCreateOpen}
-          relationOptions={relationOptions}
-          onClose={() => setQuickCreateOpen(false)}
-          onCreated={(row) => {
-            void queryClient.invalidateQueries({
-              queryKey: sitePartyPickerKey("any"),
-            });
-            appendContact({
-              party_id: row.party_id,
-              display_name: row.display_name,
-              relation_id: row.relation_id,
-              kind: row.kind,
-            });
-          }}
         />
       </FormSection>
     </FieldControl>

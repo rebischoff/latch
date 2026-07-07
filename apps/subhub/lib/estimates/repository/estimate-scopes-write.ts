@@ -2,7 +2,7 @@ import { ValidationError } from "@latch/contracts";
 import { withPermissionDb } from "@latch/pg-session";
 import type { Pool, PoolClient } from "pg";
 
-import { loadScopePanelDefIdSet } from "@/lib/catalog/repository/category-effective-specs";
+import { loadScopePanelDefIdSet } from "@/lib/catalog/repository/item-effective-specs";
 
 import type {
   EstimateLineItemPatchRow,
@@ -92,9 +92,9 @@ const assertSiteScopeBelongsToSite = async (
   client: PoolClient,
   siteId: string,
   siteScopeId: string,
-): Promise<{ root_category_id: string }> => {
-  const result = await client.query<{ root_category_id: string }>(
-    `SELECT root_category_id FROM site_scope WHERE id = $1 AND site_id = $2`,
+): Promise<{ root_item_id: string }> => {
+  const result = await client.query<{ root_item_id: string }>(
+    `SELECT root_item_id FROM site_scope WHERE id = $1 AND site_id = $2`,
     [siteScopeId, siteId],
   );
 
@@ -141,15 +141,15 @@ const assertZoneBelongsToScopeBucket = async (
 
 const assertSpecDefInScopePanel = async (
   client: PoolClient,
-  rootCategoryId: string,
+  rootItemId: string,
   specDefId: string,
 ): Promise<void> => {
-  const panelIds = await loadScopePanelDefIdSet(client as unknown as Pool, rootCategoryId);
+  const panelIds = await loadScopePanelDefIdSet(client as unknown as Pool, rootItemId);
   if (!panelIds.has(specDefId)) {
     throw new ValidationError("spec_def_id is not in scope panel defs for root category", {
       field: "scopes",
       code: "invalid_scope_panel_spec",
-      root_category_id: rootCategoryId,
+      root_item_id: rootItemId,
       spec_def_id: specDefId,
     });
   }
@@ -300,8 +300,11 @@ export const replaceEstimateScopesTx = async (
   const normalized = rows.map((row) => ({
     ...row,
     id: row.id ?? crypto.randomUUID(),
-    labor_context_type_id: row.labor_context_type_id ?? null,
-    markup_type_id: row.markup_type_id ?? null,
+    complexity_factor_id: row.complexity_factor_id ?? null,
+    zones: row.zones.map((zone) => ({
+      ...zone,
+      complexity_factor_id: zone.complexity_factor_id ?? null,
+    })),
   }));
 
   for (const row of normalized) {
@@ -313,8 +316,8 @@ export const replaceEstimateScopesTx = async (
       });
     }
 
-    if (!row.root_category_id) {
-      throw new ValidationError("Scoped row requires root_category_id", {
+    if (!row.root_item_id) {
+      throw new ValidationError("Scoped row requires root_item_id", {
         field: "scopes",
         code: "missing_root_category",
         id: row.id,
@@ -327,12 +330,12 @@ export const replaceEstimateScopesTx = async (
       row.site_scope_id,
     );
 
-    if (row.root_category_id !== siteScope.root_category_id) {
-      throw new ValidationError("root_category_id must match site scope root", {
+    if (row.root_item_id !== siteScope.root_item_id) {
+      throw new ValidationError("root_item_id must match site scope root", {
         field: "scopes",
         code: "root_mismatch",
         site_scope_id: row.site_scope_id,
-        root_category_id: row.root_category_id,
+        root_item_id: row.root_item_id,
       });
     }
 
@@ -340,7 +343,7 @@ export const replaceEstimateScopesTx = async (
     for (const spec of row.specs) {
       await assertSpecDefInScopePanel(
         client,
-        siteScope.root_category_id,
+        siteScope.root_item_id,
         spec.spec_def_id,
       );
       if (spec.spec_option_id !== null && spec.spec_option_id !== undefined) {
@@ -372,7 +375,7 @@ export const replaceEstimateScopesTx = async (
       for (const spec of zone.specs) {
         await assertSpecDefInScopePanel(
           client,
-          row.root_category_id,
+          row.root_item_id,
           spec.spec_def_id,
         );
         if (spec.spec_option_id !== null && spec.spec_option_id !== undefined) {
@@ -439,19 +442,17 @@ export const replaceEstimateScopesTx = async (
       await client.query(
         `UPDATE estimate_scope
          SET site_scope_id = $2,
-             root_category_id = $3,
+             root_item_id = $3,
              sort_order = $4,
-             labor_context_type_id = $5,
-             markup_type_id = $6
+             complexity_factor_id = $5
          WHERE id = $1
-           AND estimate_id = $7`,
+           AND estimate_id = $6`,
         [
           row.id,
           row.site_scope_id,
-          row.root_category_id,
+          row.root_item_id,
           row.sort_order,
-          row.labor_context_type_id,
-          row.markup_type_id,
+          row.complexity_factor_id,
           estimateId,
         ],
       );
@@ -461,20 +462,18 @@ export const replaceEstimateScopesTx = async (
            id,
            estimate_id,
            site_scope_id,
-           root_category_id,
+           root_item_id,
            sort_order,
-           labor_context_type_id,
-           markup_type_id
+           complexity_factor_id
          )
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+         VALUES ($1, $2, $3, $4, $5, $6)`,
         [
           row.id,
           estimateId,
           row.site_scope_id,
-          row.root_category_id,
+          row.root_item_id,
           row.sort_order,
-          row.labor_context_type_id,
-          row.markup_type_id,
+          row.complexity_factor_id,
         ],
       );
     }
@@ -507,9 +506,9 @@ export const replaceEstimateScopesTx = async (
 
     for (const zone of row.zones) {
       await client.query(
-        `INSERT INTO estimate_zone (estimate_scope_id, site_zone_id, sort_order)
-         VALUES ($1, $2, $3)`,
-        [row.id, zone.site_zone_id, zone.sort_order],
+        `INSERT INTO estimate_zone (estimate_scope_id, site_zone_id, sort_order, complexity_factor_id)
+         VALUES ($1, $2, $3, $4)`,
+        [row.id, zone.site_zone_id, zone.sort_order, zone.complexity_factor_id],
       );
 
       await client.query(

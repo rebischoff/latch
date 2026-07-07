@@ -31,11 +31,6 @@ fields:
       - column: site.customer_party_id
         type: string
         nullable: true
-  - id: property_owner_party
-    columns:
-      - column: site.property_owner_party_id
-        type: string
-        nullable: true
   - id: contacts
     # logical — DAL maps to site_contact; see docs/child-collections.md
     columns: []

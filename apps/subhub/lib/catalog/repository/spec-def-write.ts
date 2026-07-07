@@ -1,7 +1,7 @@
 import { ValidationError } from "@latch/contracts";
 import type { PoolClient } from "pg";
 
-import type { SpecDefinitionPatchRow } from "../descriptors/category-detail";
+import type { SpecDefinitionPatchRow } from "../descriptors/item-detail";
 
 export const assertRootSpecDefinitionsPatch = (isRoot: boolean): void => {
   if (!isRoot) {
@@ -51,12 +51,91 @@ const assertSpecDefDeletable = async (
   }
 };
 
+export const assertSpecOptionDeletable = async (
+  client: PoolClient,
+  specOptionId: string,
+): Promise<void> => {
+  const partSpecResult = await client.query<{ count: number }>(
+    `SELECT COUNT(*)::int AS count
+     FROM manufacturer_part_spec
+     WHERE spec_option_id = $1`,
+    [specOptionId],
+  );
+  const partCount = partSpecResult.rows[0]?.count ?? 0;
+  if (partCount > 0) {
+    throw new ValidationError(
+      `${partCount} part compatibility row(s) use this option — update those parts first`,
+      {
+        field: "spec_definitions",
+        code: "spec_option_in_use",
+        spec_option_id: specOptionId,
+        part_count: partCount,
+      },
+    );
+  }
+};
+
+const deleteSpecOptionsForDefTx = async (
+  client: PoolClient,
+  specDefId: string,
+): Promise<void> => {
+  const existingResult = await client.query<{ id: string }>(
+    `SELECT id::text FROM spec_option WHERE spec_def_id = $1`,
+    [specDefId],
+  );
+  for (const row of existingResult.rows) {
+    await assertSpecOptionDeletable(client, row.id);
+  }
+  await client.query(`DELETE FROM spec_option WHERE spec_def_id = $1`, [specDefId]);
+};
+
+const upsertSpecOptionsTx = async (
+  client: PoolClient,
+  defId: string,
+  options: SpecDefinitionPatchRow["options"],
+): Promise<void> => {
+  const existingResult = await client.query<{ id: string }>(
+    `SELECT id::text FROM spec_option WHERE spec_def_id = $1`,
+    [defId],
+  );
+  const existingIds = new Set(existingResult.rows.map((row) => row.id));
+  const payloadIds = new Set(options.filter((option) => option.id).map((option) => option.id!));
+  const removedIds = [...existingIds].filter((id) => !payloadIds.has(id));
+
+  for (const optionId of removedIds) {
+    await assertSpecOptionDeletable(client, optionId);
+  }
+
+  for (const [optionIndex, option] of options.entries()) {
+    const optionId = option.id ?? crypto.randomUUID();
+    await client.query(
+      `INSERT INTO spec_option (id, spec_def_id, code, display_name, sort_order)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (id) DO UPDATE SET
+         code = EXCLUDED.code,
+         display_name = EXCLUDED.display_name,
+         sort_order = EXCLUDED.sort_order`,
+      [
+        optionId,
+        defId,
+        option.code ?? null,
+        option.display_name,
+        option.sort_order ?? optionIndex + 1,
+      ],
+    );
+  }
+
+  for (const optionId of removedIds) {
+    await client.query(`DELETE FROM spec_option WHERE id = $1`, [optionId]);
+  }
+};
+
 const deleteSpecDefinitionTx = async (
   client: PoolClient,
   specDefId: string,
 ): Promise<void> => {
   await assertSpecDefDeletable(client, specDefId);
-  await client.query(`DELETE FROM category_spec_exclude WHERE spec_def_id = $1`, [specDefId]);
+  await client.query(`DELETE FROM item_spec_exclude WHERE spec_def_id = $1`, [specDefId]);
   await client.query(`DELETE FROM spec_option WHERE spec_def_id = $1`, [specDefId]);
   await client.query(`DELETE FROM spec_def WHERE id = $1`, [specDefId]);
 };
@@ -70,7 +149,7 @@ const upsertSpecDefinitionTx = async (
 ): Promise<void> => {
   await client.query(
     `INSERT INTO spec_def (
-       id, category_id, code, display_name, value_type, filter_mode, sort_order
+       id, item_id, code, display_name, value_type, filter_mode, sort_order
      ) VALUES ($1, $2, $3, $4, $5, $6, $7)
      ON CONFLICT (id) DO UPDATE SET
        code = EXCLUDED.code,
@@ -89,29 +168,16 @@ const upsertSpecDefinitionTx = async (
     ],
   );
 
-  await client.query(`DELETE FROM spec_option WHERE spec_def_id = $1`, [defId]);
-
   if (row.value_type === "enum") {
-    for (const [optionIndex, option] of row.options.entries()) {
-      const optionId = option.id ?? crypto.randomUUID();
-      await client.query(
-        `INSERT INTO spec_option (id, spec_def_id, code, display_name, sort_order)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [
-          optionId,
-          defId,
-          option.code ?? null,
-          option.display_name,
-          option.sort_order ?? optionIndex + 1,
-        ],
-      );
-    }
+    await upsertSpecOptionsTx(client, defId, row.options);
+  } else {
+    await deleteSpecOptionsForDefTx(client, defId);
   }
 };
 
 /**
  * Replace the spec definitions **owned by** `ownerCategoryId` from `rows`.
- * Owner is the `spec_def.category_id` column (037/038 owner model). Defs owned
+ * Owner is the `spec_def.item_id` column (037/038 owner model). Defs owned
  * elsewhere are untouched; this only manages the owner's own rows.
  */
 export const replaceSpecDefinitionsTx = async (
@@ -122,7 +188,7 @@ export const replaceSpecDefinitionsTx = async (
   assertSpecDefinitionShape(rows);
 
   const existingResult = await client.query<{ id: string }>(
-    `SELECT id FROM spec_def WHERE category_id = $1`,
+    `SELECT id FROM spec_def WHERE item_id = $1`,
     [ownerCategoryId],
   );
   const existingIds = new Set(existingResult.rows.map((row) => row.id));
@@ -147,24 +213,24 @@ export const replaceSpecDefinitionsTx = async (
 
 export const applyCategorySpecDefinitionsTx = async (
   client: PoolClient,
-  category: { id: string; is_root: boolean; root_category_id: string | null },
+  category: { id: string; is_root: boolean; root_item_id: string | null },
   rows: SpecDefinitionPatchRow[],
 ): Promise<void> => {
   assertSpecDefinitionShape(rows);
 
   const referencedIds = rows.filter((row) => row.id).map((row) => row.id!);
   if (referencedIds.length > 0) {
-    const ownerResult = await client.query<{ category_id: string; id: string }>(
-      `SELECT id, category_id FROM spec_def WHERE id = ANY($1::uuid[])`,
+    const ownerResult = await client.query<{ item_id: string; id: string }>(
+      `SELECT id, item_id FROM spec_def WHERE id = ANY($1::uuid[])`,
       [referencedIds],
     );
     for (const def of ownerResult.rows) {
-      if (def.category_id !== category.id) {
+      if (def.item_id !== category.id) {
         throw new ValidationError("Only the owning category may edit a spec definition", {
           field: "spec_definitions",
           code: "owner_only",
           spec_def_id: def.id,
-          assign_category_id: def.category_id,
+          assign_item_id: def.item_id,
         });
       }
     }

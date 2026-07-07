@@ -13,6 +13,22 @@ const VendorPricingPatchElementSchema = z
   })
   .strict();
 
+const ItemLinkPatchElementSchema = z
+  .object({
+    item_id: z.string(),
+    sort_order: z.number().optional(),
+  })
+  .strict();
+
+const PartSpecPatchElementSchema = z
+  .object({
+    spec_def_id: z.string(),
+    spec_option_id: z.string().nullable().optional(),
+    value_text: z.string().nullable().optional(),
+    value_boolean: z.boolean().nullable().optional(),
+  })
+  .strict();
+
 /** Hand-written — codegen stubs collections with placeholder `user_id`. */
 export const PartDetailPatchSchema = z
   .object({
@@ -29,6 +45,8 @@ export const PartDetailPatchSchema = z
       .strict()
       .optional(),
     vendor_pricing: z.array(VendorPricingPatchElementSchema).optional(),
+    item_links: z.array(ItemLinkPatchElementSchema).optional(),
+    part_specs: z.array(PartSpecPatchElementSchema).optional(),
   })
   .strict();
 
@@ -46,6 +64,8 @@ export const PartDetailCreateSchema = z
       })
       .strict(),
     vendor_pricing: z.array(VendorPricingPatchElementSchema).optional(),
+    item_links: z.array(ItemLinkPatchElementSchema).optional(),
+    part_specs: z.array(PartSpecPatchElementSchema).optional(),
   })
   .strict();
 
@@ -70,13 +90,37 @@ export type VendorPricingRow = {
   vendor_pn: string;
 };
 
+export type ItemLinkRow = {
+  breadcrumb: string;
+  item_id: string;
+  name: string;
+  sort_order: number;
+};
+
+export type PartSpecRow = {
+  code: string;
+  display_name: string;
+  option_display_name: string | null;
+  spec_def_id: string;
+  spec_option_id: string | null;
+  value_boolean: boolean | null;
+  value_text: string | null;
+  value_type: "boolean" | "enum" | "text";
+};
+
 export type PartDetailRelated = {
+  item_links: ItemLinkRow[];
+  part_specs: PartSpecRow[];
   vendor_pricing: VendorPricingRow[];
 };
 
 export type VendorPricingPatchRow = z.infer<typeof VendorPricingPatchElementSchema>;
+export type ItemLinkPatchRow = z.infer<typeof ItemLinkPatchElementSchema>;
+export type PartSpecPatchRow = z.infer<typeof PartSpecPatchElementSchema>;
 
 export type PartDetailRelatedPatch = {
+  item_links?: ItemLinkPatchRow[];
+  part_specs?: PartSpecPatchRow[];
   vendor_pricing?: VendorPricingPatchRow[];
 };
 
@@ -107,6 +151,8 @@ const normalizePartDetailRelated = (
   related: PartDetailStoreRelated,
 ): PartDetailRelated => ({
   vendor_pricing: (related.vendor_pricing ?? []) as VendorPricingRow[],
+  item_links: (related.item_links ?? []) as ItemLinkRow[],
+  part_specs: (related.part_specs ?? []) as PartSpecRow[],
 });
 
 export const projectPartDetailRow = (
@@ -132,6 +178,14 @@ export const projectPartDetailRow = (
 
   if (manifest.fields.vendor_pricing?.includes("read")) {
     dto.vendor_pricing = normalized.vendor_pricing;
+  }
+
+  if (manifest.fields.item_links?.includes("read")) {
+    dto.item_links = normalized.item_links;
+  }
+
+  if (manifest.fields.part_specs?.includes("read")) {
+    dto.part_specs = normalized.part_specs;
   }
 
   return dto;
@@ -187,6 +241,12 @@ export const partDetailDescriptor: SurfaceDescriptor<
     if (typed.vendor_pricing !== undefined) {
       related.vendor_pricing = typed.vendor_pricing;
     }
+    if (typed.item_links !== undefined) {
+      related.item_links = typed.item_links;
+    }
+    if (typed.part_specs !== undefined) {
+      related.part_specs = typed.part_specs;
+    }
 
     return Object.keys(related).length > 0 ? related : undefined;
   },
@@ -194,6 +254,8 @@ export const partDetailDescriptor: SurfaceDescriptor<
   deleteAuditSnapshot: (row, related) => ({
     ...formatPartDetailRow(row),
     vendor_pricing: normalizePartDetailRelated(related).vendor_pricing,
+    item_links: normalizePartDetailRelated(related).item_links,
+    part_specs: normalizePartDetailRelated(related).part_specs,
   }),
   canDelete: (ctx) => ctx.manifest.actions.includes("delete"),
 };

@@ -1,6 +1,6 @@
 import type { Pool } from "pg";
 
-import { scopePanelDefs } from "@/lib/catalog/repository/category-effective-specs";
+import { scopePanelDefs } from "@/lib/catalog/repository/item-effective-specs";
 
 import type {
   EstimateScopeRow,
@@ -9,17 +9,17 @@ import type {
 } from "../descriptors/estimate-detail";
 
 type EstimateScopeBaseRow = {
+  complexity_factor_id: string | null;
   id: string;
-  labor_context_type_id: string | null;
-  markup_type_id: string | null;
-  root_category_id: string;
-  root_category_name: string | null;
+  root_item_id: string;
+  root_item_name: string | null;
   site_scope_id: string;
   site_scope_name: string | null;
   sort_order: number;
 };
 
 type EstimateZoneRow = {
+  complexity_factor_id: string | null;
   estimate_scope_id: string;
   site_zone_id: string;
   sort_order: number;
@@ -103,14 +103,14 @@ const mergeScopeSpecs = async (
   pool: Pool,
   scopes: EstimateScopeBaseRow[],
 ): Promise<Map<string, EstimateScopeSpecRow[]>> => {
-  const scopedWithRoot = scopes.filter((scope) => scope.root_category_id !== null);
+  const scopedWithRoot = scopes.filter((scope) => scope.root_item_id !== null);
   if (scopedWithRoot.length === 0) {
     return new Map();
   }
 
   const panelDefsByRoot = new Map<string, Awaited<ReturnType<typeof scopePanelDefs>>>();
   for (const rootId of [
-    ...new Set(scopedWithRoot.map((scope) => scope.root_category_id as string)),
+    ...new Set(scopedWithRoot.map((scope) => scope.root_item_id as string)),
   ]) {
     panelDefsByRoot.set(rootId, await scopePanelDefs(pool, rootId));
   }
@@ -124,7 +124,7 @@ const mergeScopeSpecs = async (
   const defIds = [
     ...new Set(
       scopedWithRoot.flatMap((scope) =>
-        (panelDefsByRoot.get(scope.root_category_id as string) ?? []).map(
+        (panelDefsByRoot.get(scope.root_item_id as string) ?? []).map(
           (def) => def.spec_def_id,
         ),
       ),
@@ -134,7 +134,7 @@ const mergeScopeSpecs = async (
 
   const specsByScopeId = new Map<string, EstimateScopeSpecRow[]>();
   for (const scope of scopedWithRoot) {
-    const panelDefs = panelDefsByRoot.get(scope.root_category_id as string) ?? [];
+    const panelDefs = panelDefsByRoot.get(scope.root_item_id as string) ?? [];
     specsByScopeId.set(
       scope.id,
       panelDefs.map((def) => {
@@ -209,12 +209,12 @@ const mergeZoneSpecs = async (
     return new Map();
   }
 
-  const scopedWithRoot = scopes.filter((scope) => scope.root_category_id !== null);
+  const scopedWithRoot = scopes.filter((scope) => scope.root_item_id !== null);
   const scopeById = new Map(scopedWithRoot.map((scope) => [scope.id, scope]));
 
   const panelDefsByRoot = new Map<string, Awaited<ReturnType<typeof scopePanelDefs>>>();
   for (const rootId of [
-    ...new Set(scopedWithRoot.map((scope) => scope.root_category_id as string)),
+    ...new Set(scopedWithRoot.map((scope) => scope.root_item_id as string)),
   ]) {
     panelDefsByRoot.set(rootId, await scopePanelDefs(pool, rootId));
   }
@@ -231,7 +231,7 @@ const mergeZoneSpecs = async (
   const defIds = [
     ...new Set(
       scopedWithRoot.flatMap((scope) =>
-        (panelDefsByRoot.get(scope.root_category_id as string) ?? []).map(
+        (panelDefsByRoot.get(scope.root_item_id as string) ?? []).map(
           (def) => def.spec_def_id,
         ),
       ),
@@ -242,11 +242,11 @@ const mergeZoneSpecs = async (
   const specsByZoneKey = new Map<string, EstimateScopeSpecRow[]>();
   for (const zone of zoneRows) {
     const scope = scopeById.get(zone.estimate_scope_id);
-    if (!scope?.root_category_id) {
+    if (!scope?.root_item_id) {
       continue;
     }
 
-    const panelDefs = panelDefsByRoot.get(scope.root_category_id) ?? [];
+    const panelDefs = panelDefsByRoot.get(scope.root_item_id) ?? [];
     const key = `${zone.estimate_scope_id}:${zone.site_zone_id}`;
     specsByZoneKey.set(
       key,
@@ -278,14 +278,13 @@ export const loadEstimateScopes = async (
        es.id,
        es.site_scope_id,
        ss.name AS site_scope_name,
-       es.root_category_id,
-       c.name AS root_category_name,
+       es.root_item_id,
+       c.name AS root_item_name,
        es.sort_order,
-       es.labor_context_type_id,
-       es.markup_type_id
+       es.complexity_factor_id
      FROM estimate_scope es
      LEFT JOIN site_scope ss ON ss.id = es.site_scope_id
-     LEFT JOIN category c ON c.id = es.root_category_id
+     LEFT JOIN item c ON c.id = es.root_item_id
      WHERE es.estimate_id = $1
      ORDER BY es.sort_order ASC, es.id ASC`,
     [estimateId],
@@ -300,7 +299,7 @@ export const loadEstimateScopes = async (
   const [scopeSpecsByScopeId, zoneRowsResult] = await Promise.all([
     mergeScopeSpecs(pool, scopesResult.rows),
     pool.query<EstimateZoneRow>(
-      `SELECT estimate_scope_id, site_zone_id, sort_order
+      `SELECT estimate_scope_id, site_zone_id, sort_order, complexity_factor_id
        FROM estimate_zone
        WHERE estimate_scope_id = ANY($1::text[])
        ORDER BY sort_order ASC, site_zone_id ASC`,
@@ -320,6 +319,7 @@ export const loadEstimateScopes = async (
     zones.push({
       site_zone_id: zone.site_zone_id,
       sort_order: zone.sort_order,
+      complexity_factor_id: zone.complexity_factor_id,
       specs: zoneSpecsByKey.get(specKey) ?? [],
     });
     zonesByScopeId.set(zone.estimate_scope_id, zones);

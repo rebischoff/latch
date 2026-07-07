@@ -1,6 +1,6 @@
 # Standing-contact relation catalog (editable table page)
 id: site_contact_relation_table
-displayName: Site contact relations
+displayName: Site relations
 anchorTable: site_contact_relation
 
 fieldActions:

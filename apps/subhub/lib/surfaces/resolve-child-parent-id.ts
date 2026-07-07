@@ -12,7 +12,7 @@ export const resolveChildParentId = ({
   entityId,
   config,
 }: ResolveChildParentIdInput): string | null => {
-  if (config.create?.variant === "category") {
+  if (config.create?.variant === "item") {
     return selectionId ?? entityId;
   }
 

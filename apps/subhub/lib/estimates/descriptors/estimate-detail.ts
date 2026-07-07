@@ -22,6 +22,7 @@ const EstimateScopeZonePatchElementSchema = z
   .object({
     site_zone_id: z.string(),
     sort_order: z.number(),
+    complexity_factor_id: z.string().nullable().optional(),
     specs: z.array(EstimateScopeSpecPatchElementSchema),
   })
   .strict();
@@ -30,10 +31,11 @@ const EstimateScopePatchElementSchema = z
   .object({
     id: z.string().optional(),
     site_scope_id: z.string(),
-    root_category_id: z.string(),
+    root_item_id: z.string(),
     sort_order: z.number(),
     labor_context_type_id: z.string().nullable().optional(),
     markup_type_id: z.string().nullable().optional(),
+    complexity_factor_id: z.string().nullable().optional(),
     specs: z.array(EstimateScopeSpecPatchElementSchema),
     zones: z.array(EstimateScopeZonePatchElementSchema),
   })
@@ -43,7 +45,6 @@ const EstimateLineItemPatchElementSchema = z
   .object({
     id: z.string().optional(),
     line_role: z.enum(["standalone", "kit_header", "kit_component"]),
-    line_kind: z.enum(["product", "labor", "expense"]),
     description: z.string(),
     quantity: z.number(),
     unit: z.string(),
@@ -52,17 +53,14 @@ const EstimateLineItemPatchElementSchema = z
     unit_material: z.number().optional(),
     unit_labor: z.number().optional(),
     unit_incidental: z.number().optional(),
+    unit_freight: z.number().optional(),
     unit_price_target: z.number().optional(),
     estimate_scope_id: z.string(),
     site_zone_id: z.string().nullable().optional(),
-    material_status: z
-      .enum(["generic", "suggested", "verified"])
-      .nullable()
-      .optional(),
+    lock: z.enum(["none", "sell", "line"]).optional(),
     phase_id: z.string().nullable().optional(),
     item_id: z.string().nullable().optional(),
     part_id: z.string().nullable().optional(),
-    part_locked: z.boolean().optional(),
     vendor_part_id: z.string().nullable().optional(),
     parent_line_id: z.string().nullable().optional(),
   })
@@ -79,7 +77,7 @@ export const EstimateDetailPatchSchema = z
         estimate_date: z.string().nullable().optional(),
         valid_until: z.string().nullable().optional(),
         source_estimate_id: z.string().nullable().optional(),
-        category_id: z.string().nullable().optional(),
+        item_id: z.string().nullable().optional(),
       })
       .strict()
       .optional(),
@@ -99,7 +97,7 @@ export const EstimateDetailCreateSchema = z
         estimate_date: z.string().nullable().optional(),
         valid_until: z.string().nullable().optional(),
         source_estimate_id: z.string().nullable().optional(),
-        category_id: z.string().nullable().optional(),
+        item_id: z.string().nullable().optional(),
       })
       .strict(),
     stakeholders: z.array(EstimateStakeholderPatchElementSchema).optional(),
@@ -109,7 +107,7 @@ export const EstimateDetailCreateSchema = z
   .strict();
 
 export type EstimateDetailRow = {
-  category_id: string | null;
+  item_id: string | null;
   estimate_date: string | null;
   id: string;
   site_display_name: string;
@@ -138,7 +136,7 @@ export type EstimateSiteZoneTreeRow = {
 export type EstimateSiteScopeTreeRow = {
   id: string;
   name: string;
-  root_category_id: string;
+  root_item_id: string;
   zones: EstimateSiteZoneTreeRow[];
 };
 
@@ -159,17 +157,17 @@ export type EstimateScopeSpecRow = {
 };
 
 export type EstimateScopeZoneRow = {
+  complexity_factor_id: string | null;
   site_zone_id: string;
   sort_order: number;
   specs: EstimateScopeSpecRow[];
 };
 
 export type EstimateScopeRow = {
+  complexity_factor_id: string | null;
   id: string;
-  labor_context_type_id: string | null;
-  markup_type_id: string | null;
-  root_category_id: string;
-  root_category_name: string | null;
+  root_item_id: string;
+  root_item_name: string | null;
   site_scope_id: string;
   site_scope_name: string | null;
   sort_order: number;
@@ -182,19 +180,18 @@ export type EstimateLineItemRow = {
   estimate_scope_id: string;
   id: string;
   item_id: string | null;
-  line_kind: string;
   line_number: number;
   line_role: string;
-  material_status: string | null;
+  lock: "line" | "none" | "sell";
   parent_line_id: string | null;
   part_id: string | null;
-  part_locked: boolean;
   phase_id: string | null;
   quantity: number;
   site_zone_id: string | null;
   sort_order: number;
   unit: string;
   unit_cost: number;
+  unit_freight: number;
   unit_incidental: number;
   unit_labor: number;
   unit_material: number;
@@ -237,7 +234,7 @@ export type EstimateDetailWriteRow = Pick<
   | "estimate_date"
   | "valid_until"
   | "source_estimate_id"
-  | "category_id"
+  | "item_id"
 >;
 
 export type EstimateDetailRelatedPatch = {
@@ -251,7 +248,7 @@ export type EstimateDetailStoreRelated =
   | EstimateDetailRelatedPatch;
 
 const formatEstimateDetailRow = (row: EstimateDetailRow): Record<string, unknown> => ({
-  category_id: row.category_id,
+  item_id: row.item_id,
   estimate_date: row.estimate_date,
   id: row.id,
   site_display_name: row.site_display_name,
@@ -289,7 +286,7 @@ export const projectEstimateDetailRow = (
       estimate_date: row.estimate_date,
       valid_until: row.valid_until,
       source_estimate_id: row.source_estimate_id,
-      category_id: row.category_id,
+      item_id: row.item_id,
     };
   }
 
@@ -336,8 +333,8 @@ const applyEstimateDetailPatch = (
   if (typed.profile?.source_estimate_id !== undefined) {
     next.source_estimate_id = typed.profile.source_estimate_id;
   }
-  if (typed.profile?.category_id !== undefined) {
-    next.category_id = typed.profile.category_id;
+  if (typed.profile?.item_id !== undefined) {
+    next.item_id = typed.profile.item_id;
   }
 
   return next;

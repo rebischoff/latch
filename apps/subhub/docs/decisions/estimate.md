@@ -4,6 +4,25 @@
 
 [Index](./README.md) · [All decisions](../decisions/README.md)
 
+> **Amended (2026-07-05):** [unified item tree — lifecycle + line lock](./catalog.md#decision-unified-item-tree--merge-category--item-node-anchored-estimate-lines-2026-07-05) (**D6a–D6b**) — see [estimate lifecycle freeze](#decision-estimate-lifecycle-freeze-and-line-lock-2026-07-05).
+
+---
+
+### Decision: estimate lifecycle freeze and line lock (2026-07-05)
+
+**Status:** **Locked.** **Supersedes** 37f [O4 sell lock deferred](../tasks/37f-estimate-line-costing.md#decision-o4--sell-lock-deferred-2026-07-04) for draft recalc behavior.
+
+| `estimate.status` | Edit policy | Recalc on save |
+|-------------------|-------------|----------------|
+| **`draft`** | Full edit — lines, scopes, scope/zone specs, complexity | **Yes** — per `estimate_line.lock` (`none` \| `sell` \| `line`) |
+| **`sent`** | **Frozen** — no PATCH to quote-driving fields | **No** — snapshots are the issued quote |
+| **`won`** | Immutable (existing) | **No** |
+| **`lost` / `expired`** | Read-only (v1: same freeze as `sent`) | **No** |
+
+**`estimate_line.lock` (draft only):** `none` = full fluid recalc incl. sell; `sell` = freeze `unit_price` only; `line` = skip recalc entirely. Manual sell edit → `sell`; lock line → `line`; sync to target → `none`. Replaces `part_locked` / `sell_locked`. Estimate-level freeze (`sent`+) supersedes line lock.
+
+**Source:** [catalog D6a–D6d](./catalog.md#estimate-status-and-recalc-policy-d6a--locked-2026-07-05).
+
 ---
 
 ### Decision: estimate site anchor — gate lines, immutable after create (2026-06-30)

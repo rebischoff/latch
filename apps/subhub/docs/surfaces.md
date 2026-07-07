@@ -376,12 +376,12 @@ Applies to **customer, vendor, manufacturer, property_owner** detail lenses — 
 
 | | |
 |--|--|
-| **Status** | **target spec** [part.md](./surface-specs/part.md) (2026-06-19) |
+| **Status** | **shipped** [part.md](./surface-specs/part.md) (37j, 2026-07-06) |
 | **Wave** | 3 |
 | **Route** | `/parts`, `/parts/[id]` |
 | **Nav group** | Catalog |
 | **Anchor** | `manufacturer_part` |
-| **Tables** | `manufacturer_part`, `vendor_part` |
+| **Tables** | `manufacturer_part`, `vendor_part`, `part_item`, `manufacturer_part_spec` |
 
 **`part_list` columns:** `mpn`, `description`, `manufacturer` label — search `mpn` + `description`; sort manufacturer then `mpn`; no price columns; no manufacturer filter v1
 
@@ -389,8 +389,10 @@ Applies to **customer, vendor, manufacturer, property_owner** detail lenses — 
 
 | Field | Type | Notes |
 |-------|------|-------|
-| `profile` | scalar | `manufacturer_party_id`, `mpn`, `description`, `unit`, `purchase_unit`, `units_per_purchase` — defer `specs`, `cut_sheet_url` |
+| `profile` | scalar | `manufacturer_party_id`, `mpn`, `description`, `unit`, `purchase_unit`, `units_per_purchase` |
 | `vendor_pricing` | collection | `vendor_part` — `vendor_party_id`, `vendor_pn`, `vendor_description`, `unit_price`, `is_preferred` (one preferred per part) |
+| `item_links` | collection | `part_item` — item tree picker; any node; replace-array |
+| `part_specs` | collection | `manufacturer_part_spec` — enum / boolean / text compatibility rows; contextual defs from linked items |
 
 ### `item_list` · `item_detail`
 

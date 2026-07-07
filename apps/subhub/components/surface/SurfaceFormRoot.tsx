@@ -2,7 +2,7 @@
 
 import type { Manifest } from "@latch/contracts";
 import { CapabilitiesProvider } from "@latch/react";
-import { useEffect, useRef, type ReactNode } from "react";
+import { useLayoutEffect, useRef, type ReactNode } from "react";
 import {
   FormProvider,
   type DefaultValues,
@@ -40,7 +40,7 @@ export const SurfaceFormRoot = <T extends FieldValues>({
   const showOverlay = useDelayedOverlay(blocking);
   const paneRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     form.reset(defaultValues);
   }, [defaultValues, form, resetKey]);
 

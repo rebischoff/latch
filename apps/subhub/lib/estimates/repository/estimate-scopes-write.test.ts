@@ -25,14 +25,14 @@ describe("replaceEstimateScopesTx", () => {
       replaceEstimateScopesTx(client, "est-1", "site-1", [
         {
           site_scope_id: "ss-1",
-          root_category_id: "cat-1",
+          root_item_id: "cat-1",
           sort_order: 1,
           specs: [],
           zones: [],
         },
         {
           site_scope_id: "ss-1",
-          root_category_id: "cat-1",
+          root_item_id: "cat-1",
           sort_order: 2,
           specs: [],
           zones: [],
@@ -45,14 +45,14 @@ describe("replaceEstimateScopesTx", () => {
       replaceEstimateScopesTx(client, "est-1", "site-1", [
         {
           site_scope_id: "ss-1",
-          root_category_id: "cat-1",
+          root_item_id: "cat-1",
           sort_order: 1,
           specs: [],
           zones: [],
         },
         {
           site_scope_id: "ss-1",
-          root_category_id: "cat-1",
+          root_item_id: "cat-1",
           sort_order: 2,
           specs: [],
           zones: [],
@@ -95,7 +95,7 @@ describe("replaceEstimateScopesTx", () => {
       replaceEstimateScopesTx(client, "est-1", "site-1", [
         {
           site_scope_id: "",
-          root_category_id: "cat-1",
+          root_item_id: "cat-1",
           sort_order: 1,
           specs: [],
           zones: [],

@@ -1,7 +1,6 @@
 export {
   EstimateLineTreeTable as EstimateLineItemsField,
   type EstimateLineFormRow,
-  type EstimateLineKind,
   type EstimateLineRole,
   type EstimateScopeFormRow,
 } from "@/components/estimates/EstimateLineTreeTable";

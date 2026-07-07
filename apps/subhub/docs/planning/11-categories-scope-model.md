@@ -1,6 +1,6 @@
 # Categories-only scope model
 
-> **Status:** **Locked** (2026-06-30); **amended** (2026-07-04) — scope required on quotes; commercial resolution ([catalog decision](../decisions/catalog.md#decision-commercial-costing--org-tables-category-defaults-estimate-overrides-2026-07-04)). **Task:** [37a](../tasks/37a-category-scope-decision-dbml-migration.md) · **Migration:** [`033-category-scope-plan.md`](../migrations/033-category-scope-plan.md) · **Supersedes:** catalog `system` + site `site_system` + estimate `estimate_system` / 4c′ `estimate_area` snapshot model.
+> **Status:** **Locked** (2026-06-30); **amended** (2026-07-04) — scope required on quotes; commercial resolution ([catalog decision](../decisions/catalog.md#decision-commercial-costing--org-tables-category-defaults-estimate-overrides-2026-07-04)); **superseded in part (2026-07-05)** by [unified item tree](../decisions/catalog.md#decision-unified-item-tree--merge-category--item-node-anchored-estimate-lines-2026-07-05) — **C3, C7, C8, C11, C23** below. **Task:** [37a](../tasks/37a-category-scope-decision-dbml-migration.md) · **Migration:** [`033-category-scope-plan.md`](../migrations/033-category-scope-plan.md) · **Structural follow-on:** [`040a-unified-item-tree-plan.md`](../migrations/040a-unified-item-tree-plan.md).
 
 ---
 
@@ -16,25 +16,25 @@
 |----|--------|--------|
 | C1 | **Scope roots** | `category.parent_id IS NULL` — Fire Alarm, Intrusion, HVAC, … |
 | C2 | **Many roots** | Multiple roots per informal trade (e.g. low voltage) OK; **`trade` table omitted from scope path v1** |
-| C3 | **Items / parts** | M:N via `item_category`, `part_category`; **same category tree** |
+| C3 | **Items / parts** | ~~M:N via `item_category`, `part_category`~~ **Superseded (2026-07-05)** — unified **`item`** tree; `part_item` M:N; drop `item_category` ([D1](../decisions/catalog.md#locked-decisions-review-2026-07-05)) |
 | C4 | **Site structure** | **`site_scope`** (root category instance, renamable) + **`site_zone`** tree under that scope. **Amended (2026-07-04):** no site **General** zones — every zone belongs to a **`site_scope`**. Mobilization / lump-sum uses a named scope instance. |
 | C5 | **Estimate scope** | Read-only site tree + checkboxes; check zone → auto-check parent scope. **Amended (2026-07-04):** **≥1 checked `estimate_scope` required** before Line Items. |
 | C6 | ~~**Estimate General bucket**~~ | **Superseded (2026-07-04)** — no ROM / full-catalog bucket. All lines under a checked scope; item picker = root subtree only ([C7](#locked-decisions)). |
-| C7 | **Scoped lines** | Item picker = **TreeSelect** on active scope’s **`root_category_id` subtree** only |
-| C8 | **Duplicate tree nodes** | Same `item_id` may appear under multiple category paths; picker path is UX-only |
+| C7 | **Scoped lines** | ~~Item picker = TreeSelect on leaf items only~~ **Superseded (2026-07-05)** — picker on scope **`root_item_id` subtree**; **branch + leaf** nodes selectable ([D1, D8c](../decisions/catalog.md#locked-decisions-review-2026-07-05)) |
+| C8 | **Duplicate tree nodes** | ~~Same `item_id` under multiple category paths~~ **Superseded (2026-07-05)** — one tree placement per node (`parent_id`); line anchors any depth |
 | C9 | **Specs** | **`spec_def`** namespace per root; participation via **`category_spec_def`** (one assign per def) + **`category_spec_exclude`** (branch cut, no re-include) — [decision](../decisions/catalog.md#decision-category-spec-participation--assign-once-branch-exclude-2026-07-03); **admin visibility** per [owner-branch knowledge (2026-07-03)](../decisions/catalog.md#decision-category-spec-visibility--owner-branch-knowledge-2026-07-03); bucket holds values (`estimate_scope_spec`, `estimate_zone_spec`) |
 | C20 | **Scope spec panel** | Union of **effective participation** across all category nodes in checked scope’s root subtree |
 | C10 | **Part filter** | When bucket value is **non-blank**, participating defs **must** match ([matching rules](../decisions/catalog.md#decision-spec_def-value-types-and-part-matching-rules-2026-07-02)). `filter_mode = prefer` scoring **deferred**. |
 | C18 | **`spec_def` value types** | `enum` \| `boolean` \| `text` \| **`number`**; canonical `unit` on number defs; enum multi-value = multiple `manufacturer_part_spec` rows |
 | C19 | **Bucket cardinality** | Scope / zone / line: **one value per `spec_def_id`**; blank = no filter; zone overrides scope; line overrides zone (**line UI deferred** — [37f O5](../tasks/37f-estimate-line-costing.md#decision-o5--estimate_line_spec-ui-deferred)) |
-| C11 | **Lines** | **`item_id`** required; **`part_id`** optional; **`part_locked`** when user confirms PN ([O2](../tasks/37f-estimate-line-costing.md#decision-o2--line-item-part-pin-2026-07-04)) |
+| C11 | **Lines** | **`item_id`** required (any tree depth); **`part_id`** optional; **`lock`** enum while `draft` ([D6b](../decisions/catalog.md#locked-decisions-review-2026-07-05)); supersedes `part_locked` |
 | C12 | **Zero / many part matches** | **0** → `item.fallback_unit_cost` + alert; **many** → `max` vendor price among **filtered** parts until pin; **1** → that part ([O1](../tasks/37f-estimate-line-costing.md#decision-o1--ambiguous-part-material-cost-2026-07-04)) |
 | C13 | **Costing** | Per line: **`unit_material`**, **`unit_labor`**, **`unit_incidental`**, **`unit_price_target`**, **`unit_price`** snapshotted; labor/incidental **not** separate lines |
 | C14 | ~~**Commercial on scope bucket**~~ | **Superseded (2026-07-04)** by [commercial costing decision](../decisions/catalog.md#decision-commercial-costing--org-tables-category-defaults-estimate-overrides-2026-07-04) — org rate tables + **category defaults**; **`estimate_scope` / `estimate_zone` overrides only** (markup, complexity). |
 | C15 | ~~**Wire under General**~~ | **Superseded (2026-07-04)** — wire and all items under a **checked scope** (e.g. Fire Alarm). |
 | C21 | **Commercial org tables** | **`labor_rate_type`**, **`incidental_rate_type`** (% of **material** v1), **`markup_type`**, **`complexity_factor`** — list surfaces (37g). **No** sales commission table v1. |
 | C22 | **Commercial category** | **`phase_template`** (phase → `labor_rate_type` + hours); default **`markup_type_id`**, **`incidental_rate_type_id`** — **inherit walk up** category tree (not spec exclude model). **No item override** v1. |
-| C23 | **Complexity** | **`complexity_factor_id`** on **category** (inherit walk); **not** overridable on estimate |
+| C23 | **Complexity** | ~~`complexity_factor_id` on category (inherit walk)~~ **Superseded (2026-07-05)** — on **`estimate_scope` / `estimate_zone` only** ([D5](../decisions/catalog.md#locked-decisions-review-2026-07-05)) |
 | C24 | **Estimate pricing** | **`unit_price_target`** = policy sell from catalog types; **`unit_price`** = actual sell (estimator may undercut). Manager compares target vs actual margin. |
 | C25 | **Rate types on quote** | Estimator **cannot** pick alternate org rate types on estimate — **category only** |
 | C16 | **Migration** | **Big-bang** `033` — no backward compatibility with `system` / `site_system` / `estimate_system` |
@@ -56,20 +56,23 @@ bucket values (estimate_scope_spec / estimate_zone_spec / estimate_line_spec)
 
 ---
 
-## Costing rollup (v1 target — [commercial decision](../decisions/catalog.md#decision-commercial-costing--org-tables-category-defaults-estimate-overrides-2026-07-04))
+## Costing rollup (040b — [commercial decision](../decisions/catalog.md#decision-commercial-costing--org-tables-category-defaults-estimate-overrides-2026-07-04))
 
 ```text
-material $     ← resolved part / item default (vendor price)
-labor $        ← Σ category phase_template hours × labor_rate_type.$/hr × complexity_factor
-incidental $   ← incidental_rate_type % of material only (v1)
-unit_cost      ← M + L + I
-unit_price_target ← unit_cost × resolved_markup (category default; estimate_scope override)
-unit_price     ← actual sell (estimator; may be < target)
+N = estimate_line.item_id                    // any tree depth
+unit_material  ← part resolver (37f)
+unit_freight   ← resolveRate(N, freight) on cost_add_on_type (kind=freight)
+unit_incidental← resolveRate(N, incidental) on cost_add_on_type (kind=incidental)
+base_labor     ← resolveRate(N, labor) from item_labor_phase rows
+unit_labor     ← base_labor × complexity (zone > scope > 100%)
+unit_cost      ← M + L + freight + incidental
+unit_price_target ← split markup (material side on M+freight+incidental; labor side on L)
+unit_price     ← estimator sell; lock gates recalc (D6b)
 ```
 
-**Complexity:** `category.walk_up(complexity_factor_id)` — not overridable on estimate (2026-07-04).
+**Complexity:** `estimate_zone.complexity_factor_id` ?? `estimate_scope.complexity_factor_id` ?? 100% — **not** on item nodes (D5).
 
-**Implementation:** material + part filter → **37f**; full commercial engine + org surfaces → **37g**; scope-required + retire ROM General → **37f** amend (see task).
+**Implementation:** 37f (material + part filter) · **37g** (full engine + org catalog tables) · **37i** (unified item tree).
 
 Rollups: zone → scope instance → estimate. PDF may show lump sum or M/L/I columns (presentation).
 

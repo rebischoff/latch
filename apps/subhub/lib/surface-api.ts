@@ -97,10 +97,34 @@ export const SURFACE_API: Partial<Record<SurfaceId, SurfaceApiConfig>> = {
     detailPath: "/api/parts",
     listSurfaceId: "part_list",
   },
-  category_list: { listPath: "/api/categories/tree" },
-  category_detail: {
-    detailPath: "/api/categories",
-    listSurfaceId: "category_list",
+  item_list: { listPath: "/api/items/tree" },
+  item_detail: {
+    detailPath: "/api/items",
+    listSurfaceId: "item_list",
+  },
+  labor_rate_type_table: {
+    listPath: "/api/catalog/labor-rates",
+    detailPath: "/api/catalog/labor-rates",
+  },
+  freight_rate_type_table: {
+    listPath: "/api/catalog/freight-rates",
+    detailPath: "/api/catalog/freight-rates",
+  },
+  incidental_rate_type_table: {
+    listPath: "/api/catalog/incidental-rates",
+    detailPath: "/api/catalog/incidental-rates",
+  },
+  markup_type_table: {
+    listPath: "/api/catalog/markup-types",
+    detailPath: "/api/catalog/markup-types",
+  },
+  complexity_factor_table: {
+    listPath: "/api/catalog/complexity-factors",
+    detailPath: "/api/catalog/complexity-factors",
+  },
+  labor_phase_table: {
+    listPath: "/api/catalog/labor-phases",
+    detailPath: "/api/catalog/labor-phases",
   },
 };
 
@@ -172,7 +196,7 @@ export type EstimateSiteTreePickerData = {
     scopes: Array<{
       id: string;
       name: string;
-      root_category_id: string;
+      root_item_id: string;
       zones: Array<{ id: string; name: string; zones?: unknown[] }>;
     }>;
     spec_templates: Record<
@@ -205,10 +229,10 @@ export type EstimateItemPickerData = {
 };
 
 export const fetchEstimateItemPicker = async (
-  rootCategoryId: string,
+  rootItemId: string,
   searchQuery?: string,
 ): Promise<ApiSuccessBody<EstimateItemPickerData>> => {
-  const params = new URLSearchParams({ root_category_id: rootCategoryId });
+  const params = new URLSearchParams({ root_item_id: rootItemId });
   if (searchQuery) {
     params.set("q", searchQuery);
   }
@@ -268,11 +292,58 @@ export type CategoryRootPickerData = {
   total: number;
 };
 
-export const fetchCategoryRootPicker = async (): Promise<
+export const fetchItemRootPicker = async (): Promise<
   ApiSuccessBody<CategoryRootPickerData>
 > => {
-  const response = await fetch("/api/sites/pickers/category-roots");
+  const response = await fetch("/api/sites/pickers/item-roots");
   return parseResponse<CategoryRootPickerData>(response);
+};
+
+export type PartItemTreePickerNode = {
+  children?: PartItemTreePickerNode[];
+  id: string;
+  label: string;
+  selectable: boolean;
+  type: "node";
+  value: string;
+};
+
+export type PartItemTreePickerData = {
+  tree: PartItemTreePickerNode[];
+};
+
+export const fetchPartItemTreePicker = async (
+  searchQuery?: string,
+): Promise<ApiSuccessBody<PartItemTreePickerData>> => {
+  const params = new URLSearchParams();
+  if (searchQuery) {
+    params.set("q", searchQuery);
+  }
+  const qs = params.toString();
+  const response = await fetch(
+    qs ? `/api/parts/pickers/items?${qs}` : "/api/parts/pickers/items",
+  );
+  return parseResponse<PartItemTreePickerData>(response);
+};
+
+export type PartSpecDefPickerRow = {
+  code: string;
+  display_name: string;
+  options: Array<{ id: string; code: string; display_name: string }>;
+  spec_def_id: string;
+  value_type: "boolean" | "enum" | "text";
+};
+
+export type PartSpecDefsPickerData = {
+  defs: PartSpecDefPickerRow[];
+};
+
+export const fetchPartSpecDefsPicker = async (
+  itemIds: string[],
+): Promise<ApiSuccessBody<PartSpecDefsPickerData>> => {
+  const params = new URLSearchParams({ item_ids: itemIds.join(",") });
+  const response = await fetch(`/api/parts/pickers/spec-defs?${params.toString()}`);
+  return parseResponse<PartSpecDefsPickerData>(response);
 };
 
 export const fetchJobSitePicker = async (): Promise<

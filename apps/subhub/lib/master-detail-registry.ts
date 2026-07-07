@@ -38,12 +38,12 @@ export const MASTER_DETAIL_SURFACES = {
     detailSurfaceId: "manufacturer_detail",
     createGate: "write",
   },
-  categories: {
-    listRoute: routes.categories.list,
-    newPath: routes.categories.new,
-    detailSurfaceId: "category_detail",
+  items: {
+    listRoute: routes.items.list,
+    newPath: routes.items.new,
+    detailSurfaceId: "item_detail",
     createGate: "create",
-    createManifestSurfaceId: "category_list",
-    create: { variant: "category", trigger: "hover" as const },
+    createManifestSurfaceId: "item_list",
+    create: { variant: "item", trigger: "hover" as const },
   },
 } as const satisfies Record<string, MasterDetailSurfaceConfig>;

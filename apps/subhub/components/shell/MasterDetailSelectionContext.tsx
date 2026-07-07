@@ -12,8 +12,10 @@ import {
 } from "react";
 
 type MasterDetailSelectionContextValue = {
+  childCreateBlocked: boolean;
   selectedId: string | null;
   selectionRef: RefObject<string | null>;
+  setChildCreateBlocked: (blocked: boolean) => void;
   setSelectedId: (id: string | null) => void;
 };
 
@@ -23,15 +25,26 @@ const MasterDetailSelectionContext =
 export const MasterDetailSelectionProvider = ({ children }: { children: ReactNode }) => {
   const selectionRef = useRef<string | null>(null);
   const [selectedId, setSelectedIdState] = useState<string | null>(null);
+  const [childCreateBlocked, setChildCreateBlockedState] = useState(false);
 
   const setSelectedId = useCallback((id: string | null) => {
     selectionRef.current = id;
     setSelectedIdState(id);
   }, []);
 
+  const setChildCreateBlocked = useCallback((blocked: boolean) => {
+    setChildCreateBlockedState(blocked);
+  }, []);
+
   const value = useMemo(
-    () => ({ selectedId, selectionRef, setSelectedId }),
-    [selectedId, setSelectedId],
+    () => ({
+      selectedId,
+      selectionRef,
+      childCreateBlocked,
+      setSelectedId,
+      setChildCreateBlocked,
+    }),
+    [childCreateBlocked, selectedId, setSelectedId, setChildCreateBlocked],
   );
 
   return (

@@ -1,6 +1,6 @@
 import type { Pool } from "pg";
 
-import { scopePanelDefs } from "@/lib/catalog/repository/category-effective-specs";
+import { scopePanelDefs } from "@/lib/catalog/repository/item-effective-specs";
 
 import type {
   EstimateSiteScopeTreeRow,
@@ -12,7 +12,7 @@ import type {
 type SiteScopeBaseRow = {
   id: string;
   name: string;
-  root_category_id: string;
+  root_item_id: string;
 };
 
 type SiteZoneFlatRow = {
@@ -47,7 +47,7 @@ export const loadEstimateSiteTree = async (
 ): Promise<EstimateSiteTreeRow> => {
   const [scopesResult, zonesResult] = await Promise.all([
     pool.query<SiteScopeBaseRow>(
-      `SELECT ss.id, ss.name, ss.root_category_id
+      `SELECT ss.id, ss.name, ss.root_item_id
        FROM site_scope ss
        WHERE ss.site_id = $1
        ORDER BY ss.sort_order ASC, ss.id ASC`,
@@ -73,7 +73,7 @@ export const loadEstimateSiteTree = async (
   const scopes: EstimateSiteScopeTreeRow[] = scopesResult.rows.map((scope) => ({
     id: scope.id,
     name: scope.name,
-    root_category_id: scope.root_category_id,
+    root_item_id: scope.root_item_id,
     zones: nestZones(zonesByScopeId.get(scope.id) ?? [], null),
   }));
 
@@ -81,24 +81,24 @@ export const loadEstimateSiteTree = async (
     scopes,
     spec_templates: await loadSpecTemplatesForRoots(
       pool,
-      scopesResult.rows.map((scope) => scope.root_category_id),
+      scopesResult.rows.map((scope) => scope.root_item_id),
     ),
   };
 };
 
 const loadSpecTemplatesForRoots = async (
   pool: Pool,
-  rootCategoryIds: string[],
+  rootItemIds: string[],
 ): Promise<Record<string, EstimateScopeSpecRow[]>> => {
-  const uniqueRoots = [...new Set(rootCategoryIds)];
+  const uniqueRoots = [...new Set(rootItemIds)];
   if (uniqueRoots.length === 0) {
     return {};
   }
 
   const panelDefsByRoot = await Promise.all(
-    uniqueRoots.map(async (rootCategoryId) => ({
-      rootCategoryId,
-      defs: await scopePanelDefs(pool, rootCategoryId),
+    uniqueRoots.map(async (rootItemId) => ({
+      rootItemId,
+      defs: await scopePanelDefs(pool, rootItemId),
     })),
   );
 
@@ -129,7 +129,7 @@ const loadSpecTemplatesForRoots = async (
 
   const templates: Record<string, EstimateScopeSpecRow[]> = {};
   for (const entry of panelDefsByRoot) {
-    templates[entry.rootCategoryId] = entry.defs.map((def) => ({
+    templates[entry.rootItemId] = entry.defs.map((def) => ({
       spec_def_id: def.spec_def_id,
       def_display_name: def.display_name,
       value_type: def.value_type,

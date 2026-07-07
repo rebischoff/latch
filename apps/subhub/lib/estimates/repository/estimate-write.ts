@@ -207,7 +207,7 @@ export const insertEstimate = async (
            estimate_date,
            valid_until,
            source_estimate_id,
-           category_id
+           item_id
          )
          VALUES ($1, $2, $3, 'draft', $4, $5, $6, $7)`,
         [
@@ -217,7 +217,7 @@ export const insertEstimate = async (
           row.estimate_date,
           row.valid_until,
           row.source_estimate_id,
-          row.category_id,
+          row.item_id,
         ],
       );
 
@@ -258,7 +258,7 @@ export const updateEstimate = async (
            estimate_date = $4,
            valid_until = $5,
            source_estimate_id = $6,
-           category_id = $7,
+           item_id = $7,
            updated_at = now()
        WHERE id = $1`,
       [
@@ -268,7 +268,7 @@ export const updateEstimate = async (
         row.estimate_date,
         row.valid_until,
         row.source_estimate_id,
-        row.category_id,
+        row.item_id,
       ],
     );
   });

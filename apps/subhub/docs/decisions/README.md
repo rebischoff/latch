@@ -43,6 +43,7 @@ _Operations backbone forks **resolved** (2026-06-27). Optional: [J3 phase weight
 
 | Decision | File | Date | Status |
 |----------|------|------|--------|
+| Catalog part authoring UI — `item_links` + `part_specs` on `part_detail` | [catalog.md](./catalog.md) | 2026-07-06 | **locked** ([37j](../tasks/37j-catalog-part-authoring.md)) |
 | Line item part pin — `item_id`, `part_id`, `part_locked` | [37f](../tasks/37f-estimate-line-costing.md) | 2026-07-04 | **locked** |
 | Ambiguous part material cost — fallback + max vendor | [37f](../tasks/37f-estimate-line-costing.md) | 2026-07-04 | **locked** |
 | Commercial costing — org tables, category defaults, estimate overrides | [catalog.md](./catalog.md) | 2026-07-04 | **locked** |

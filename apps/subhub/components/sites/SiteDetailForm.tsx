@@ -8,14 +8,12 @@ import {
   fieldAllows,
   type Manifest,
 } from "@latch/contracts";
-import { App, Space, Tabs, Typography } from "antd";
-import Link from "next/link";
+import { App, Tabs, Typography } from "antd";
 import { notFound, useRouter } from "next/navigation";
 import { useCallback, useMemo } from "react";
 import { useForm, type Resolver } from "react-hook-form";
 import { z } from "zod";
 
-import { FormSection } from "@/components/form/FormSection";
 import { SURFACE_FORM_MAX_WIDTH } from "@/components/form/formLayout";
 import { SelectInput } from "@/components/form/SelectInput";
 import { TextInput } from "@/components/form/TextInput";
@@ -45,13 +43,11 @@ import {
   sanitizeReturnTo,
 } from "@/lib/surface-navigation";
 import { SiteDetailCreateSchema, SiteDetailPatchSchema } from "@/lib/sites/descriptors";
-import type { SiteHubLinkAccess } from "@/lib/surfaces/prefetch-surface-query";
 import { SurfaceApiError } from "@/lib/surface-api";
 
 type SiteDetailFormProps = {
   siteId: string;
   manifest: Manifest;
-  hubLinks: SiteHubLinkAccess;
   returnTo?: string | null;
   returnField?: string | null;
 };
@@ -62,9 +58,6 @@ type SiteDetailFormValues = SiteScopesFormValues & {
   };
   customer_party: {
     customer_party_id: string | null;
-  };
-  property_owner_party: {
-    property_owner_party_id: string | null;
   };
   contacts: SiteContactFormRow[];
 };
@@ -99,9 +92,9 @@ const mapScopes = (rows: unknown): SiteScopeFormRow[] => {
     const item = row as Record<string, unknown>;
     return {
       id: typeof item.id === "string" ? item.id : crypto.randomUUID(),
-      root_category_id: typeof item.root_category_id === "string" ? item.root_category_id : "",
-      root_category_name:
-        typeof item.root_category_name === "string" ? item.root_category_name : "",
+      root_item_id: typeof item.root_item_id === "string" ? item.root_item_id : "",
+      root_item_name:
+        typeof item.root_item_name === "string" ? item.root_item_name : "",
       name: typeof item.name === "string" ? item.name : "",
       sort_order: typeof item.sort_order === "number" ? item.sort_order : index + 1,
       status: typeof item.status === "string" ? item.status : "active",
@@ -138,9 +131,6 @@ const buildDefaultValues = (
   const customerParty = data?.customer_party as
     | { customer_party_id?: string | null }
     | undefined;
-  const propertyOwnerParty = data?.property_owner_party as
-    | { property_owner_party_id?: string | null }
-    | undefined;
 
   return {
     profile: {
@@ -148,9 +138,6 @@ const buildDefaultValues = (
     },
     customer_party: {
       customer_party_id: customerParty?.customer_party_id ?? null,
-    },
-    property_owner_party: {
-      property_owner_party_id: propertyOwnerParty?.property_owner_party_id ?? null,
     },
     contacts: mapContacts(data?.contacts),
     scopes: mapScopes(data?.scopes),
@@ -167,42 +154,9 @@ const partyPickerOptions = (
     label: row.display_name,
   })) ?? [];
 
-type PortfolioHubLinkProps = {
-  partyId: string | null | undefined;
-  displayName: string | null | undefined;
-  href: string;
-  canNavigate: boolean;
-};
-
-const PortfolioHubLink = ({
-  partyId,
-  displayName,
-  href,
-  canNavigate,
-}: PortfolioHubLinkProps) => {
-  if (!partyId) {
-    return null;
-  }
-
-  if (canNavigate) {
-    return (
-      <Link href={href}>
-        {displayName ?? partyId}
-      </Link>
-    );
-  }
-
-  return (
-    <Typography.Text type="secondary">
-      {displayName ?? partyId}
-    </Typography.Text>
-  );
-};
-
 export const SiteDetailForm = ({
   siteId,
   manifest,
-  hubLinks,
   returnTo = null,
   returnField = null,
 }: SiteDetailFormProps) => {
@@ -214,7 +168,6 @@ export const SiteDetailForm = ({
     isCreate ? undefined : siteId,
   );
   const { data: customerPicker } = useSitePartyPicker("customer");
-  const { data: propertyOwnerPicker } = useSitePartyPicker("property_owner");
   const patch = useSurfacePatch("site_detail", siteId);
   const create = useSurfaceListCreate("site_list", "site_detail");
   const remove = useSurfaceDelete("site_detail", siteId);
@@ -225,12 +178,6 @@ export const SiteDetailForm = ({
     | {
         customer_party_id?: string | null;
         customer_display_name?: string | null;
-      }
-    | undefined;
-  const propertyOwnerParty = detail?.data.property_owner_party as
-    | {
-        property_owner_party_id?: string | null;
-        property_owner_display_name?: string | null;
       }
     | undefined;
 
@@ -277,24 +224,6 @@ export const SiteDetailForm = ({
     return options;
   }, [customerParty?.customer_display_name, customerParty?.customer_party_id, customerPicker?.data.rows]);
 
-  const propertyOwnerOptions = useMemo(() => {
-    const options = partyPickerOptions(propertyOwnerPicker?.data.rows);
-    const currentId = propertyOwnerParty?.property_owner_party_id;
-    const currentName = propertyOwnerParty?.property_owner_display_name;
-    if (
-      currentId &&
-      currentName &&
-      !options.some((option) => option.value === currentId)
-    ) {
-      return [...options, { value: currentId, label: currentName }];
-    }
-    return options;
-  }, [
-    propertyOwnerParty?.property_owner_display_name,
-    propertyOwnerParty?.property_owner_party_id,
-    propertyOwnerPicker?.data.rows,
-  ]);
-
   const canSave = patchableFieldIds(activeManifest).length > 0;
   const canDelete = !isCreate && surfaceAllows(activeManifest, "delete");
   const saving = patch.isPending || create.isPending;
@@ -307,14 +236,13 @@ export const SiteDetailForm = ({
         fieldAllows(activeManifest, "contacts", "write") &&
         !validateSiteContactDuplicates(contacts, form.setError)
       ) {
-        message.error("Fix duplicate standing contacts before saving");
+        message.error("Fix duplicate contacts before saving");
         return;
       }
 
       const body: Record<string, unknown> = {
         profile: values.profile,
         customer_party: values.customer_party,
-        property_owner_party: values.property_owner_party,
       };
 
       if (fieldAllows(activeManifest, "contacts", "write")) {
@@ -383,7 +311,7 @@ export const SiteDetailForm = ({
                 });
               }
             });
-            message.error("Fix duplicate standing contacts before saving");
+            message.error("Fix duplicate contacts before saving");
             return;
           }
 
@@ -480,72 +408,32 @@ export const SiteDetailForm = ({
 
   const initialLoading = !isCreate && isLoading && !detail;
   const blocking = !isCreate && isFetching && Boolean(detail);
-  const customerPartyId = form.watch("customer_party.customer_party_id");
-  const propertyOwnerPartyId = form.watch("property_owner_party.property_owner_party_id");
 
   const generalTab = (
     <>
-      <FormSection title="Profile">
-        <TextInput<SiteDetailFormValues>
-          field="profile"
-          name="profile.name"
-          label="Name"
-        />
-      </FormSection>
-
-      <FormSection title="Portfolio">
-        <SelectInput<SiteDetailFormValues>
-          field="customer_party"
-          name="customer_party.customer_party_id"
-          label="Customer"
-          options={customerOptions}
-          selectProps={{ allowClear: true, showSearch: true, optionFilterProp: "label" }}
-        />
-        {customerPartyId ? (
-          <div style={{ marginBottom: 16 }}>
-            <Space>
-              <Typography.Text type="secondary">Open:</Typography.Text>
-              <PortfolioHubLink
-                partyId={customerPartyId}
-                displayName={customerParty?.customer_display_name}
-                href={routes.customers.detail(customerPartyId)}
-                canNavigate={hubLinks.customer}
-              />
-            </Space>
-          </div>
-        ) : null}
-
-        <SelectInput<SiteDetailFormValues>
-          field="property_owner_party"
-          name="property_owner_party.property_owner_party_id"
-          label="Property owner"
-          options={propertyOwnerOptions}
-          selectProps={{ allowClear: true, showSearch: true, optionFilterProp: "label" }}
-        />
-        {propertyOwnerPartyId ? (
-          <div style={{ marginBottom: 16 }}>
-            <Space>
-              <Typography.Text type="secondary">Open:</Typography.Text>
-              <PortfolioHubLink
-                partyId={propertyOwnerPartyId}
-                displayName={propertyOwnerParty?.property_owner_display_name}
-                href={routes.propertyOwners.detail(propertyOwnerPartyId)}
-                canNavigate={hubLinks.propertyOwner}
-              />
-            </Space>
-          </div>
-        ) : null}
-      </FormSection>
-
+      <TextInput<SiteDetailFormValues>
+        field="profile"
+        name="profile.name"
+        label="Name"
+      />
+      <SelectInput<SiteDetailFormValues>
+        field="customer_party"
+        name="customer_party.customer_party_id"
+        label="Customer"
+        options={customerOptions}
+        selectProps={{ allowClear: true, showSearch: true, optionFilterProp: "label" }}
+      />
       <SiteContactFields manifest={activeManifest} />
     </>
   );
 
+  const canReadScopes =
+    fieldAllows(activeManifest, "scopes", "read") ||
+    fieldAllows(activeManifest, "scopes", "write");
+
   const tabItems = [
     { key: "general", label: "General", children: generalTab },
-    ...(!isCreate &&
-    (fieldAllows(activeManifest, "scopes", "read") ||
-      fieldAllows(activeManifest, "scopes", "read"))
+    ...(!isCreate && canReadScopes
       ? [
           {
             key: "scopes-zones",

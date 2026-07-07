@@ -14,7 +14,7 @@ export const PLAYGROUND_SCALAR_FIELD_IDS = [
   "effective_date",
   "start_time",
   "address_line",
-  "category_id",
+  "item_id",
   "priority",
   "body",
   "assignee_ids",
@@ -93,7 +93,7 @@ export const PROFILE_EDITOR_MANIFEST: Manifest = {
     effective_date: ["read", "write"],
     start_time: ["read"],
     address_line: ["read", "write"],
-    category_id: ["read"],
+    item_id: ["read"],
     priority: ["read", "write"],
     body: ["read"],
     assignee_ids: ["read", "write"],
@@ -174,7 +174,7 @@ export type PlaygroundDto = {
   effective_date: string | null;
   start_time: string | null;
   address_line: string;
-  category_id: string;
+  item_id: string;
   priority: number;
   body: string;
   assignee_ids: string[];
@@ -194,7 +194,7 @@ export const FIXTURE_DTO: PlaygroundDto = {
   effective_date: "2026-06-01",
   start_time: "09:30:00",
   address_line: "123 Main St",
-  category_id: "cat-electrical",
+  item_id: "cat-electrical",
   priority: 65,
   body: "Hello @team — playground mention sample.",
   assignee_ids: ["user-alice", "user-bob"],
@@ -241,7 +241,7 @@ export const PLAYGROUND_RECORDS: Record<PlaygroundRecordId, PlaygroundDto> = {
     effective_date: "2026-05-15",
     start_time: "14:00:00",
     address_line: "456 Oak Ave",
-    category_id: "cat-plumbing",
+    item_id: "cat-plumbing",
     priority: 30,
     body: "Person record @alice",
     assignee_ids: ["user-alice"],
@@ -262,7 +262,7 @@ export const EMPTY_PLAYGROUND_DTO: PlaygroundDto = {
   effective_date: null,
   start_time: null,
   address_line: "",
-  category_id: "cat-electrical",
+  item_id: "cat-electrical",
   priority: 50,
   body: "",
   assignee_ids: [],
@@ -294,7 +294,7 @@ export const PlaygroundPatchSchema = z
     effective_date: z.string().nullable(),
     start_time: z.string().nullable(),
     address_line: z.string(),
-    category_id: z.string(),
+    item_id: z.string(),
     priority: z.number(),
     body: z.string(),
     assignee_ids: z.array(z.string()),

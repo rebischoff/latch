@@ -1,151 +1,121 @@
 import type { Pool } from "pg";
 
-import { loadAllCategories } from "./category-tree";
-
-export type ItemTreeNode = {
-  children?: ItemTreeNode[];
-  id: string;
-  label: string;
-  selectable: boolean;
-  type: "category" | "item";
-  value: string;
-};
-
-type ItemRow = {
+export type ItemRootRow = {
   id: string;
   name: string;
+  sort_order: number;
 };
 
-const collectSubtreeIds = (
-  rootCategoryId: string,
-  categoriesById: Map<string, { id: string; parent_id: string | null }>,
-): Set<string> => {
-  const ids = new Set<string>();
-  const walk = (categoryId: string): void => {
-    ids.add(categoryId);
-    for (const [id, row] of categoriesById) {
-      if (row.parent_id === categoryId) {
-        walk(id);
-      }
-    }
-  };
-  walk(rootCategoryId);
-  return ids;
+export type ItemFlatRow = {
+  csi_code: string | null;
+  freight_rate_type_id: string | null;
+  id: string;
+  incidental_rate_type_id: string | null;
+  markup_type_id: string | null;
+  name: string;
+  node_type: "scope" | "category" | "item";
+  parent_id: string | null;
+  sort_order: number;
 };
 
-export const loadItemTreeForRoot = async (
+export type ItemTreeNode = {
+  children: ItemTreeNode[];
+  id: string;
+  is_root: boolean;
+  name: string;
+  node_type: "scope" | "category" | "item";
+  parent_id: string | null;
+  sort_order: number;
+};
+
+/** Migration 039 backfill root — existing site scopes may reference it; not offered for new scopes. */
+export const MIGRATION_GENERAL_SCOPE_ROOT_NAME = "General";
+
+export const listRootItems = async (
   pool: Pool,
-  rootCategoryId: string,
-  searchQuery?: string,
+): Promise<ItemRootRow[]> => {
+  const result = await pool.query<ItemRootRow>(
+    `SELECT id, name, sort_order
+     FROM item
+     WHERE parent_id IS NULL
+     ORDER BY sort_order ASC, name ASC, id ASC`,
+  );
+
+  return result.rows;
+};
+
+export const listSiteScopePickerRoots = async (
+  pool: Pool,
+): Promise<ItemRootRow[]> => {
+  const result = await pool.query<ItemRootRow>(
+    `SELECT id, name, sort_order
+     FROM item
+     WHERE parent_id IS NULL
+       AND name <> $1
+     ORDER BY sort_order ASC, name ASC, id ASC`,
+    [MIGRATION_GENERAL_SCOPE_ROOT_NAME],
+  );
+
+  return result.rows;
+};
+
+export const loadAllItems = async (
+  pool: Pool,
+): Promise<ItemFlatRow[]> => {
+  const result = await pool.query<ItemFlatRow>(
+    `SELECT id, name, parent_id, node_type, sort_order, csi_code,
+            freight_rate_type_id, incidental_rate_type_id, markup_type_id
+     FROM item
+     ORDER BY sort_order ASC, name ASC, id ASC`,
+  );
+
+  return result.rows;
+};
+
+export const nestItemTree = (
+  rows: ItemFlatRow[],
+  parentId: string | null,
+): ItemTreeNode[] => {
+  const children = rows
+    .filter((row) => (row.parent_id ?? null) === parentId)
+    .sort(
+      (left, right) =>
+        left.sort_order - right.sort_order ||
+        left.name.localeCompare(right.name) ||
+        left.id.localeCompare(right.id),
+    );
+
+  return children.map((row) => ({
+    id: row.id,
+    name: row.name,
+    parent_id: row.parent_id,
+    node_type: row.node_type,
+    sort_order: row.sort_order,
+    is_root: row.parent_id === null,
+    children: nestItemTree(rows, row.id),
+  }));
+};
+
+export const listItemTree = async (
+  pool: Pool,
 ): Promise<ItemTreeNode[]> => {
-  const allCategories = await loadAllCategories(pool);
-  const categoriesById = new Map(allCategories.map((row) => [row.id, row]));
-  const subtreeIds = collectSubtreeIds(rootCategoryId, categoriesById);
+  const rows = await loadAllItems(pool);
+  return nestItemTree(rows, null);
+};
 
-  if (!subtreeIds.has(rootCategoryId)) {
-    return [];
+export const resolveRootItemId = (
+  rows: ItemFlatRow[],
+  categoryId: string,
+): string | undefined => {
+  const byId = new Map(rows.map((row) => [row.id, row]));
+  let current = byId.get(categoryId);
+
+  while (current) {
+    if (current.parent_id === null) {
+      return current.id;
+    }
+    current = byId.get(current.parent_id);
   }
 
-  const categoryIds = [...subtreeIds];
-
-  const [itemsResult, itemCategoryResult, legacyItemsResult] = await Promise.all([
-    pool.query<ItemRow>(`SELECT id, name FROM item ORDER BY name ASC, id ASC`),
-    pool.query<{ item_id: string; category_id: string }>(
-      `SELECT item_id, category_id
-       FROM item_category
-       WHERE category_id = ANY($1::text[])`,
-      [categoryIds],
-    ),
-    pool.query<ItemRow>(
-      `SELECT id, name FROM item
-       WHERE category_id = ANY($1::text[])`,
-      [categoryIds],
-    ),
-  ]);
-
-  const itemsById = new Map(itemsResult.rows.map((row) => [row.id, row]));
-  const itemsByCategory = new Map<string, ItemRow[]>();
-
-  const linkItem = (categoryId: string, itemId: string): void => {
-    const item = itemsById.get(itemId);
-    if (!item) {
-      return;
-    }
-    const bucket = itemsByCategory.get(categoryId) ?? [];
-    if (!bucket.some((row) => row.id === itemId)) {
-      bucket.push(item);
-      itemsByCategory.set(categoryId, bucket);
-    }
-  };
-
-  for (const link of itemCategoryResult.rows) {
-    linkItem(link.category_id, link.item_id);
-  }
-
-  for (const item of legacyItemsResult.rows) {
-    const categoryId = (
-      await pool.query<{ category_id: string | null }>(
-        `SELECT category_id FROM item WHERE id = $1`,
-        [item.id],
-      )
-    ).rows[0]?.category_id;
-    if (categoryId && subtreeIds.has(categoryId)) {
-      linkItem(categoryId, item.id);
-    }
-  }
-
-  const normalizedSearch = searchQuery?.trim().toLowerCase() ?? "";
-
-  const buildFromCategory = (categoryId: string): ItemTreeNode | null => {
-    const category = categoriesById.get(categoryId);
-    if (!category) {
-      return null;
-    }
-
-    const childCategories = allCategories
-      .filter((row) => row.parent_id === categoryId && subtreeIds.has(row.id))
-      .sort((left, right) => left.sort_order - right.sort_order || left.id.localeCompare(right.id));
-
-    const items = (itemsByCategory.get(categoryId) ?? [])
-      .filter((item) =>
-        normalizedSearch === "" ? true : item.name.toLowerCase().includes(normalizedSearch),
-      )
-      .map((item) => ({
-        id: `item:${item.id}`,
-        value: item.id,
-        label: item.name,
-        type: "item" as const,
-        selectable: true,
-      }));
-
-    const childNodes = childCategories
-      .map((child) => buildFromCategory(child.id))
-      .filter((node): node is ItemTreeNode => node !== null);
-
-    const children = [...childNodes, ...items];
-    if (children.length === 0 && normalizedSearch !== "") {
-      return category.name.toLowerCase().includes(normalizedSearch)
-        ? {
-            id: `category:${categoryId}`,
-            value: categoryId,
-            label: category.name,
-            type: "category",
-            selectable: false,
-            children: [],
-          }
-        : null;
-    }
-
-    return {
-      id: `category:${categoryId}`,
-      value: categoryId,
-      label: category.name,
-      type: "category",
-      selectable: false,
-      ...(children.length > 0 ? { children } : {}),
-    };
-  };
-
-  const root = buildFromCategory(rootCategoryId);
-  return root?.children ?? [];
+  return undefined;
 };

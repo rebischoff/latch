@@ -75,11 +75,19 @@ export const extendPartDetailDal = (
     const actorId = await getActorId();
     await insertPart(pool, actorId, row, {
       vendor_pricing: input.vendor_pricing,
+      item_links: input.item_links,
+      part_specs: input.part_specs,
     });
 
     const fieldIds = ["profile"];
     if (input.vendor_pricing !== undefined) {
       fieldIds.push("vendor_pricing");
+    }
+    if (input.item_links !== undefined) {
+      fieldIds.push("item_links");
+    }
+    if (input.part_specs !== undefined) {
+      fieldIds.push("part_specs");
     }
 
     await writeAudit({

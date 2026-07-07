@@ -238,7 +238,11 @@ flowchart LR
 | **37d5** | [37d5-category-spec-owner-column.md](./37d5-category-spec-owner-column.md) | `spec_def.category_id` owner column; drop `category_spec_def`; migration `038` — **complete** |
 | **37e** | [37e-estimate-scope-tab.md](./37e-estimate-scope-tab.md) | Estimate Scope tab DAL/UI + migration 035 + minimal line retarget — **complete** |
 | **37f** | [37f-estimate-line-costing.md](./37f-estimate-line-costing.md) | Scope required; zone parents; TreeSelect; part filter; material snapshot — **complete** |
-| **37g** | [37g-commercial-costing.md](./37g-commercial-costing.md) | Org rate tables; category commercial; full costing engine |
+| **37i** | [37i-unified-item-tree-apply.md](./37i-unified-item-tree-apply.md) | Migration **040a**; unified `item` tree; catalog rename; branch picker — **complete** |
+| **37g** | [37g-commercial-costing.md](./37g-commercial-costing.md) | Org rate tables; commercial engine; migration **040b** (after **37i**) — **complete** |
+| **37j** | [37j-catalog-part-authoring.md](./37j-catalog-part-authoring.md) | `item_links` + `part_specs` on `part_detail` — **complete** (2026-07-06) |
+| **37k** | [37k-part-spec-lifecycle.md](./37k-part-spec-lifecycle.md) | Prune `manufacturer_part_spec` on link shrink; diff `spec_option` writes; part/item warnings — **complete** (2026-07-06) |
+| **37l** | [37l-leaf-quotable-item-model.md](./37l-leaf-quotable-item-model.md) | `item.node_type` (scope/category/item); leaf-only estimate selection; drop `descendantMax`; migration `044` — **complete** (2026-07-06) |
 | **37h** | *(see 37a chain)* | Job `site_zone_id` FK renames |
 
 ### Backbone pass (estimate finish) — tasks 29–32

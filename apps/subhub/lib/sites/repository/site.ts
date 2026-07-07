@@ -22,7 +22,7 @@ export type SiteListQuery = {
 
 export type SiteDetailWriteRow = Pick<
   SiteDetailRow,
-  "id" | "name" | "customer_party_id" | "property_owner_party_id"
+  "id" | "name" | "customer_party_id"
 >;
 
 const assertValidCustomerParty = async (
@@ -52,36 +52,12 @@ const assertValidCustomerParty = async (
   }
 };
 
-const assertValidPropertyOwnerParty = async (
-  client: Pool | PoolClient,
-  partyId: string,
-): Promise<void> => {
-  const result = await client.query<{ id: string }>(
-    `SELECT p.id
-     FROM party p
-     INNER JOIN party_role pr ON pr.party_id = p.id AND pr.role = 'property_owner'
-     WHERE p.id = $1`,
-    [partyId],
-  );
-
-  if (result.rows.length === 0) {
-    throw new ValidationError("Invalid property_owner_party_id", {
-      field: "property_owner_party",
-      code: "invalid_party",
-    });
-  }
-};
-
 const validatePortfolioFks = async (
   client: Pool | PoolClient,
   row: SiteDetailWriteRow,
 ): Promise<void> => {
   if (row.customer_party_id !== null) {
     await assertValidCustomerParty(client, row.customer_party_id);
-  }
-
-  if (row.property_owner_party_id !== null) {
-    await assertValidPropertyOwnerParty(client, row.property_owner_party_id);
   }
 };
 
@@ -95,9 +71,9 @@ export const insertSite = async (
     await withPermissionDb(pool, actorId, async (client) => {
       await validatePortfolioFks(client, row);
       await client.query(
-        `INSERT INTO site (id, name, customer_party_id, property_owner_party_id)
-         VALUES ($1, $2, $3, $4)`,
-        [row.id, row.name, row.customer_party_id, row.property_owner_party_id],
+        `INSERT INTO site (id, name, customer_party_id)
+         VALUES ($1, $2, $3)`,
+        [row.id, row.name, row.customer_party_id],
       );
 
       if (contacts !== undefined) {
@@ -123,10 +99,9 @@ export const updateSite = async (
       `UPDATE site
        SET name = $2,
            customer_party_id = $3,
-           property_owner_party_id = $4,
            updated_at = now()
        WHERE id = $1`,
-      [row.id, row.name, row.customer_party_id, row.property_owner_party_id],
+      [row.id, row.name, row.customer_party_id],
     );
   });
 };
@@ -252,12 +227,9 @@ export const loadSiteDetail = async (
        s.id,
        s.name,
        s.customer_party_id,
-       customer.display_name AS customer_display_name,
-       s.property_owner_party_id,
-       property_owner.display_name AS property_owner_display_name
+       customer.display_name AS customer_display_name
      FROM site s
      LEFT JOIN party customer ON customer.id = s.customer_party_id
-     LEFT JOIN party property_owner ON property_owner.id = s.property_owner_party_id
      WHERE s.id = $1`,
     [id],
   );

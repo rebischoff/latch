@@ -12,14 +12,12 @@ export type SiteDetailRow = {
   customer_party_id: string | null;
   id: string;
   name: string;
-  property_owner_party_id: string | null;
 };
 
 const formatSiteDetailRow = (row: SiteDetailRow): Record<string, unknown> => ({
   customer_party_id: row.customer_party_id,
   id: row.id,
   name: row.name,
-  property_owner_party_id: row.property_owner_party_id,
 });
 
 export const projectSiteDetailRow = (
@@ -35,9 +33,6 @@ export const projectSiteDetailRow = (
   }
   if (manifest.fields.customer_party?.includes("read")) {
     dto.customer_party = { customer_party_id: row.customer_party_id };
-  }
-  if (manifest.fields.property_owner_party?.includes("read")) {
-    dto.property_owner_party = { property_owner_party_id: row.property_owner_party_id };
   }
   return dto;
 };
@@ -57,9 +52,6 @@ export const applySiteDetailPatch = (
   }
   if (typed.customer_party?.customer_party_id !== undefined) {
     next.customer_party_id = typed.customer_party.customer_party_id;
-  }
-  if (typed.property_owner_party?.property_owner_party_id !== undefined) {
-    next.property_owner_party_id = typed.property_owner_party.property_owner_party_id;
   }
   return next;
 };

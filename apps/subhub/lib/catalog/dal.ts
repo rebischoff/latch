@@ -5,23 +5,27 @@ import type { Pool } from "pg";
 import { ensureAuditBootstrap, getPool, getPrincipal } from "../latch";
 
 import {
-  categoryDetailDescriptor,
-  categoryListDescriptor,
-  CategoryListListQuerySchema,
+  itemDetailDescriptor,
+  itemListDescriptor,
+  ItemListListQuerySchema,
 } from "./descriptors";
-import { listCategoryTree } from "./repository/category-tree";
-import { extendCategoryDetailDal } from "./stores/category-detail-create";
-import { createCategoryDetailStore } from "./stores/category-detail-store";
-import { createCategoryListStore } from "./stores/category-list-store";
+import { listItemTree } from "./repository/item-tree";
+import { extendItemDetailDal } from "./stores/item-detail-create";
+import { createItemDetailStore } from "./stores/item-detail-store";
+import { createItemListStore } from "./stores/item-list-store";
+import {
+  createCommercialCatalogDals,
+  type CommercialCatalogDals,
+} from "./stores/commercial-catalog-dals";
 
-export type CategoryListDal = SurfaceDal & {
+export type ItemListDal = SurfaceDal & {
   list: (
     ctx: PermissionContext,
     opts?: Record<string, unknown>,
   ) => Promise<{ rows: Record<string, unknown>[]; total: number }>;
 };
 
-export type CategoryDetailDal = SurfaceDal & {
+export type ItemDetailDal = SurfaceDal & {
   create: (
     ctx: PermissionContext,
     id: string,
@@ -29,9 +33,9 @@ export type CategoryDetailDal = SurfaceDal & {
   ) => Promise<Record<string, unknown>>;
 };
 
-export type CatalogDal = {
-  categoryDetail: CategoryDetailDal;
-  categoryList: CategoryListDal;
+export type CatalogDal = CommercialCatalogDals & {
+  itemDetail: ItemDetailDal;
+  itemList: ItemListDal;
 };
 
 export type CreateCatalogDalOptions = {
@@ -40,9 +44,9 @@ export type CreateCatalogDalOptions = {
 };
 
 const filterTreeByName = (
-  nodes: Awaited<ReturnType<typeof listCategoryTree>>,
+  nodes: Awaited<ReturnType<typeof listItemTree>>,
   query: string,
-): Awaited<ReturnType<typeof listCategoryTree>> => {
+): Awaited<ReturnType<typeof listItemTree>> => {
   const needle = query.trim().toLowerCase();
   if (!needle) {
     return nodes;
@@ -73,45 +77,46 @@ const filterTreeByName = (
 
 export const createCatalogDal = (options: CreateCatalogDalOptions): CatalogDal => {
   const { pool, getActorId } = options;
-  const categoryListStore = createCategoryListStore(pool);
-  const categoryDetailStore = createCategoryDetailStore(pool, getActorId);
-  const categoryListBaseDal = createSurfaceDal(categoryListDescriptor, categoryListStore);
-  const categoryDetailBaseDal = createSurfaceDal(
-    categoryDetailDescriptor,
-    categoryDetailStore,
+  const itemListStore = createItemListStore(pool);
+  const itemDetailStore = createItemDetailStore(pool, getActorId);
+  const itemListBaseDal = createSurfaceDal(itemListDescriptor, itemListStore);
+  const itemDetailBaseDal = createSurfaceDal(
+    itemDetailDescriptor,
+    itemDetailStore,
   );
-  const categoryDetail = extendCategoryDetailDal(
+  const itemDetail = extendItemDetailDal(
     pool,
     getActorId,
-    categoryDetailBaseDal,
+    itemDetailBaseDal,
   );
+  const commercialCatalogDals = createCommercialCatalogDals(pool, getActorId);
 
-  const categoryList: CategoryListDal = {
-    ...categoryListBaseDal,
+  const itemList: ItemListDal = {
+    ...itemListBaseDal,
     list: async (ctx, opts) => {
-      const parsed = CategoryListListQuerySchema.safeParse(opts ?? {});
+      const parsed = ItemListListQuerySchema.safeParse(opts ?? {});
       if (!parsed.success) {
         throw new ValidationError("Validation failed", parsed.error.flatten());
       }
 
-      let tree = await listCategoryTree(pool);
+      let tree = await listItemTree(pool);
       if (parsed.data.q) {
         tree = filterTreeByName(tree, parsed.data.q);
       }
 
       const row = {
-        id: "__category_tree__",
+        id: "__item_tree__",
         tree,
       };
 
       return {
-        rows: [categoryListDescriptor.projectRow(row, ctx.manifest, undefined)],
+        rows: [itemListDescriptor.projectRow(row, ctx.manifest, undefined)],
         total: tree.length,
       };
     },
   };
 
-  return { categoryList, categoryDetail };
+  return { ...commercialCatalogDals, itemList, itemDetail };
 };
 
 let catalogDal: CatalogDal | undefined;

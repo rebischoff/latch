@@ -69,18 +69,18 @@ export const flattenZoneTree = (
 
 const assertRootCategoryExists = async (
   client: PoolClient,
-  rootCategoryId: string,
+  rootItemId: string,
 ): Promise<void> => {
   const result = await client.query<{ id: string }>(
-    `SELECT id FROM category WHERE id = $1 AND parent_id IS NULL`,
-    [rootCategoryId],
+    `SELECT id FROM item WHERE id = $1 AND parent_id IS NULL`,
+    [rootItemId],
   );
 
   if (result.rows.length === 0) {
-    throw new ValidationError("Unknown root_category_id in scopes", {
+    throw new ValidationError("Unknown root_item_id in scopes", {
       field: "scopes",
       code: "unknown_root_category",
-      root_category_id: rootCategoryId,
+      root_item_id: rootItemId,
     });
   }
 };
@@ -210,7 +210,7 @@ export const replaceSiteScopesTx = async (
   }));
 
   for (const row of normalizedScopes) {
-    await assertRootCategoryExists(client, row.root_category_id);
+    await assertRootCategoryExists(client, row.root_item_id);
   }
 
   const scopeKeepIds = normalizedScopes
@@ -284,19 +284,19 @@ export const replaceSiteScopesTx = async (
     if (existingScopeIds.has(scope.id)) {
       await client.query(
         `UPDATE site_scope
-         SET root_category_id = $2,
+         SET root_item_id = $2,
              name = $3,
              sort_order = $4,
              status = 'active'
          WHERE id = $1
            AND site_id = $5`,
-        [scope.id, scope.root_category_id, scope.name, scope.sort_order, siteId],
+        [scope.id, scope.root_item_id, scope.name, scope.sort_order, siteId],
       );
     } else {
       await client.query(
-        `INSERT INTO site_scope (id, site_id, root_category_id, name, sort_order, status)
+        `INSERT INTO site_scope (id, site_id, root_item_id, name, sort_order, status)
          VALUES ($1, $2, $3, $4, $5, 'active')`,
-        [scope.id, siteId, scope.root_category_id, scope.name, scope.sort_order],
+        [scope.id, siteId, scope.root_item_id, scope.name, scope.sort_order],
       );
     }
   }

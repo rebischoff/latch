@@ -40,9 +40,10 @@ export const parseCreateTableColumns = (
   const columns = new Map<string, string>();
   const tableRe = new RegExp(
     `CREATE\\s+TABLE\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?${tableName}\\s*\\(([\\s\\S]*?)\\)\\s*;`,
-    "i",
+    "gi",
   );
-  const match = sql.match(tableRe);
+  const matches = [...sql.matchAll(tableRe)];
+  const match = matches.at(-1);
   if (!match?.[1]) {
     return columns;
   }

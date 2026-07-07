@@ -1,14 +1,13 @@
+import { z } from "zod";
+
 import type { Manifest } from "@latch/contracts";
 import type { SurfaceDescriptor } from "@latch/dal";
-import { z } from "zod";
 
 export type SiteDetailRow = {
   customer_display_name: string | null;
   customer_party_id: string | null;
   id: string;
   name: string;
-  property_owner_display_name: string | null;
-  property_owner_party_id: string | null;
 };
 
 export type SiteContactRow = {
@@ -34,8 +33,8 @@ export type SiteScopeRow = {
   can_delete: boolean;
   id: string;
   name: string;
-  root_category_id: string;
-  root_category_name: string;
+  root_item_id: string;
+  root_item_name: string;
   sort_order: number;
   status: string;
   zones: SiteZoneRow[];
@@ -51,7 +50,7 @@ export type SiteZonePatchRow = {
 export type SiteScopePatchRow = {
   id?: string;
   name: string;
-  root_category_id: string;
+  root_item_id: string;
   sort_order?: number;
   zones: SiteZonePatchRow[];
 };
@@ -102,7 +101,7 @@ const SiteZonePatchElementSchema: z.ZodType<SiteZonePatchRow> = z.lazy(() =>
 const SiteScopePatchElementSchema = z
   .object({
     id: z.string().optional(),
-    root_category_id: z.string(),
+    root_item_id: z.string(),
     name: z.string(),
     sort_order: z.number().optional(),
     zones: z.array(SiteZonePatchElementSchema),
@@ -125,12 +124,6 @@ export const SiteDetailPatchSchema = z
       })
       .strict()
       .optional(),
-    property_owner_party: z
-      .object({
-        property_owner_party_id: z.string().nullable().optional(),
-      })
-      .strict()
-      .optional(),
     contacts: z.array(SiteContactPatchElementSchema).optional(),
     scopes: z.array(SiteScopePatchElementSchema).optional(),
   })
@@ -150,12 +143,6 @@ export const SiteDetailCreateSchema = z
       })
       .strict()
       .optional(),
-    property_owner_party: z
-      .object({
-        property_owner_party_id: z.string().nullable().optional(),
-      })
-      .strict()
-      .optional(),
     contacts: z.array(SiteContactPatchElementSchema).optional(),
     scopes: z.array(SiteScopePatchElementSchema).optional(),
   })
@@ -166,8 +153,6 @@ const formatSiteDetailRow = (row: SiteDetailRow): Record<string, unknown> => ({
   customer_party_id: row.customer_party_id,
   id: row.id,
   name: row.name,
-  property_owner_display_name: row.property_owner_display_name,
-  property_owner_party_id: row.property_owner_party_id,
 });
 
 const normalizeSiteDetailRelated = (
@@ -193,13 +178,6 @@ export const projectSiteDetailRow = (
     dto.customer_party = {
       customer_party_id: row.customer_party_id,
       customer_display_name: row.customer_display_name,
-    };
-  }
-
-  if (manifest.fields.property_owner_party?.includes("read")) {
-    dto.property_owner_party = {
-      property_owner_party_id: row.property_owner_party_id,
-      property_owner_display_name: row.property_owner_display_name,
     };
   }
 
@@ -229,9 +207,6 @@ const applySiteDetailPatch = (
   }
   if (typed.customer_party?.customer_party_id !== undefined) {
     next.customer_party_id = typed.customer_party.customer_party_id;
-  }
-  if (typed.property_owner_party?.property_owner_party_id !== undefined) {
-    next.property_owner_party_id = typed.property_owner_party.property_owner_party_id;
   }
 
   return next;

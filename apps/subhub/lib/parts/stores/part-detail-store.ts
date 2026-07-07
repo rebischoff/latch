@@ -11,6 +11,8 @@ import {
   deletePart,
   loadPartDetail,
   loadPartDetailRelated,
+  replaceItemLinks,
+  replacePartSpecs,
   replaceVendorPricing,
   updatePart,
 } from "../repository";
@@ -59,6 +61,12 @@ export const createPartDetailStore = (
     const patch = related as PartDetailRelatedPatch;
     if (patch.vendor_pricing !== undefined) {
       await replaceVendorPricing(pool, actorId, partId, patch.vendor_pricing);
+    }
+    if (patch.item_links !== undefined) {
+      await replaceItemLinks(pool, actorId, partId, patch.item_links);
+    }
+    if (patch.part_specs !== undefined) {
+      await replacePartSpecs(pool, actorId, partId, patch.part_specs);
     }
   },
 

@@ -1,7 +1,6 @@
 import type { Pool, PoolClient } from "pg";
 
-import { unionEffectiveForCategories } from "@/lib/catalog/repository/category-effective-specs";
-import { loadItemCategories } from "@/lib/catalog/repository/item-part-category";
+import { unionEffectiveForItems } from "@/lib/catalog/repository/item-effective-specs";
 
 import {
   isBucketValueBlank,
@@ -24,15 +23,13 @@ export type FilteredPartRow = {
 
 export type MaterialResolveInput = {
   item_id: string;
+  lock: "line" | "none" | "sell";
   part_id: string | null;
-  part_locked: boolean;
-  material_status: string | null;
 };
 
 export type MaterialResolveResult = {
+  lock: "line" | "none" | "sell";
   part_id: string | null;
-  part_locked: boolean;
-  material_status: "generic" | "suggested" | "verified";
   unit_material: number;
   part_match_alert: string | null;
   filtered_part_count: number;
@@ -45,37 +42,19 @@ type SpecDefMeta = {
   wildcard_option_id: string | null;
 };
 
-const loadItemCategoryIds = async (
-  client: Pool | PoolClient,
-  itemId: string,
-): Promise<string[]> => {
-  const linked = await loadItemCategories(client as Pool, itemId);
-  if (linked.length > 0) {
-    return linked.map((row) => row.category_id);
-  }
-
-  const fallback = await client.query<{ category_id: string | null }>(
-    `SELECT category_id FROM item WHERE id = $1`,
-    [itemId],
-  );
-
-  const categoryId = fallback.rows[0]?.category_id ?? null;
-  return categoryId ? [categoryId] : [];
-};
-
 const loadCandidatePartIds = async (
   client: Pool | PoolClient,
-  categoryIds: string[],
+  itemIds: string[],
 ): Promise<string[]> => {
-  if (categoryIds.length === 0) {
+  if (itemIds.length === 0) {
     return [];
   }
 
   const result = await client.query<{ part_id: string }>(
-    `SELECT DISTINCT pc.part_id
-     FROM part_category pc
-     WHERE pc.category_id = ANY($1::text[])`,
-    [categoryIds],
+    `SELECT DISTINCT pi.part_id
+     FROM part_item pi
+     WHERE pi.item_id = ANY($1::text[])`,
+    [itemIds],
   );
 
   return result.rows.map((row) => row.part_id);
@@ -218,11 +197,10 @@ export const filterPartsForItem = async (
   itemId: string,
   bucket: MergedBucketSpecs,
 ): Promise<FilteredPartRow[]> => {
-  const categoryIds = await loadItemCategoryIds(client, itemId);
-  const effectiveDefs = await unionEffectiveForCategories(client as Pool, categoryIds);
+  const effectiveDefs = await unionEffectiveForItems(client as Pool, [itemId]);
   const effectiveDefIds = new Set(effectiveDefs.map((def) => def.spec_def_id));
 
-  const candidateIds = await loadCandidatePartIds(client, categoryIds);
+  const candidateIds = await loadCandidatePartIds(client, [itemId]);
   if (candidateIds.length === 0) {
     return [];
   }
@@ -319,15 +297,9 @@ export const resolveLineMaterial = async (
   const fallback = await loadItemFallbackCost(client, input.item_id);
   const filteredCount = filtered.length;
 
-  if (input.part_locked && input.part_id) {
+  if (input.lock === "line" && input.part_id) {
     const stillMatches = filtered.some((part) => part.id === input.part_id);
     const pinned = filtered.find((part) => part.id === input.part_id);
-    const vendor =
-      pinned ??
-      (await client.query<{ id: string; mpn: string; description: string }>(
-        `SELECT id, mpn, description FROM manufacturer_part WHERE id = $1`,
-        [input.part_id],
-      ).then((result) => result.rows[0]));
 
     let unitMaterial = fallback;
     let vendorPartId: string | null = null;
@@ -340,13 +312,13 @@ export const resolveLineMaterial = async (
 
     return {
       part_id: input.part_id,
-      part_locked: true,
-      material_status:
-        input.material_status === "verified" ? "verified" : "suggested",
+      lock: "line",
       unit_material: unitMaterial,
       part_match_alert: stillMatches
         ? null
-        : "Pinned part no longer matches bucket specs",
+        : pinned
+          ? null
+          : "Pinned part no longer matches bucket specs",
       filtered_part_count: filteredCount,
       vendor_part_id: vendorPartId,
     };
@@ -355,8 +327,7 @@ export const resolveLineMaterial = async (
   if (filteredCount === 0) {
     return {
       part_id: null,
-      part_locked: false,
-      material_status: "generic",
+      lock: input.lock,
       unit_material: fallback,
       part_match_alert: "No parts match bucket specs — using fallback cost",
       filtered_part_count: 0,
@@ -372,8 +343,7 @@ export const resolveLineMaterial = async (
 
     return {
       part_id: part.id,
-      part_locked: false,
-      material_status: "suggested",
+      lock: input.lock,
       unit_material: unitMaterial,
       part_match_alert: null,
       filtered_part_count: 1,
@@ -386,8 +356,7 @@ export const resolveLineMaterial = async (
 
   return {
     part_id: input.part_id,
-    part_locked: input.part_locked,
-    material_status: input.part_id ? "verified" : "generic",
+    lock: input.lock,
     unit_material: unitMaterial,
     part_match_alert: input.part_id ? null : "Multiple parts match — pick a PN or use max vendor cost",
     filtered_part_count: filteredCount,

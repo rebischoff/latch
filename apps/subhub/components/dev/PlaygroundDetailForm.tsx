@@ -381,8 +381,8 @@ export const PlaygroundDetailForm = () => {
               options={ADDRESS_SUGGESTIONS}
             />
             <TreeSelectInput<PlaygroundFormValues>
-              field="category_id"
-              name="category_id"
+              field="item_id"
+              name="item_id"
               label="Category"
               treeData={CATEGORY_TREE}
             />

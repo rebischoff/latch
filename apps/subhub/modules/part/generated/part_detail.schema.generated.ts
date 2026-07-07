@@ -6,6 +6,8 @@ import { z } from "zod";
 export const PartDetailFieldIds = {
   profile: "profile",
   vendor_pricing: "vendor_pricing",
+  item_links: "item_links",
+  part_specs: "part_specs",
 } as const;
 
 export type PartDetailFieldId = (typeof PartDetailFieldIds)[keyof typeof PartDetailFieldIds];
@@ -13,6 +15,8 @@ export type PartDetailFieldId = (typeof PartDetailFieldIds)[keyof typeof PartDet
 export const partDetailColumnMap = {
   profile: ["manufacturer_part.id", "manufacturer_part.manufacturer_party_id", "manufacturer_part.mpn", "manufacturer_part.description", "manufacturer_part.unit", "manufacturer_part.purchase_unit", "manufacturer_part.units_per_purchase"],
   vendor_pricing: [],
+  item_links: [],
+  part_specs: [],
 } as const satisfies Record<PartDetailFieldId, readonly string[]>;
 
 /** Full read DTO keyed by Field id (narrow with `narrowSchema(..., manifest, 'read')`). */
@@ -28,6 +32,8 @@ export const PartDetailSchema = z.object({
     units_per_purchase: z.number(),
   }),
   vendor_pricing: z.array(z.object({ user_id: z.string() })),
+  item_links: z.array(z.object({ user_id: z.string() })),
+  part_specs: z.array(z.object({ user_id: z.string() })),
 });
 
 /** PATCH body keyed by Field id (narrow with `narrowSchema(..., manifest, 'write')`). */
@@ -44,6 +50,8 @@ export const PartDetailPatchSchema = z.object({
     })
     .optional(),
   vendor_pricing: z.array(z.object({ user_id: z.string() })).optional(),
+  item_links: z.array(z.object({ user_id: z.string() })).optional(),
+  part_specs: z.array(z.object({ user_id: z.string() })).optional(),
 });
 
 export type PartDetailDto = z.infer<typeof PartDetailSchema>;

@@ -454,7 +454,6 @@ Table site {
   id text [pk, default: `gen_random_uuid()::text`]
   name text [not null]
   customer_party_id text [note: 'nullable FK → party — portfolio customer for customer hub tree (not vendor hub)']
-  property_owner_party_id text [note: 'nullable FK → party — legal owner for property_owner hub related_sites']
   parent_site_id text [note: 'nullable FK → site.id; ON DELETE SET NULL']
   physical_address_id text [note: 'nullable FK → address — dispatch/maps; wave 2b; many sites may share one row']
   created_at timestamptz [not null, default: `now()`]
@@ -462,7 +461,6 @@ Table site {
 
   indexes {
     customer_party_id [name: 'site_customer_party_id_idx']
-    property_owner_party_id [name: 'site_property_owner_party_id_idx']
     parent_site_id [name: 'site_parent_site_id_idx']
     physical_address_id [name: 'site_physical_address_id_idx']
   }
@@ -471,22 +469,21 @@ Table site {
     Logical place — portfolio, campus, building, job site. **No inline postal columns** on `site`.
     Optional **`physical_address_id`** → `address` for dispatch/maps (wave 2b). Billing postal on
     party via `party_address`. **Site-owned as-built geography**:
-    optional `site_system` → `site_area` (tree) → `site_asset` (device leaf); estimates may add `proposed` rows.
+    optional `site_scope` → `site_zone` (tree) → `site_asset` (device leaf); estimates may add `proposed` rows.
 
     **`customer_party_id`** — which customer org owns this property in the address-book
     hub (subsidiary or top-level). Set when creating site from **customer_detail** only.
     Vendor hub does not create sites.
 
-    **`property_owner_party_id`** — which property-owner party legally owns this site for
-    **property_owner_detail** `related_sites`. Set when creating site from **property_owner_detail**.
-    May differ from `customer_party_id` when payer ≠ owner. `ON DELETE SET NULL` on owner party.
+    **Property owner** — recorded via **`site_contact`** + site relation label (e.g. Property owner),
+    not a portfolio FK on `site`.
 
     Per-job counterparties remain on `job_party`. See site.md 2026-06-18.
 
     Worked example (Tower REIT / 200 Market Tower):
       party "Tower REIT" + party_address → address "200 Market St" (purpose: hq)
-      site "200 Market Tower" — site_system "Fire alarm" → site_area "Floor 3" → site_asset "Pull station PS-12"
-      estimate @ site → may create proposed site_area/site_asset; lines reference site_area_id / site_asset_id
+      site "200 Market Tower" — site_scope "Fire alarm" → site_zone "Floor 3" → site_asset "Pull station PS-12"
+      estimate @ site → may create proposed site_zone/site_asset; lines reference site_zone_id
       job complete → promotes proposed → active; publishes relocations/removals
 
     Hierarchy (optional): parent_site_id — Portfolio → Building → Wing.
@@ -498,7 +495,7 @@ Table site {
 Table site_scope {
   id text [pk, default: `gen_random_uuid()::text`]
   site_id text [not null]
-  root_category_id text [not null, note: 'FK → category (parent_id IS NULL) — Fire alarm, CCTV, …']
+  root_item_id text [not null, note: 'FK → item (parent_id IS NULL) — Fire alarm, CCTV, …']
   name text [not null, default: '']
   status text [not null, default: 'proposed', note: 'CHECK: proposed | active | removed | cancelled']
   sort_order int [not null, default: 0]
@@ -594,22 +591,19 @@ TableGroup catalog [color: #e67e22] {
   trade
   spec_def
   spec_option
-  category_spec_exclude
+  item_spec_exclude
   manufacturer_part_spec
-  phase_template
-  phase_template_step
-  category
-  item_category
-  part_category
-  labor_context_type
+  labor_phase
+  item_labor_phase
+  item
+  part_item
   labor_rate_type
-  incidental_rate_type
+  cost_add_on_type
   markup_type
-  labor_class
+  complexity_factor
   phase
   manufacturer_part
   vendor_part
-  item
   item_part_link
 }
 
@@ -623,7 +617,7 @@ Table trade {
 
 Table spec_def {
   id uuid [pk, default: `gen_random_uuid()`]
-  category_id text [not null, note: 'FK → category — owning category (root or nested); def inherits to all descendants until a category_spec_exclude']
+  item_id text [not null, note: 'FK → item — owning node (root or nested); def inherits to descendants until item_spec_exclude']
   code text [note: 'nullable stable slug — e.g. slc_protocol; not PK']
   display_name text [not null]
   value_type text [not null, default: 'enum', note: 'CHECK: enum | boolean | text']
@@ -631,9 +625,9 @@ Table spec_def {
   sort_order int [not null, default: 0]
 
   Note: '''
-    One spec dimension owned by a single **category** (`category_id`), root or nested. The namespace
-    scope root is derived by walking `category.parent_id` to the root ancestor. Owner-column model
-    supersedes `category_spec_def`; see catalog decision spec ownership (2026-07-04). Renamed from
+    One spec dimension owned by a single **item** (`item_id`), root or nested. The namespace
+    scope root is derived by walking `item.parent_id` to the root ancestor. Unified item tree
+    (040a) — see catalog decision spec ownership (2026-07-04). Renamed from
     `system_spec_def`. Estimate and part rows FK to `spec_option` for enums — not loose strings.
   '''
 }
@@ -665,52 +659,60 @@ Table manufacturer_part_spec {
   '''
 }
 
-Table phase_template {
+Table labor_phase {
   id text [pk, default: `gen_random_uuid()::text`]
-  name text [not null, note: 'e.g. standard install, FA commissioning']
+  name text [not null, unique]
   sort_order int [not null, default: 0]
 
-  Note: 'Named ordered step set — referenced by `system.default_phase_template_id` and `item.phase_template_id`.'
+  Note: 'Org labor phase catalog — referenced by `item_labor_phase` for commercial costing (040b).'
 }
 
-Table phase_template_step {
-  id text [pk, default: `gen_random_uuid()::text`]
-  phase_template_id text [not null]
-  name text [not null, note: 'Install, Program, Test, Complete, …']
-  sequence int [not null]
-  progress_weight numeric [not null, default: 1]
-  billing_weight numeric [not null, default: 1]
-  requires_previous_phase boolean [not null, default: false]
+Table item_labor_phase {
+  item_id text [not null]
+  labor_phase_id text [not null]
+  labor_rate_type_id text [not null]
+  hours_per_unit numeric [not null, default: 0]
   sort_order int [not null, default: 0]
 
-  Note: '''
-    Ordered steps within a `phase_template`. Seeded onto `scope_phase` when job line is created or
-    on estimate win. Org `phase` catalog bridges here for legacy labor lines (`phase_id`).
-  '''
+  indexes {
+    (item_id, labor_phase_id) [pk]
+  }
+
+  Note: 'Labor hours × rate per item node — one row per phase per item (040b).'
 }
 
-Table category {
+Table item {
   id text [pk, default: `gen_random_uuid()::text`]
   name text [not null]
-  parent_id text [note: 'nullable FK → category.id; NULL = scope root (Fire Alarm, HVAC, …)']
-  csi_code text [note: 'nullable — when aligned to CSI MasterFormat (e.g. 26, 26 05 00)']
-  default_phase_template_id text [note: 'nullable FK → phase_template — on scope roots (J5 fallback)']
+  parent_id text [note: 'nullable FK → item.id; NULL = scope root (Fire Alarm, HVAC, …)']
+  node_type text [not null, default: 'category', note: 'CHECK: scope | category | item — structural role (044)']
+  csi_code text [note: 'nullable — when aligned to CSI MasterFormat']
   sort_order int [not null, default: 0]
+  description text [not null, default: '']
+  default_part_id text [note: 'nullable FK → manufacturer_part']
+  default_vendor_part_id text [note: 'nullable FK → vendor_part']
+  fallback_unit_cost numeric [not null, default: 0]
+  freight_rate_type_id text [note: 'nullable FK → cost_add_on_type (kind=freight)']
+  incidental_rate_type_id text [note: 'nullable FK → cost_add_on_type (kind=incidental)']
+  markup_type_id text [note: 'nullable FK → markup_type']
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
 
   Note: '''
-    **Scope roots** (`parent_id IS NULL`) replace catalog `system`. Nested categories classify
-    items/parts (M:N). Categories own spec dimensions via `spec_def.category_id`. Optional
-    `csi_code` when org uses CSI MasterFormat.
+    **Unified item tree** (040a) — merges legacy `category` + `item`. Scope roots have
+    `parent_id IS NULL` and `node_type = scope`. Estimate lines anchor to **quotable leaves**
+    only (`node_type = item`, 044). Commercial FKs + `item_labor_phase` resolved via
+    `resolveRate(N, R)` (040b).
   '''
 }
 
-Table category_spec_exclude {
-  category_id text [not null]
+Table item_spec_exclude {
+  item_id text [not null]
   spec_def_id uuid [not null]
   sort_order int [not null, default: 0]
 
   indexes {
-    (category_id, spec_def_id) [pk]
+    (item_id, spec_def_id) [pk]
   }
 
   Note: '''
@@ -719,67 +721,57 @@ Table category_spec_exclude {
   '''
 }
 
-Table item_category {
-  item_id text [not null]
-  category_id text [not null]
-  sort_order int [not null, default: 0]
-
-  indexes {
-    (item_id, category_id) [pk]
-  }
-}
-
-Table part_category {
+Table part_item {
   part_id text [not null]
-  category_id text [not null]
+  item_id text [not null]
   sort_order int [not null, default: 0]
 
   indexes {
-    (part_id, category_id) [pk]
+    (part_id, item_id) [pk]
   }
-}
-
-Table labor_context_type {
-  id text [pk, default: `gen_random_uuid()::text`]
-  name text [not null]
-  sort_order int [not null, default: 0]
-
-  Note: 'Estimate scope bucket context — retrofit vs new, warehouse vs office, …'
 }
 
 Table labor_rate_type {
   id text [pk, default: `gen_random_uuid()::text`]
-  name text [not null]
+  name text [not null, unique]
   rate_cents int [not null, default: 0]
-  labor_class_id text [note: 'nullable — bridge to labor_class when shipped']
   sort_order int [not null, default: 0]
+
+  Note: 'Labor class + hourly rate in one row (040b).'
 }
 
-Table incidental_rate_type {
+Table cost_add_on_type {
   id text [pk, default: `gen_random_uuid()::text`]
+  kind text [not null, note: 'CHECK: freight | incidental']
   name text [not null]
-  amount_cents int [not null, default: 0]
-  unit text [not null, default: 'ea']
+  percent numeric [not null, default: 0, note: '% of unit_material']
+  amount_cents int [not null, default: 0, note: 'fixed per quoted unit']
   sort_order int [not null, default: 0]
+
+  indexes {
+    (kind, name) [unique]
+  }
+
+  Note: 'Freight + incidental add-on profiles — split surfaces filter by `kind` (040b).'
 }
 
 Table markup_type {
   id text [pk, default: `gen_random_uuid()::text`]
-  name text [not null]
-  markup_percent numeric [not null, default: 0]
+  name text [not null, unique]
+  material_markup_percent numeric [not null, default: 0]
+  labor_markup_percent numeric [not null, default: 0]
   sort_order int [not null, default: 0]
+
+  Note: 'Split markup — material side on M+freight+incidental; labor side on unit_labor (040b).'
 }
 
-Table labor_class {
+Table complexity_factor {
   id text [pk, default: `gen_random_uuid()::text`]
-  name text [not null, note: 'e.g. installer, programmer, project manager']
+  name text [not null, unique]
+  factor_percent numeric [not null, default: 100]
   sort_order int [not null, default: 0]
 
-  Note: '''
-    Hourly **rate class** for `item.kind = labor`. Drives which rate applies when burdened
-    labor rates land (deferred). Labor is not composed in catalog BOM — use standalone labor
-    `item` rows on the estimate, or multiple `estimate_line` rows when quoting install + program.
-  '''
+  Note: 'Labor complexity multiplier — assigned on estimate scope/zone only (040b).'
 }
 
 Table phase {
@@ -788,9 +780,8 @@ Table phase {
   sort_order int [not null, default: 0]
 
   Note: '''
-    Org catalog of **labor / reporting phases** (not schedule — v2). Bridge to `phase_template_step`
-    for scope phase seeding on jobs. Attach on labor `estimate_line` / `job_line` via `phase_id`
-    until full template rollout. Scheduling dates deferred (v2 `job_phase` instance table).
+    Org catalog of **labor / reporting phases** (not schedule — v2). Used by `item_labor_phase`
+    for commercial costing (040b). Legacy `phase_id` on job/estimate lines may still reference this table.
   '''
 }
 
@@ -836,31 +827,6 @@ Table vendor_part {
   Note: '''
     Vendor orderable SKU + current price (v1 one row per vendor PN; history deferred). No UOM
     column — inherits from `manufacturer_part`. Snapshot onto lines at pick time.
-  '''
-}
-
-Table item {
-  id text [pk, default: `gen_random_uuid()::text`]
-  name text [not null]
-  description text [not null, default: '']
-  kind text [not null, default: 'product', note: 'CHECK: product | labor | assembly | expense']
-  category_id text [note: 'nullable FK → category']
-  labor_class_id text [note: 'nullable FK → labor_class — required when kind = labor (app/DAL)']
-  default_part_id text [note: 'nullable FK → manufacturer_part — primary part for costing']
-  default_vendor_part_id text [note: 'nullable FK → vendor_part — default buy path for costing']
-  fallback_unit_cost numeric [not null, default: 0, note: 'estimate UOM — when part/vendor resolver cannot determine material $ (37f)']
-  phase_template_id text [note: 'nullable FK → phase_template — overrides system default (J5)']
-  created_at timestamptz [not null, default: `now()`]
-  updated_at timestamptz [not null, default: `now()`]
-
-  Note: '''
-    Sellable / estimate resource. An item may represent: **(a)** one exact part (`default_part_id`
-    or a single `item_part_link`), **(b)** one-of-many parts (`item_part_link.link_role =
-    alternate`), or **(c)** a group (`kind = assembly`, `link_role = component`). Default
-    **cost** rolls up from `default_part_id` + `default_vendor_part_id` → `vendor_part.unit_price`
-    (DAL converts purchase vs estimate unit). `expense` = travel, per diem; rentals may be
-    expense or subcontractor on `job_party`. Assembly BOM (parts only) via `item_part_link`.
-    Labor items stand alone — composed on the estimate, not via a second link table.
   '''
 }
 
@@ -921,7 +887,7 @@ Table estimate {
   estimate_date date [note: 'nullable — quote date']
   valid_until date [note: 'nullable — quote expiry']
   source_estimate_id text [note: 'nullable FK → estimate.id; revision chain']
-  category_id text [note: 'nullable FK → category — optional default grouping context for quote']
+  item_id text [note: 'nullable FK → item — optional default grouping context for quote']
   created_at timestamptz [not null, default: `now()`]
   updated_at timestamptz [not null, default: `now()`]
 
@@ -948,22 +914,21 @@ Table estimate_party {
 Table estimate_scope {
   id text [pk, default: `gen_random_uuid()::text`]
   estimate_id text [not null]
-  root_category_id text [note: 'nullable FK → category — null for General scope row']
+  root_item_id text [not null, note: 'FK → item (parent_id IS NULL) — Fire alarm, CCTV, …']
   site_scope_id text [note: 'nullable FK → site_scope — checked scope instance on quote site']
-  labor_context_type_id text [note: 'nullable FK → labor_context_type']
-  markup_type_id text [note: 'nullable FK → markup_type']
+  complexity_factor_id text [note: 'nullable FK → complexity_factor — labor multiplier (040b)']
   sort_order int [not null, default: 0]
 
   Note: '''
-    Checked **scope root** on a quote (renamed from `estimate_system`). Links to site scope
-    instance when user checks a site scope row. General row: both `site_scope_id` and
-    `root_category_id` null. Spec values in `estimate_scope_spec`.
+    Checked **scope root** on a quote. Links to site scope instance when user checks a site scope row.
+    Complexity on scope/zone only — zone overrides scope (040b).
   '''
 }
 
 Table estimate_zone {
   estimate_scope_id text [not null]
   site_zone_id text [not null]
+  complexity_factor_id text [note: 'nullable FK → complexity_factor — overrides scope (040b)']
   sort_order int [not null, default: 0]
 
   indexes {
@@ -1014,23 +979,22 @@ Table estimate_line {
   parent_line_id text [note: 'nullable FK → estimate_line — kit header/component']
   line_number int [not null]
   line_role text [not null, default: 'standalone', note: 'CHECK: standalone | kit_header | kit_component']
-  line_kind text [not null, default: 'product', note: 'CHECK: product | labor | expense']
   description text [not null, default: '']
   quantity numeric [not null, default: 1]
   unit text [not null, default: 'ea', note: 'snapshotted UOM — from manufacturer_part.unit or labor/expense default']
   unit_cost numeric [not null, default: 0]
   unit_price numeric [not null, default: 0]
-  unit_price_target numeric [note: 'nullable — policy sell from markup at calc; 37f']
+  unit_price_target numeric [note: 'nullable — policy sell from markup at calc']
   unit_material numeric [not null, default: 0]
   unit_labor numeric [not null, default: 0]
+  unit_freight numeric [not null, default: 0]
   unit_incidental numeric [not null, default: 0]
   site_zone_id text [note: 'nullable FK → site_zone — zone bucket placement']
   site_asset_id text [note: 'nullable FK → site_asset — device-level scope']
-  material_status text [note: 'nullable — generic | suggested | verified']
-  phase_id text [note: 'nullable FK → phase — labor lines only; bridges to phase_template_step on win']
-  item_id text [not null, note: 'FK → item — required on product lines (37f)']
+  lock text [not null, default: 'none', note: 'CHECK: none | sell | line — recalc gate (040b D6b)']
+  phase_id text [note: 'nullable FK → phase — legacy labor lines']
+  item_id text [not null, note: 'FK → item — required on product lines']
   part_id text [note: 'nullable FK → manufacturer_part — when PN determined or user-picked']
-  part_locked boolean [not null, default: false, note: 'true when user confirmed PN — recalc must not change part_id']
   vendor_part_id text [note: 'nullable FK → vendor_part — cost source when pinned']
   sort_order int [not null, default: 0]
 
@@ -1039,9 +1003,8 @@ Table estimate_line {
   }
 
   Note: '''
-    Quote line — **item_id** required on product lines; **part_id** optional when exact PN is known.
-    **part_locked** — user-confirmed PN; resolver must not overwrite. Material/labor/incidental $
-    snapshotted internally (not separate labor rows). Flat array; UI groups by zone within scope.
+    Quote line — **item_id** at any tree depth; commercial snapshots M/L/freight/incidental/target.
+    **lock** — none=fluid recalc; sell=freeze unit_price; line=skip recalc (040b).
   '''
 }
 
@@ -1113,7 +1076,7 @@ Table job_scope_group {
   name text [not null, default: '']
   group_type text [not null, default: 'general', note: 'CHECK: location | trade | system | phase | sov_section | change_order | repair_group | testing_group | closeout_group | general']
   trade_id text [note: 'nullable FK → trade']
-  root_category_id text [note: 'nullable FK → category (scope root)']
+  root_item_id text [note: 'nullable FK → item (scope root)']
   fulfillment_type text [note: 'nullable — self | subcontracted | by_others | allowance | …']
   site_scope_id text [note: 'nullable FK → site_scope']
   site_zone_id text [note: 'nullable FK → site_zone']
@@ -1690,10 +1653,9 @@ Ref: employee.party_id > party_person.party_id [delete: cascade]
 Ref: party_address.address_id > address.id [delete: cascade]
 Ref: site.physical_address_id > address.id [delete: set null]
 Ref: site.customer_party_id > party.id [delete: set null]
-Ref: site.property_owner_party_id > party.id [delete: set null]
 Ref: site.parent_site_id > site.id [delete: set null]
 Ref: site_scope.site_id > site.id [delete: cascade]
-Ref: site_scope.root_category_id > category.id [delete: restrict]
+Ref: site_scope.root_item_id > item.id [delete: restrict]
 Ref: site_zone.site_id > site.id [delete: cascade]
 Ref: site_zone.site_scope_id > site_scope.id [delete: set null]
 Ref: site_zone.parent_zone_id > site_zone.id [delete: set null]
@@ -1707,49 +1669,45 @@ Ref: site_contact.site_id > site.id [delete: cascade]
 Ref: site_contact.party_id > party.id [delete: cascade]
 Ref: site_contact.relation_id > site_contact_relation.id [delete: restrict]
 
-Ref: category.parent_id > category.id [delete: set null]
-Ref: category.default_phase_template_id > phase_template.id [delete: set null]
-Ref: category_spec_exclude.category_id > category.id [delete: cascade]
-Ref: category_spec_exclude.spec_def_id > spec_def.id [delete: cascade]
-Ref: spec_def.category_id > category.id [delete: cascade]
+Ref: item.parent_id > item.id [delete: set null]
+Ref: item.freight_rate_type_id > cost_add_on_type.id [delete: set null]
+Ref: item.incidental_rate_type_id > cost_add_on_type.id [delete: set null]
+Ref: item.markup_type_id > markup_type.id [delete: set null]
+Ref: item_labor_phase.item_id > item.id [delete: cascade]
+Ref: item_labor_phase.labor_phase_id > labor_phase.id [delete: restrict]
+Ref: item_labor_phase.labor_rate_type_id > labor_rate_type.id [delete: restrict]
+Ref: item_spec_exclude.item_id > item.id [delete: cascade]
+Ref: item_spec_exclude.spec_def_id > spec_def.id [delete: cascade]
+Ref: spec_def.item_id > item.id [delete: cascade]
 Ref: spec_option.spec_def_id > spec_def.id [delete: cascade]
 Ref: manufacturer_part_spec.manufacturer_part_id > manufacturer_part.id [delete: cascade]
 Ref: manufacturer_part_spec.spec_def_id > spec_def.id [delete: cascade]
-Ref: manufacturer_part_spec.spec_option_id > spec_option.id [delete: set null]
-Ref: phase_template_step.phase_template_id > phase_template.id [delete: cascade]
+Ref: manufacturer_part_spec.spec_option_id > spec_option.id [delete: cascade]
 
 Ref: manufacturer_part.manufacturer_party_id > party.id [delete: restrict]
 Ref: vendor_part.vendor_party_id > party.id [delete: cascade]
 Ref: vendor_part.manufacturer_part_id > manufacturer_part.id [delete: cascade]
-Ref: category.parent_id > category.id [delete: set null]
-Ref: item.category_id > category.id [delete: set null]
-Ref: item.labor_class_id > labor_class.id [delete: set null]
-Ref: item.default_part_id > manufacturer_part.id [delete: set null]
-Ref: item.default_vendor_part_id > vendor_part.id [delete: set null]
-Ref: item.phase_template_id > phase_template.id [delete: set null]
 Ref: item_part_link.item_id > item.id [delete: cascade]
 Ref: item_part_link.part_id > manufacturer_part.id [delete: restrict]
 
 Ref: estimate.site_id > site.id [delete: restrict]
 Ref: estimate.source_estimate_id > estimate.id [delete: set null]
-Ref: estimate.category_id > category.id [delete: set null]
+Ref: estimate.item_id > item.id [delete: set null]
 Ref: estimate_party.estimate_id > estimate.id [delete: cascade]
 Ref: estimate_party.party_id > party.id [delete: cascade]
 Ref: estimate_party.relation_id > job_party_relation.id [delete: restrict]
-Ref: item_category.item_id > item.id [delete: cascade]
-Ref: item_category.category_id > category.id [delete: cascade]
-Ref: part_category.part_id > manufacturer_part.id [delete: cascade]
-Ref: part_category.category_id > category.id [delete: cascade]
+Ref: part_item.part_id > manufacturer_part.id [delete: cascade]
+Ref: part_item.item_id > item.id [delete: cascade]
 Ref: estimate_scope.estimate_id > estimate.id [delete: cascade]
-Ref: estimate_scope.root_category_id > category.id [delete: restrict]
+Ref: estimate_scope.root_item_id > item.id [delete: restrict]
 Ref: estimate_scope.site_scope_id > site_scope.id [delete: set null]
-Ref: estimate_scope.labor_context_type_id > labor_context_type.id [delete: set null]
-Ref: estimate_scope.markup_type_id > markup_type.id [delete: set null]
+Ref: estimate_scope.complexity_factor_id > complexity_factor.id [delete: set null]
 Ref: estimate_scope_spec.estimate_scope_id > estimate_scope.id [delete: cascade]
 Ref: estimate_scope_spec.spec_def_id > spec_def.id [delete: restrict]
 Ref: estimate_scope_spec.spec_option_id > spec_option.id [delete: set null]
 Ref: estimate_zone.estimate_scope_id > estimate_scope.id [delete: cascade]
 Ref: estimate_zone.site_zone_id > site_zone.id [delete: cascade]
+Ref: estimate_zone.complexity_factor_id > complexity_factor.id [delete: set null]
 Ref: estimate_zone_spec.estimate_scope_id > estimate_scope.id [delete: cascade]
 Ref: estimate_zone_spec.site_zone_id > site_zone.id [delete: cascade]
 Ref: estimate_zone_spec.spec_def_id > spec_def.id [delete: restrict]
@@ -1775,7 +1733,7 @@ Ref: job_party.party_id > party.id [delete: cascade]
 Ref: job_party.relation_id > job_party_relation.id [delete: restrict]
 Ref: job_scope_group.job_id > job.id [delete: cascade]
 Ref: job_scope_group.trade_id > trade.id [delete: set null]
-Ref: job_scope_group.root_category_id > category.id [delete: set null]
+Ref: job_scope_group.root_item_id > item.id [delete: set null]
 Ref: job_scope_group.site_scope_id > site_scope.id [delete: set null]
 Ref: job_scope_group.site_zone_id > site_zone.id [delete: set null]
 Ref: job_scope_group.sov_line_id > sov_line.id [delete: set null]

@@ -65,11 +65,17 @@ export const routes = {
     new: "/parts/new",
     detail: (id: string) => `/parts/${id}`,
   },
-  categories: {
-    list: "/categories",
-    new: "/categories/new",
-    detail: (id: string) => `/categories/${id}`,
+  items: {
+    list: "/items",
+    new: "/items/new",
+    detail: (id: string) => `/items/${id}`,
   },
+  laborRates: "/labor-rates",
+  freightRates: "/freight-rates",
+  incidentalRates: "/incidental-rates",
+  markupTypes: "/markup-types",
+  complexityFactors: "/complexity-factors",
+  laborPhases: "/labor-phases",
 } as const;
 
 const navMatchPrefixes = [

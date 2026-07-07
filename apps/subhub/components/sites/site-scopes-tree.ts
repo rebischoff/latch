@@ -13,8 +13,8 @@ export type SiteScopeFormRow = {
   can_delete: boolean;
   id: string;
   name: string;
-  root_category_id: string;
-  root_category_name: string;
+  root_item_id: string;
+  root_item_name: string;
   sort_order: number;
   status: string;
   zones: SiteZoneFormRow[];
@@ -78,19 +78,32 @@ export const makeZoneRow = (
 });
 
 export const makeScopeRow = (
-  rootCategoryId: string,
-  rootCategoryName: string,
+  rootItemId: string,
+  rootItemName: string,
   sortOrder: number,
 ): SiteScopeFormRow => ({
   id: crypto.randomUUID(),
-  root_category_id: rootCategoryId,
-  root_category_name: rootCategoryName,
-  name: rootCategoryName,
+  root_item_id: rootItemId,
+  root_item_name: rootItemName,
+  name: rootItemName,
   sort_order: sortOrder,
   status: "active",
   can_delete: true,
   zones: [],
 });
+
+/** Read-only tree label: root name alone, or `instance (root)` when renamed. */
+export const formatScopeInstanceLabel = (
+  instanceName: string,
+  rootItemName: string,
+): string => {
+  const name = instanceName.trim();
+  const root = rootItemName.trim();
+  if (!root || name === root) {
+    return name || root;
+  }
+  return `${name} (${root})`;
+};
 
 const zoneTreeNodes = (zones: SiteZoneFormRow[] | undefined): SiteScopesTreeNode[] =>
   (zones ?? []).map((zone) => ({
@@ -111,7 +124,7 @@ export const buildScopesTree = (scopes: SiteScopeFormRow[]): SiteScopesTreeNode[
     .map((scope) => ({
       key: `scope:${scope.id}`,
       rowKind: "scope",
-      label: scope.root_category_name,
+      label: formatScopeInstanceLabel(scope.name, scope.root_item_name),
       scopeIndex: scopes.findIndex((row) => row.id === scope.id),
       children: zoneTreeNodes(scope.zones),
     }));
@@ -452,7 +465,7 @@ export const stripScopesForPatch = (
   scopes: Array<{
     id: string;
     name: string;
-    root_category_id: string;
+    root_item_id: string;
     sort_order: number;
     zones: StrippedZonePatchRow[];
   }>;
@@ -469,7 +482,7 @@ export const stripScopesForPatch = (
   return {
     scopes: ordered.scopes.map((scope) => ({
       id: scope.id,
-      root_category_id: scope.root_category_id,
+      root_item_id: scope.root_item_id,
       name: scope.name,
       sort_order: scope.sort_order,
       zones: scope.zones.map(stripZone),

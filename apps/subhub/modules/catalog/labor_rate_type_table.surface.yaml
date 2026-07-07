@@ -1,0 +1,32 @@
+# Org labor rate catalog (editable table page)
+id: labor_rate_type_table
+displayName: Labor rates
+anchorTable: labor_rate_type
+
+fieldActions:
+  - read
+  - write
+
+surfaceActions:
+  - read
+  - write
+  - delete
+
+tables:
+  - labor_rate_type
+
+fields:
+  - id: name
+    columns:
+      - column: labor_rate_type.id
+        type: string
+      - column: labor_rate_type.name
+        type: string
+  - id: rate_cents
+    columns:
+      - column: labor_rate_type.rate_cents
+        type: number
+  - id: sort_order
+    columns:
+      - column: labor_rate_type.sort_order
+        type: number

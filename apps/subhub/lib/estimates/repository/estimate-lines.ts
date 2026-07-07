@@ -9,12 +9,13 @@ const mapLineItemRow = (row: EstimateLineItemRow): EstimateLineItemRow => ({
   unit_price: Number(row.unit_price),
   unit_material: Number(row.unit_material),
   unit_labor: Number(row.unit_labor),
+  unit_freight: Number(row.unit_freight ?? 0),
   unit_incidental: Number(row.unit_incidental),
   unit_price_target:
     row.unit_price_target === null || row.unit_price_target === undefined
       ? null
       : Number(row.unit_price_target),
-  part_locked: Boolean(row.part_locked),
+  lock: (row.lock ?? "none") as EstimateLineItemRow["lock"],
 });
 
 export const loadEstimateLineItems = async (
@@ -27,7 +28,6 @@ export const loadEstimateLineItems = async (
        el.line_number,
        el.sort_order,
        el.line_role,
-       el.line_kind,
        el.description,
        el.quantity,
        el.unit,
@@ -35,15 +35,15 @@ export const loadEstimateLineItems = async (
        el.unit_price,
        el.unit_material,
        el.unit_labor,
+       el.unit_freight,
        el.unit_incidental,
        el.unit_price_target,
        el.estimate_scope_id,
        el.site_zone_id,
-       el.material_status,
+       el.lock,
        el.phase_id,
        el.item_id,
        el.part_id,
-       el.part_locked,
        el.vendor_part_id,
        el.parent_line_id
      FROM estimate_line el

@@ -8,7 +8,6 @@ import { requireAuth } from "@/lib/require-auth";
 import {
   prefetchSurfaceCreate,
   prefetchSurfaceDetail,
-  resolveHubLinkAccess,
 } from "@/lib/surfaces/prefetch-surface-query";
 
 type SiteIdPageProps = {
@@ -18,7 +17,6 @@ type SiteIdPageProps = {
 
 const SiteIdPage = async ({ params, searchParams }: SiteIdPageProps) => {
   const { id } = await params;
-  const hubLinks = await resolveHubLinkAccess();
 
   if (id === "new") {
     const resolvedSearchParams = await searchParams;
@@ -37,7 +35,6 @@ const SiteIdPage = async ({ params, searchParams }: SiteIdPageProps) => {
         <SiteDetailForm
           siteId="new"
           manifest={manifest}
-          hubLinks={hubLinks}
           returnTo={returnTo}
           returnField={returnField}
         />
@@ -53,7 +50,7 @@ const SiteIdPage = async ({ params, searchParams }: SiteIdPageProps) => {
 
   return (
     <HydrationBoundary state={state}>
-      <SiteDetailForm siteId={id} manifest={manifest} hubLinks={hubLinks} />
+      <SiteDetailForm siteId={id} manifest={manifest} />
     </HydrationBoundary>
   );
 };

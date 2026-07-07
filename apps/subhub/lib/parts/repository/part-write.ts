@@ -13,6 +13,8 @@ import type {
   PartDetailRow,
   PartDetailWriteRow,
 } from "../descriptors/part-detail";
+import { replaceItemLinksTx } from "./part-item-links";
+import { replacePartSpecsTx } from "./part-specs";
 import { replaceVendorPricingTx } from "./vendor-pricing-write";
 
 const DELETE_BLOCKER_SAMPLE_LIMIT = 5;
@@ -219,6 +221,12 @@ export const insertPart = async (
 
       if (related?.vendor_pricing !== undefined) {
         await replaceVendorPricingTx(client, row.id, related.vendor_pricing);
+      }
+      if (related?.item_links !== undefined) {
+        await replaceItemLinksTx(client, row.id, related.item_links);
+      }
+      if (related?.part_specs !== undefined) {
+        await replacePartSpecsTx(client, row.id, related.part_specs);
       }
     });
   } catch (error) {

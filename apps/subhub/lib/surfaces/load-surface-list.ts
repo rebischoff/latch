@@ -25,7 +25,7 @@ const isSurfaceListId = (surfaceId: SurfaceId): surfaceId is SurfaceListId =>
   surfaceId === "estimate_list" ||
   surfaceId === "job_list" ||
   surfaceId === "part_list" ||
-  surfaceId === "category_list";
+  surfaceId === "item_list";
 
 export const loadSurfaceListQuery = async (
   surfaceId: SurfaceListId,

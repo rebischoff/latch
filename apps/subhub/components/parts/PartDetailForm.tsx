@@ -24,6 +24,19 @@ import { useSurfaceFormChrome } from "@/components/surface/SurfaceFormChromeCont
 import { SurfaceFormLayout } from "@/components/surface/SurfaceFormLayout";
 import { SurfaceFormRoot } from "@/components/surface/SurfaceFormRoot";
 import {
+  PartItemLinksField,
+  validateItemLinkDuplicates,
+  type ItemLinkFormRow,
+} from "@/components/parts/PartItemLinksField";
+import {
+  PartSpecsField,
+  type PartSpecFormRow,
+} from "@/components/parts/PartSpecsField";
+import {
+  collapsePartSpecRows,
+  expandPartSpecsForPatch,
+} from "@/lib/parts/part-specs-form";
+import {
   PartVendorPricingFields,
   validateVendorPricingDuplicates,
   type VendorPricingFormRow,
@@ -64,6 +77,54 @@ type PartDetailFormValues = {
     units_per_purchase?: number;
   };
   vendor_pricing: VendorPricingFormRow[];
+  item_links: ItemLinkFormRow[];
+  part_specs: PartSpecFormRow[];
+};
+
+const mapItemLinks = (rows: unknown): ItemLinkFormRow[] => {
+  if (!Array.isArray(rows)) {
+    return [];
+  }
+
+  return rows.map((row) => {
+    const item = row as Record<string, unknown>;
+    return {
+      item_id: typeof item.item_id === "string" ? item.item_id : "",
+      name: typeof item.name === "string" ? item.name : "",
+      breadcrumb: typeof item.breadcrumb === "string" ? item.breadcrumb : "",
+      sort_order: typeof item.sort_order === "number" ? item.sort_order : undefined,
+    };
+  });
+};
+
+const mapPartSpecs = (rows: unknown): PartSpecFormRow[] => {
+  if (!Array.isArray(rows)) {
+    return [];
+  }
+
+  const flat: PartSpecFormRow[] = rows.map((row) => {
+    const item = row as Record<string, unknown>;
+    const valueType =
+      item.value_type === "enum" ||
+      item.value_type === "boolean" ||
+      item.value_type === "text"
+        ? item.value_type
+        : undefined;
+
+    return {
+      spec_def_id: typeof item.spec_def_id === "string" ? item.spec_def_id : "",
+      code: typeof item.code === "string" ? item.code : "",
+      display_name: typeof item.display_name === "string" ? item.display_name : "",
+      value_type: valueType,
+      spec_option_ids:
+        typeof item.spec_option_id === "string" ? [item.spec_option_id] : undefined,
+      value_text: typeof item.value_text === "string" ? item.value_text : null,
+      value_boolean:
+        typeof item.value_boolean === "boolean" ? item.value_boolean : null,
+    };
+  });
+
+  return collapsePartSpecRows(flat);
 };
 
 const mapVendorPricing = (rows: unknown): VendorPricingFormRow[] => {
@@ -102,6 +163,8 @@ const buildDefaultValues = (
         units_per_purchase: 1,
       },
       vendor_pricing: [],
+      item_links: [],
+      part_specs: [],
     };
   }
 
@@ -126,6 +189,8 @@ const buildDefaultValues = (
       units_per_purchase: profile?.units_per_purchase ?? 1,
     },
     vendor_pricing: mapVendorPricing(data?.vendor_pricing),
+    item_links: mapItemLinks(data?.item_links),
+    part_specs: mapPartSpecs(data?.part_specs),
   };
 };
 
@@ -152,6 +217,18 @@ const normalizeProfileBody = (
       : profile.purchase_unit,
   units_per_purchase: profile.units_per_purchase,
 });
+
+const normalizeItemLinksBody = (
+  rows: ItemLinkFormRow[],
+): Array<Record<string, unknown>> =>
+  rows.map((row, index) => ({
+    item_id: row.item_id,
+    sort_order: row.sort_order ?? index + 1,
+  }));
+
+const normalizePartSpecsBody = (
+  rows: PartSpecFormRow[],
+): Array<Record<string, unknown>> => expandPartSpecsForPatch(rows);
 
 const normalizeVendorPricingBody = (
   rows: VendorPricingFormRow[],
@@ -218,6 +295,30 @@ export const PartDetailForm = ({
     return base;
   }, [detail?.data, isCreate, pickerReturn.selectedId]);
 
+  const partSpecsSyncKey = useMemo(() => {
+    if (isCreate) {
+      return "create";
+    }
+    if (!detail?.data) {
+      return `${partId}:loading`;
+    }
+    const links = mapItemLinks(detail.data.item_links);
+    const specs = mapPartSpecs(detail.data.part_specs);
+    const linkIds = links
+      .map((row) => row.item_id)
+      .filter(Boolean)
+      .sort()
+      .join(",");
+    const specIds = specs
+      .map((row) => row.spec_def_id)
+      .filter(Boolean)
+      .sort()
+      .join(",");
+    const dataId =
+      typeof detail.data.id === "string" ? detail.data.id : String(detail.data.id ?? "");
+    return `${partId}:${dataId}:${linkIds}:${specIds}`;
+  }, [detail?.data, isCreate, partId]);
+
   const resolver = useMemo(() => {
     const baseSchema = (isCreate ? PartDetailCreateSchema : PartDetailPatchSchema) as z.ZodObject<
       z.ZodRawShape
@@ -225,6 +326,8 @@ export const PartDetailForm = ({
     const narrowed = narrowPatchSchema(baseSchema, activeManifest) as z.ZodObject<z.ZodRawShape>;
     const loosened = narrowed.extend({
       vendor_pricing: z.array(z.object({}).passthrough()).optional(),
+      item_links: z.array(z.object({}).passthrough()).optional(),
+      part_specs: z.array(z.object({}).passthrough()).optional(),
     });
 
     return zodResolver(loosened);
@@ -299,6 +402,8 @@ export const PartDetailForm = ({
   const persistPart = useCallback(
     async (values: PartDetailFormValues, afterCreate: "detail" | "reset") => {
       const pricingRows = values.vendor_pricing ?? [];
+      const itemLinkRows = values.item_links ?? [];
+      const partSpecRows = values.part_specs ?? [];
 
       if (
         fieldAllows(activeManifest, "vendor_pricing", "write") &&
@@ -308,12 +413,28 @@ export const PartDetailForm = ({
         return;
       }
 
+      if (
+        fieldAllows(activeManifest, "item_links", "write") &&
+        !validateItemLinkDuplicates(itemLinkRows, form.setError)
+      ) {
+        message.error("Fix duplicate item links before saving");
+        return;
+      }
+
       const body: Record<string, unknown> = {
         profile: normalizeProfileBody(values.profile),
       };
 
       if (fieldAllows(activeManifest, "vendor_pricing", "write")) {
         body.vendor_pricing = normalizeVendorPricingBody(pricingRows);
+      }
+
+      if (fieldAllows(activeManifest, "item_links", "write")) {
+        body.item_links = normalizeItemLinksBody(itemLinkRows);
+      }
+
+      if (fieldAllows(activeManifest, "part_specs", "write")) {
+        body.part_specs = normalizePartSpecsBody(partSpecRows);
       }
 
       try {
@@ -550,6 +671,14 @@ export const PartDetailForm = ({
               manifest={activeManifest}
               canNavigateVendor={canNavigateVendor}
             />
+          ) : null}
+
+          {fieldAllows(activeManifest, "item_links", "read") ? (
+            <PartItemLinksField manifest={activeManifest} />
+          ) : null}
+
+          {fieldAllows(activeManifest, "part_specs", "read") ? (
+            <PartSpecsField manifest={activeManifest} syncKey={partSpecsSyncKey} />
           ) : null}
         </SurfaceFormLayout>
       </form>

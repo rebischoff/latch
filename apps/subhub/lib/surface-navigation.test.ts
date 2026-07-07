@@ -41,12 +41,12 @@ describe("buildCreateUrl", () => {
   it("appends extra params after returnTo", () => {
     expect(
       buildCreateUrl({
-        newPath: "/categories/new",
-        returnTo: "/categories",
-        fallbackList: "/categories",
+        newPath: "/items/new",
+        returnTo: "/items",
+        fallbackList: "/items",
         params: { parent_id: "cat-1" },
       }),
-    ).toBe("/categories/new?returnTo=%2Fcategories&parent_id=cat-1");
+    ).toBe("/items/new?returnTo=%2Fitems&parent_id=cat-1");
   });
 });
 

@@ -120,7 +120,7 @@ export const SiteContactRelationCatalog = ({
 
   if (error) {
     return (
-      <Typography.Text type="danger">Unable to load contact relations.</Typography.Text>
+      <Typography.Text type="danger">Unable to load site relations.</Typography.Text>
     );
   }
 

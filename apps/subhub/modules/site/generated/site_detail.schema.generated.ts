@@ -6,7 +6,6 @@ import { z } from "zod";
 export const SiteDetailFieldIds = {
   profile: "profile",
   customer_party: "customer_party",
-  property_owner_party: "property_owner_party",
   contacts: "contacts",
   scopes: "scopes",
 } as const;
@@ -16,7 +15,6 @@ export type SiteDetailFieldId = (typeof SiteDetailFieldIds)[keyof typeof SiteDet
 export const siteDetailColumnMap = {
   profile: ["site.id", "site.name"],
   customer_party: ["site.customer_party_id"],
-  property_owner_party: ["site.property_owner_party_id"],
   contacts: [],
   scopes: [],
 } as const satisfies Record<SiteDetailFieldId, readonly string[]>;
@@ -30,9 +28,6 @@ export const SiteDetailSchema = z.object({
   }),
   customer_party: z.object({
     customer_party_id: z.string().nullable(),
-  }),
-  property_owner_party: z.object({
-    property_owner_party_id: z.string().nullable(),
   }),
   contacts: z.array(z.object({ user_id: z.string() })),
   scopes: z.array(z.object({ user_id: z.string() })),
@@ -49,11 +44,6 @@ export const SiteDetailPatchSchema = z.object({
   customer_party: z
     .object({
       customer_party_id: z.string().nullable().optional(),
-    })
-    .optional(),
-  property_owner_party: z
-    .object({
-      property_owner_party_id: z.string().nullable().optional(),
     })
     .optional(),
   contacts: z.array(z.object({ user_id: z.string() })).optional(),

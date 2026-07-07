@@ -87,7 +87,7 @@ export const loadEstimateDetail = async (
        e.estimate_date,
        e.valid_until,
        e.source_estimate_id,
-       e.category_id
+       e.item_id
      FROM estimate e
      INNER JOIN site s ON s.id = e.site_id
      WHERE e.id = $1`,

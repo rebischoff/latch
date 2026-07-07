@@ -1,10 +1,8 @@
-export type EstimateLineKind = "product" | "labor" | "expense";
 export type EstimateLineRole = "standalone" | "kit_header" | "kit_component";
 
 export type EstimateLineFormRow = {
   id: string;
   line_role: EstimateLineRole;
-  line_kind: EstimateLineKind;
   description: string;
   quantity: number;
   unit: string;
@@ -12,16 +10,16 @@ export type EstimateLineFormRow = {
   unit_price: number;
   unit_material: number;
   unit_labor: number;
+  unit_freight: number;
   unit_incidental: number;
   unit_price_target: number;
   parent_line_id: string | null;
   estimate_scope_id: string | null;
   site_zone_id: string | null;
-  material_status: "generic" | "suggested" | "verified" | null;
+  lock: "line" | "none" | "sell";
   phase_id: string | null;
   item_id: string | null;
   part_id: string | null;
-  part_locked: boolean;
   vendor_part_id: string | null;
 };
 
@@ -42,20 +40,20 @@ export type EstimateScopeSpecFormRow = {
 };
 
 export type EstimateScopeZoneFormRow = {
+  complexity_factor_id: string | null;
   site_zone_id: string;
   sort_order: number;
   specs: EstimateScopeSpecFormRow[];
 };
 
 export type EstimateScopeFormRow = {
+  complexity_factor_id: string | null;
   id: string;
   site_scope_id: string;
-  root_category_id: string;
-  root_category_name: string | null;
+  root_item_id: string;
+  root_item_name: string | null;
   site_scope_name: string | null;
   sort_order: number;
-  labor_context_type_id: string | null;
-  markup_type_id: string | null;
   specs: EstimateScopeSpecFormRow[];
   zones: EstimateScopeZoneFormRow[];
 };
@@ -69,7 +67,7 @@ export type EstimateSiteZoneTreeFormRow = {
 export type EstimateSiteScopeTreeFormRow = {
   id: string;
   name: string;
-  root_category_id: string;
+  root_item_id: string;
   zones: EstimateSiteZoneTreeFormRow[];
 };
 
@@ -102,7 +100,6 @@ export const makeLine = (
 ): EstimateLineFormRow => ({
   id: crypto.randomUUID(),
   line_role: "standalone",
-  line_kind: "product",
   description: "",
   quantity: 1,
   unit: "ea",
@@ -110,16 +107,16 @@ export const makeLine = (
   unit_price: 0,
   unit_material: 0,
   unit_labor: 0,
+  unit_freight: 0,
   unit_incidental: 0,
   unit_price_target: 0,
   parent_line_id: null,
   estimate_scope_id: null,
   site_zone_id: null,
-  material_status: null,
+  lock: "none",
   phase_id: null,
   item_id: null,
   part_id: null,
-  part_locked: false,
   vendor_part_id: null,
   ...overrides,
 });
@@ -185,7 +182,7 @@ export const buildLineTree = (
   return sortedScopes.map((scope, scopeIndex) => {
     const label =
       scope.site_scope_name ??
-      scope.root_category_name ??
+      scope.root_item_name ??
       "Scope";
 
     const siteScopeTree = siteTree?.scopes.find(
@@ -326,7 +323,7 @@ export const parentTargetForKey = (
   return null;
 };
 
-export const rootCategoryIdForParentKey = (
+export const rootItemIdForParentKey = (
   parentKey: string,
   scopes: EstimateScopeFormRow[],
 ): string | null => {
@@ -335,7 +332,7 @@ export const rootCategoryIdForParentKey = (
     return null;
   }
 
-  return scopes.find((scope) => scope.id === target.estimate_scope_id)?.root_category_id ?? null;
+  return scopes.find((scope) => scope.id === target.estimate_scope_id)?.root_item_id ?? null;
 };
 
 // Legacy aliases for gradual migration in tests/docs

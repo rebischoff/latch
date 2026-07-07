@@ -7,6 +7,8 @@ import type {
   VendorPricingRow,
 } from "../descriptors/part-detail";
 import type { PartListRow } from "../descriptors/part-list";
+import { loadItemLinks } from "./part-item-links";
+import { loadPartSpecs } from "./part-specs";
 
 export type PartListQuery = {
   limit: number;
@@ -137,4 +139,6 @@ export const loadPartDetailRelated = async (
   manufacturerPartId: string,
 ): Promise<PartDetailRelated> => ({
   vendor_pricing: await loadVendorPricing(pool, manufacturerPartId),
+  item_links: await loadItemLinks(pool, manufacturerPartId),
+  part_specs: await loadPartSpecs(pool, manufacturerPartId),
 });

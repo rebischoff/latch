@@ -9,6 +9,7 @@ import { Controller, useFieldArray, useFormContext, useWatch } from "react-hook-
 
 import {
   buildScopesTree,
+  formatScopeInstanceLabel,
   getZoneById,
   insertZoneChild,
   makeScopeRow,
@@ -26,7 +27,7 @@ import {
 } from "@/components/sites/site-scopes-tree";
 import { SURFACE_CONTROL_MAX_WIDTH } from "@/components/form/formLayout";
 import { useFormUi } from "@/components/surface/useFormUi";
-import { useCategoryRootPicker } from "@/lib/hooks/use-category-root-picker";
+import { useItemRootPicker } from "@/lib/hooks/use-item-root-picker";
 
 type SiteScopesZonesTreeProps = {
   manifest: Manifest;
@@ -40,6 +41,7 @@ const TREE_ROW_WIDTH = SURFACE_CONTROL_MAX_WIDTH + TREE_DELETE_COL_WIDTH + TREE_
 type ScopesNameInputProps = {
   rowKey: string;
   value: string;
+  readOnlyLabel?: string;
   onChange: (value: string) => void;
   onBlur?: () => void;
   onSelectRow: () => void;
@@ -54,6 +56,7 @@ type ScopesNameInputProps = {
 const ScopesNameInput = ({
   rowKey,
   value,
+  readOnlyLabel,
   onChange,
   onBlur,
   onSelectRow,
@@ -84,7 +87,7 @@ const ScopesNameInput = ({
           focusEditKeyRef.current = null;
         }
       }}
-      value={value}
+      value={isEditing ? value : (readOnlyLabel ?? value)}
       readOnly={!isEditing}
       variant={isEditing ? "outlined" : "borderless"}
       disabled={disabled}
@@ -193,7 +196,7 @@ export const SiteScopesZonesTree = ({ manifest }: SiteScopesZonesTreeProps) => {
   const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
   const [editingKey, setEditingKey] = useState<string | null>(null);
 
-  const { data: rootPicker, isLoading: rootPickerLoading } = useCategoryRootPicker();
+  const { data: rootPicker, isLoading: rootPickerLoading } = useItemRootPicker();
 
   const writableScopes = fieldAllows(manifest, "scopes", "write");
   const writable = writableScopes;
@@ -202,7 +205,7 @@ export const SiteScopesZonesTree = ({ manifest }: SiteScopesZonesTreeProps) => {
 
   const treeData = useMemo(() => toAntdTreeData(buildScopesTree(scopes)), [scopes]);
 
-  const rootCategoryOptions = useMemo(
+  const rootItemOptions = useMemo(
     () =>
       (rootPicker?.data.rows ?? []).map((row) => ({
         key: row.id,
@@ -211,7 +214,7 @@ export const SiteScopesZonesTree = ({ manifest }: SiteScopesZonesTreeProps) => {
     [rootPicker?.data.rows],
   );
 
-  const hasRootCategories = rootCategoryOptions.length > 0;
+  const hasScopeRoots = rootItemOptions.length > 0;
 
   const selectRow = useCallback((key: string) => {
     setSelectedKeys([key]);
@@ -239,8 +242,8 @@ export const SiteScopesZonesTree = ({ manifest }: SiteScopesZonesTreeProps) => {
   );
 
   const addRootScope = useCallback(
-    (rootCategoryId: string) => {
-      const rootRow = rootPicker?.data.rows.find((row) => row.id === rootCategoryId);
+    (rootItemId: string) => {
+      const rootRow = rootPicker?.data.rows.find((row) => row.id === rootItemId);
       if (!rootRow) {
         return;
       }
@@ -334,7 +337,7 @@ export const SiteScopesZonesTree = ({ manifest }: SiteScopesZonesTreeProps) => {
   };
 
   const addScopeMenu = {
-    items: rootCategoryOptions,
+    items: rootItemOptions,
     onClick: ({ key }: { key: string }) => addRootScope(key),
   };
 
@@ -431,6 +434,10 @@ export const SiteScopesZonesTree = ({ manifest }: SiteScopesZonesTreeProps) => {
                 <ScopesNameInput
                   rowKey={rowKey}
                   value={String(value ?? "")}
+                  readOnlyLabel={formatScopeInstanceLabel(
+                    String(value ?? ""),
+                    scope.root_item_name,
+                  )}
                   disabled={disabled || !writableScopes}
                   emphasis
                   placeholder="Scope name"
@@ -493,7 +500,8 @@ export const SiteScopesZonesTree = ({ manifest }: SiteScopesZonesTreeProps) => {
   return (
     <div>
       <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
-        Optional. Define scopes and zones for quoting and jobs.
+        Optional. Each scope is an instance of a catalog scope root (top-level item). Add
+        zones underneath for geography on this site.
       </Typography.Paragraph>
 
       {writable ? (
@@ -501,7 +509,7 @@ export const SiteScopesZonesTree = ({ manifest }: SiteScopesZonesTreeProps) => {
           {writableScopes ? (
             <Dropdown
               menu={addScopeMenu}
-              disabled={disabled || rootPickerLoading || !hasRootCategories}
+              disabled={disabled || rootPickerLoading || !hasScopeRoots}
             >
               <Button type="primary" icon={<PlusOutlined />}>
                 Add scope <DownOutlined />
@@ -516,9 +524,9 @@ export const SiteScopesZonesTree = ({ manifest }: SiteScopesZonesTreeProps) => {
         </Space>
       ) : null}
 
-      {writableScopes && !rootPickerLoading && !hasRootCategories ? (
+      {writableScopes && !rootPickerLoading && !hasScopeRoots ? (
         <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
-          No root categories defined — add categories in catalog admin before adding scopes.
+          No scope roots in Items — add top-level items there before adding scopes.
         </Typography.Paragraph>
       ) : null}
 

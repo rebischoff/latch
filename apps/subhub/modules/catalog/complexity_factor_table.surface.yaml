@@ -1,0 +1,32 @@
+# Org complexity factor catalog (editable table page)
+id: complexity_factor_table
+displayName: Complexity factors
+anchorTable: complexity_factor
+
+fieldActions:
+  - read
+  - write
+
+surfaceActions:
+  - read
+  - write
+  - delete
+
+tables:
+  - complexity_factor
+
+fields:
+  - id: name
+    columns:
+      - column: complexity_factor.id
+        type: string
+      - column: complexity_factor.name
+        type: string
+  - id: factor_percent
+    columns:
+      - column: complexity_factor.factor_percent
+        type: number
+  - id: sort_order
+    columns:
+      - column: complexity_factor.sort_order
+        type: number

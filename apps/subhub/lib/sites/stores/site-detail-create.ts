@@ -42,10 +42,7 @@ export const createSiteRowFromBody = (
   id,
   name: body.profile.name,
   customer_party_id: body.customer_party?.customer_party_id ?? null,
-  property_owner_party_id:
-    body.property_owner_party?.property_owner_party_id ?? null,
   customer_display_name: null,
-  property_owner_display_name: null,
 });
 
 export const extendSiteDetailDal = (
@@ -78,9 +75,6 @@ export const extendSiteDetailDal = (
     const fieldIds = ["profile"];
     if (input.customer_party !== undefined) {
       fieldIds.push("customer_party");
-    }
-    if (input.property_owner_party !== undefined) {
-      fieldIds.push("property_owner_party");
     }
     if (input.contacts !== undefined) {
       fieldIds.push("contacts");

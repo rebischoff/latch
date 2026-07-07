@@ -1,0 +1,20 @@
+# Items — tree list pane for item_detail
+id: item_list
+displayName: Item list
+anchorTable: item
+
+fieldActions:
+  - read
+  - write
+
+surfaceActions:
+  - read
+  - create
+
+tables:
+  - item
+
+fields:
+  - id: tree
+    # logical — DAL maps nested item forest; see docs/surface-specs/item.md
+    columns: []

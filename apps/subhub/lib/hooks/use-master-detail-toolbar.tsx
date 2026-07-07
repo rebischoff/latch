@@ -32,14 +32,14 @@ export type CreateConfig =
         disabled?: boolean;
       }>;
     }
-  | { variant: "category"; trigger?: "click" | "hover" };
+  | { variant: "item"; trigger?: "click" | "hover" };
 
 export type MasterDetailSurfaceConfig = {
   listRoute: string;
   newPath: string;
   detailSurfaceId: SurfaceId;
   createGate: "write" | "create";
-  /** Manifest surface for gating **New** (default: `detailSurfaceId`). Categories use `category_list`. */
+  /** Manifest surface for gating **New** (default: `detailSurfaceId`). Categories use `item_list`. */
   createManifestSurfaceId?: SurfaceId;
   create?: CreateConfig;
 };
@@ -110,6 +110,7 @@ export const useMasterDetailToolbar = (
     entityId,
     config,
   });
+  const childCreateBlocked = selection?.childCreateBlocked ?? false;
 
   const onNew = useCallback(() => {
     const href = buildCreateUrl({
@@ -129,7 +130,7 @@ export const useMasterDetailToolbar = (
       const createConfig = config.create ?? { variant: "button" as const };
       const returnTo = currentReturnTo(pathname, searchParams);
 
-      if (createConfig.variant === "category" && canCreate(createManifest, config.createGate)) {
+      if (createConfig.variant === "item" && canCreate(createManifest, config.createGate)) {
         items.push({
           variant: "dropdown",
           key: "new",
@@ -155,7 +156,7 @@ export const useMasterDetailToolbar = (
             {
               key: "new-child",
               label: "New child",
-              disabled: !childParentIdForRender,
+              disabled: !childParentIdForRender || childCreateBlocked,
               onClick: () => {
                 const parentId = resolveChildParentId({
                   selectionId: selection?.selectionRef.current ?? null,
@@ -308,6 +309,7 @@ export const useMasterDetailToolbar = (
 
     return items;
   }, [
+    childCreateBlocked,
     childParentIdForRender,
     chrome,
     config,

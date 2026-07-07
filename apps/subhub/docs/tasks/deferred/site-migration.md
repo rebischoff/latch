@@ -19,8 +19,9 @@ Business DDL for postal addresses, sites, site geography, site contacts, and rel
 | `migrations/018_party_refactor.sql` | **Create** — `party_person`, `party_organization`, `note`; backfill from `016`; retarget `employee` → `party_person`; drop `party.notes`; widen `party_role.role` check |
 | `migrations/019_site.sql` | **Create** — `address`, `site`, `site_section`, `site_location`, `party_address`, `site_contact_relation`, `site_contact` |
 | `migrations/020_site_contact_relation_dev_seed.sql` | **Create** — optional dev fixtures for relation catalog (approved 2026-06-16) |
+| `migrations/042_site_dev_seed.sql` | **Create** — optional Oahu portfolio sites with customers, standing contacts, scopes & zones (local QA; idempotent on name keys) |
 
-> Business DDL continues from `016`–`017` (party). Platform migrations remain `001`–`015`. **No business `INSERT`s in `019_site.sql`** — `site_contact_relation` DDL is empty ([task 16](../16-slice2-planning-gate.md)). Local QA: `020_site_contact_relation_dev_seed.sql` (Postgres-assigned ids; idempotent on `display_name`).
+> Business DDL continues from `016`–`017` (party). Platform migrations remain `001`–`015`. **No business `INSERT`s in `019_site.sql`** — `site_contact_relation` DDL is empty ([task 16](../16-slice2-planning-gate.md)). Local QA: `020_site_contact_relation_dev_seed.sql` (Postgres-assigned ids; idempotent on `display_name`); portfolio sites: `042_site_dev_seed.sql` (requires `020`, `031`, `039+`).
 
 **Party refactor before sites:** Shipped `016_party.sql` still has inline `party.notes` and `employee` → `party`; [`current.dbml`](../../schema/current.dbml) targets kind extensions and polymorphic `note`. Run **`018_party_refactor.sql` before `019_site.sql`**. **Backfill:** person → `party_person.first_name` from `display_name`, `last_name` `''`; organization → `party_organization` (optional `dba_name` when `display_name` ≠ `legal_name`); non-empty `party.notes` → one `note` row per party (`entity_type = 'party'`); then drop `party.notes`.
 

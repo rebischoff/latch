@@ -26,10 +26,16 @@ export type SurfaceListId =
   | "site_list"
   | "site_contact_relation_table"
   | "job_party_relation_table"
+  | "labor_rate_type_table"
+  | "freight_rate_type_table"
+  | "incidental_rate_type_table"
+  | "markup_type_table"
+  | "complexity_factor_table"
+  | "labor_phase_table"
   | "estimate_list"
   | "job_list"
   | "part_list"
-  | "category_list";
+  | "item_list";
 
 /** Detail surfaces with a shared loader (see surface-form-prefetch.md inventory). */
 export type SurfaceDetailId =
@@ -42,7 +48,7 @@ export type SurfaceDetailId =
   | "estimate_detail"
   | "job_detail"
   | "part_detail"
-  | "category_detail";
+  | "item_detail";
 
 type ListLoader = {
   ensureDal: () => Promise<void>;
@@ -192,6 +198,60 @@ const listLoaders: Record<SurfaceListId, ListLoader> = {
       return dal.jobPartyRelationTable.listAll(ctx);
     },
   },
+  labor_rate_type_table: {
+    ensureDal: async () => {
+      await ensureCatalogDal();
+    },
+    list: async (ctx) => {
+      const dal = await ensureCatalogDal();
+      return dal.laborRateTypeTable.listAll(ctx);
+    },
+  },
+  freight_rate_type_table: {
+    ensureDal: async () => {
+      await ensureCatalogDal();
+    },
+    list: async (ctx) => {
+      const dal = await ensureCatalogDal();
+      return dal.freightRateTypeTable.listAll(ctx);
+    },
+  },
+  incidental_rate_type_table: {
+    ensureDal: async () => {
+      await ensureCatalogDal();
+    },
+    list: async (ctx) => {
+      const dal = await ensureCatalogDal();
+      return dal.incidentalRateTypeTable.listAll(ctx);
+    },
+  },
+  markup_type_table: {
+    ensureDal: async () => {
+      await ensureCatalogDal();
+    },
+    list: async (ctx) => {
+      const dal = await ensureCatalogDal();
+      return dal.markupTypeTable.listAll(ctx);
+    },
+  },
+  complexity_factor_table: {
+    ensureDal: async () => {
+      await ensureCatalogDal();
+    },
+    list: async (ctx) => {
+      const dal = await ensureCatalogDal();
+      return dal.complexityFactorTable.listAll(ctx);
+    },
+  },
+  labor_phase_table: {
+    ensureDal: async () => {
+      await ensureCatalogDal();
+    },
+    list: async (ctx) => {
+      const dal = await ensureCatalogDal();
+      return dal.laborPhaseTable.listAll(ctx);
+    },
+  },
   estimate_list: {
     ensureDal: async () => {
       await ensureEstimatesDal();
@@ -235,19 +295,19 @@ const listLoaders: Record<SurfaceListId, ListLoader> = {
       return createViaDetailDal("part_detail", dal.partDetail.create.bind(dal.partDetail), body);
     },
   },
-  category_list: {
+  item_list: {
     ensureDal: async () => {
       await ensureCatalogDal();
     },
     list: async (ctx, query) => {
       const dal = await ensureCatalogDal();
-      return dal.categoryList.list(ctx, query);
+      return dal.itemList.list(ctx, query);
     },
     create: async (_ctx, body) => {
       const dal = await ensureCatalogDal();
       return createViaDetailDal(
-        "category_detail",
-        dal.categoryDetail.create.bind(dal.categoryDetail),
+        "item_detail",
+        dal.itemDetail.create.bind(dal.itemDetail),
         body,
       );
     },
@@ -336,13 +396,13 @@ const detailLoaders: Record<SurfaceDetailId, DetailLoader> = {
       return dal.partDetail;
     },
   },
-  category_detail: {
+  item_detail: {
     ensureDal: async () => {
       await ensureCatalogDal();
     },
     getDal: async () => {
       const dal = await ensureCatalogDal();
-      return dal.categoryDetail;
+      return dal.itemDetail;
     },
   },
 };

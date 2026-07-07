@@ -10,12 +10,12 @@ import {
 
 export type ItemTreeNode = ItemTreePickerNode;
 
-export const useEstimateItemPicker = (rootCategoryId: string | null, enabled: boolean) =>
+export const useEstimateItemPicker = (rootItemId: string | null, enabled: boolean) =>
   useQuery({
-    queryKey: ["estimate-item-picker", rootCategoryId],
-    enabled: enabled && Boolean(rootCategoryId),
+    queryKey: ["estimate-item-picker", rootItemId],
+    enabled: enabled && Boolean(rootItemId),
     queryFn: async () => {
-      const result = await fetchEstimateItemPicker(rootCategoryId as string);
+      const result = await fetchEstimateItemPicker(rootItemId as string);
       return result.data.tree;
     },
     staleTime: 30_000,
