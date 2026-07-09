@@ -1,4 +1,4 @@
-# Item profile + root spec definitions + nested spec participation
+# Item profile + leaf spec participation + labor phases
 id: item_detail
 displayName: Item detail
 anchorTable: item
@@ -16,7 +16,7 @@ tables:
   - item
   - spec_def
   - spec_option
-  - item_spec_exclude
+  - item_spec_participation
 
 fields:
   - id: profile
@@ -51,9 +51,15 @@ fields:
   - id: item_labor_phase
     # logical — DAL maps item_labor_phase junction rows
     columns: []
+  - id: inherited_labor_phase
+    # logical — read-only ancestor labor group when leaf has no own rows (37n)
+    columns: []
+  - id: labor_phase_mode
+    # logical — derived: empty | inherited | override (37n)
+    columns: []
   - id: spec_definitions
-    # logical — DAL maps spec_def + spec_option for scope roots
+    # logical — DAL maps spec_def + spec_option for scope roots only (37o UI pivot)
     columns: []
   - id: spec_participation
-    # logical — DAL maps item_spec_exclude joined to spec_def owners
+    # logical — DAL maps item_spec_participation flat opt-in (37o)
     columns: []

@@ -140,6 +140,12 @@ const costAddOnConfig = (kind: "freight" | "incidental"): CatalogTableConfig => 
     Number(row.sort_order ?? 0),
   ],
   updateSet: "name = $2, percent = $3, amount_cents = $4, sort_order = $5",
+  updateValues: (row) => [
+    row.name,
+    Number(row.percent ?? 0),
+    Number(row.amount_cents ?? 0),
+    Number(row.sort_order ?? 0),
+  ],
   validateRow: validateAddOnRow,
   deleteBlockers: itemFkBlockers([
     kind === "freight" ? "freight_rate_type_id" : "incidental_rate_type_id",

@@ -1,5 +1,7 @@
 import type { Pool, PoolClient } from "pg";
 
+import { tableExists } from "../../sites/repository/sql-utils";
+
 export type ItemCommercialRow = {
   fallback_unit_cost: number;
   freight_rate_type_id: string | null;
@@ -81,16 +83,16 @@ export const loadCommercialCatalog = async (
   };
 };
 
-const laborCostForItem = (
-  catalog: CommercialCatalog,
-  itemId: string,
-): number => {
-  const rows = catalog.laborByItem.get(itemId) ?? [];
-  return rows.reduce(
+const laborCostForRows = (rows: ItemLaborPhaseRow[]): number =>
+  rows.reduce(
     (sum, row) => sum + Number(row.hours_per_unit) * Number(row.rate_cents) / 100,
     0,
   );
-};
+
+const laborCostForItem = (
+  catalog: CommercialCatalog,
+  itemId: string,
+): number => laborCostForRows(catalog.laborByItem.get(itemId) ?? []);
 
 const walkAncestry = (
   catalog: CommercialCatalog,
@@ -113,6 +115,60 @@ export type RateFamily =
   | "incidental"
   | "markup"
   | "material_rom";
+
+export const resolveLaborGroup = (
+  catalog: CommercialCatalog,
+  itemId: string,
+): ItemLaborPhaseRow[] => {
+  const selfRows = catalog.laborByItem.get(itemId) ?? [];
+  if (selfRows.length > 0) {
+    return selfRows;
+  }
+
+  const path = walkAncestry(catalog, itemId);
+  for (let index = 1; index < path.length; index += 1) {
+    const ancestorId = path[index]!;
+    const rows = catalog.laborByItem.get(ancestorId) ?? [];
+    if (rows.length > 0) {
+      return rows;
+    }
+  }
+
+  return [];
+};
+
+export const resolveIncludedLaborPhaseIds = (
+  scopePhaseIds: string[] | null | undefined,
+  zonePhaseIds: string[] | null | undefined,
+  laborGroup: ItemLaborPhaseRow[],
+): Set<string> => {
+  const explicit = zonePhaseIds ?? scopePhaseIds;
+  if (!explicit || explicit.length === 0) {
+    return new Set(laborGroup.map((row) => row.labor_phase_id));
+  }
+  return new Set(explicit);
+};
+
+export const filterLaborGroupByInclusion = (
+  laborGroup: ItemLaborPhaseRow[],
+  includedPhaseIds: Set<string>,
+): ItemLaborPhaseRow[] =>
+  laborGroup.filter((row) => includedPhaseIds.has(row.labor_phase_id));
+
+export const resolveFilteredLaborCost = (
+  catalog: CommercialCatalog,
+  itemId: string,
+  scopePhaseIds: string[] | null | undefined,
+  zonePhaseIds: string[] | null | undefined,
+): number => {
+  const laborGroup = resolveLaborGroup(catalog, itemId);
+  const included = resolveIncludedLaborPhaseIds(
+    scopePhaseIds,
+    zonePhaseIds,
+    laborGroup,
+  );
+  return laborCostForRows(filterLaborGroupByInclusion(laborGroup, included));
+};
 
 const selfRate = (
   catalog: CommercialCatalog,
@@ -214,6 +270,43 @@ export const computeUnitPriceTarget = (
     materialSide * (1 + materialMarkup / 100) +
     laborSide * (1 + laborMarkup / 100)
   );
+};
+
+export const loadScopeLaborPhases = async (
+  client: Pool | PoolClient,
+  estimateScopeId: string,
+): Promise<string[]> => {
+  if (!(await tableExists(client, "estimate_scope_labor_phase"))) {
+    return [];
+  }
+
+  const result = await client.query<{ labor_phase_id: string }>(
+    `SELECT labor_phase_id
+     FROM estimate_scope_labor_phase
+     WHERE estimate_scope_id = $1
+     ORDER BY sort_order ASC, labor_phase_id ASC`,
+    [estimateScopeId],
+  );
+  return result.rows.map((row) => row.labor_phase_id);
+};
+
+export const loadZoneLaborPhases = async (
+  client: Pool | PoolClient,
+  estimateScopeId: string,
+  siteZoneId: string,
+): Promise<string[]> => {
+  if (!(await tableExists(client, "estimate_zone_labor_phase"))) {
+    return [];
+  }
+
+  const result = await client.query<{ labor_phase_id: string }>(
+    `SELECT labor_phase_id
+     FROM estimate_zone_labor_phase
+     WHERE estimate_scope_id = $1 AND site_zone_id = $2
+     ORDER BY sort_order ASC, labor_phase_id ASC`,
+    [estimateScopeId, siteZoneId],
+  );
+  return result.rows.map((row) => row.labor_phase_id);
 };
 
 export const loadComplexityContext = async (

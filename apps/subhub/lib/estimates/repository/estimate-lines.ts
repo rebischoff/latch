@@ -2,8 +2,12 @@ import type { Pool } from "pg";
 
 import type { EstimateLineItemRow } from "../descriptors/estimate-detail";
 
-const mapLineItemRow = (row: EstimateLineItemRow): EstimateLineItemRow => ({
+const mapLineItemRow = (
+  row: Omit<EstimateLineItemRow, "phase_id">,
+): EstimateLineItemRow => ({
   ...row,
+  // Legacy org phase_id dropped in migration 045 (37n); DTO keeps null for form compat.
+  phase_id: null,
   quantity: Number(row.quantity),
   unit_cost: Number(row.unit_cost),
   unit_price: Number(row.unit_price),
@@ -22,7 +26,8 @@ export const loadEstimateLineItems = async (
   pool: Pool,
   estimateId: string,
 ): Promise<EstimateLineItemRow[]> => {
-  const result = await pool.query<EstimateLineItemRow>(
+  // phase_id removed from estimate_line in migration 045 — do not SELECT it.
+  const result = await pool.query<Omit<EstimateLineItemRow, "phase_id">>(
     `SELECT
        el.id,
        el.line_number,
@@ -41,7 +46,6 @@ export const loadEstimateLineItems = async (
        el.estimate_scope_id,
        el.site_zone_id,
        el.lock,
-       el.phase_id,
        el.item_id,
        el.part_id,
        el.vendor_part_id,

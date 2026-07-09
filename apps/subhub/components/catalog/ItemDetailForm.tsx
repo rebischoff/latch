@@ -3,43 +3,38 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   fieldAllows,
-  narrowPatchSchema,
   patchableFieldIds,
   surfaceAllows,
   type Manifest,
 } from "@latch/contracts";
 import { App } from "antd";
-import { Badge, Select, TreeSelect, Typography } from "antd";
-import type { TreeSelectProps } from "antd";
-import { notFound, useRouter } from "next/navigation";
+import { Checkbox, Tabs, Typography } from "antd";
+import { notFound, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useMemo, useRef } from "react";
 import { useForm, type Resolver } from "react-hook-form";
 import { z } from "zod";
 
-import { ItemCommercialFields, validateItemLaborPhaseDuplicates } from "@/components/catalog/ItemCommercialFields";
+import { ItemCommercialFields, validateItemLaborPhaseDuplicates, validateItemLaborPhaseRowsComplete } from "@/components/catalog/ItemCommercialFields";
 import { ItemSpecDefinitionsField } from "@/components/catalog/ItemSpecDefinitionsField";
+import { ItemSpecParticipationField } from "@/components/catalog/ItemSpecParticipationField";
 import { FormSection } from "@/components/form/FormSection";
 import { SURFACE_FORM_MAX_WIDTH } from "@/components/form/formLayout";
-import { InputNumberInput } from "@/components/form/InputNumberInput";
+import { FormFieldItem } from "@/components/form/FormFieldItem";
 import { TextInput } from "@/components/form/TextInput";
 import { useSurfaceFormChrome } from "@/components/surface/SurfaceFormChromeContext";
 import { useMasterDetailSelectionOptional } from "@/components/shell/MasterDetailSelectionContext";
 import { SurfaceFormLayout } from "@/components/surface/SurfaceFormLayout";
 import { SurfaceFormRoot } from "@/components/surface/SurfaceFormRoot";
 import { useSurfaceListCreate } from "@/lib/hooks/use-surface-list-create";
-import { useItemTreePicker } from "@/lib/hooks/use-item-tree-picker";
 import { useSurfaceDetail } from "@/lib/hooks/use-surface-detail";
 import { useSurfaceDelete, useSurfacePatch } from "@/lib/hooks/use-surface-patch";
-import {
-  ItemDetailCreateSchema,
-  ItemDetailPatchSchema,
-} from "@/lib/catalog/descriptors/item-detail";
 import { routes } from "@/lib/nav-routes";
 import {
   navigateAfterCreate,
   navigateOnCancel,
   sanitizeReturnTo,
 } from "@/lib/surface-navigation";
+import { toSpecDefinitionPatchRow } from "@/lib/catalog/item-spec-definitions-form";
 import { SurfaceApiError } from "@/lib/surface-api";
 
 type ItemDetailFormProps = {
@@ -60,30 +55,31 @@ export type ItemDetailFormValues = {
     root_item_id?: string | null;
     root_item_name?: string | null;
     is_root?: boolean;
+    has_children?: boolean;
+    in_use?: boolean;
   };
   spec_definitions: Array<{
     id?: string;
-    code?: string | null;
     display_name: string;
-    value_type: "boolean" | "enum" | "text";
-    filter_mode?: "prefer" | "required";
+    value_type: "boolean" | "enum" | "number";
+    unit_id?: string | null;
+    decimal_places?: number | null;
+    unit_symbol?: string | null;
     sort_order?: number;
     options: Array<{
       id?: string;
-      code?: string | null;
       display_name: string;
       sort_order?: number;
     }>;
+    in_use_participation_count?: number;
+    in_use_part_count?: number;
   }>;
   spec_participation: {
     participates: Array<{
       spec_def_id: string;
       display_name: string;
-      value_type: "boolean" | "enum" | "text";
+      value_type: "boolean" | "enum" | "number";
       active: boolean;
-      assign_item_id: string | null;
-      excluded_here: boolean;
-      state: "assigned" | "inherited" | "excluded" | "inactive";
     }>;
   };
   commercial: {
@@ -100,7 +96,19 @@ export type ItemDetailFormValues = {
     hours_per_unit: number;
     sort_order?: number;
   }>;
+  inherited_labor_phase: Array<{
+    labor_phase_id: string;
+    labor_phase_name?: string;
+    labor_rate_type_id: string;
+    labor_rate_type_name?: string;
+    hours_per_unit: number;
+    sort_order?: number;
+  }>;
+  labor_phase_mode?: "empty" | "inherited" | "override";
+  labor_phase_source_item_name?: string | null;
 };
+
+const emptySpecDefinitions = (): ItemDetailFormValues["spec_definitions"] => [];
 
 const emptySpecParticipation = (): ItemDetailFormValues["spec_participation"] => ({
   participates: [],
@@ -119,7 +127,7 @@ const buildDefaultValues = (
         csi_code: null,
         ...(parentId ? { parent_id: parentId } : {}),
       },
-      spec_definitions: [],
+      spec_definitions: emptySpecDefinitions(),
       spec_participation: emptySpecParticipation(),
       commercial: {
         freight_rate_type_id: null,
@@ -128,14 +136,33 @@ const buildDefaultValues = (
         fallback_unit_cost: 0,
       },
       item_labor_phase: [],
+      inherited_labor_phase: [],
+      labor_phase_mode: "empty",
+      labor_phase_source_item_name: null,
     };
   }
 
   const profile = data?.profile as ItemDetailFormValues["profile"] | undefined;
+  const specDefinitions = Array.isArray(data?.spec_definitions)
+    ? (data.spec_definitions as ItemDetailFormValues["spec_definitions"])
+    : [];
   const specParticipation = data?.spec_participation as
     | ItemDetailFormValues["spec_participation"]
     | undefined;
   const commercial = data?.commercial as ItemDetailFormValues["commercial"] | undefined;
+
+  const ownRows = Array.isArray(data?.item_labor_phase)
+    ? (data.item_labor_phase as ItemDetailFormValues["item_labor_phase"])
+    : [];
+  const inheritedRows = Array.isArray(data?.inherited_labor_phase)
+    ? (data.inherited_labor_phase as ItemDetailFormValues["inherited_labor_phase"])
+    : [];
+  const laborPhaseMode =
+    data?.labor_phase_mode === "inherited" ||
+    data?.labor_phase_mode === "override" ||
+    data?.labor_phase_mode === "empty"
+      ? data.labor_phase_mode
+      : "empty";
 
   return {
     profile: {
@@ -148,10 +175,10 @@ const buildDefaultValues = (
       root_item_id: profile?.root_item_id ?? null,
       root_item_name: profile?.root_item_name ?? null,
       is_root: profile?.is_root ?? false,
+      has_children: profile?.has_children ?? false,
+      in_use: profile?.in_use ?? false,
     },
-    spec_definitions: Array.isArray(data?.spec_definitions)
-      ? (data.spec_definitions as ItemDetailFormValues["spec_definitions"])
-      : [],
+    spec_definitions: specDefinitions,
     spec_participation: specParticipation ?? emptySpecParticipation(),
     commercial: {
       freight_rate_type_id: commercial?.freight_rate_type_id ?? null,
@@ -159,35 +186,15 @@ const buildDefaultValues = (
       markup_type_id: commercial?.markup_type_id ?? null,
       fallback_unit_cost: commercial?.fallback_unit_cost ?? 0,
     },
-    item_labor_phase: Array.isArray(data?.item_labor_phase)
-      ? (data.item_labor_phase as ItemDetailFormValues["item_labor_phase"])
-      : [],
+    item_labor_phase: ownRows,
+    inherited_labor_phase: inheritedRows,
+    labor_phase_mode: laborPhaseMode,
+    labor_phase_source_item_name:
+      typeof data?.labor_phase_source_item_name === "string"
+        ? data.labor_phase_source_item_name
+        : null,
   };
 };
-
-const specDefinitionOwnerId = (
-  values: ItemDetailFormValues,
-  row: ItemDetailFormValues["spec_definitions"][number],
-): string | null | undefined => {
-  if (!row.id) {
-    return undefined;
-  }
-  return values.spec_participation.participates.find((participation) => participation.spec_def_id === row.id)
-    ?.assign_item_id;
-};
-
-/** Only defs owned by this category (or new rows at root) belong in the patch body. */
-const patchableSpecDefinitions = (
-  values: ItemDetailFormValues,
-  categoryId: string,
-  isRoot: boolean,
-): ItemDetailFormValues["spec_definitions"] =>
-  values.spec_definitions.filter((row) => {
-    if (!row.id) {
-      return isRoot;
-    }
-    return specDefinitionOwnerId(values, row) === categoryId;
-  });
 
 const toPatchBody = (
   values: ItemDetailFormValues,
@@ -201,37 +208,20 @@ const toPatchBody = (
   if (patchable.includes("profile")) {
     body.profile = {
       name: values.profile.name,
-      sort_order: values.profile.sort_order,
       csi_code: values.profile.csi_code ?? null,
-      ...(values.profile.parent_id !== undefined
-        ? { parent_id: values.profile.parent_id }
+      ...(values.profile.node_type && values.profile.node_type !== "scope"
+        ? { node_type: values.profile.node_type }
         : {}),
-      ...(values.profile.node_type ? { node_type: values.profile.node_type } : {}),
     };
   }
 
-  if (patchable.includes("spec_definitions")) {
-    const ownedRows = patchableSpecDefinitions(values, categoryId, isRoot);
-    body.spec_definitions = ownedRows.map((row, index) => ({
-      ...(row.id ? { id: row.id } : {}),
-      code: row.code ?? null,
-      display_name: row.display_name,
-      value_type: row.value_type,
-      filter_mode: row.filter_mode ?? "required",
-      sort_order: row.sort_order ?? index + 1,
-      options:
-        row.value_type === "enum"
-          ? row.options.map((option, optionIndex) => ({
-              ...(option.id ? { id: option.id } : {}),
-              code: option.code ?? null,
-              display_name: option.display_name,
-              sort_order: option.sort_order ?? optionIndex + 1,
-            }))
-          : [],
-    }));
+  if (patchable.includes("spec_definitions") && values.profile.node_type === "scope") {
+    body.spec_definitions = values.spec_definitions.map((row, index) =>
+      toSpecDefinitionPatchRow(row, index),
+    );
   }
 
-  if (patchable.includes("spec_participation")) {
+  if (patchable.includes("spec_participation") && values.profile.node_type === "item") {
     body.spec_participation = {
       participates: values.spec_participation.participates.map((row) => ({
         spec_def_id: row.spec_def_id,
@@ -255,7 +245,10 @@ const toPatchBody = (
     };
   }
 
-  if (patchable.includes("item_labor_phase")) {
+  if (
+    patchable.includes("item_labor_phase") &&
+    values.profile.node_type !== "scope"
+  ) {
     body.item_labor_phase = values.item_labor_phase
       .filter((row) => row.labor_phase_id && row.labor_rate_type_id)
       .map((row, index) => ({
@@ -276,6 +269,7 @@ export const ItemDetailForm = ({
   returnTo = null,
 }: ItemDetailFormProps) => {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { message, modal } = App.useApp();
   const isCreate = categoryId === "new";
   const detailQuery = useSurfaceDetail(
@@ -296,26 +290,26 @@ export const ItemDetailForm = ({
   );
 
   const resolver = useMemo(() => {
-    const baseSchema = (
-      isCreate ? ItemDetailCreateSchema : ItemDetailPatchSchema
-    ) as z.ZodObject<z.ZodRawShape>;
-    const narrowed = narrowPatchSchema(baseSchema, activeManifest) as z.ZodObject<z.ZodRawShape>;
-    const loosened = narrowed.extend({
-      // Server enforces strict profile schema; form carries read-only display keys.
-      profile: z.object({}).passthrough().optional(),
-      spec_definitions: z.array(z.object({}).passthrough()).optional(),
-      spec_participation: z.object({}).passthrough().optional(),
-      commercial: z.object({}).passthrough().optional(),
-      item_labor_phase: z.array(z.object({}).passthrough()).optional(),
-    });
+    // Client carries read-only display keys; server validates PATCH via narrowPatchSchema.
+    const formSchema = z
+      .object({
+        profile: z.object({}).passthrough().optional(),
+        commercial: z.object({}).passthrough().optional(),
+        item_labor_phase: z.array(z.object({}).passthrough()).optional(),
+        spec_participation: z.object({}).passthrough().optional(),
+        spec_definitions: z.array(z.object({}).passthrough()).optional(),
+        inherited_labor_phase: z.array(z.object({}).passthrough()).optional(),
+        labor_phase_mode: z.enum(["empty", "inherited", "override"]).optional(),
+        labor_phase_source_item_name: z.string().nullable().optional(),
+      })
+      .passthrough();
 
-    return zodResolver(loosened);
-  }, [activeManifest, isCreate]);
+    return zodResolver(formSchema);
+  }, []);
 
   const form = useForm<ItemDetailFormValues>({
     resolver: resolver as unknown as Resolver<ItemDetailFormValues>,
     defaultValues,
-    values: isCreate ? undefined : defaultValues,
   });
 
   const {
@@ -324,19 +318,23 @@ export const ItemDetailForm = ({
 
   const isRoot = form.watch("profile.is_root") ?? false;
   const nodeType = form.watch("profile.node_type") ?? "category";
-  const { data: reparentTree, isLoading: reparentTreeLoading } = useItemTreePicker();
-  const canDelete = !isCreate && surfaceAllows(activeManifest, "delete");
+  const hasChildren = form.watch("profile.has_children") ?? false;
+  const inUse = form.watch("profile.in_use") ?? false;
   const canSave = patchableFieldIds(activeManifest).length > 0;
   const saving = patchMutation.isPending || createMutation.isPending;
+  const showQuotableControl = !isRoot && (isCreate ? Boolean(parentId) : true);
+  const quotableCheckboxDisabled = saving || hasChildren || inUse;
+  const canWriteProfile = fieldAllows(activeManifest, "profile", "write");
+  const canDelete = !isCreate && surfaceAllows(activeManifest, "delete");
 
   const buildCreateProfile = useCallback(
     (profile: ItemDetailFormValues["profile"]) => {
       const resolvedParentId = parentId ?? profile.parent_id;
       return {
         name: profile.name,
-        sort_order: profile.sort_order,
         csi_code: profile.csi_code ?? null,
         ...(resolvedParentId ? { parent_id: resolvedParentId } : {}),
+        ...(profile.node_type === "item" ? { node_type: "item" as const } : {}),
       };
     },
     [parentId],
@@ -344,19 +342,30 @@ export const ItemDetailForm = ({
 
   const persistCategory = useCallback(
     async (values: ItemDetailFormValues, afterCreate: "detail" | "reset") => {
-      if (
-        patchableFieldIds(activeManifest).includes("item_labor_phase") &&
-        !validateItemLaborPhaseDuplicates(values.item_labor_phase, form.setError)
-      ) {
-        message.error("Fix labor phase errors before saving");
-        return;
+      const laborPhasePatchable = patchableFieldIds(activeManifest).includes(
+        "item_labor_phase",
+      );
+      if (laborPhasePatchable && values.profile.node_type !== "scope") {
+        const laborValid =
+          validateItemLaborPhaseDuplicates(values.item_labor_phase, form.setError) &&
+          validateItemLaborPhaseRowsComplete(values.item_labor_phase, form.setError);
+        if (!laborValid) {
+          message.error("Fix labor phase errors before saving");
+          return;
+        }
       }
 
       try {
         if (isCreate) {
-          const result = await createMutation.mutateAsync({
-            profile: buildCreateProfile(values.profile),
-          });
+          const createIsRoot = !parentId && !values.profile.parent_id;
+          const body = toPatchBody(values, activeManifest, createIsRoot, "new");
+          if (patchableFieldIds(activeManifest).includes("profile")) {
+            body.profile = {
+              ...(body.profile as Record<string, unknown> | undefined),
+              ...buildCreateProfile(values.profile),
+            };
+          }
+          const result = await createMutation.mutateAsync(body);
           const newId = String(result.data.id);
           message.success("Category created");
 
@@ -397,7 +406,10 @@ export const ItemDetailForm = ({
               }
             | undefined;
 
-          if (details?.field === "spec_definitions" && details.code === "spec_option_in_use") {
+          if (
+            (details?.field === "options" || details?.field === "spec_definitions") &&
+            details.code === "spec_option_in_use"
+          ) {
             const count = details.part_count ?? 1;
             message.error(
               count === 1
@@ -429,7 +441,12 @@ export const ItemDetailForm = ({
     ],
   );
 
-  const onSave = form.handleSubmit((values) => persistCategory(values, "detail"));
+  const onSave = form.handleSubmit(
+    (values) => persistCategory(values, "detail"),
+    () => {
+      message.error("Fix form errors before saving");
+    },
+  );
 
   const onSaveAndNew = useMemo(
     () =>
@@ -502,6 +519,76 @@ export const ItemDetailForm = ({
 
   const initialLoading = !isCreate && detailQuery.isLoading && !detailQuery.data;
   const blocking = !isCreate && detailQuery.isFetching && Boolean(detailQuery.data);
+  const activeTab = searchParams.get("tab") === "specs" ? "specs" : "general";
+  const showSpecsTab =
+    nodeType === "scope" && fieldAllows(activeManifest, "spec_definitions", "read");
+  const serverNodeType = (
+    detailQuery.data?.data?.profile as { node_type?: "scope" | "category" | "item" } | undefined
+  )?.node_type;
+  const detailReady = Boolean(detailQuery.data);
+
+  const generalContent = (
+    <>
+      <FormSection title="Profile">
+        {fieldAllows(activeManifest, "profile", "read") ? (
+          <>
+            <TextInput<ItemDetailFormValues>
+              field="profile"
+              name="profile.name"
+              label="Name"
+            />
+            {showQuotableControl ? (
+              <FormFieldItem
+                label="Quotable"
+                help={
+                  hasChildren
+                    ? "Remove child items before marking as quotable."
+                    : inUse
+                      ? "Referenced on an estimate or job line — cannot change."
+                      : undefined
+                }
+              >
+                {canWriteProfile ? (
+                  <Checkbox
+                    checked={nodeType === "item"}
+                    disabled={quotableCheckboxDisabled}
+                    onChange={(event) =>
+                      form.setValue(
+                        "profile.node_type",
+                        event.target.checked ? "item" : "category",
+                        { shouldDirty: true },
+                      )
+                    }
+                  />
+                ) : (
+                  <Typography.Text>{nodeType === "item" ? "Yes" : "No"}</Typography.Text>
+                )}
+              </FormFieldItem>
+            ) : null}
+            <TextInput<ItemDetailFormValues>
+              field="profile"
+              name="profile.csi_code"
+              label="CSI code"
+            />
+          </>
+        ) : null}
+      </FormSection>
+
+      <ItemSpecParticipationField
+        isCreate={isCreate}
+        manifest={activeManifest}
+        detailReady={detailReady}
+        serverNodeType={serverNodeType}
+      />
+
+      <ItemCommercialFields
+        categoryId={categoryId}
+        isCreate={isCreate}
+        manifest={activeManifest}
+        nodeType={nodeType}
+      />
+    </>
+  );
 
   return (
     <SurfaceFormRoot
@@ -511,100 +598,46 @@ export const ItemDetailForm = ({
       disabled={saving}
       form={form}
       defaultValues={defaultValues}
-      resetKey={isCreate ? "create" : `${categoryId}:${detailQuery.data?.data?.id ?? ""}`}
+      resetKey={
+        isCreate
+          ? "create"
+          : `${categoryId}:${detailQuery.data?.data?.id ?? ""}:${serverNodeType ?? "loading"}`
+      }
     >
       <form onSubmit={onSave}>
         <SurfaceFormLayout maxWidth={SURFACE_FORM_MAX_WIDTH}>
-        <FormSection title="Profile">
-          {fieldAllows(activeManifest, "profile", "read") ? (
-            <>
-              {!isCreate ? (
-                <div style={{ marginBottom: 12 }}>
-                  <Typography.Text type="secondary" style={{ marginRight: 8 }}>
-                    Role
-                  </Typography.Text>
-                  <Badge
-                    count={nodeType}
-                    style={{
-                      backgroundColor:
-                        nodeType === "item"
-                          ? "#52c41a"
-                          : nodeType === "scope"
-                            ? "#1677ff"
-                            : "#8c8c8c",
-                    }}
-                  />
-                  {!isRoot && fieldAllows(activeManifest, "profile", "write") ? (
-                    <Select
-                      style={{ marginLeft: 12, minWidth: 140 }}
-                      value={nodeType}
-                      disabled={saving}
-                      options={[
-                        { value: "category", label: "Category" },
-                        { value: "item", label: "Quotable item" },
-                      ]}
-                      onChange={(value) =>
-                        form.setValue("profile.node_type", value, { shouldDirty: true })
-                      }
-                    />
-                  ) : null}
-                </div>
-              ) : null}
-              <TextInput<ItemDetailFormValues>
-                field="profile"
-                name="profile.name"
-                label="Name"
-              />
-              <InputNumberInput<ItemDetailFormValues>
-                field="profile"
-                name="profile.sort_order"
-                label="Sort order"
-              />
-              <TextInput<ItemDetailFormValues>
-                field="profile"
-                name="profile.csi_code"
-                label="CSI code"
-              />
-              {!isCreate && !isRoot && fieldAllows(activeManifest, "profile", "write") ? (
-                <div style={{ marginBottom: 16 }}>
-                  <Typography.Text type="secondary" style={{ display: "block", marginBottom: 4 }}>
-                    Parent
-                  </Typography.Text>
-                  <TreeSelect
-                    allowClear={false}
-                    loading={reparentTreeLoading}
-                    style={{ width: "100%" }}
-                    value={form.watch("profile.parent_id") ?? undefined}
-                    treeData={(reparentTree ?? []).map((root) => ({
-                      value: root.value,
-                      title: root.label,
-                      selectable: root.selectable,
-                      disabled: root.value === categoryId,
-                      children: root.children?.map((child) => ({
-                        value: child.value,
-                        title: child.label,
-                        selectable: child.selectable,
-                        disabled: child.value === categoryId,
-                        children: child.children as TreeSelectProps["treeData"],
-                      })),
-                    }))}
-                    onChange={(value) =>
-                      form.setValue("profile.parent_id", String(value), { shouldDirty: true })
-                    }
-                  />
-                </div>
-              ) : null}
-            </>
-          ) : null}
-        </FormSection>
-
-        <ItemSpecDefinitionsField
-          categoryId={categoryId}
-          isCreate={isCreate}
-          manifest={activeManifest}
-        />
-
-        <ItemCommercialFields manifest={activeManifest} nodeType={nodeType} />
+          {showSpecsTab ? (
+            <Tabs
+              activeKey={activeTab}
+              onChange={(key) => {
+                const params = new URLSearchParams(searchParams.toString());
+                if (key === "specs") {
+                  params.set("tab", "specs");
+                } else {
+                  params.delete("tab");
+                }
+                const query = params.toString();
+                router.replace(
+                  query
+                    ? `${routes.items.detail(categoryId)}?${query}`
+                    : routes.items.detail(categoryId),
+                  { scroll: false },
+                );
+              }}
+              items={[
+                { key: "general", label: "General", children: generalContent },
+                {
+                  key: "specs",
+                  label: "Specs",
+                  children: (
+                    <ItemSpecDefinitionsField isCreate={isCreate} manifest={activeManifest} />
+                  ),
+                },
+              ]}
+            />
+          ) : (
+            generalContent
+          )}
         </SurfaceFormLayout>
       </form>
     </SurfaceFormRoot>

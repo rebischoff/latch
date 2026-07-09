@@ -31,8 +31,12 @@ import {
   useFormContext,
   type ArrayPath,
   type FieldArray,
+  type FieldArrayWithId,
   type FieldValues,
   type Path,
+  type UseFieldArrayAppend,
+  type UseFieldArrayMove,
+  type UseFieldArrayRemove,
 } from "react-hook-form";
 
 import { useFieldMode } from "@/components/surface/useFieldMode";
@@ -114,6 +118,16 @@ const SortableRow = ({ children, ...props }: SortableRowProps) => {
   );
 };
 
+type FieldArrayTableControls<
+  T extends FieldValues,
+  TName extends ArrayPath<T>,
+> = {
+  append: UseFieldArrayAppend<T, TName>;
+  fields: FieldArrayWithId<T, TName, "id">[];
+  move: UseFieldArrayMove;
+  remove: UseFieldArrayRemove;
+};
+
 type FieldArrayTableProps<
   T extends FieldValues,
   TName extends ArrayPath<T>,
@@ -132,9 +146,11 @@ type FieldArrayTableProps<
   allowAdd?: boolean;
   /** Show row remove control. Default: field write mode (child collections). */
   allowRemove?: boolean;
+  /** Parent-owned field array (skips an internal useFieldArray). */
+  fieldArray?: FieldArrayTableControls<T, TName>;
 };
 
-export const FieldArrayTable = <
+const FieldArrayTableCore = <
   T extends FieldValues,
   TName extends ArrayPath<T>,
 >({
@@ -148,10 +164,13 @@ export const FieldArrayTable = <
   sortOrderKey = "sort_order",
   allowAdd,
   allowRemove,
-}: FieldArrayTableProps<T, TName>) => {
+  fieldArray,
+}: FieldArrayTableProps<T, TName> & {
+  fieldArray: FieldArrayTableControls<T, TName>;
+}) => {
   const mode = useFieldMode(field);
-  const { control, getValues, setValue } = useFormContext<T>();
-  const { fields, append, remove, move } = useFieldArray({ control, name });
+  const { getValues, setValue } = useFormContext<T>();
+  const { fields, append, remove, move } = fieldArray;
   const { loading: formLoading, disabled } = useFormUi();
   const mounted = useClientMounted();
 
@@ -316,3 +335,38 @@ export const FieldArrayTable = <
     </DndContext>
   );
 };
+
+const FieldArrayTableConnected = <
+  T extends FieldValues,
+  TName extends ArrayPath<T>,
+>(
+  props: FieldArrayTableProps<T, TName>,
+) => {
+  const { control } = useFormContext<T>();
+  const fieldArray = useFieldArray({ control, name: props.name });
+  return <FieldArrayTableCore {...props} fieldArray={fieldArray} />;
+};
+
+export const FieldArrayTable = <
+  T extends FieldValues,
+  TName extends ArrayPath<T>,
+>(props: FieldArrayTableProps<T, TName>) => {
+  if (props.fieldArray) {
+    return <FieldArrayTableCore {...props} fieldArray={props.fieldArray} />;
+  }
+  return <FieldArrayTableConnected {...props} />;
+};
+
+export const LaborPhaseAddButton = ({
+  disabled,
+  onClick,
+  label = "Add labor phase",
+}: {
+  disabled?: boolean;
+  label?: string;
+  onClick: () => void;
+}) => (
+  <Button type="dashed" block icon={<PlusOutlined />} disabled={disabled} onClick={onClick}>
+    {label}
+  </Button>
+);

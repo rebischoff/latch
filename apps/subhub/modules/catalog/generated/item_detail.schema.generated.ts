@@ -7,6 +7,8 @@ export const ItemDetailFieldIds = {
   profile: "profile",
   commercial: "commercial",
   item_labor_phase: "item_labor_phase",
+  inherited_labor_phase: "inherited_labor_phase",
+  labor_phase_mode: "labor_phase_mode",
   spec_definitions: "spec_definitions",
   spec_participation: "spec_participation",
 } as const;
@@ -17,6 +19,8 @@ export const itemDetailColumnMap = {
   profile: ["item.id", "item.name", "item.parent_id", "item.node_type", "item.sort_order", "item.csi_code"],
   commercial: ["item.freight_rate_type_id", "item.incidental_rate_type_id", "item.markup_type_id", "item.fallback_unit_cost"],
   item_labor_phase: [],
+  inherited_labor_phase: [],
+  labor_phase_mode: [],
   spec_definitions: [],
   spec_participation: [],
 } as const satisfies Record<ItemDetailFieldId, readonly string[]>;
@@ -39,6 +43,8 @@ export const ItemDetailSchema = z.object({
     fallback_unit_cost: z.number(),
   }),
   item_labor_phase: z.array(z.object({ user_id: z.string() })),
+  inherited_labor_phase: z.array(z.object({ user_id: z.string() })),
+  labor_phase_mode: z.array(z.object({ user_id: z.string() })),
   spec_definitions: z.array(z.object({ user_id: z.string() })),
   spec_participation: z.array(z.object({ user_id: z.string() })),
 });
@@ -64,6 +70,8 @@ export const ItemDetailPatchSchema = z.object({
     })
     .optional(),
   item_labor_phase: z.array(z.object({ user_id: z.string() })).optional(),
+  inherited_labor_phase: z.array(z.object({ user_id: z.string() })).optional(),
+  labor_phase_mode: z.array(z.object({ user_id: z.string() })).optional(),
   spec_definitions: z.array(z.object({ user_id: z.string() })).optional(),
   spec_participation: z.array(z.object({ user_id: z.string() })).optional(),
 });

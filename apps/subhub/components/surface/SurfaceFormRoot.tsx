@@ -39,8 +39,16 @@ export const SurfaceFormRoot = <T extends FieldValues>({
 }: SurfaceFormRootProps<T>) => {
   const showOverlay = useDelayedOverlay(blocking);
   const paneRef = useRef<HTMLDivElement>(null);
+  const lastResetKeyRef = useRef(resetKey);
 
   useLayoutEffect(() => {
+    const resetKeyChanged = lastResetKeyRef.current !== resetKey;
+    lastResetKeyRef.current = resetKey;
+
+    if (!resetKeyChanged && form.formState.isDirty) {
+      return;
+    }
+
     form.reset(defaultValues);
   }, [defaultValues, form, resetKey]);
 

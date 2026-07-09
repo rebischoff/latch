@@ -51,6 +51,10 @@ const unwrapNumber = (
   return value === undefined ? undefined : Number(value);
 };
 
+const centsToDollars = (cents: number): number => cents / 100;
+
+const dollarsToCents = (dollars: number): number => Math.round(dollars * 100);
+
 const mapRows = (
   rows: Array<Record<string, unknown>> | undefined,
   columns: CatalogColumnKey[],
@@ -60,13 +64,13 @@ const mapRows = (
     name: unwrapName(row),
     sort_order: index + 1,
     ...(columns.includes("rate_cents")
-      ? { rate_cents: unwrapNumber(row, "rate_cents") ?? 0 }
+      ? { rate_cents: centsToDollars(unwrapNumber(row, "rate_cents") ?? 0) }
       : {}),
     ...(columns.includes("percent")
       ? { percent: unwrapNumber(row, "percent") ?? 0 }
       : {}),
     ...(columns.includes("amount_cents")
-      ? { amount_cents: unwrapNumber(row, "amount_cents") ?? 0 }
+      ? { amount_cents: centsToDollars(unwrapNumber(row, "amount_cents") ?? 0) }
       : {}),
     ...(columns.includes("factor_percent")
       ? { factor_percent: unwrapNumber(row, "factor_percent") ?? 100 }
@@ -166,9 +170,13 @@ export const CommercialCatalogTable = ({
       rows: rows.map((row) => ({
         ...(row.id ? { id: row.id } : {}),
         name: row.name,
-        ...(row.rate_cents !== undefined ? { rate_cents: row.rate_cents } : {}),
+        ...(row.rate_cents !== undefined
+          ? { rate_cents: dollarsToCents(row.rate_cents) }
+          : {}),
         ...(row.percent !== undefined ? { percent: row.percent } : {}),
-        ...(row.amount_cents !== undefined ? { amount_cents: row.amount_cents } : {}),
+        ...(row.amount_cents !== undefined
+          ? { amount_cents: dollarsToCents(row.amount_cents) }
+          : {}),
         ...(row.factor_percent !== undefined ? { factor_percent: row.factor_percent } : {}),
         ...(row.material_markup_percent !== undefined
           ? { material_markup_percent: row.material_markup_percent }

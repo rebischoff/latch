@@ -589,9 +589,10 @@ Table site_contact {
 
 TableGroup catalog [color: #e67e22] {
   trade
+  spec_unit
   spec_def
   spec_option
-  item_spec_exclude
+  item_spec_participation
   manufacturer_part_spec
   labor_phase
   item_labor_phase
@@ -615,39 +616,59 @@ Table trade {
   Note: 'Who performs work — used on `job_scope_group` for production rollups and labor costing.'
 }
 
-Table spec_def {
+Table spec_unit {
   id uuid [pk, default: `gen_random_uuid()`]
-  item_id text [not null, note: 'FK → item — owning node (root or nested); def inherits to descendants until item_spec_exclude']
-  code text [note: 'nullable stable slug — e.g. slc_protocol; not PK']
-  display_name text [not null]
-  value_type text [not null, default: 'enum', note: 'CHECK: enum | boolean | text']
-  filter_mode text [not null, default: 'required', note: 'CHECK: required | prefer — behavior deferred v1']
+  symbol text [not null]
+  name text [not null]
+  dimension text [not null]
+  canonical_unit_id uuid [note: 'null = this row is canonical for dimension']
+  to_canonical_factor numeric [not null, default: 1]
   sort_order int [not null, default: 0]
 
   Note: '''
-    One spec dimension owned by a single **item** (`item_id`), root or nested. The namespace
-    scope root is derived by walking `item.parent_id` to the root ancestor. Unified item tree
-    (040a) — see catalog decision spec ownership (2026-07-04). Renamed from
-    `system_spec_def`. Estimate and part rows FK to `spec_option` for enums — not loose strings.
+    Org unit catalog for numeric spec defs (37p, 2026-07-08). Conversion factors normalize to
+    canonical per dimension; `spec_def.unit_id` may reference a non-canonical row (e.g. mA).
+    Admin Surface `spec_unit_table` in 37q.
+  '''
+}
+
+Table spec_def {
+  id uuid [pk, default: `gen_random_uuid()`]
+  scope_root_item_id text [not null, note: 'FK → item where node_type = scope — flat namespace, no ownership/inheritance (37o)']
+  display_name text [not null]
+  value_type text [not null, default: 'enum', note: 'CHECK: enum | boolean | number (37s)']
+  unit_id uuid [note: 'nullable FK → spec_unit — required in DAL for number']
+  decimal_places int [note: 'nullable — display-only formatting (37p)']
+  sort_order int [not null, default: 0]
+
+  Note: '''
+    **37o (2026-07-07):** flat namespace per scope root — `scope_root_item_id` replaces the prior
+    owning-node `item_id` (no node in the tree "owns" a def; no inheritance). Edited on
+    `item_detail` `spec_definitions` Field (scope tab only, 37o UI pivot 2026-07-08).
+    Renamed from `system_spec_def` (028) → node-owned (038/040a) → scope-scoped (37o).
+    Estimate and part rows FK to `spec_option` for enums — not loose strings.
+    `code` column dropped (048) — matching uses FK ids only.
+    **37p (2026-07-08):** `text` dropped; `number` + `unit_id`/`decimal_places` added.
+    **37s (2026-07-08):** `range` def type dropped — band via optional part `value_number_max`.
   '''
 }
 
 Table spec_option {
   id uuid [pk, default: `gen_random_uuid()`]
   spec_def_id uuid [not null]
-  code text [note: 'nullable slug — e.g. fire_lite_litespeed']
   display_name text [not null]
   sort_order int [not null, default: 0]
 
-  Note: 'Enum values for a `spec_def`. Renamed from `system_spec_option`.'
+  Note: 'Enum values for a `spec_def`. Renamed from `system_spec_option`. `code` dropped (048).'
 }
 
 Table manufacturer_part_spec {
   manufacturer_part_id text [not null]
   spec_def_id uuid [not null]
   spec_option_id uuid [note: 'nullable — enum match; multiple rows per def allowed']
-  value_text text [note: 'nullable — non-enum defs']
   value_boolean boolean [note: 'nullable — boolean defs']
+  value_number numeric [note: 'nullable — number/range defs (canonical unit, 37p)']
+  value_number_max numeric [note: 'nullable — range defs only (canonical unit, 37p)']
 
   indexes {
     (manufacturer_part_id, spec_def_id, spec_option_id) [unique, name: 'manufacturer_part_spec_unique']
@@ -655,7 +676,8 @@ Table manufacturer_part_spec {
 
   Note: '''
     Part compatibility rows — filter/suggest in estimate part picker. `manufacturer_part.specs` text
-    column is human notes only; never used for filtering.
+    column is human notes only; never used for filtering. Numeric values stored in canonical unit
+    (37p); `value_text` dropped when empty at migration 049.
   '''
 }
 
@@ -706,8 +728,8 @@ Table item {
   '''
 }
 
-Table item_spec_exclude {
-  item_id text [not null]
+Table item_spec_participation {
+  item_id text [not null, note: 'FK → item where node_type = item — leaf only (37o)']
   spec_def_id uuid [not null]
   sort_order int [not null, default: 0]
 
@@ -716,8 +738,10 @@ Table item_spec_exclude {
   }
 
   Note: '''
-    **Branch exclude** — def no longer applies at this node or any descendant (no re-include below).
-    See catalog decision assign-once (2026-07-03).
+    **37o (2026-07-07):** flat per-leaf opt-in — replaces `item_spec_exclude` +
+    ownership-based inheritance. No ancestry, no exclude semantics: a row's presence means
+    this item's part filter uses this dimension; absence means it doesn't. Editing one item's
+    rows never affects any other item.
   '''
 }
 
@@ -780,8 +804,8 @@ Table phase {
   sort_order int [not null, default: 0]
 
   Note: '''
-    Org catalog of **labor / reporting phases** (not schedule — v2). Used by `item_labor_phase`
-    for commercial costing (040b). Legacy `phase_id` on job/estimate lines may still reference this table.
+    **Retired (045).** Replaced by org `labor_phase` + `item_labor_phase` for costing and
+    `scope_phase.labor_phase_id` for progress. Table dropped in migration 045.
   '''
 }
 
@@ -943,8 +967,9 @@ Table estimate_scope_spec {
   estimate_scope_id text [not null]
   spec_def_id uuid [not null]
   spec_option_id uuid [note: 'nullable — enum defs']
-  value_text text [note: 'nullable — text defs']
   value_boolean boolean [note: 'nullable — boolean defs']
+  value_number numeric [note: 'nullable — number/range bucket point (canonical, 37p)']
+  value_number_max numeric [note: 'nullable — unused on buckets (range is point-in-band match)']
 
   Note: 'Scope-root spec values — inherited by lines unless overridden at zone or line level.'
 }
@@ -955,10 +980,36 @@ Table estimate_zone_spec {
   site_zone_id text [not null]
   spec_def_id uuid [not null]
   spec_option_id uuid [note: 'nullable — enum defs']
-  value_text text [note: 'nullable — text defs']
   value_boolean boolean [note: 'nullable — boolean defs']
+  value_number numeric [note: 'nullable — number/range bucket point (canonical, 37p)']
+  value_number_max numeric [note: 'nullable — unused on buckets']
 
   Note: 'Per-zone spec override within a scope — applies to lines with matching `site_zone_id`.'
+}
+
+Table estimate_scope_labor_phase {
+  estimate_scope_id text [not null]
+  labor_phase_id text [not null]
+  sort_order int [not null, default: 0]
+
+  indexes {
+    (estimate_scope_id, labor_phase_id) [pk]
+  }
+
+  Note: 'Which org labor phases count for lines in this scope bucket. Empty = include all resolved phases (37n).'
+}
+
+Table estimate_zone_labor_phase {
+  estimate_scope_id text [not null]
+  site_zone_id text [not null]
+  labor_phase_id text [not null]
+  sort_order int [not null, default: 0]
+
+  indexes {
+    (estimate_scope_id, site_zone_id, labor_phase_id) [pk]
+  }
+
+  Note: 'Zone override for included labor phases — overrides scope when rows exist (37n).'
 }
 
 Table estimate_line_spec {
@@ -966,8 +1017,9 @@ Table estimate_line_spec {
   estimate_line_id text [not null]
   spec_def_id uuid [not null]
   spec_option_id uuid [note: 'nullable — enum defs']
-  value_text text [note: 'nullable — text defs']
   value_boolean boolean [note: 'nullable — boolean defs']
+  value_number numeric [note: 'nullable — number/range bucket point (canonical, 37p)']
+  value_number_max numeric [note: 'nullable — unused on buckets']
 
   Note: 'Per-line spec override. Resolution: line → zone → `estimate_scope_spec`.'
 }
@@ -992,7 +1044,6 @@ Table estimate_line {
   site_zone_id text [note: 'nullable FK → site_zone — zone bucket placement']
   site_asset_id text [note: 'nullable FK → site_asset — device-level scope']
   lock text [not null, default: 'none', note: 'CHECK: none | sell | line — recalc gate (040b D6b)']
-  phase_id text [note: 'nullable FK → phase — legacy labor lines']
   item_id text [not null, note: 'FK → item — required on product lines']
   part_id text [note: 'nullable FK → manufacturer_part — when PN determined or user-picked']
   vendor_part_id text [note: 'nullable FK → vendor_part — cost source when pinned']
@@ -1105,7 +1156,6 @@ Table job_line {
   site_zone_id text [note: 'nullable FK → site_zone — frozen for this job line']
   site_asset_id text [note: 'nullable FK → site_asset — device-level scope']
   material_status text [note: 'nullable — carried from estimate']
-  phase_id text [note: 'nullable FK → phase — labor lines only; bridges to scope_phase seeding']
   item_id text [note: 'nullable FK → item — sold scope; may stay generic']
   part_id text [note: 'nullable FK → manufacturer_part']
   vendor_part_id text [note: 'nullable FK → vendor_part']
@@ -1152,7 +1202,7 @@ Table job_line_part {
 Table scope_phase {
   id text [pk, default: `gen_random_uuid()::text`]
   job_line_id text [not null]
-  phase_template_step_id text [note: 'nullable FK → phase_template_step']
+  labor_phase_id text [note: 'nullable FK → labor_phase — bridges item matrix to progress (37n)']
   name text [not null, note: 'Install, Program, Test, Complete, …']
   sequence int [not null]
   planned_qty numeric [not null, default: 0]
@@ -1165,9 +1215,8 @@ Table scope_phase {
 
   Note: '''
     Per scope item (`job_line`) — fractional completion lives here (replaces `job_work_item`).
-    Seeded from `phase_template_step` on line create or estimate win. `progress_entry_line`
-    quantities roll up into `completed_qty`. Billing `qty_installed` reads rollups when auto
-    generator ships (deferred v1 — manual `billable_line` first).
+    Seeded from resolved `item_labor_phase` filtered by estimate scope/zone inclusion on win (37n).
+    `progress_entry_line` quantities roll up into `completed_qty`.
   '''
 }
 
@@ -1203,10 +1252,11 @@ Table job_system_spec {
   job_scope_group_id text [not null, note: 'FK → job_scope_group — system block from win']
   system_spec_def_id uuid [not null]
   system_spec_option_id uuid [note: 'nullable — enum defs']
-  value_text text [note: 'nullable — text defs']
   value_boolean boolean [note: 'nullable — boolean defs']
+  value_number numeric [note: 'nullable — number/range (canonical, 37p)']
+  value_number_max numeric [note: 'nullable — range part rows only']
 
-  Note: 'Spec snapshot on win — copied from `estimate_system_spec` per scope group.'
+  Note: 'Spec snapshot on win — copied from `estimate_scope_spec` per scope group.'
 }
 
 Table job_area_spec {
@@ -1215,10 +1265,11 @@ Table job_area_spec {
   site_area_id text [not null]
   system_spec_def_id uuid [not null]
   system_spec_option_id uuid [note: 'nullable — enum defs']
-  value_text text [note: 'nullable — text defs']
   value_boolean boolean [note: 'nullable — boolean defs']
+  value_number numeric [note: 'nullable — number/range (canonical, 37p)']
+  value_number_max numeric [note: 'nullable — range part rows only']
 
-  Note: 'Per-area spec snapshot on win — copied from `estimate_area_spec`.'
+  Note: 'Per-area spec snapshot on win — copied from `estimate_zone_spec`.'
 }
 
 Table job_line_spec {
@@ -1226,8 +1277,9 @@ Table job_line_spec {
   job_line_id text [not null]
   system_spec_def_id uuid [not null]
   system_spec_option_id uuid [note: 'nullable — enum defs']
-  value_text text [note: 'nullable — text defs']
   value_boolean boolean [note: 'nullable — boolean defs']
+  value_number numeric [note: 'nullable — number/range (canonical, 37p)']
+  value_number_max numeric [note: 'nullable — range part rows only']
 
   Note: 'Per-line spec snapshot on win — copied from `estimate_line_spec`.'
 }
@@ -1676,9 +1728,11 @@ Ref: item.markup_type_id > markup_type.id [delete: set null]
 Ref: item_labor_phase.item_id > item.id [delete: cascade]
 Ref: item_labor_phase.labor_phase_id > labor_phase.id [delete: restrict]
 Ref: item_labor_phase.labor_rate_type_id > labor_rate_type.id [delete: restrict]
-Ref: item_spec_exclude.item_id > item.id [delete: cascade]
-Ref: item_spec_exclude.spec_def_id > spec_def.id [delete: cascade]
-Ref: spec_def.item_id > item.id [delete: cascade]
+Ref: item_spec_participation.item_id > item.id [delete: cascade]
+Ref: item_spec_participation.spec_def_id > spec_def.id [delete: cascade]
+Ref: spec_def.scope_root_item_id > item.id [delete: restrict]
+Ref: spec_def.unit_id > spec_unit.id [delete: restrict]
+Ref: spec_unit.canonical_unit_id > spec_unit.id [delete: restrict]
 Ref: spec_option.spec_def_id > spec_def.id [delete: cascade]
 Ref: manufacturer_part_spec.manufacturer_part_id > manufacturer_part.id [delete: cascade]
 Ref: manufacturer_part_spec.spec_def_id > spec_def.id [delete: cascade]
@@ -1712,6 +1766,10 @@ Ref: estimate_zone_spec.estimate_scope_id > estimate_scope.id [delete: cascade]
 Ref: estimate_zone_spec.site_zone_id > site_zone.id [delete: cascade]
 Ref: estimate_zone_spec.spec_def_id > spec_def.id [delete: restrict]
 Ref: estimate_zone_spec.spec_option_id > spec_option.id [delete: set null]
+Ref: estimate_scope_labor_phase.estimate_scope_id > estimate_scope.id [delete: cascade]
+Ref: estimate_scope_labor_phase.labor_phase_id > labor_phase.id [delete: restrict]
+Ref: estimate_zone_labor_phase.estimate_scope_id > estimate_zone.estimate_scope_id [delete: cascade]
+Ref: estimate_zone_labor_phase.labor_phase_id > labor_phase.id [delete: restrict]
 Ref: estimate_line_spec.estimate_line_id > estimate_line.id [delete: cascade]
 Ref: estimate_line_spec.spec_def_id > spec_def.id [delete: restrict]
 Ref: estimate_line_spec.spec_option_id > spec_option.id [delete: set null]
@@ -1720,7 +1778,6 @@ Ref: estimate_line.estimate_scope_id > estimate_scope.id [delete: set null]
 Ref: estimate_line.parent_line_id > estimate_line.id [delete: set null]
 Ref: estimate_line.site_zone_id > site_zone.id [delete: set null]
 Ref: estimate_line.site_asset_id > site_asset.id [delete: set null]
-Ref: estimate_line.phase_id > phase.id [delete: set null]
 Ref: estimate_line.item_id > item.id [delete: set null]
 Ref: estimate_line.part_id > manufacturer_part.id [delete: set null]
 Ref: estimate_line.vendor_part_id > vendor_part.id [delete: set null]
@@ -1742,7 +1799,6 @@ Ref: job_line.job_scope_group_id > job_scope_group.id [delete: set null]
 Ref: job_line.parent_line_id > job_line.id [delete: set null]
 Ref: job_line.site_zone_id > site_zone.id [delete: set null]
 Ref: job_line.site_asset_id > site_asset.id [delete: set null]
-Ref: job_line.phase_id > phase.id [delete: set null]
 Ref: job_line.item_id > item.id [delete: set null]
 Ref: job_line.part_id > manufacturer_part.id [delete: set null]
 Ref: job_line.vendor_part_id > vendor_part.id [delete: set null]
@@ -1755,7 +1811,7 @@ Ref: job_line_part.vendor_part_id > vendor_part.id [delete: set null]
 Ref: job_line_part.site_area_id > site_area.id [delete: set null]
 Ref: job_line_part.site_asset_id > site_asset.id [delete: set null]
 Ref: scope_phase.job_line_id > job_line.id [delete: cascade]
-Ref: scope_phase.phase_template_step_id > phase_template_step.id [delete: set null]
+Ref: scope_phase.labor_phase_id > labor_phase.id [delete: restrict]
 Ref: progress_entry.job_id > job.id [delete: cascade]
 Ref: progress_entry.entered_by > employee.party_id [delete: set null]
 Ref: progress_entry_line.progress_entry_id > progress_entry.id [delete: cascade]

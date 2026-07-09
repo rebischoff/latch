@@ -1,69 +1,49 @@
 "use client";
 
+import { fieldAllows } from "@latch/contracts";
 import type { DataNode } from "antd/es/tree";
-import { Badge, Input, Tree, Typography } from "antd";
+import { App, Badge, Input, Tree, Typography } from "antd";
+import type { TreeProps } from "antd";
 import { usePathname, useRouter } from "next/navigation";
-import { useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { useMasterDetailSelection } from "@/components/shell/MasterDetailSelectionContext";
+import type { ItemTreeNode } from "@/lib/catalog/descriptors/item-list";
+import {
+  allowItemDrop,
+  applyDropToTree,
+  dropFailureMessage,
+  findNodeById,
+  resolveDropPatch,
+  type ItemDropInfo,
+} from "@/lib/catalog/item-tree-dnd";
+import { useSurfaceDetail } from "@/lib/hooks/use-surface-detail";
+import { surfaceDetailKey, surfaceListKey } from "@/lib/hooks/surface-query-keys";
 import { useSurfaceList } from "@/lib/hooks/use-surface-list";
 import { useSurfaceListSearch } from "@/lib/hooks/use-surface-list-search";
 import { routes } from "@/lib/nav-routes";
-
-type ItemTreeNode = {
-  children: ItemTreeNode[];
-  id: string;
-  is_root: boolean;
-  name: string;
-  node_type: "scope" | "category" | "item";
-  parent_id: string | null;
-  sort_order: number;
-};
-
-const nodeTypeBadge = (nodeType: ItemTreeNode["node_type"]) => {
-  if (nodeType === "scope") {
-    return <Badge count="scope" style={{ marginLeft: 8, backgroundColor: "#1677ff" }} />;
-  }
-  if (nodeType === "item") {
-    return <Badge count="leaf" style={{ marginLeft: 8, backgroundColor: "#52c41a" }} />;
-  }
-  return null;
-};
+import { patchSurfaceDetail, SurfaceApiError } from "@/lib/surface-api";
 
 const toAntdTreeData = (nodes: ItemTreeNode[]): DataNode[] =>
   nodes.map((node) => ({
     key: node.id,
     title: (
-      <span>
+      <span style={node.node_type === "scope" ? { fontWeight: 600 } : undefined}>
         {node.name}
-        {node.is_root ? (
-          <Badge count="root" style={{ marginLeft: 8, backgroundColor: "#1677ff" }} />
+        {node.node_type === "item" ? (
+          <Badge status="default" style={{ marginLeft: 8 }} />
         ) : null}
-        {nodeTypeBadge(node.node_type)}
       </span>
     ),
     children: toAntdTreeData(node.children),
   }));
 
-const findNodeById = (
-  nodes: ItemTreeNode[],
-  id: string,
-): ItemTreeNode | undefined => {
-  for (const node of nodes) {
-    if (node.id === id) {
-      return node;
-    }
-    const child = findNodeById(node.children, id);
-    if (child) {
-      return child;
-    }
-  }
-  return undefined;
-};
-
 export const ItemTreeList = () => {
   const pathname = usePathname();
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const { message } = App.useApp();
   const { selectedId, setSelectedId, setChildCreateBlocked } = useMasterDetailSelection();
 
   const baseList = useSurfaceList("item_list");
@@ -79,12 +59,63 @@ export const ItemTreeList = () => {
     return row?.tree ?? [];
   }, [active.data?.data.rows]);
 
+  const [displayTree, setDisplayTree] = useState<ItemTreeNode[]>([]);
+
+  useEffect(() => {
+    setDisplayTree(tree);
+  }, [tree]);
+
   const selectedFromRoute = useMemo(() => {
     const match = pathname.match(/^\/items\/([^/]+)$/);
     return match?.[1] && match[1] !== "new" ? match[1] : null;
   }, [pathname]);
 
   const activeSelection = selectedId ?? selectedFromRoute;
+  const manifestProbeId = activeSelection ?? displayTree[0]?.id;
+  const { data: detailForManifest } = useSurfaceDetail("item_detail", manifestProbeId);
+  const writable = detailForManifest?.manifest
+    ? fieldAllows(detailForManifest.manifest, "profile", "write")
+    : false;
+  const searchActive = Boolean(listQuery);
+
+  const handleDrop = useCallback(
+    async (info: ItemDropInfo) => {
+      const patch = resolveDropPatch(info, displayTree);
+      if (!patch) {
+        return;
+      }
+
+      const previousTree = displayTree;
+      setDisplayTree(applyDropToTree(displayTree, info));
+
+      try {
+        await patchSurfaceDetail("item_detail", patch.id, {
+          profile: {
+            parent_id: patch.parent_id,
+            sort_order: patch.sort_order,
+          },
+        });
+        message.success(patch.successMessage);
+        await queryClient.invalidateQueries({ queryKey: surfaceListKey("item_list") });
+        if (activeSelection === patch.id) {
+          await queryClient.invalidateQueries({
+            queryKey: surfaceDetailKey("item_detail", patch.id),
+          });
+        }
+      } catch (error) {
+        setDisplayTree(previousTree);
+        const serverMessage =
+          error instanceof SurfaceApiError ? error.message : undefined;
+        message.error(dropFailureMessage(patch.draggedName, serverMessage));
+      }
+    },
+    [activeSelection, displayTree, message, queryClient],
+  );
+
+  const handleAllowDrop = useCallback<NonNullable<TreeProps["allowDrop"]>>(
+    (info) => allowItemDrop(info, displayTree),
+    [displayTree],
+  );
 
   if (active.error) {
     return (
@@ -109,20 +140,26 @@ export const ItemTreeList = () => {
       <div style={{ padding: 8 }}>
         {active.isLoading || active.isFetching ? (
           <Typography.Text type="secondary">Loading items…</Typography.Text>
-        ) : tree.length === 0 ? (
+        ) : displayTree.length === 0 ? (
           <Typography.Text type="secondary">No categories yet.</Typography.Text>
         ) : (
           <Tree
+            blockNode
             showLine
             defaultExpandAll
             selectedKeys={activeSelection ? [activeSelection] : []}
-            treeData={toAntdTreeData(tree)}
+            treeData={toAntdTreeData(displayTree)}
+            draggable={writable && !searchActive ? { icon: false } : false}
+            allowDrop={handleAllowDrop}
+            onDrop={(info) => {
+              void handleDrop(info);
+            }}
             onSelect={(keys) => {
               const id = String(keys[0] ?? "");
               if (!id) {
                 return;
               }
-              const node = findNodeById(tree, id);
+              const node = findNodeById(displayTree, id);
               setChildCreateBlocked(node?.node_type === "item");
               setSelectedId(id);
               router.push(routes.items.detail(id));
@@ -133,6 +170,3 @@ export const ItemTreeList = () => {
     </div>
   );
 };
-
-// exported for tests
-export { findNodeById };

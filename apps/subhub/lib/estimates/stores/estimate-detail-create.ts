@@ -68,12 +68,16 @@ const hasScopesPatch = (body: unknown): boolean => {
 };
 
 const assertCollectionsPatchAllowed = (status: string, body: unknown): void => {
-  if (status !== "won") {
+  if (status !== "won" && status !== "sent") {
     return;
   }
 
   if (hasLineItemsPatch(body) || hasScopesPatch(body)) {
-    throw new ConflictError("Cannot modify line items or scopes on a won estimate");
+    throw new ConflictError(
+      status === "sent"
+        ? "Cannot modify line items or scopes on a sent estimate"
+        : "Cannot modify line items or scopes on a won estimate",
+    );
   }
 };
 

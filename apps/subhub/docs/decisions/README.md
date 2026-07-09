@@ -43,12 +43,17 @@ _Operations backbone forks **resolved** (2026-06-27). Optional: [J3 phase weight
 
 | Decision | File | Date | Status |
 |----------|------|------|--------|
+| Part item links leaf-only + Specs value UX | [catalog.md](./catalog.md) | 2026-07-08 | **locked** ([37u](../tasks/37u-part-leaf-links-specs-ui.md)) |
+| Numeric specs — drop `range` type; band is part-authored | [catalog.md](./catalog.md) | 2026-07-08 | **locked** ([37s](../tasks/37s-spec-defs-ui-drop-range.md)) |
+| Spec value types, units table, and locks | [catalog.md](./catalog.md) | 2026-07-08 | **amended** ([37s](../tasks/37s-spec-defs-ui-drop-range.md); was 37p → 37q → 37r) |
+| Spec definitions scoped to root, flat item participation | [catalog.md](./catalog.md) | 2026-07-07 | **locked** ([37o](../tasks/37o-spec-participation-flatten.md)) |
+| Labor phase inclusion — catalog → estimate → job | [catalog.md](./catalog.md) | 2026-07-07 | **locked** ([37n](../tasks/37n-labor-phase-inclusion.md)) |
 | Catalog part authoring UI — `item_links` + `part_specs` on `part_detail` | [catalog.md](./catalog.md) | 2026-07-06 | **locked** ([37j](../tasks/37j-catalog-part-authoring.md)) |
 | Line item part pin — `item_id`, `part_id`, `part_locked` | [37f](../tasks/37f-estimate-line-costing.md) | 2026-07-04 | **locked** |
 | Ambiguous part material cost — fallback + max vendor | [37f](../tasks/37f-estimate-line-costing.md) | 2026-07-04 | **locked** |
 | Commercial costing — org tables, category defaults, estimate overrides | [catalog.md](./catalog.md) | 2026-07-04 | **locked** |
 | Estimate scope required + pricing overrides | [estimate.md](./estimate.md) | 2026-07-04 | **locked** |
-| `spec_def` value types and part-matching rules | [catalog.md](./catalog.md) | 2026-07-02 | **locked** (DDL in 37f follow-on) |
+| `spec_def` value types and part-matching rules | [catalog.md](./catalog.md) | 2026-07-02 | **amended** 2026-07-08 ([units + number/range](./catalog.md#decision-spec-value-types-units-table-and-locks-2026-07-08)) |
 | Category spec participation — inherit, include, exclude | [catalog.md](./catalog.md) | 2026-07-02 | **locked** (37d amend + migration) |
 | Category-only scope — roots replace catalog `system` | [catalog.md](./catalog.md) | 2026-06-30 | **locked** |
 | Estimate scope — checkbox site tree, item-first lines | [estimate.md](./estimate.md) | 2026-06-30 | **locked** |
@@ -61,7 +66,7 @@ _Operations backbone forks **resolved** (2026-06-27). Optional: [J3 phase weight
 | Site as-built — system, area tree, asset | [site.md](./site.md) | 2026-06-27 | planning |
 | As-built publish on job complete (A2) | [job.md](./job.md), [site.md](./site.md) | 2026-06-27 | **locked** |
 | Progress entry — no workflow (J2) | [job.md](./job.md) | 2026-06-27 | **locked** |
-| Phase templates — per system default (J5) | [catalog.md](./catalog.md) | 2026-06-27 | **locked** |
+| Phase templates — per system default (J5) | [catalog.md](./catalog.md) | 2026-06-27 | **superseded** ([37n](../tasks/37n-labor-phase-inclusion.md)) |
 | Job scope group — implicit General (J4) | [job.md](./job.md) | 2026-06-27 | **locked** |
 | Field progress — scope phase + progress entries (J1) | [job.md](./job.md) | 2026-06-27 | **locked** |
 | Job scope, progress model | [job.md](./job.md) | 2026-06-27 | planning |

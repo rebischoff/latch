@@ -243,6 +243,17 @@ flowchart LR
 | **37j** | [37j-catalog-part-authoring.md](./37j-catalog-part-authoring.md) | `item_links` + `part_specs` on `part_detail` — **complete** (2026-07-06) |
 | **37k** | [37k-part-spec-lifecycle.md](./37k-part-spec-lifecycle.md) | Prune `manufacturer_part_spec` on link shrink; diff `spec_option` writes; part/item warnings — **complete** (2026-07-06) |
 | **37l** | [37l-leaf-quotable-item-model.md](./37l-leaf-quotable-item-model.md) | `item.node_type` (scope/category/item); leaf-only estimate selection; drop `descendantMax`; migration `044` — **complete** (2026-07-06) |
+| **37m** | [37m-item-tree-dnd-ui.md](./37m-item-tree-dnd-ui.md) | Item list tree DnD (reorder + reparent); chip cleanup; immediate PATCH + toast — **complete** (2026-07-07) |
+| **37n** | [37n-labor-phase-inclusion.md](./37n-labor-phase-inclusion.md) | `labor_phase` inclusion on estimate scope/zone; item inherit/override UI; `scope_phase` seed; migration `045` — **complete** (2026-07-07) |
+| **37o** | [37o-spec-participation-flatten.md](./37o-spec-participation-flatten.md) | Flat `item_spec_participation`; `spec_definitions` on scope `item_detail` Specs tab; `/specs` retired; migrations `046` + `048` — **complete** (manual smoke pending, 2026-07-08) |
+| **37p** | [37p-spec-value-types-ddl.md](./37p-spec-value-types-ddl.md) | `spec_unit` + number/range DDL; drop `text`; type/unit locks; migration `049` — **complete** (2026-07-08) |
+| **37q** | [37q-spec-units-defs-ui.md](./37q-spec-units-defs-ui.md) | `spec_unit_table` Surface; defs UI (unit picker, options popover) — **complete** (2026-07-08) |
+| **37r** | [37r-spec-number-range-consumers.md](./37r-spec-number-range-consumers.md) | Part + estimate number/range inputs; resolver exact + range-contains — **complete** (2026-07-08) |
+| **37s** | [37s-spec-defs-ui-drop-range.md](./37s-spec-defs-ui-drop-range.md) | Drop def `range` type; Specs Name·Type·Details popover; part band match via optional max — **complete** (2026-07-08) |
+| **37t** | [37t-spec-def-type-roundtrip.md](./37t-spec-def-type-roundtrip.md) | Spec def type round-trip — preserve Details (options / unit / dp) before save — **complete** (2026-07-08) |
+| **37u** | [37u-part-leaf-links-specs-ui.md](./37u-part-leaf-links-specs-ui.md) | Part `item_links` leaf-only + multi TreeSelect; Specs Spec·Value (checkbox / number band / enum) — **complete** (2026-07-08) |
+| **37v** | [37v-estimate-structure-tab.md](./37v-estimate-structure-tab.md) | Merge Scope into **Line Items** tab (Add scope/zone dropdowns, Configure popover; kits UI removed); no schema change — **complete** (2026-07-08); **UI superseded by 37w** |
+| **37w** | [37w-estimate-line-items-panels.md](./37w-estimate-line-items-panels.md) | Line Items **three-panel layout** (S + C left, LI flat right); **W1–W9** — **complete** (2026-07-08) |
 | **37h** | *(see 37a chain)* | Job `site_zone_id` FK renames |
 
 ### Backbone pass (estimate finish) — tasks 29–32

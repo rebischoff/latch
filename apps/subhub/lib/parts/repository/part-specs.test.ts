@@ -53,9 +53,9 @@ vi.mock("../../catalog/repository/item-effective-specs", () => ({
           value_type: "boolean",
         },
         {
-          spec_def_id: "def-text",
-          display_name: "Label",
-          value_type: "text",
+          spec_def_id: "def-num",
+          display_name: "Tonnage",
+          value_type: "number",
         },
       ],
     };
@@ -77,7 +77,8 @@ const createMockClient = (state: {
     manufacturer_part_id: string;
     spec_def_id: string;
     spec_option_id: string | null;
-    value_text: string | null;
+    value_number: number | null;
+    value_number_max: number | null;
     value_boolean: boolean | null;
   }>;
 }) => {
@@ -88,37 +89,31 @@ const createMockClient = (state: {
         const rows = [
           {
             id: "def-enum",
-            code: "slc_protocol",
             display_name: "SLC protocol",
             value_type: "enum",
           },
           {
             id: "def-bool",
-            code: "supervised",
             display_name: "Supervised",
             value_type: "boolean",
           },
           {
-            id: "def-text",
-            code: "label",
-            display_name: "Label",
-            value_type: "text",
+            id: "def-num",
+            display_name: "Tonnage",
+            value_type: "number",
           },
           {
             id: "def-slc",
-            code: "slc_protocol",
             display_name: "SLC protocol",
             value_type: "enum",
           },
           {
             id: "def-color",
-            code: "color",
             display_name: "Color",
             value_type: "enum",
           },
           {
             id: "def-series",
-            code: "series",
             display_name: "Series",
             value_type: "enum",
           },
@@ -132,13 +127,11 @@ const createMockClient = (state: {
             {
               id: "opt-a",
               spec_def_id: "def-enum",
-              code: "a",
               display_name: "Option A",
             },
             {
               id: "opt-b",
               spec_def_id: "def-enum",
-              code: "b",
               display_name: "Option B",
             },
           ],
@@ -167,8 +160,9 @@ const createMockClient = (state: {
           manufacturer_part_id: params?.[0] as string,
           spec_def_id: params?.[1] as string,
           spec_option_id: params?.[2] as string | null,
-          value_text: params?.[3] as string | null,
-          value_boolean: params?.[4] as boolean | null,
+          value_boolean: params?.[3] as boolean | null,
+          value_number: params?.[4] as number | null,
+          value_number_max: params?.[5] as number | null,
         });
         return { rows: [] };
       }
@@ -186,7 +180,8 @@ const createMockPool = () => {
       manufacturer_part_id: string;
       spec_def_id: string;
       spec_option_id: string | null;
-      value_text: string | null;
+      value_number: number | null;
+      value_number_max: number | null;
       value_boolean: boolean | null;
     }>,
   });
@@ -201,7 +196,7 @@ describe("listDefsForItemIds", () => {
     expect(defs).toHaveLength(1);
     expect(defs[0]).toMatchObject({
       spec_def_id: "def-slc",
-      code: "slc_protocol",
+      code: "def-slc",
       display_name: "SLC protocol",
       value_type: "enum",
     });
@@ -223,13 +218,14 @@ describe("listDefsForItemIds", () => {
 });
 
 describe("replacePartSpecsTx", () => {
-  it("persists enum multi-row, boolean, and text values", async () => {
+  it("persists enum multi-row, boolean, and number values", async () => {
     const state = {
       rows: [] as Array<{
         manufacturer_part_id: string;
         spec_def_id: string;
         spec_option_id: string | null;
-        value_text: string | null;
+        value_number: number | null;
+      value_number_max: number | null;
         value_boolean: boolean | null;
       }>,
     };
@@ -239,7 +235,7 @@ describe("replacePartSpecsTx", () => {
       { spec_def_id: "def-enum", spec_option_id: "opt-a" },
       { spec_def_id: "def-enum", spec_option_id: "opt-b" },
       { spec_def_id: "def-bool", value_boolean: true },
-      { spec_def_id: "def-text", value_text: "FACP-1" },
+      { spec_def_id: "def-num", value_number: 3 },
     ];
 
     await replacePartSpecsTx(client, "part-1", rows);
@@ -264,8 +260,8 @@ describe("replacePartSpecsTx", () => {
         }),
         expect.objectContaining({
           manufacturer_part_id: "part-1",
-          spec_def_id: "def-text",
-          value_text: "FACP-1",
+          spec_def_id: "def-num",
+          value_number: 3,
         }),
       ]),
     );
@@ -277,14 +273,15 @@ describe("replacePartSpecsTx", () => {
         manufacturer_part_id: string;
         spec_def_id: string;
         spec_option_id: string | null;
-        value_text: string | null;
+        value_number: number | null;
+      value_number_max: number | null;
         value_boolean: boolean | null;
       }>,
     };
     const client = createMockClient(state);
 
     await expect(
-      replacePartSpecsTx(client, "part-1", [{ spec_def_id: "def-unknown", value_text: "x" }]),
+      replacePartSpecsTx(client, "part-1", [{ spec_def_id: "def-unknown", value_number: 1 }]),
     ).rejects.toMatchObject({
       details: { field: "part_specs", code: "unknown_spec_def" },
     });
@@ -296,7 +293,8 @@ describe("replacePartSpecsTx", () => {
         manufacturer_part_id: string;
         spec_def_id: string;
         spec_option_id: string | null;
-        value_text: string | null;
+        value_number: number | null;
+      value_number_max: number | null;
         value_boolean: boolean | null;
       }>,
     };
@@ -321,14 +319,16 @@ describe("prunePartSpecsToContextTx", () => {
           manufacturer_part_id: "part-1",
           spec_def_id: "def-enum",
           spec_option_id: "opt-a",
-          value_text: null,
+          value_number: null,
+          value_number_max: null,
           value_boolean: null,
         },
         {
           manufacturer_part_id: "part-1",
           spec_def_id: "def-stale",
           spec_option_id: null,
-          value_text: "orphan",
+          value_number: 1,
+          value_number_max: null,
           value_boolean: null,
         },
       ],
@@ -354,14 +354,16 @@ describe("prunePartSpecsToContextTx", () => {
           manufacturer_part_id: "part-1",
           spec_def_id: "def-enum",
           spec_option_id: "opt-a",
-          value_text: null,
+          value_number: null,
+          value_number_max: null,
           value_boolean: null,
         },
         {
           manufacturer_part_id: "part-1",
           spec_def_id: "def-bool",
           spec_option_id: null,
-          value_text: null,
+          value_number: null,
+          value_number_max: null,
           value_boolean: true,
         },
       ],
@@ -385,7 +387,8 @@ describe("prunePartSpecsToContextTx", () => {
           manufacturer_part_id: "part-1",
           spec_def_id: "def-enum",
           spec_option_id: "opt-a",
-          value_text: null,
+          value_number: null,
+          value_number_max: null,
           value_boolean: null,
         },
       ],

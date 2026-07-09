@@ -3,7 +3,11 @@ import { describe, expect, it } from "vitest";
 import {
   computeAddOnUnit,
   computeUnitPriceTarget,
+  filterLaborGroupByInclusion,
   resolveComplexityPercent,
+  resolveFilteredLaborCost,
+  resolveIncludedLaborPhaseIds,
+  resolveLaborGroup,
   resolveRate,
   type CommercialCatalog,
   type CostAddOnProfile,
@@ -147,5 +151,136 @@ describe("resolveComplexityPercent", () => {
         zone_factor_percent: null,
       }),
     ).toBe(100);
+  });
+});
+
+describe("resolveLaborGroup", () => {
+  const laborRow = (
+    item_id: string,
+    labor_phase_id: string,
+    hours: number,
+  ): ItemLaborPhaseRow => ({
+    item_id,
+    labor_phase_id,
+    labor_rate_type_id: "r1",
+    hours_per_unit: hours,
+    rate_cents: 5000,
+  });
+
+  it("returns leaf rows when present", () => {
+    const catalog = buildCatalog({
+      items: [item("branch", "root"), item("leaf", "branch")],
+      labor: [
+        laborRow("branch", "program", 1),
+        laborRow("leaf", "install", 2),
+      ],
+    });
+
+    expect(resolveLaborGroup(catalog, "leaf").map((row) => row.labor_phase_id)).toEqual([
+      "install",
+    ]);
+  });
+
+  it("inherits ancestor group atomically", () => {
+    const catalog = buildCatalog({
+      items: [item("branch", "root"), item("leaf", "branch")],
+      labor: [laborRow("branch", "program", 2), laborRow("branch", "test", 1)],
+    });
+
+    expect(resolveLaborGroup(catalog, "leaf")).toHaveLength(2);
+  });
+});
+
+describe("resolveFilteredLaborCost", () => {
+  const laborRow = (
+    item_id: string,
+    labor_phase_id: string,
+    hours: number,
+  ): ItemLaborPhaseRow => ({
+    item_id,
+    labor_phase_id,
+    labor_rate_type_id: "r1",
+    hours_per_unit: hours,
+    rate_cents: 5000,
+  });
+
+  it("filters scope inclusion to selected phases", () => {
+    const catalog = buildCatalog({
+      items: [item("leaf", "root")],
+      labor: [
+        laborRow("leaf", "program", 1),
+        laborRow("leaf", "install", 2),
+      ],
+    });
+
+    expect(
+      resolveFilteredLaborCost(catalog, "leaf", ["program"], null),
+    ).toBe(50);
+  });
+
+  it("includes all phases when inclusion unset", () => {
+    const catalog = buildCatalog({
+      items: [item("leaf", "root")],
+      labor: [
+        laborRow("leaf", "program", 1),
+        laborRow("leaf", "install", 2),
+      ],
+    });
+
+    expect(resolveFilteredLaborCost(catalog, "leaf", [], null)).toBe(150);
+  });
+
+  it("prefers zone inclusion over scope", () => {
+    const catalog = buildCatalog({
+      items: [item("leaf", "root")],
+      labor: [
+        laborRow("leaf", "program", 1),
+        laborRow("leaf", "install", 2),
+        laborRow("leaf", "test", 1),
+      ],
+    });
+
+    expect(
+      resolveFilteredLaborCost(catalog, "leaf", ["program", "install"], ["test"]),
+    ).toBe(50);
+  });
+});
+
+describe("resolveIncludedLaborPhaseIds", () => {
+  it("defaults to all group phases", () => {
+    const group = [
+      {
+        item_id: "leaf",
+        labor_phase_id: "a",
+        labor_rate_type_id: "r1",
+        hours_per_unit: 1,
+        rate_cents: 100,
+      },
+    ];
+    expect([...resolveIncludedLaborPhaseIds([], null, group)]).toEqual(["a"]);
+  });
+});
+
+describe("filterLaborGroupByInclusion", () => {
+  it("keeps only included ids", () => {
+    const rows = [
+      {
+        item_id: "leaf",
+        labor_phase_id: "a",
+        labor_rate_type_id: "r1",
+        hours_per_unit: 1,
+        rate_cents: 100,
+      },
+      {
+        item_id: "leaf",
+        labor_phase_id: "b",
+        labor_rate_type_id: "r1",
+        hours_per_unit: 1,
+        rate_cents: 100,
+      },
+    ];
+    expect(
+      filterLaborGroupByInclusion(rows, new Set(["b"])).map((row) => row.labor_phase_id),
+    ).toEqual(["b"]);
   });
 });

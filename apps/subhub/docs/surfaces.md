@@ -391,8 +391,8 @@ Applies to **customer, vendor, manufacturer, property_owner** detail lenses — 
 |-------|------|-------|
 | `profile` | scalar | `manufacturer_party_id`, `mpn`, `description`, `unit`, `purchase_unit`, `units_per_purchase` |
 | `vendor_pricing` | collection | `vendor_part` — `vendor_party_id`, `vendor_pn`, `vendor_description`, `unit_price`, `is_preferred` (one preferred per part) |
-| `item_links` | collection | `part_item` — item tree picker; any node; replace-array |
-| `part_specs` | collection | `manufacturer_part_spec` — enum / boolean / text compatibility rows; contextual defs from linked items |
+| `item_links` | collection | `part_item` — leaf-only multi TreeSelect; replace-array |
+| `part_specs` | collection | `manufacturer_part_spec` — Spec · Value (checkbox / number band / enum multi); contextual defs from linked leaves |
 
 ### `item_list` · `item_detail`
 
@@ -456,9 +456,11 @@ Applies to **customer, vendor, manufacturer, property_owner** detail lenses — 
 | **Route** | `/estimates`, `/estimates/[id]` |
 | **Nav group** | Sales |
 | **Anchor** | `estimate` |
-| **Tables** | `estimate`, `estimate_section`, `estimate_line`, `estimate_party` |
+| **Tables** | `estimate`, `estimate_scope`, `estimate_zone`, `estimate_line`, `estimate_party` |
 
-**Prerequisite:** `site_id` on estimate → site's `site_section` / `site_location` registry ([`site_detail`](#site_list--site_detail)). Grouping by place uses site-owned rows only ([decision](./decisions/estimate.md#decision-estimate--job-line-grouping--site-geography-2026-06-17).
+**Tabs (`estimate_detail`, 37w):** **General** · **Line Items** — Scope tab retired; three-panel **S** / **C** / **LI** on Line Items.
+
+**Prerequisite:** `site_id` on estimate → site's `site_scope` / `site_zone` registry ([`site_detail`](#site_list--site_detail)). Quote includes existing site geography via implicit include on line/config edit; estimate PATCH does not create site scopes/zones.
 
 **`estimate_list` columns:** `title`, `site` name, `status`, `estimate_date`
 
@@ -468,21 +470,22 @@ Applies to **customer, vendor, manufacturer, property_owner** detail lenses — 
 |-------|------|-------|
 | `profile` | scalar | `title`, `site_id`, `status`, `estimate_date`, `valid_until`, `source_estimate_id`, optional `category_id` |
 | `stakeholders` | collection | `estimate_party` — `party_id`, `relation_id` |
-| `quote_sections` | collection | `estimate_section` — commercial / CSI buckets (`title`, `category_id`, `sort_order`) — optional; not site geography |
-| `line_items` | collection | `estimate_line` — see below |
+| `scopes` | collection | `estimate_scope` + `estimate_zone` junction + bucket specs/phases — configured in **C** panel on Line Items tab |
+| `line_items` | collection | `estimate_line` — flat grid in **LI** panel; filtered by **S** selection |
 
-**`line_items` editor (O3):**
+**`line_items` editor (37w):**
 
-| Mode | When | UI |
-|------|------|-----|
-| **Flat (A)** | No grouping by site section/location | Single `line_items` field array |
-| **Grouped (B)** | Lines organized by site **section** and/or **location** | Nested/grouped view over same `line_items` DTO; each line has `site_location_id`; may create `proposed` locations on quote site |
+| Panel | When | UI |
+|-------|------|-----|
+| **S** | Site selected | Ant `Tree` — full `site_tree`; select scope/zone only |
+| **C** | **S** selection | Permanent bucket config — complexity, labor phases multi-select, specs |
+| **LI** | **S** selection | Flat `Table` — 37f columns; dashed **Add line** footer |
 
-**Line element:** `line_number`, `line_role`, `line_kind`, `description`, `quantity`, `unit`, `unit_cost`, `unit_price`, `estimate_section_id`, `site_location_id`, `phase_id`, `item_id`, `part_id`, `vendor_part_id`, `parent_line_id`, `sort_order`
+**Line element:** `line_role` (`standalone` only in UI), `description`, `quantity`, `unit`, `unit_cost`, `unit_price`, `estimate_scope_id`, `site_zone_id`, `phase_id`, `item_id`, `part_id`, `vendor_part_id`, `lock`
 
 **Surface actions:** + `win` / `lose` — DAL creates job on win with line snapshots
 
-**Notes:** Kits via `parent_line_id` + `line_role`. Physical place = `site_location_id` only.
+**Notes:** Kit UI removed (37v); DAL still validates kit rows if sent. Lines require non-null `estimate_scope_id`.
 
 ---
 

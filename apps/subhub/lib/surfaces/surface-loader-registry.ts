@@ -32,6 +32,7 @@ export type SurfaceListId =
   | "markup_type_table"
   | "complexity_factor_table"
   | "labor_phase_table"
+  | "spec_unit_table"
   | "estimate_list"
   | "job_list"
   | "part_list"
@@ -250,6 +251,15 @@ const listLoaders: Record<SurfaceListId, ListLoader> = {
     list: async (ctx) => {
       const dal = await ensureCatalogDal();
       return dal.laborPhaseTable.listAll(ctx);
+    },
+  },
+  spec_unit_table: {
+    ensureDal: async () => {
+      await ensureCatalogDal();
+    },
+    list: async (ctx) => {
+      const dal = await ensureCatalogDal();
+      return dal.specUnitTable.listAll(ctx);
     },
   },
   estimate_list: {

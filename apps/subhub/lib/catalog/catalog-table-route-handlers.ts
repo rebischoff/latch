@@ -12,7 +12,8 @@ type CatalogTableDalKey =
   | "complexityFactorTable"
   | "markupTypeTable"
   | "freightRateTypeTable"
-  | "incidentalRateTypeTable";
+  | "incidentalRateTypeTable"
+  | "specUnitTable";
 
 export const createCatalogTableRouteHandlers = (
   surfaceId: SurfaceId,

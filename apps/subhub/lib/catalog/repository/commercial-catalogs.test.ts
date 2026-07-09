@@ -121,6 +121,44 @@ describe("replaceCatalogTable commercial writes", () => {
     expect(insertParams[0]?.[1]).toBe("freight");
   });
 
+  it("updates existing cost_add_on row without kind in bind params", async () => {
+    const updateParams: unknown[] = [];
+    mockClient = {
+      query: vi.fn(async (sql: string, params?: unknown[]) => {
+        if (sql.includes("SELECT id FROM cost_add_on_type")) {
+          return { rows: [] };
+        }
+        if (sql.startsWith("UPDATE cost_add_on_type")) {
+          updateParams.push(...(params ?? []));
+          return { rows: [] };
+        }
+        if (sql.includes("SELECT id FROM cost_add_on_type WHERE")) {
+          return { rows: [] };
+        }
+        return { rows: [] };
+      }),
+    } as unknown as PoolClient;
+
+    const pool = { query: mockClient.query.bind(mockClient) } as never;
+
+    await replaceCatalogTable(pool, "actor-1", incidentalRateTypeConfig, [
+      {
+        id: "existing-id",
+        name: "More",
+        percent: 2,
+        amount_cents: 150,
+      },
+    ]);
+
+    expect(updateParams).toEqual([
+      "existing-id",
+      "More",
+      2,
+      150,
+      1,
+    ]);
+  });
+
   it("rejects duplicate names in replace payload", async () => {
     mockClient = {
       query: vi.fn(async () => ({ rows: [] })),

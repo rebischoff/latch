@@ -8,7 +8,7 @@ import {
   surfaceAllows,
   type Manifest,
 } from "@latch/contracts";
-import { App, Typography } from "antd";
+import { App, Tabs, Typography } from "antd";
 import { notFound, usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useMemo, useRef } from "react";
 import { useForm, type Resolver } from "react-hook-form";
@@ -35,6 +35,7 @@ import {
 import {
   collapsePartSpecRows,
   expandPartSpecsForPatch,
+  partSpecsToDisplayUnits,
 } from "@/lib/parts/part-specs-form";
 import {
   PartVendorPricingFields,
@@ -107,7 +108,7 @@ const mapPartSpecs = (rows: unknown): PartSpecFormRow[] => {
     const valueType =
       item.value_type === "enum" ||
       item.value_type === "boolean" ||
-      item.value_type === "text"
+      item.value_type === "number"
         ? item.value_type
         : undefined;
 
@@ -118,13 +119,20 @@ const mapPartSpecs = (rows: unknown): PartSpecFormRow[] => {
       value_type: valueType,
       spec_option_ids:
         typeof item.spec_option_id === "string" ? [item.spec_option_id] : undefined,
-      value_text: typeof item.value_text === "string" ? item.value_text : null,
+      value_number: typeof item.value_number === "number" ? item.value_number : null,
+      value_number_max:
+        typeof item.value_number_max === "number" ? item.value_number_max : null,
       value_boolean:
         typeof item.value_boolean === "boolean" ? item.value_boolean : null,
+      unit_symbol: typeof item.unit_symbol === "string" ? item.unit_symbol : null,
+      to_canonical_factor:
+        typeof item.to_canonical_factor === "number" ? item.to_canonical_factor : undefined,
+      decimal_places:
+        typeof item.decimal_places === "number" ? item.decimal_places : null,
     };
   });
 
-  return collapsePartSpecRows(flat);
+  return partSpecsToDisplayUnits(collapsePartSpecRows(flat));
 };
 
 const mapVendorPricing = (rows: unknown): VendorPricingFormRow[] => {
@@ -221,10 +229,12 @@ const normalizeProfileBody = (
 const normalizeItemLinksBody = (
   rows: ItemLinkFormRow[],
 ): Array<Record<string, unknown>> =>
-  rows.map((row, index) => ({
-    item_id: row.item_id,
-    sort_order: row.sort_order ?? index + 1,
-  }));
+  rows
+    .filter((row) => Boolean(row.item_id))
+    .map((row, index) => ({
+      item_id: row.item_id,
+      sort_order: row.sort_order ?? index + 1,
+    }));
 
 const normalizePartSpecsBody = (
   rows: PartSpecFormRow[],
@@ -597,6 +607,91 @@ export const PartDetailForm = ({
   const initialLoading = !isCreate && isLoading && !detail;
   const blocking = !isCreate && isFetching && Boolean(detail);
 
+  const showPurchaseTab =
+    fieldAllows(activeManifest, "profile", "read") ||
+    fieldAllows(activeManifest, "vendor_pricing", "read");
+  const showSpecsTab =
+    fieldAllows(activeManifest, "item_links", "read") ||
+    fieldAllows(activeManifest, "part_specs", "read");
+  const activeTab =
+    searchParams.get("tab") === "specs" && showSpecsTab ? "specs" : "purchase";
+
+  const purchaseContent = (
+    <>
+      {fieldAllows(activeManifest, "profile", "read") ? (
+        <FormSection title="Profile">
+          <LinkedSelectInput<PartDetailFormValues>
+            field="profile"
+            name="profile.manufacturer_party_id"
+            label="Manufacturer"
+            options={manufacturerOptions}
+            loading={manufacturerPickerLoading}
+            canLink={canNavigateManufacturer}
+            linkHref={routes.manufacturers.detail}
+            canAddNew={showAddManufacturer}
+            addNewHref={manufacturerCreateUrl}
+            addNewLabel="Add manufacturer"
+            selectProps={{
+              showSearch: true,
+              optionFilterProp: "label",
+            }}
+          />
+          <TextInput<PartDetailFormValues>
+            field="profile"
+            name="profile.mpn"
+            label="MPN"
+          />
+          <TextAreaInput<PartDetailFormValues>
+            field="profile"
+            name="profile.description"
+            label="Description"
+          />
+          <TextInput<PartDetailFormValues>
+            field="profile"
+            name="profile.unit"
+            label="Unit"
+          />
+          <TextInput<PartDetailFormValues>
+            field="profile"
+            name="profile.purchase_unit"
+            label="Purchase unit"
+          />
+          <InputNumberInput<PartDetailFormValues>
+            field="profile"
+            name="profile.units_per_purchase"
+            label="Units per purchase"
+            min={1}
+          />
+        </FormSection>
+      ) : null}
+
+      {showUomHint ? (
+        <Typography.Paragraph type="secondary" style={{ marginBottom: 16 }}>
+          Price is per {purchaseUnit}. 1 {purchaseUnit} = {unitsPerPurchase} {unit}.
+        </Typography.Paragraph>
+      ) : null}
+
+      {fieldAllows(activeManifest, "vendor_pricing", "read") ? (
+        <PartVendorPricingFields
+          manifest={activeManifest}
+          canNavigateVendor={canNavigateVendor}
+        />
+      ) : null}
+    </>
+  );
+
+  const specsContent = (
+    <>
+      {fieldAllows(activeManifest, "item_links", "read") ? (
+        <PartItemLinksField manifest={activeManifest} />
+      ) : null}
+
+      {fieldAllows(activeManifest, "part_specs", "read") ? (
+        <PartSpecsField manifest={activeManifest} syncKey={partSpecsSyncKey} />
+      ) : null}
+    </>
+  );
+
   return (
     <SurfaceFormRoot
       manifest={activeManifest}
@@ -613,73 +708,29 @@ export const PartDetailForm = ({
             {isCreate ? "New part" : (profile?.mpn ?? "Part")}
           </Typography.Title>
 
-          {fieldAllows(activeManifest, "profile", "read") ? (
-            <FormSection title="Profile">
-              <LinkedSelectInput<PartDetailFormValues>
-                field="profile"
-                name="profile.manufacturer_party_id"
-                label="Manufacturer"
-                options={manufacturerOptions}
-                loading={manufacturerPickerLoading}
-                canLink={canNavigateManufacturer}
-                linkHref={routes.manufacturers.detail}
-                canAddNew={showAddManufacturer}
-                addNewHref={manufacturerCreateUrl}
-                addNewLabel="Add manufacturer"
-                selectProps={{
-                  showSearch: true,
-                  optionFilterProp: "label",
-                }}
-              />
-              <TextInput<PartDetailFormValues>
-                field="profile"
-                name="profile.mpn"
-                label="MPN"
-              />
-              <TextAreaInput<PartDetailFormValues>
-                field="profile"
-                name="profile.description"
-                label="Description"
-              />
-              <TextInput<PartDetailFormValues>
-                field="profile"
-                name="profile.unit"
-                label="Unit"
-              />
-              <TextInput<PartDetailFormValues>
-                field="profile"
-                name="profile.purchase_unit"
-                label="Purchase unit"
-              />
-              <InputNumberInput<PartDetailFormValues>
-                field="profile"
-                name="profile.units_per_purchase"
-                label="Units per purchase"
-                min={1}
-              />
-            </FormSection>
-          ) : null}
-
-          {showUomHint ? (
-            <Typography.Paragraph type="secondary" style={{ marginBottom: 16 }}>
-              Price is per {purchaseUnit}. 1 {purchaseUnit} = {unitsPerPurchase} {unit}.
-            </Typography.Paragraph>
-          ) : null}
-
-          {fieldAllows(activeManifest, "vendor_pricing", "read") ? (
-            <PartVendorPricingFields
-              manifest={activeManifest}
-              canNavigateVendor={canNavigateVendor}
+          {showPurchaseTab && showSpecsTab ? (
+            <Tabs
+              activeKey={activeTab}
+              onChange={(key) => {
+                const params = new URLSearchParams(searchParams.toString());
+                if (key === "specs") {
+                  params.set("tab", "specs");
+                } else {
+                  params.delete("tab");
+                }
+                const query = params.toString();
+                router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+              }}
+              items={[
+                { key: "purchase", label: "Purchase", children: purchaseContent },
+                { key: "specs", label: "Specs", children: specsContent },
+              ]}
             />
-          ) : null}
-
-          {fieldAllows(activeManifest, "item_links", "read") ? (
-            <PartItemLinksField manifest={activeManifest} />
-          ) : null}
-
-          {fieldAllows(activeManifest, "part_specs", "read") ? (
-            <PartSpecsField manifest={activeManifest} syncKey={partSpecsSyncKey} />
-          ) : null}
+          ) : showPurchaseTab ? (
+            purchaseContent
+          ) : (
+            specsContent
+          )}
         </SurfaceFormLayout>
       </form>
     </SurfaceFormRoot>

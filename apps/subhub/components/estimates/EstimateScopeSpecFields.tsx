@@ -1,6 +1,6 @@
 "use client";
 
-import { Input, Select, Switch, Typography } from "antd";
+import { InputNumber, Select, Switch, Typography } from "antd";
 import { Controller, useWatch, type FieldPath } from "react-hook-form";
 
 import {
@@ -28,6 +28,20 @@ const specFieldPath = (
   return `scopes.${scopeIndex}.specs.${specIndex}.${key}` as FieldPath<EstimateLineEditorFormValues>;
 };
 
+const formatDisplayNumber = (
+  value: number | null | undefined,
+  spec: EstimateScopeSpecFormRow,
+): string => {
+  if (value === null || value === undefined) {
+    return "—";
+  }
+
+  const formatted =
+    spec.decimal_places != null ? value.toFixed(spec.decimal_places) : String(value);
+
+  return spec.unit_symbol ? `${formatted} ${spec.unit_symbol}` : formatted;
+};
+
 type SpecControlProps = {
   disabled: boolean;
   scopeIndex: number;
@@ -46,7 +60,7 @@ const SpecControl = ({
   zoneIndex,
 }: SpecControlProps) => {
   const label = spec.def_display_name ?? "Spec";
-  const valueType = spec.value_type ?? "text";
+  const valueType = spec.value_type ?? "enum";
 
   if (valueType === "enum") {
     const options = (spec.options ?? []).map((option) => ({
@@ -126,33 +140,47 @@ const SpecControl = ({
     );
   }
 
+  if (valueType === "number") {
+    return (
+      <Controller<EstimateLineEditorFormValues>
+        name={specFieldPath(scopeIndex, specIndex, "value_number", zoneIndex)}
+        render={({ field: { value, onChange } }) =>
+          writable ? (
+            <div>
+              <Typography.Text type="secondary" style={{ display: "block", marginBottom: 4 }}>
+                {label}
+              </Typography.Text>
+              <InputNumber
+                addonAfter={spec.unit_symbol ?? undefined}
+                disabled={disabled}
+                placeholder="No filter"
+                precision={spec.decimal_places ?? undefined}
+                size="small"
+                style={{ width: "100%" }}
+                value={typeof value === "number" ? value : null}
+                onChange={(next) => onChange(next ?? null)}
+              />
+            </div>
+          ) : (
+            <div>
+              <Typography.Text type="secondary" style={{ display: "block", marginBottom: 4 }}>
+                {label}
+              </Typography.Text>
+              <Typography.Text>{formatDisplayNumber(value as number | null, spec)}</Typography.Text>
+            </div>
+          )
+        }
+      />
+    );
+  }
+
   return (
-    <Controller<EstimateLineEditorFormValues>
-      name={specFieldPath(scopeIndex, specIndex, "value_text", zoneIndex)}
-      render={({ field: { value, onChange, onBlur } }) =>
-        writable ? (
-          <div>
-            <Typography.Text type="secondary" style={{ display: "block", marginBottom: 4 }}>
-              {label}
-            </Typography.Text>
-            <Input
-              size="small"
-              value={typeof value === "string" ? value : ""}
-              disabled={disabled}
-              onChange={onChange}
-              onBlur={onBlur}
-            />
-          </div>
-        ) : (
-          <div>
-            <Typography.Text type="secondary" style={{ display: "block", marginBottom: 4 }}>
-              {label}
-            </Typography.Text>
-            <Typography.Text>{typeof value === "string" && value ? value : "—"}</Typography.Text>
-          </div>
-        )
-      }
-    />
+    <div>
+      <Typography.Text type="secondary" style={{ display: "block", marginBottom: 4 }}>
+        {label}
+      </Typography.Text>
+      <Typography.Text>—</Typography.Text>
+    </div>
   );
 };
 

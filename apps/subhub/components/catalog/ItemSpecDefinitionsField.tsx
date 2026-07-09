@@ -1,305 +1,366 @@
 "use client";
 
 import { fieldAllows, type Manifest } from "@latch/contracts";
-import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
-import { Button, Checkbox, Input, Select, Typography } from "antd";
-import { Controller, useFieldArray, useFormContext } from "react-hook-form";
+import { Button, Input, InputNumber, Popover, Select, Typography } from "antd";
+import { useMemo, useState } from "react";
+import { Controller, useFormContext, useWatch } from "react-hook-form";
 
+import type { FieldArrayTableColumn } from "@/components/form/FieldArrayTable";
+import { FieldArrayTable } from "@/components/form/FieldArrayTable";
 import { FormSection } from "@/components/form/FormSection";
+import { useSurfaceList } from "@/lib/hooks/use-surface-list";
 
 import type { ItemDetailFormValues } from "./ItemDetailForm";
 
-type ParticipatesRow = ItemDetailFormValues["spec_participation"]["participates"][number];
-
-const findParticipation = (
-  participates: ParticipatesRow[],
-  specDefId: string | undefined,
-  index: number,
-): ParticipatesRow | undefined => {
-  if (specDefId) {
-    const match = participates.find((row) => row.spec_def_id === specDefId);
-    if (match) {
-      return match;
-    }
-  }
-  return participates[index];
-};
-
-const isAssignedHere = (
-  participation: ParticipatesRow | undefined,
-  categoryId: string,
-): boolean => participation?.assign_item_id === categoryId;
-
-const canToggleParticipation = (
-  participation: ParticipatesRow | undefined,
-  categoryId: string,
-): boolean => {
-  if (!participation || isAssignedHere(participation, categoryId)) {
-    return false;
-  }
-  return participation.state === "inherited" || participation.excluded_here;
-};
-
-const isRowEditable = (
-  isRoot: boolean,
-  participation: ParticipatesRow | undefined,
-  categoryId: string,
-  isNewRow: boolean,
-): boolean => {
-  if (isNewRow) {
-    return isRoot;
-  }
-  if (!participation?.assign_item_id) {
-    return isRoot;
-  }
-  return participation.assign_item_id === categoryId;
-};
-
 type ItemSpecDefinitionsFieldProps = {
-  categoryId: string;
   isCreate: boolean;
   manifest: Manifest;
 };
 
-export const ItemSpecDefinitionsField = ({
-  categoryId,
-  isCreate,
-  manifest,
-}: ItemSpecDefinitionsFieldProps) => {
+type SpecUnitOption = {
+  dimension: string;
+  id: string;
+  label: string;
+  symbol: string;
+};
+
+const isTypeLocked = (row: ItemDetailFormValues["spec_definitions"][number]): boolean =>
+  (row.in_use_part_count ?? 0) > 0;
+
+const isUnitLocked = isTypeLocked;
+
+const unwrapUnitRows = (
+  rows: Array<Record<string, unknown>> | undefined,
+): SpecUnitOption[] =>
+  (rows ?? []).map((row) => {
+    const symbol = (row.symbol as { symbol?: string } | undefined)?.symbol ?? "";
+    const name = (row.name as { name?: string } | undefined)?.name ?? "";
+    const dimension =
+      (row.dimension as { dimension?: string } | undefined)?.dimension ?? "";
+    return {
+      id: String(row.id),
+      dimension,
+      symbol,
+      label: symbol ? `${symbol} — ${name}` : name,
+    };
+  });
+
+const formatNumberDetailsSummary = (
+  unitId: string | null | undefined,
+  decimalPlaces: number | null | undefined,
+  unitOptions: SpecUnitOption[],
+): string => {
+  if (!unitId) {
+    return "Set unit…";
+  }
+  const unit = unitOptions.find((row) => row.id === unitId);
+  const symbol = unit?.symbol ?? unitId;
+  const dp = decimalPlaces ?? 0;
+  return `${symbol} · ${dp} dp`;
+};
+
+type SpecOptionsPopoverProps = {
+  disabled: boolean;
+  index: number;
+  writable: boolean;
+};
+
+const SpecOptionsPopover = ({ index, writable, disabled }: SpecOptionsPopoverProps) => {
   const { control, watch, setValue } = useFormContext<ItemDetailFormValues>();
-  const { fields, append, remove } = useFieldArray({
-    control,
-    name: "spec_definitions",
-  });
-  const definitions = watch("spec_definitions");
-  const isRoot = watch("profile.is_root") ?? false;
-  const canRead = fieldAllows(manifest, "spec_definitions", "read");
-  const canWriteDefinitions = fieldAllows(manifest, "spec_definitions", "write");
-  const canWriteParticipation = fieldAllows(manifest, "spec_participation", "write");
-  const participates = watch("spec_participation.participates");
-
-  if (!canRead || isCreate) {
-    return null;
-  }
-
-  const removeRow = (index: number) => {
-    const removedDef = definitions[index];
-    remove(index);
-    const removedSpecDefId = removedDef?.id;
-    setValue(
-      "spec_participation.participates",
-      removedSpecDefId
-        ? participates.filter((row) => row.spec_def_id !== removedSpecDefId)
-        : participates.filter((_, rowIndex) => rowIndex !== index),
-    );
-  };
-
-  return (
-    <FormSection title="Spec definitions">
-      {fields.length === 0 ? (
-        <Typography.Text type="secondary">No spec definitions yet.</Typography.Text>
-      ) : null}
-      <div style={{ display: "grid", gap: 16 }}>
-        {fields.map((field, index) => {
-          const definition = definitions[index];
-          const specDefId = definition?.id;
-          const isNewRow = !specDefId;
-          const participation = findParticipation(participates, specDefId, index);
-          const showParticipationToggle = canToggleParticipation(participation, categoryId);
-          const editable = canWriteDefinitions && isRowEditable(isRoot, participation, categoryId, isNewRow);
-          const participatesActive = participation?.active ?? false;
-          const checkboxDisabled =
-            !canWriteParticipation ||
-            (participation?.state === "excluded" && !participation.excluded_here);
-          const rowInactive = Boolean(participation?.excluded_here && !participatesActive);
-
-          return (
-            <div
-              key={field.id}
-              style={{
-                border: "1px solid rgba(0,0,0,0.06)",
-                borderRadius: 8,
-                padding: 12,
-                display: "grid",
-                gap: 8,
-                opacity: rowInactive ? 0.55 : 1,
-              }}
-            >
-              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                {showParticipationToggle && participation ? (
-                  <Controller
-                    control={control}
-                    name="spec_participation.participates"
-                    render={({ field: participationField }) => {
-                      const participationIndex = participationField.value.findIndex(
-                        (row) => row.spec_def_id === participation.spec_def_id,
-                      );
-                      const fieldActive =
-                        participationIndex >= 0
-                          ? (participationField.value[participationIndex]?.active ?? false)
-                          : participatesActive;
-
-                      return (
-                      <Checkbox
-                        checked={fieldActive}
-                        disabled={checkboxDisabled}
-                        title="Include this inherited spec under this category"
-                        onChange={(event) => {
-                          if (participationIndex < 0) {
-                            return;
-                          }
-                          const next = [...participationField.value];
-                          next[participationIndex] = {
-                            ...participationField.value[participationIndex],
-                            active: event.target.checked,
-                          };
-                          participationField.onChange(next);
-                        }}
-                      />
-                      );
-                    }}
-                  />
-                ) : null}
-                {editable ? (
-                  <>
-                    <Controller
-                      control={control}
-                      name={`spec_definitions.${index}.display_name`}
-                      render={({ field: nameField }) => (
-                        <Input {...nameField} placeholder="Display name" />
-                      )}
-                    />
-                    <Controller
-                      control={control}
-                      name={`spec_definitions.${index}.value_type`}
-                      render={({ field: typeField }) => (
-                        <Select
-                          style={{ minWidth: 120 }}
-                          value={typeField.value}
-                          onChange={typeField.onChange}
-                          options={[
-                            { value: "enum", label: "Enum" },
-                            { value: "boolean", label: "Boolean" },
-                            { value: "text", label: "Text" },
-                          ]}
-                        />
-                      )}
-                    />
-                    <Button
-                      type="text"
-                      danger
-                      icon={<DeleteOutlined />}
-                      onClick={() => removeRow(index)}
-                    />
-                  </>
-                ) : (
-                  <>
-                    <Typography.Text>{definition?.display_name || "—"}</Typography.Text>
-                    <Typography.Text type="secondary">
-                      ({definition?.value_type ?? "enum"})
-                    </Typography.Text>
-                  </>
-                )}
-              </div>
-              <Controller
-                control={control}
-                name={`spec_definitions.${index}.value_type`}
-                render={({ field: typeField }) =>
-                  typeField.value === "enum" ? (
-                    editable ? (
-                      <SpecOptionsEditor index={index} />
-                    ) : (
-                      <SpecOptionsReadOnly index={index} />
-                    )
-                  ) : (
-                    <span />
-                  )
-                }
-              />
-            </div>
-          );
-        })}
-      </div>
-      {canWriteDefinitions && isRoot ? (
-        <Button
-          type="dashed"
-          icon={<PlusOutlined />}
-          style={{ marginTop: 12 }}
-          onClick={() =>
-            append({
-              display_name: "",
-              value_type: "enum",
-              filter_mode: "required",
-              sort_order: fields.length + 1,
-              options: [],
-            })
-          }
-        >
-          Add spec definition
-        </Button>
-      ) : null}
-    </FormSection>
-  );
-};
-
-const SpecOptionsReadOnly = ({ index }: { index: number }) => {
-  const { watch } = useFormContext<ItemDetailFormValues>();
   const options = watch(`spec_definitions.${index}.options`) ?? [];
+  const [open, setOpen] = useState(false);
 
-  if (options.length === 0) {
-    return null;
-  }
+  const summary =
+    options.length > 0
+      ? options.map((row) => row.display_name).filter(Boolean).join(", ")
+      : "No options";
 
-  return (
-    <div style={{ paddingLeft: 12 }}>
-      <Typography.Text type="secondary">Options: </Typography.Text>
-      <Typography.Text>
-        {options.map((option) => option.display_name).filter(Boolean).join(", ") || "—"}
-      </Typography.Text>
-    </div>
-  );
-};
-
-const SpecOptionsEditor = ({ index }: { index: number }) => {
-  const { control } = useFormContext<ItemDetailFormValues>();
-  const { fields, append, remove } = useFieldArray({
-    control,
-    name: `spec_definitions.${index}.options`,
-  });
-
-  return (
-    <div style={{ paddingLeft: 12, display: "grid", gap: 8 }}>
-      <Typography.Text type="secondary">Options</Typography.Text>
-      {fields.map((field, optionIndex) => (
-        <div key={field.id} style={{ display: "flex", gap: 8 }}>
+  const content = (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8, minWidth: 280 }}>
+      {options.map((option, optionIndex) => (
+        <div key={option.id ?? `new-${optionIndex}`} style={{ display: "flex", gap: 8 }}>
           <Controller
             control={control}
             name={`spec_definitions.${index}.options.${optionIndex}.display_name`}
-            render={({ field: optionField }) => (
-              <Input {...optionField} placeholder="Option label" />
+            render={({ field }) => (
+              <Input
+                {...field}
+                disabled={!writable || disabled}
+                placeholder="Option name"
+                style={{ flex: 1 }}
+              />
             )}
           />
-          <Button
-            type="text"
-            danger
-            icon={<DeleteOutlined />}
-            onClick={() => remove(optionIndex)}
-          />
+          {writable && !disabled ? (
+            <Button
+              type="text"
+              danger
+              onClick={() => {
+                const next = options.filter((_, i) => i !== optionIndex);
+                setValue(`spec_definitions.${index}.options`, next, { shouldDirty: true });
+              }}
+            >
+              Remove
+            </Button>
+          ) : null}
         </div>
       ))}
-      <Button
-        size="small"
-        type="dashed"
-        icon={<PlusOutlined />}
-        onClick={() =>
-          append({
-            display_name: "",
-            sort_order: fields.length + 1,
-          })
-        }
-      >
-        Add option
-      </Button>
+      {writable && !disabled ? (
+        <Button
+          type="dashed"
+          onClick={() => {
+            setValue(
+              `spec_definitions.${index}.options`,
+              [...options, { display_name: "", sort_order: options.length + 1 }],
+              { shouldDirty: true },
+            );
+          }}
+        >
+          Add option
+        </Button>
+      ) : null}
     </div>
+  );
+
+  return (
+    <Popover
+      content={content}
+      open={open}
+      onOpenChange={setOpen}
+      trigger="click"
+      title="Enum options"
+    >
+      <Typography.Link disabled={!writable && options.length === 0}>{summary}</Typography.Link>
+    </Popover>
+  );
+};
+
+type NumberDetailsPopoverProps = {
+  disabled: boolean;
+  index: number;
+  locked: boolean;
+  unitOptions: SpecUnitOption[];
+  writable: boolean;
+};
+
+const NumberDetailsPopover = ({
+  index,
+  writable,
+  disabled,
+  locked,
+  unitOptions,
+}: NumberDetailsPopoverProps) => {
+  const { control, watch } = useFormContext<ItemDetailFormValues>();
+  const unitId = watch(`spec_definitions.${index}.unit_id`);
+  const decimalPlaces = watch(`spec_definitions.${index}.decimal_places`);
+  const [open, setOpen] = useState(false);
+
+  const summary = formatNumberDetailsSummary(unitId, decimalPlaces, unitOptions);
+
+  const content = (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12, minWidth: 280 }}>
+      <Controller
+        control={control}
+        name={`spec_definitions.${index}.unit_id`}
+        render={({ field }) => (
+          <div>
+            <Typography.Text type="secondary" style={{ display: "block", marginBottom: 4 }}>
+              Unit
+            </Typography.Text>
+            <Select
+              allowClear={false}
+              disabled={!writable || disabled || locked}
+              options={unitOptions.map((unit) => ({
+                value: unit.id,
+                label: unit.label,
+              }))}
+              placeholder="Select unit"
+              style={{ width: "100%" }}
+              value={field.value ?? undefined}
+              onChange={(value) => field.onChange(value ?? null)}
+            />
+          </div>
+        )}
+      />
+      <Controller
+        control={control}
+        name={`spec_definitions.${index}.decimal_places`}
+        render={({ field }) => (
+          <div>
+            <Typography.Text type="secondary" style={{ display: "block", marginBottom: 4 }}>
+              Decimal places
+            </Typography.Text>
+            <InputNumber
+              min={0}
+              max={10}
+              disabled={!writable || disabled || locked}
+              placeholder="0"
+              style={{ width: "100%" }}
+              value={field.value ?? undefined}
+              onChange={(value) => field.onChange(value ?? null)}
+            />
+          </div>
+        )}
+      />
+    </div>
+  );
+
+  return (
+    <Popover
+      content={content}
+      open={open}
+      onOpenChange={setOpen}
+      trigger="click"
+      title="Number details"
+    >
+      <Typography.Link disabled={!writable && !unitId}>{summary}</Typography.Link>
+    </Popover>
+  );
+};
+
+type SpecDefinitionDetailsCellProps = {
+  disabled: boolean;
+  index: number;
+  unitOptions: SpecUnitOption[];
+  writable: boolean;
+};
+
+const SpecDefinitionDetailsCell = ({
+  index,
+  writable,
+  disabled,
+  unitOptions,
+}: SpecDefinitionDetailsCellProps) => {
+  const valueType = useWatch({
+    name: `spec_definitions.${index}.value_type`,
+    defaultValue: "enum" as const,
+  });
+  const row = useWatch({
+    name: `spec_definitions.${index}`,
+  });
+
+  if (valueType === "boolean") {
+    return null;
+  }
+  if (valueType === "enum") {
+    return <SpecOptionsPopover index={index} writable={writable} disabled={disabled} />;
+  }
+
+  const locked = row ? isUnitLocked(row) : false;
+
+  return (
+    <NumberDetailsPopover
+      index={index}
+      writable={writable}
+      disabled={disabled}
+      locked={locked}
+      unitOptions={unitOptions}
+    />
+  );
+};
+
+export const ItemSpecDefinitionsField = ({
+  isCreate,
+  manifest,
+}: ItemSpecDefinitionsFieldProps) => {
+  const { control, watch } = useFormContext<ItemDetailFormValues>();
+  const nodeType = watch("profile.node_type") ?? "category";
+  const definitions = watch("spec_definitions");
+  const canRead = fieldAllows(manifest, "spec_definitions", "read");
+  const canWrite = fieldAllows(manifest, "spec_definitions", "write");
+  const { data: unitListData } = useSurfaceList("spec_unit_table");
+  const unitOptions = useMemo(
+    () => unwrapUnitRows(unitListData?.data.rows),
+    [unitListData?.data.rows],
+  );
+
+  const columns = useMemo((): FieldArrayTableColumn<
+    ItemDetailFormValues,
+    "spec_definitions"
+  >[] => {
+    const result: FieldArrayTableColumn<ItemDetailFormValues, "spec_definitions">[] = [
+      {
+        key: "display_name",
+        title: "Name",
+        width: 220,
+        render: ({ index, writable, disabled }) => (
+          <Controller
+            control={control}
+            name={`spec_definitions.${index}.display_name`}
+            render={({ field }) => (
+              <Input {...field} disabled={!writable || disabled} placeholder="Display name" />
+            )}
+          />
+        ),
+      },
+      {
+        key: "value_type",
+        title: "Type",
+        width: 130,
+        render: ({ index, writable, disabled }) => {
+          const row = definitions[index];
+          const locked = row ? isTypeLocked(row) : false;
+          return (
+            <Controller
+              control={control}
+              name={`spec_definitions.${index}.value_type`}
+              render={({ field }) => (
+                <Select
+                  {...field}
+                  disabled={!writable || disabled || locked}
+                  options={[
+                    { value: "enum", label: "Enum" },
+                    { value: "boolean", label: "Boolean" },
+                    { value: "number", label: "Number" },
+                  ]}
+                  style={{ width: "100%" }}
+                />
+              )}
+            />
+          );
+        },
+      },
+      {
+        key: "details",
+        title: "Details",
+        render: ({ index, writable, disabled }) => (
+          <SpecDefinitionDetailsCell
+            index={index}
+            writable={writable}
+            disabled={disabled}
+            unitOptions={unitOptions}
+          />
+        ),
+      },
+    ];
+
+    return result;
+  }, [control, definitions, unitOptions]);
+
+  if (!canRead || isCreate || nodeType !== "scope") {
+    return null;
+  }
+
+  return (
+    <FormSection title="Spec definitions">
+      <FieldArrayTable<ItemDetailFormValues, "spec_definitions">
+        field="spec_definitions"
+        name="spec_definitions"
+        columns={columns}
+        orderable={canWrite}
+        addLabel="Add spec"
+        allowRemove={canWrite}
+        createRow={() => ({
+          display_name: "",
+          value_type: "enum",
+          sort_order: definitions.length + 1,
+          options: [],
+          unit_id: null,
+          decimal_places: null,
+          in_use_part_count: 0,
+          in_use_participation_count: 0,
+        })}
+      />
+    </FormSection>
   );
 };

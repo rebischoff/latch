@@ -23,6 +23,10 @@ import {
   mapMarkupReplaceBody,
   mapNameCreateBody,
   mapNameReplaceBody,
+  mapSpecUnitCreateBody,
+  mapSpecUnitReplaceBody,
+  specUnitTableDescriptor,
+  SpecUnitTableCreateSchema,
 } from "../descriptors/commercial-catalog-tables";
 import {
   insertComplexityFactor,
@@ -44,12 +48,18 @@ import {
   replaceLaborRateTypes,
   replaceMarkupTypes,
 } from "../repository/commercial-catalogs";
+import {
+  insertSpecUnit,
+  loadSpecUnitList,
+  replaceSpecUnits,
+} from "../repository/spec-units";
 import { createLaborRateTypeTableStore } from "../../../modules/catalog/generated/labor_rate_type_table.store.generated";
 import { createLaborPhaseTableStore } from "../../../modules/catalog/generated/labor_phase_table.store.generated";
 import { createComplexityFactorTableStore } from "../../../modules/catalog/generated/complexity_factor_table.store.generated";
 import { createMarkupTypeTableStore } from "../../../modules/catalog/generated/markup_type_table.store.generated";
 import { createFreightRateTypeTableStore } from "../../../modules/catalog/generated/freight_rate_type_table.store.generated";
 import { createIncidentalRateTypeTableStore } from "../../../modules/catalog/generated/incidental_rate_type_table.store.generated";
+import { createSpecUnitTableStore } from "../../../modules/catalog/generated/spec_unit_table.store.generated";
 import { extendCatalogTableDal } from "./catalog-table-dal";
 
 export const createCommercialCatalogDals = (
@@ -150,6 +160,20 @@ export const createCommercialCatalogDals = (
       replaceRows: replaceIncidentalRateTypes,
       mapCreateBody: mapCostAddOnCreateBody,
       mapReplaceBody: mapCostAddOnReplaceBody,
+    },
+  ),
+  specUnitTable: extendCatalogTableDal(
+    pool,
+    getActorId,
+    createSurfaceDal(specUnitTableDescriptor, createSpecUnitTableStore(pool, getActorId)),
+    {
+      createSchema: SpecUnitTableCreateSchema,
+      descriptor: specUnitTableDescriptor,
+      listRows: () => loadSpecUnitList(pool),
+      insertRow: insertSpecUnit,
+      replaceRows: replaceSpecUnits,
+      mapCreateBody: mapSpecUnitCreateBody,
+      mapReplaceBody: mapSpecUnitReplaceBody,
     },
   ),
 });

@@ -2,7 +2,7 @@
 
 > **Wave:** 3 · **Status:** shipped (37j part authoring, 2026-07-06) · **Implementation:** [`24-part-wave-3a.md`](../tasks/24-part-wave-3a.md) wave 3a — **complete** (2026-06-24); [`37j`](../tasks/37j-catalog-part-authoring.md) — `item_links` + `part_specs` · **Catalog:** [`surfaces.md`](../surfaces.md#part_list--part_detail) · **DBML:** `manufacturer_part`, `vendor_part`, `part_item`, `manufacturer_part_spec` · **Decisions:** [catalog parts](../decisions/catalog.md#decision-part_detail--mpn-catalog-and-vendor-pricing-2026-06-19), [part authoring UI](../decisions/catalog.md#decision-catalog-part-authoring-ui-2026-07-06), [catalog simplified](../decisions/catalog.md#decision-catalog--simplified-parts-items-categories-2026-06-16), [list+detail create](../decisions/general.md#decision-listdetail-surface-create--toolbar-and-picker-add-new-2026-06-19), [delete blockers](../decisions/cross-cutting.md#decision-delete-blocked-by-referential-use--structured-errors-2026-06-18), [cross-Surface nav](../decisions/general.md#decision-cross-surface-related-records--navigation-only-v1-2026-06-18)
 
-**Related:** [`manufacturer.md`](./manufacturer.md) — manufacturer is a picker anchor only; no parts hub. [`vendor.md`](./vendor.md) — primary `vendor_part` edit on this Surface. [`item.md`](./item.md) — part pool assignment on **`part_detail` only** v1 (no writable `part_pool` on `item_detail`). Estimate item picker is **leaf-only** (`node_type = item`); part `item_links` may attach to any non-scope node. **Deferred:** `manufacturer_part.specs` free-text, part requirements, `cut_sheet_url` / submittals — estimate/job slice (#20–21); `number` value type → migration `045`.
+**Related:** [`manufacturer.md`](./manufacturer.md) — manufacturer is a picker anchor only; no parts hub. [`vendor.md`](./vendor.md) — primary `vendor_part` edit on this Surface. [`item.md`](./item.md) — part pool assignment on **`part_detail` only** v1 (no writable `part_pool` on `item_detail`). [`spec.md`](./spec.md) *(37o, new)* — `part_specs` writable-def union now reads `item_spec_participation` directly (no more ancestor walk). Estimate/job item pickers and part `item_links` are **leaf-only** (`node_type = item`) — [37u](../tasks/37u-part-leaf-links-specs-ui.md). Resolver matches exact `part_item.item_id` (no subtree walk). **Deferred:** `manufacturer_part.specs` free-text, part requirements, `cut_sheet_url` / submittals — estimate/job slice (#20–21).
 
 ---
 
@@ -19,8 +19,8 @@
 | 7 | Create | [Cross-cutting](../decisions/general.md#decision-listdetail-surface-create--toolbar-and-picker-add-new-2026-06-19) — **New** on list toolbar; **Add new** in pickers when `create` granted. POST requires manufacturer + MPN + description; `vendor_pricing` optional |
 | 8 | Delete | `ConflictError` with counts + sample labels + deep links; allow when only `vendor_part` children; **PATCH** identity unless `RESTRICT` blockers |
 | 9 | Policy | **`profile`** and **`vendor_pricing`** separate manifest Fields — no sensitive-field tier |
-| 10 | Item assignment | **`item_links`** on `part_detail` — `part_item` replace-array; any item tree node; estimate resolver subtree pool unchanged |
-| 11 | Part compatibility specs | **`part_specs`** on `part_detail` — `manufacturer_part_spec` rows; enum / boolean / text v1; contextual defs from linked items' scope roots |
+| 10 | Item assignment | **`item_links`** on `part_detail` — `part_item` replace-array; **`node_type = item` leaves only**; one multi leaf-only `TreeSelect`; resolver exact leaf match (no parent→subtree pool) — [37u](../tasks/37u-part-leaf-links-specs-ui.md) |
+| 11 | Part compatibility specs | **`part_specs`** on `part_detail` — Spec · Value table; boolean checkbox; number min + optional max; enum multi-select; rows = contextual union of linked leaves’ `item_spec_participation` |
 
 ---
 
@@ -73,8 +73,8 @@
 |----------|------|----------|-------------------------|-------|
 | `profile` | scalar | read + write | `manufacturer_party_id`, `mpn`, `description`, `unit`, `purchase_unit`, `units_per_purchase` | Manufacturer ref + denormalized label in read DTO |
 | `vendor_pricing` | collection | read + write | `vendor_part` | replace-array PATCH; see element shape |
-| `item_links` | collection | read + write | `part_item`, `item` | replace-array; part → item M:N pool for estimate resolver |
-| `part_specs` | collection | read + write | `manufacturer_part_spec`, `spec_def`, `spec_option` | replace-array; compatibility rows for part filter |
+| `item_links` | collection | read + write | `part_item`, `item` | replace-array; leaf items only (`node_type = item`); part → item M:N pool for estimate resolver |
+| `part_specs` | collection | read + write | `manufacturer_part_spec`, `spec_def`, `spec_option` | replace-array; Spec · Value UX; compatibility rows for part filter |
 
 **Omit on this Surface:** `manufacturer_part.specs` text, `cut_sheet_url`, related job aggregates, price history.
 
@@ -109,7 +109,7 @@
 }
 ```
 
-Assigning a part to a **parent** item makes it available when quoting that branch or any descendant (estimate resolver collects `part_item` for anchor ∪ subtree).
+Only **quotable leaves** (`item.node_type = 'item'`) are linkable. The estimate resolver matches exact `part_item.item_id` — linking a parent/category does not expand a subtree pool (and is rejected by the DAL).
 
 ### Collection — `part_specs` element
 
@@ -121,12 +121,13 @@ Assigning a part to a **parent** item makes it available when quoting that branc
   "value_type": "enum",
   "spec_option_id": "<uuid>",
   "option_display_name": "Fire-Lite LiteSpeed",
-  "value_text": null,
-  "value_boolean": null
+  "value_boolean": null,
+  "value_number": null,
+  "value_number_max": null
 }
 ```
 
-Enum defs may appear as **multiple rows** (one per compatible `spec_option_id`). Boolean/text: one row per def. Writable defs = contextual union of effective `spec_def` ids for scope roots of `item_links` (J6).
+Enum defs may appear as **multiple rows** (one per compatible `spec_option_id`). Boolean / number: one row per def. UI is a **Spec · Value** table: checkbox (boolean), min + optional max popover (number), multi-select (enum). Writable defs = contextual union of `item_spec_participation` for the part's linked **leaves** (J6 / 37o — direct join; no ancestor walk).
 
 ---
 
@@ -180,9 +181,9 @@ Enum defs may appear as **multiple rows** (one per compatible `spec_option_id`).
 
 **`is_preferred`:** when a row is patched/upserted with `is_preferred: true`, set `is_preferred = false` on all other `vendor_part` rows for the same `manufacturer_part_id` in the same transaction.
 
-**`item_links`:** replace-array — upsert by `item_id`; delete omitted rows; `sort_order` from array index; reject unknown `item_id` and duplicate `item_id`. **Prune** `manufacturer_part_spec` in the same transaction — delete rows whose `spec_def_id` is outside the contextual union for the new links (even when PATCH omits `part_specs`).
+**`item_links`:** replace-array — upsert by `item_id`; delete omitted rows; `sort_order` from array index; reject unknown `item_id`, duplicate `item_id`, and non-leaf `item_id` (`node_type <> 'item'`). **Prune** `manufacturer_part_spec` in the same transaction — delete rows whose `spec_def_id` is outside the contextual union for the new links (even when PATCH omits `part_specs`).
 
-**`part_specs`:** replace-array — delete all rows for part then insert; reject `spec_def_id` outside contextual union (linked items' scope roots); enum = one row per `spec_option_id`; boolean/text = one row per def; strict value-type validation.
+**`part_specs`:** replace-array — delete all rows for part then insert; reject `spec_def_id` outside contextual union (**37o:** `⋃ item_spec_participation` for `item_links`, direct join); enum = one row per `spec_option_id`; boolean / number = one row per def; strict value-type validation.
 
 **PATCH `manufacturer_party_id` / `mpn`:** allowed when no `RESTRICT` dependents (see § F); re-check uniqueness on change.
 
@@ -219,18 +220,20 @@ Master-detail per [routing-and-libraries.md](../routing-and-libraries.md): list 
 ┌─────────────────────────────────────────┐
 │ SurfaceToolbar — New part | Save | Delete … │
 ├──────────────────┬──────────────────────┤
-│ part_list        │  profile (MPN header) │
-│ mpn / desc / mfr │  vendor_pricing grid  │
-│                  │  item_links table     │
-│                  │  part_specs table     │
+│ part_list        │  title (MPN)          │
+│ mpn / desc / mfr │  [ Purchase | Specs ] │
+│                  │  Purchase: profile,   │
+│                  │    vendor_pricing     │
+│                  │  Specs: item_links,   │
+│                  │    part_specs         │
 └──────────────────┴──────────────────────┘
 ```
 
 **Create:** toolbar **New part** on list layout → empty detail pane → POST on first Save ([create decision](../decisions/general.md#decision-listdetail-surface-create--toolbar-and-picker-add-new-2026-06-19)).
 
-**Section order:** `profile` → `vendor_pricing` → `item_links` → `part_specs` (when granted).
+**Tabs:** **Purchase** (`profile`, `vendor_pricing`) and **Specs** (`item_links`, `part_specs`). URL `?tab=specs` selects Specs; default is Purchase. When only one tab group is readable, show that content without tab chrome.
 
-**UOM helper:** when `purchase_unit` differs from `unit`, show conversion hint (`units_per_purchase`) above pricing grid.
+**UOM helper:** when `purchase_unit` differs from `unit`, show conversion hint (`units_per_purchase`) on the Purchase tab above the pricing grid.
 
 ---
 
@@ -261,8 +264,8 @@ Master-detail per [routing-and-libraries.md](../routing-and-libraries.md): list 
 | Field | Add | Pickers | Empty state |
 |-------|-----|---------|-------------|
 | `vendor_pricing` | **Add vendor price** | **Vendor** — vendor-tagged `party` only; [`LinkedSelectInput`](../../components/form/LinkedSelectInput.tsx) inline layout (`[ Select ] [ open icon ]`) when `vendor_detail` `read`; read-only row: label + icon (not inline link text); **Add new vendor** deferred | "No vendor pricing" |
-| `item_links` | **Add item** | **Item** — org item tree (`TreeSelect`); any node (root, branch, leaf) | "Not assigned to any items — add an item to include this part in estimate resolution." |
-| `part_specs` | **Add spec** | Contextual `spec_def` picker from linked items' scope roots; enum multi-option → multiple rows | "No compatibility specs — add rows after linking items." |
+| `item_links` | multi `TreeSelect` | **Item** — org item tree; **leaves selectable only** (`node_type = item`); selection order → `sort_order` | "Not assigned to any items — add an item to include this part in estimate resolution." |
+| `part_specs` | (auto rows) | Spec · Value — checkbox / number min–max popover / enum multi-select; defs from linked leaves’ participation union | "Link items first — compatibility specs appear for each effective definition on the linked items." |
 
 ### `profile` pickers
 
@@ -290,7 +293,8 @@ Master-detail per [routing-and-libraries.md](../routing-and-libraries.md): list 
 | Topic | Handling |
 |-------|----------|
 | **`specs` / requirements / cut sheets** | `manufacturer_part.specs` text deferred; structured compatibility via `part_specs` (37j); submittals #28 |
-| **`number` value type** | Deferred — migration `044` + UI follow-up (J8) |
+| **`number` value type** | Shipped (37p–37u) — exact or band via optional max; Spec · Value popover on part Specs tab |
+| **Non-leaf `item_links`** | Rejected on write (`not_leaf_item`); migration `053` cleans legacy non-leaf `part_item` rows |
 | **`currency`** | Not a Field; v1 assumes org currency; per-vendor currency deferred |
 | **Manufacturer filter on list** | Deferred — org-wide catalog only |
 | **Duplicate vendor PN** | Unique per vendor — validation on collection upsert |
@@ -298,8 +302,8 @@ Master-detail per [routing-and-libraries.md](../routing-and-libraries.md): list 
 | **Codegen L1/L2** | Hand-written descriptor + repository for `vendor_pricing` until collection codegen |
 | **`vendor_pricing` on `vendor_detail`** | Deferred optional read-only rollup — primary edit here ([`vendor.md`](./vendor.md)) |
 | **Picker return context** | [`25-manufacturer-detail.md`](../tasks/25-manufacturer-detail.md) + [return-context decision](../decisions/general.md#decision-picker-return-context--url-protocol-2026-06-24) — part → manufacturer first; other foreign pickers reuse protocol |
-| **Link shrink / orphan specs** | DAL **prunes** `manufacturer_part_spec` on `item_links` save when union shrinks (37k K1/K4); UI shows helper when links dirty and warning banner when GET rows fall outside current union until save |
-| **Item option delete** | Item `spec_definitions` save **blocks** removal of options referenced by part compatibility rows (`spec_option_in_use`) — diff upsert, not delete-all |
+| **Link shrink / orphan specs** | DAL **prunes** `manufacturer_part_spec` on `item_links` save when union shrinks (37k K1/K4); UI shows helper when links dirty and warning banner when GET rows fall outside current union until save. **37o:** stale rows are also inert at match time (matcher reads only current `item_spec_participation`), so eager prune stays a hygiene nicety, not a correctness requirement — see [S9](../decisions/catalog.md#decision-spec-definitions-scoped-to-root-flat-item-participation--no-ownershipinheritance-2026-07-07) |
+| **Option delete** | `spec_detail` save (37o; moved off `item_detail`) **blocks** removal of options referenced by part compatibility rows (`spec_option_in_use`) — diff upsert, not delete-all |
 
 ---
 

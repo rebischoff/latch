@@ -135,8 +135,11 @@ const loadSpecTemplatesForRoots = async (
       value_type: def.value_type,
       spec_option_id: null,
       option_display_name: null,
-      value_text: null,
+      value_number: null,
       value_boolean: null,
+      unit_symbol: def.unit_symbol,
+      to_canonical_factor: def.to_canonical_factor,
+      decimal_places: def.decimal_places,
       options: optionsByDefId.get(def.spec_def_id) ?? [],
     }));
   }

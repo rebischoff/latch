@@ -9,11 +9,17 @@ const EstimateStakeholderPatchElementSchema = z
   })
   .strict();
 
+const EstimateScopeLaborPhasePatchElementSchema = z
+  .object({
+    labor_phase_id: z.string(),
+  })
+  .strict();
+
 const EstimateScopeSpecPatchElementSchema = z
   .object({
     spec_def_id: z.string(),
     spec_option_id: z.string().nullable().optional(),
-    value_text: z.string().nullable().optional(),
+    value_number: z.number().nullable().optional(),
     value_boolean: z.boolean().nullable().optional(),
   })
   .strict();
@@ -23,6 +29,7 @@ const EstimateScopeZonePatchElementSchema = z
     site_zone_id: z.string(),
     sort_order: z.number(),
     complexity_factor_id: z.string().nullable().optional(),
+    included_labor_phases: z.array(EstimateScopeLaborPhasePatchElementSchema).optional(),
     specs: z.array(EstimateScopeSpecPatchElementSchema),
   })
   .strict();
@@ -36,6 +43,7 @@ const EstimateScopePatchElementSchema = z
     labor_context_type_id: z.string().nullable().optional(),
     markup_type_id: z.string().nullable().optional(),
     complexity_factor_id: z.string().nullable().optional(),
+    included_labor_phases: z.array(EstimateScopeLaborPhasePatchElementSchema).optional(),
     specs: z.array(EstimateScopeSpecPatchElementSchema),
     zones: z.array(EstimateScopeZonePatchElementSchema),
   })
@@ -145,19 +153,29 @@ export type EstimateSiteTreeRow = {
   spec_templates: Record<string, EstimateScopeSpecRow[]>;
 };
 
+export type EstimateScopeLaborPhaseRow = {
+  labor_phase_id: string;
+  labor_phase_name: string;
+  sort_order: number;
+};
+
 export type EstimateScopeSpecRow = {
+  decimal_places: number | null;
   def_display_name: string;
   option_display_name: string | null;
   options?: Array<{ display_name: string; id: string }>;
   spec_def_id: string;
   spec_option_id: string | null;
+  to_canonical_factor: number;
+  unit_symbol: string | null;
   value_boolean: boolean | null;
-  value_text: string | null;
-  value_type: "enum" | "boolean" | "text";
+  value_number: number | null;
+  value_type: "enum" | "boolean" | "number";
 };
 
 export type EstimateScopeZoneRow = {
   complexity_factor_id: string | null;
+  included_labor_phases: EstimateScopeLaborPhaseRow[];
   site_zone_id: string;
   sort_order: number;
   specs: EstimateScopeSpecRow[];
@@ -166,6 +184,7 @@ export type EstimateScopeZoneRow = {
 export type EstimateScopeRow = {
   complexity_factor_id: string | null;
   id: string;
+  included_labor_phases: EstimateScopeLaborPhaseRow[];
   root_item_id: string;
   root_item_name: string | null;
   site_scope_id: string;

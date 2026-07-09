@@ -6,7 +6,10 @@ import {
   computeUnitPriceTarget,
   loadCommercialCatalog,
   loadComplexityContext,
+  loadScopeLaborPhases,
+  loadZoneLaborPhases,
   resolveComplexityPercent,
+  resolveFilteredLaborCost,
   resolveRate,
   type CostAddOnProfile,
   type MarkupProfile,
@@ -125,11 +128,26 @@ export const recalcProductLine = async (
   const unitFreight = computeAddOnUnit(freightProfile, unitMaterial);
   const unitIncidental = computeAddOnUnit(incidentalProfile, unitMaterial);
 
-  const baseLabor = (resolveRate(commercialCatalog, line.item_id, "labor") as number | null) ?? 0;
-  const complexity = await loadComplexityContext(
-    client,
-    line.estimate_scope_id as string,
-    line.site_zone_id ?? null,
+  const [scopeLaborPhases, zoneLaborPhases, complexity] = await Promise.all([
+    loadScopeLaborPhases(client, line.estimate_scope_id as string),
+    line.site_zone_id
+      ? loadZoneLaborPhases(
+          client,
+          line.estimate_scope_id as string,
+          line.site_zone_id,
+        )
+      : Promise.resolve([]),
+    loadComplexityContext(
+      client,
+      line.estimate_scope_id as string,
+      line.site_zone_id ?? null,
+    ),
+  ]);
+  const baseLabor = resolveFilteredLaborCost(
+    commercialCatalog,
+    line.item_id,
+    scopeLaborPhases,
+    zoneLaborPhases.length > 0 ? zoneLaborPhases : null,
   );
   const complexityPercent = resolveComplexityPercent(complexity);
   const unitLabor = baseLabor * (complexityPercent / 100);

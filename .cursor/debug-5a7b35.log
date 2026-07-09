@@ -1,0 +1,6 @@
+{"sessionId":"5a7b35","location":"item-detail.ts:loadScopeSpecDefinitions:entry","message":"db role check","data":{"scopeRootId":"5c1984b0-3ed8-4bf7-820c-a9e94c4dd9ce","role":{"current_user":"latch_app","session_user":"latch_app"}},"timestamp":1783557057848,"hypothesisId":"B"}
+{"sessionId":"5a7b35","location":"item-detail.ts:loadScopeSpecDefinitions:spec_def_only","message":"spec_def query ok","data":{"rowCount":1},"timestamp":1783557057926,"hypothesisId":"C"}
+{"sessionId":"5a7b35","location":"item-detail.ts:loadScopeSpecDefinitions:spec_unit_only","message":"spec_unit direct query ok","data":{"rowCount":1},"timestamp":1783557058007,"hypothesisId":"A"}
+{"sessionId":"5a7b35","location":"item-detail.ts:loadScopeSpecDefinitions:entry","message":"db role check","data":{"scopeRootId":"5c1984b0-3ed8-4bf7-820c-a9e94c4dd9ce","role":{"current_user":"latch_app","session_user":"latch_app"}},"timestamp":1783557062299,"hypothesisId":"B"}
+{"sessionId":"5a7b35","location":"item-detail.ts:loadScopeSpecDefinitions:spec_def_only","message":"spec_def query ok","data":{"rowCount":1},"timestamp":1783557062367,"hypothesisId":"C"}
+{"sessionId":"5a7b35","location":"item-detail.ts:loadScopeSpecDefinitions:spec_unit_only","message":"spec_unit direct query ok","data":{"rowCount":1},"timestamp":1783557062437,"hypothesisId":"A"}

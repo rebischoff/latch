@@ -15,6 +15,8 @@
 
 ### Decision: phase templates — per system default + item override (J5 locked 2026-06-27)
 
+**Status:** **Superseded** (2026-07-07) by [labor phase inclusion](./catalog.md#decision-labor-phase-inclusion--catalog--estimate--job-2026-07-07) ([37n](../tasks/37n-labor-phase-inclusion.md)). Job `scope_phase` rows seed from resolved `item_labor_phase` filtered by estimate scope/zone phase inclusion — not `phase_template_step`.
+
 **Choice:** `item.phase_template_id` when set; else `system.default_phase_template_id`; else org fallback. Job line create / win copies `phase_template_step` → `scope_phase`.
 
 **Rationale:** FA vs access vs CCTV need different default install/program/test paths; items can narrow further.

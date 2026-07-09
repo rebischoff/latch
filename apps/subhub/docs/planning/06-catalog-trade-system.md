@@ -52,7 +52,6 @@ Not to be confused with **`site_system`** (installed instance on a property).
 | `code` | Optional stable slug (`slc_protocol`) for import — not PK |
 | `display_name` | “SLC protocol” |
 | `value_type` | `enum` \| `boolean` \| `text` |
-| `filter_mode` | `required` \| `prefer` |
 | `sort_order` | |
 
 ## `system_spec_option`

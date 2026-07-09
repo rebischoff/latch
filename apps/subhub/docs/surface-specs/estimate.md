@@ -1,8 +1,25 @@
 # Estimates — `estimate_list` · `estimate_detail`
 
-> **Wave:** 4e · **Status:** backbone + **37e scope tab** (2026-07-02) · **Implementation:** [task 32](../tasks/32-estimate-wave-4e.md) wave 4e; [task 37e](../tasks/37e-estimate-scope-tab.md) scope tab · **Planning:** [`02-estimates.md`](../planning/02-estimates.md) · **Catalog:** [`surfaces.md`](../surfaces.md#estimate_list--estimate_detail) · **DBML:** `estimate`, `estimate_party`, `estimate_scope`, `estimate_zone`, `estimate_line` · **Decisions:** [scope tab](../decisions/estimate.md#decision-estimate-scope-tab--junction-zones-general-scope-row-block-uncheck-2026-07-02), [site anchor](../decisions/estimate.md#decision-estimate-site-anchor--gate-lines-immutable-after-create-2026-06-30)
+> **Wave:** 4e · **Status:** backbone + **37w three-panel Line Items** (2026-07-08) · **Implementation:** [task 32](../tasks/32-estimate-wave-4e.md) wave 4e; [task 37w](../tasks/37w-estimate-line-items-panels.md) Line Items panels · **Planning:** [`02-estimates.md`](../planning/02-estimates.md) · **Catalog:** [`surfaces.md`](../surfaces.md#estimate_list--estimate_detail) · **DBML:** `estimate`, `estimate_party`, `estimate_scope`, `estimate_zone`, `estimate_line` · **Decisions:** [three-panel layout](../decisions/estimate.md#decision-estimate-line-items-tab--three-panel-layout-2026-07-08), [Line Items merge](../decisions/estimate.md#decision-estimate-line-items-tab--merge-scope-config-into-line-tree-2026-07-08) (37v UI superseded), [site anchor](../decisions/estimate.md#decision-estimate-site-anchor--gate-lines-immutable-after-create-2026-06-30)
 
-**Related:** Site anchor via `profile.site_id` → [`site_detail`](./site.md). Stakeholder catalog: [`job-party-relation.md`](./job-party-relation.md). Win → job copy in wave **4b** → [`job.md`](./job.md). Catalog `system` / `system_spec_def` seeded in migration `031`.
+**Related:** Site anchor via `profile.site_id` → [`site_detail`](./site.md). Stakeholder catalog: [`job-party-relation.md`](./job-party-relation.md). Win → job copy in wave **4b** → [`job.md`](./job.md).
+
+---
+
+## Locked product answers (37v — 2026-07-08)
+
+> **UI superseded (2026-07-08)** by [37w three-panel layout](../tasks/37w-estimate-line-items-panels.md) — see [decision W1](../decisions/estimate.md#w1--shell-topology-locked). **Retained at DAL:** scopes, lines, include rules, persistence. **Supersedes UI of:** [37e scope tab](../tasks/37e-estimate-scope-tab.md). **Decision:** [Line Items merge](../decisions/estimate.md#decision-estimate-line-items-tab--merge-scope-config-into-line-tree-2026-07-08) (V1–V8). Historical **4e `systems` / General** vocabulary below is **retired in UI** — persisted shape is `scopes[]` + `line_items[]`.
+
+| # | Topic | Choice |
+|---|--------|--------|
+| **V1** | Tabs | **General \| Line Items** only — **Scope tab retired** |
+| **V2** | Tree parents | `scope` / `zone` parent rows (`colSpan`); line leaves; unzoned lines under scope; **≥1 scope required** per line |
+| **V3** | Include | Toolbar **Add scope ▾**; scope header **Add zone ▾**; tree = included scopes/zones only; estimate PATCH does **not** create site geography; empty site scopes → CTA to site |
+| **V4** | Bucket config | **⚙ Popover** on scope + zone parents — `EstimateScopeSpecFields`, `EstimateScopeLaborPhaseFields`, complexity picker |
+| **V5** | Summary chips | **Deferred** |
+| **V6** | Kits | **UI removed** — standalone lines only; DAL kit validation unchanged |
+| **V7** | Persistence | Unchanged — dirty until Save; `replaceEstimateCollectionsTx` |
+| **V8** | Line-level specs | **Deferred** (O5) |
 
 ---
 
@@ -308,6 +325,15 @@ Estimate PATCH **must not** INSERT/UPDATE `site_area`, `site_asset`, or `site_sy
 
 ## G — UI layout
 
+### Tabs (37w)
+
+| Tab | Content |
+|-----|---------|
+| **General** | `profile`, `stakeholders`; hint when no site selected |
+| **Line Items** | Three-panel **S** / **C** / **LI** layout — gated on non-empty `site_id` |
+
+**Scope tab retired (37e/37v).** Bucket config + line editing live on **Line Items** ([37w](../tasks/37w-estimate-line-items-panels.md)).
+
 ### List + detail
 
 Master-detail: list in `estimates/layout.tsx`, detail in `[id]/page.tsx` ([`routing-and-libraries.md`](../routing-and-libraries.md)).
@@ -316,79 +342,76 @@ Master-detail: list in `estimates/layout.tsx`, detail in `[id]/page.tsx` ([`rout
 ┌──────────────────────────────────────────────────────────────┐
 │ SurfaceToolbar — New | Save | Revert | Win | Lose | Delete … │
 ├──────────────────────────────────────────────────────────────┤
-│ profile — title, site picker, dates, status (read-only)      │
-│ ── Stakeholders ──                                           │
-│ stakeholders (field array or compact table)                  │
-│ ── Line items (tree) ──  *(tab hidden until site selected)*  │
-│ [ Add system ]                                               │
-│ antd Table treeData — General + system parents + line leaves │
-│ ── footer ── total ext sell                                  │
+│ Tabs: General | Line Items                                   │
+├──────────────────────────────────────────────────────────────┤
+│ Line Items tab (desktop three-panel):                        │
+│ ┌──────────────────────┬──────────────────────┐              │
+│ │ S — Scopes & zones   │ C — Configuration    │              │
+│ ├──────────────────────┴──────────────────────┤              │
+│ │ LI — flat line table (full width)            │              │
+│ │ FieldArrayTable-style Add line footer        │              │
+│ └──────────────────────────────────────────────┘              │
+│ ── footer ── total ext sell (visible bucket)               │
 └──────────────────────────────────────────────────────────────┘
 ```
 
-**Shared component:** `EstimateDetailForm` + `EstimateLineTreeTable` (4e); prior flat `EstimateLineItemsField` retired or refactored.
+**Shared components:** `EstimateDetailForm` + `EstimateLineItemsPanels` (`EstimateQuoteStructureTree`, `EstimateBucketConfigurePanel`, `EstimateLineFlatTable`).
 
-### Tree table — row kinds (4e)
+### Three panels (37w)
 
-| `rowKind` | Backing | Parent? | Columns |
-|-----------|---------|---------|---------|
-| `general` | Synthetic — not persisted | Yes | Label “General”; `colSpan` all columns; collapse |
-| `system` | `estimate_system` + nested `specs` | Yes | System name; optional expanded spec fields; `colSpan` when collapsed |
-| `line` | `estimate_line` | Leaf | Full line column set (kind, description, qty, …) |
+| Panel | Id | Role |
+|-------|-----|------|
+| **S** | structure | Full `site_tree` scope/zone hierarchy; **select only** — no add/remove quote UI |
+| **C** | config | Permanent bucket config for **S** selection — complexity, labor phases (multi-select), specs |
+| **LI** | lines | Flat **37f** column grid; filtered by **S** selection; **Add line** footer |
 
-**4c′ adds:** `area` parent rows under `system` (`estimate_area`); lines may attach to `system` or `area`.
+### Selection → LI filter (37w W3)
 
-### Tree shape (4e example)
+| **S** selection | **LI** shows | New line targets |
+|-----------------|--------------|------------------|
+| **Scope** | Lines with matching `estimate_scope_id` and **`site_zone_id` null** (unzoned) | Same |
+| **Zone** | Lines matching scope + zone | Same zone bucket |
 
-```text
-▼ General                          [colSpan — chrome only]
-    line: Mobilization
-▼ Fire Alarm                       [colSpan — specs in expanded row when defs exist]
-    line: Pull station  qty 10
-    line: Horn/strobe   qty 4
-▼ CCTV
-    line: Camera        qty 6
-```
+**S** selection is **client-only** (not persisted). Default on load: first site scope (unzoned bucket).
 
-Persisted: `systems[]` + flat `line_items[]` with `estimate_system_id` (`null` = General).
+### Implicit include (37w W5)
+
+No **Add scope** / **Add zone** / **Remove from quote** on Line Items. When the user **Add line** or edits **C** for a site scope/zone not yet on `scopes[]`, the client auto-includes via `addScopeToQuote` / `addZoneToQuote` — dirty until Save.
+
+Empty `site_tree.scopes` → CTA link to site **Scopes & zones**.
 
 ### Add / delete (client until Save)
 
 | Action | Control | Behavior |
 |--------|---------|----------|
-| **Add system** | Toolbar **“Add system”** → catalog picker (excludes systems already on quote) | Insert `system` parent row; empty children |
-| **Add line** | **“+ Line” on focused parent** — parent row actions: *Add line here* | Append leaf under `general` or `system` parent; set `estimate_system_id` from parent |
-| **Delete parent** | Row delete on parent | Remove parent + all descendant lines from form state |
-| **Delete line** | Row delete on leaf | Remove line only |
-| **Focus parent** | Click parent row (highlight, not checkbox) | “Add line” targets last-focused parent; default General when none focused |
+| **Select bucket** | **S** tree click | Filters **LI**; binds **C** |
+| **Configure** | **C** panel fields | Complexity, labor phases, spec filters; implicit include on first edit |
+| **Add line** | **LI** dashed **Add line** footer | Append standalone row for **S** selection; implicit include if needed |
+| **Delete line** | Row delete in **LI** | Remove line only |
 
-**Not used in 4e:** row selection checkboxes; multi-select bulk delete (defer).
+**Not in 37w:** kit UI; summary chips; 37v tree parent rows; Configure popover; explicit include/remove chrome; LI drag→**S** retarget (deferred).
 
-### Specs in tree
+### Line columns (37f / LI)
 
-When `system_spec_def` rows exist for catalog `system`: **expand** system parent → spec `Select`s in expanded area above child lines. PATCH nested in `systems[].specs`. When zero defs: no expand content for specs (panel hidden).
+| Column | Notes |
+|--------|-------|
+| Item | `TreeSelect` — root category subtree for line's scope |
+| Part | `Select` or text — resolver output |
+| Description | `Input` |
+| Qty | `InputNumber` |
+| Unit | `Input` |
+| Material / Freight / Incidental / Labor | read-only — recalc snapshots |
+| Target / Cost | read-only |
+| Lock | cycle button — `none` → `sell` → `line` |
+| Sell | `InputNumber` — manual edit → `sell` lock |
+| Ext sell | read-only — qty × sell |
+| Actions | delete |
 
-### Line leaf columns
+**Kit UI removed (37v).** PATCH emits `line_role: standalone` only.
 
-| Column | Line rows | Notes |
-|--------|-----------|-------|
-| Kind | `Select` | product / labor / expense |
-| Description | `Input` | indent when `kit_component` |
-| Item / part / phase | `Select` or text | kind-dependent |
-| Qty | `InputNumber` | |
-| Unit | `Input` | |
-| Cost | `InputNumber` | `unit_cost` |
-| Sell | `InputNumber` | `unit_price` |
-| Ext sell | read-only | qty × sell |
-| Actions | delete | cascade kit header |
+### Superseded UI (37v — historical)
 
-**Add behavior (unchanged intent):**
-
-| Control | Result |
-|---------|--------|
-| Add line | Empty standalone row under focused parent |
-| Add item | Seed from catalog; assembly expands to component lines |
-| Add kit | Header + default components under focused parent |
+37v used a single `Table` with `treeData` — scope/zone parent rows (`colSpan`) + Configure **Popover** + toolbar **Add scope ▾**. Replaced by 37w panels; DAL/persistence unchanged.
 
 ---
 
@@ -419,16 +442,14 @@ When `system_spec_def` rows exist for catalog `system`: **expand** system parent
 |-------|-----|---------|-------------|
 | `profile.site_id` | — | [`LinkedSelectInput`](../../components/form/LinkedSelectInput.tsx) — site list; **`… Add site`** last option when `site_detail` `write` + field writable → `/sites/new` + picker return ([decision](../decisions/estimate.md#decision-estimate-site-anchor--gate-lines-immutable-after-create-2026-06-30), [linked picker](../decisions/general.md#decision-linked-picker-control-linkedselectinput--2026-06-24)); **create:** writable select; **edit:** read-only label + open icon when `site_detail` `read` | Required on create |
 | `stakeholders` | Add stakeholder | Any `party`; relation from `job_party_relation_table` | "No stakeholders" |
-| `systems` | Add system (toolbar) | Catalog `system` list — **hidden until `site_id` set** | No system rows when ROM-only |
-| `line_items` | Add line on focused parent | Item catalog when `item_list` ships; `part_id` when manifest grants — **Line Items tab hidden until `site_id` set** | "No lines" under General |
+| `scopes` | Implicit include on **C** edit or **Add line** | **S** panel selects `site_tree` scope/zone — **does not create site geography** | CTA to `/sites/[id]` when site has zero scopes |
+| `line_items` | **Add line** footer in **LI** panel | Item `TreeSelect` scoped to line's `estimate_scope`; part resolver — **Line Items tab hidden until `site_id` set** | "Select a scope or zone" / bucket-specific empty copy per W3 |
 
-**Site-first gating:** Line Items tab and `systems` picker appear only when `profile.site_id` is non-empty in form state (create) or loaded DTO (edit). Stakeholders are **not** gated. When line items read is granted but no site: secondary hint on General tab — *"Select a site to add line items."*
+**Site-first gating:** Line Items tab appears only when `profile.site_id` is non-empty. Stakeholders are **not** gated. When line items read is granted but no site: hint on General tab — *"Select a site to add scopes and line items."*
+
+**Scopes:** replace-array on Save; implicit include on line/config edit. **C** panel edits dirty client-side until Save.
 
 **Stakeholders:** replace-array on Save; duplicate `(party_id, relation_id)` inline error.
-
-**Systems:** replace-array on Save; duplicate `system_id` inline error.
-
-**Kit delete:** removing header removes components client-side before Save; DAL rejects orphan `kit_component` rows.
 
 **Drag reorder:** defer; use `sort_order` from array order on Save v1.
 

@@ -126,6 +126,10 @@ export const SURFACE_API: Partial<Record<SurfaceId, SurfaceApiConfig>> = {
     listPath: "/api/catalog/labor-phases",
     detailPath: "/api/catalog/labor-phases",
   },
+  spec_unit_table: {
+    listPath: "/api/catalog/spec-units",
+    detailPath: "/api/catalog/spec-units",
+  },
 };
 
 export class SurfaceApiError extends Error {
@@ -208,8 +212,8 @@ export type EstimateSiteTreePickerData = {
         spec_option_id: string | null;
         option_display_name: string | null;
         value_boolean: boolean | null;
-        value_text: string | null;
-        value_type: "enum" | "boolean" | "text";
+        value_number: number | null;
+        value_type: "enum" | "boolean" | "number";
       }>
     >;
   };
@@ -328,10 +332,13 @@ export const fetchPartItemTreePicker = async (
 
 export type PartSpecDefPickerRow = {
   code: string;
+  decimal_places: number | null;
   display_name: string;
   options: Array<{ id: string; code: string; display_name: string }>;
   spec_def_id: string;
-  value_type: "boolean" | "enum" | "text";
+  to_canonical_factor: number;
+  unit_symbol: string | null;
+  value_type: "boolean" | "enum" | "number";
 };
 
 export type PartSpecDefsPickerData = {

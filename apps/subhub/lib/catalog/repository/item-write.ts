@@ -97,19 +97,29 @@ export const assertReparentAllowed = async (
   }
 };
 
-const countEstimateLineReferences = async (
+const countLineReferences = async (
   client: PoolClient,
   itemId: string,
 ): Promise<number> => {
-  if (!(await tableExists(client, "estimate_line"))) {
-    return 0;
+  let total = 0;
+
+  if (await tableExists(client, "estimate_line")) {
+    const estimateResult = await client.query<{ count: number }>(
+      `SELECT COUNT(*)::int AS count FROM estimate_line WHERE item_id = $1`,
+      [itemId],
+    );
+    total += estimateResult.rows[0]?.count ?? 0;
   }
 
-  const result = await client.query<{ count: number }>(
-    `SELECT COUNT(*)::int AS count FROM estimate_line WHERE item_id = $1`,
-    [itemId],
-  );
-  return result.rows[0]?.count ?? 0;
+  if (await tableExists(client, "job_line")) {
+    const jobResult = await client.query<{ count: number }>(
+      `SELECT COUNT(*)::int AS count FROM job_line WHERE item_id = $1`,
+      [itemId],
+    );
+    total += jobResult.rows[0]?.count ?? 0;
+  }
+
+  return total;
 };
 
 const countChildItems = async (
@@ -130,11 +140,40 @@ const resolveInsertNodeType = (row: ItemWriteRow): ItemNodeType => {
   return row.node_type ?? "category";
 };
 
+export const assertItemLaborPhaseWritable = async (
+  client: PoolClient,
+  itemId: string,
+): Promise<ItemNodeType> => {
+  const result = await client.query<{ node_type: ItemNodeType }>(
+    `SELECT node_type FROM item WHERE id = $1`,
+    [itemId],
+  );
+  const nodeType = result.rows[0]?.node_type;
+  if (!nodeType) {
+    throw new ValidationError("Unknown item", {
+      field: "item_labor_phase",
+      code: "unknown_item",
+      item_id: itemId,
+    });
+  }
+
+  if (nodeType === "scope") {
+    throw new ValidationError("Labor phases cannot be authored on scope roots", {
+      field: "item_labor_phase",
+      code: "scope_root",
+      item_id: itemId,
+    });
+  }
+
+  return nodeType;
+};
+
 export const replaceItemLaborPhases = async (
   client: PoolClient,
   itemId: string,
   rows: ItemLaborPhaseWriteRow[],
 ): Promise<void> => {
+  await assertItemLaborPhaseWritable(client, itemId);
   const seenPhases = new Set<string>();
   for (const row of rows) {
     if (seenPhases.has(row.labor_phase_id)) {
@@ -364,14 +403,17 @@ export const updateItem = async (
     }
 
     if (current.node_type === "item" && nextNodeType !== "item") {
-      const lineRefs = await countEstimateLineReferences(client, row.id);
+      const lineRefs = await countLineReferences(client, row.id);
       if (lineRefs > 0) {
-        throw new ValidationError("Cannot demote a quotable item referenced by estimate lines", {
-          field: "profile",
-          code: "item_in_use",
-          id: row.id,
-          estimate_line_count: lineRefs,
-        });
+        throw new ValidationError(
+          "Cannot demote a quotable item referenced by estimate or job lines",
+          {
+            field: "profile",
+            code: "item_in_use",
+            id: row.id,
+            line_count: lineRefs,
+          },
+        );
       }
     }
 

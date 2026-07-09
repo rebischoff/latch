@@ -76,6 +76,7 @@ export const routes = {
   markupTypes: "/markup-types",
   complexityFactors: "/complexity-factors",
   laborPhases: "/labor-phases",
+  specUnits: "/spec-units",
 } as const;
 
 const navMatchPrefixes = [

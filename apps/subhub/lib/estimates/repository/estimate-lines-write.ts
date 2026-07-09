@@ -51,22 +51,6 @@ const validateLineItems = async (
       });
     }
 
-    if (row.phase_id) {
-      if (await tableExists(client, "phase")) {
-        const phaseResult = await client.query<{ id: string }>(
-          `SELECT id FROM phase WHERE id = $1`,
-          [row.phase_id],
-        );
-        if (phaseResult.rows.length === 0) {
-          throw new ValidationError("Unknown phase_id on line", {
-            field: "line_items",
-            code: "unknown_phase",
-            id: row.id,
-          });
-        }
-      }
-    }
-
     if (!row.estimate_scope_id) {
       throw new ValidationError("estimate_scope_id is required on every line", {
         field: "line_items",
@@ -201,13 +185,12 @@ export const replaceEstimateLineItemsTx = async (
          unit_incidental,
          unit_price_target,
          lock,
-         phase_id,
          item_id,
          part_id,
          vendor_part_id,
          sort_order
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)`,
       [
         row.id,
         estimateId,
@@ -227,7 +210,6 @@ export const replaceEstimateLineItemsTx = async (
         row.unit_incidental,
         row.unit_price_target,
         row.lock ?? "none",
-        row.phase_id ?? null,
         row.item_id ?? null,
         row.part_id ?? null,
         row.vendor_part_id ?? null,

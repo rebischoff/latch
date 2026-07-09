@@ -14,6 +14,7 @@ export type CatalogTableConfig = {
   ) => Promise<Array<{ type: string; count: number }>>;
   filterSql?: string;
   insertValues: (row: Record<string, unknown>, id: string) => unknown[];
+  updateValues?: (row: Record<string, unknown>, id: string) => unknown[];
   nameColumn?: string;
   nameUniqueScope?: string;
   orderBy?: string;
@@ -134,9 +135,11 @@ const replaceCatalogTableTx = async (
 
     try {
       if (row.id) {
+        const updateParams = config.updateValues?.(payload, id) ??
+          config.insertValues(payload, id).slice(1);
         await client.query(
           `UPDATE ${config.anchorTable} SET ${config.updateSet} WHERE id = $1`,
-          [id, ...config.insertValues(payload, id).slice(1)],
+          [id, ...updateParams],
         );
       } else {
         await client.query(

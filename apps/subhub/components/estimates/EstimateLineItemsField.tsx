@@ -1,9 +1,13 @@
 export {
-  EstimateLineTreeTable as EstimateLineItemsField,
-  type EstimateLineFormRow,
-  type EstimateLineRole,
-  type EstimateScopeFormRow,
-} from "@/components/estimates/EstimateLineTreeTable";
+  EstimateLineItemsPanels as EstimateLineItemsField,
+} from "@/components/estimates/EstimateLineItemsPanels";
+
+export type {
+  EstimateLineFormRow,
+  EstimateScopeFormRow,
+} from "@/components/estimates/estimate-line-tree";
+
+export type { EstimateLineRole } from "@/components/estimates/estimate-line-tree";
 
 export type EstimateLineItemsFormValues = {
   scopes: import("@/components/estimates/estimate-line-tree").EstimateScopeFormRow[];

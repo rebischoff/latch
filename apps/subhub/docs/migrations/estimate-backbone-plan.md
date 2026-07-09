@@ -47,14 +47,13 @@ Latest numbered file: **027**. Backbone batch starts at **028**.
 | **`trade`** | `id`, `name`, `sort_order` — DDL only; **no seed** in v1 batch |
 | **`phase_template`** | `id`, `name`, `sort_order` |
 | **`phase_template_step`** | `id`, `phase_template_id`, `name`, `sequence`, `progress_weight`, `billing_weight`, `requires_previous_phase`, `sort_order` |
-| **`system_spec_def`** | UUID PK; `system_id`, `code`, `display_name`, `value_type`, `filter_mode`, `sort_order` |
+| **`system_spec_def`** | UUID PK; `system_id`, `code`, `display_name`, `value_type`, `sort_order` |
 | **`system_spec_option`** | UUID PK; `system_spec_def_id`, `code`, `display_name`, `sort_order` |
 | **`manufacturer_part_spec`** | Composite unique on `(manufacturer_part_id, system_spec_def_id, system_spec_option_id)` |
 
 ### Constraints
 
 - `system_spec_def.value_type` CHECK: `enum` \| `boolean` \| `text`
-- `system_spec_def.filter_mode` CHECK: `required` \| `prefer`
 - FK `system.default_phase_template_id` → `phase_template` (nullable)
 - FK `system_spec_def.system_id` → `system`
 - FK `manufacturer_part_spec` → `manufacturer_part`, `system_spec_def`, `system_spec_option`
@@ -182,9 +181,9 @@ Owner chose to ship **empty** spec tables in 031. Task 32 spec panel will have n
 
 **Proposed when seeded** (Fire Alarm only):
 
-| def `code` | `display_name` | `value_type` | `filter_mode` | options (`code` → `display_name`) |
-|------------|----------------|--------------|---------------|-----------------------------------|
-| `slc_protocol` | SLC Protocol | `enum` | `required` | `litespeed` → LiteSpeed, `clip` → CLIP |
+| def `code` | `display_name` | `value_type` | options (`code` → `display_name`) |
+|------------|----------------|--------------|-----------------------------------|
+| `slc_protocol` | SLC Protocol | `enum` | `litespeed` → LiteSpeed, `clip` → CLIP |
 
 No `manufacturer_part_spec` links in first spec seed — wire `027` Fire-Lite parts in that same pass.
 

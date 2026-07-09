@@ -1,0 +1,44 @@
+# Org spec unit catalog (editable table page)
+id: spec_unit_table
+displayName: Spec units
+anchorTable: spec_unit
+
+fieldActions:
+  - read
+  - write
+
+surfaceActions:
+  - read
+  - write
+  - delete
+
+tables:
+  - spec_unit
+
+fields:
+  - id: symbol
+    columns:
+      - column: spec_unit.symbol
+        type: string
+  - id: name
+    columns:
+      - column: spec_unit.id
+        type: string
+      - column: spec_unit.name
+        type: string
+  - id: dimension
+    columns:
+      - column: spec_unit.dimension
+        type: string
+  - id: canonical_unit_id
+    columns:
+      - column: spec_unit.canonical_unit_id
+        type: string
+  - id: to_canonical_factor
+    columns:
+      - column: spec_unit.to_canonical_factor
+        type: number
+  - id: sort_order
+    columns:
+      - column: spec_unit.sort_order
+        type: number

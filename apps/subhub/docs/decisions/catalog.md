@@ -6,6 +6,86 @@
 
 ---
 
+### Decision: part item links leaf-only + Specs value UX (2026-07-08)
+
+**Status:** **Locked** (2026-07-08). **Task:** [37u](../tasks/37u-part-leaf-links-specs-ui.md). **Amends:** [catalog part authoring J3/J4](#decision-catalog-part-authoring-ui-2026-07-06); closes **N9** from [numeric specs — drop `range`](#decision-numeric-specs--drop-range-type-band-is-part-authored-2026-07-08). **Aligns with:** leaf-only estimate/job item pickers ([37l](../tasks/37l-leaf-quotable-item-model.md)); flat leaf participation ([37o](../tasks/37o-spec-participation-flatten.md)).
+
+**Problem:** Allowing `part_item` on scope/category nodes looked convenient, but participation and estimate lines are leaf-only; today’s resolver matches exact `item_id` (no subtree pool), so parent links neither expand the candidate pool nor feed the part specs union. Separately, part Specs value UX needed a clear Spec · Value table (boolean control, number exact/band polish, enum multi).
+
+**Choice:**
+
+| # | Topic | Choice |
+|---|--------|--------|
+| **U1** | Linkable nodes | **`item.node_type = 'item'` only** |
+| **U2** | `item_links` UI | **One multi `TreeSelect`** (full tree; leaves selectable only) → replace-array `part_item` |
+| **U3** | DAL | Reject non-leaf `item_id`; cleanup any existing non-leaf `part_item` rows |
+| **U4** | Specs table | **Spec · Value** — rows from contextual union of linked leaves’ participation |
+| **U5** | Boolean | **Checkbox** (`true` / `false`); omit row when unset |
+| **U6** | Number | **Min + optional max (band)** — one row per def; not a discrete number array. Dual-voltage / closed alternatives → **enum** multi-select |
+| **U7** | Enum | Multi-select — unchanged |
+| **U8** | Resolver docs | Exact leaf `part_item` only — no parent→subtree claim |
+
+**Rationale:** Same selectable set as estimates/jobs keeps authoring and resolution coherent. Number **band** matches continuous dims against the estimate **point** bucket. Discrete OR sets (12 V **or** 24 V) are closed catalogs — model as **enum** options, not multi-point numbers or a fake band.
+
+---
+
+### Decision: spec definitions scoped to root, flat item participation — no ownership/inheritance (2026-07-07)
+
+**Status:** **Locked** (2026-07-07). **Task:** [37o](../tasks/37o-spec-participation-flatten.md). **Supersedes:** [spec ownership — `spec_def.category_id`/`item_id` (2026-07-04)](#decision-spec-ownership--spec_defcategory_id-drop-category_spec_def-2026-07-04) storage + algorithm; [category spec participation — assign-once, branch exclude (2026-07-03)](#decision-category-spec-participation--assign-once-branch-exclude-2026-07-03) storage + algorithm + UI; [category spec visibility — owner-branch knowledge (2026-07-03)](#decision-category-spec-visibility--owner-branch-knowledge-2026-07-03) in full. **Amends:** [D3 in unified item tree (2026-07-05)](#decision-unified-item-tree--merge-category--item-node-anchored-estimate-lines-2026-07-05) — the "spec defs inherit down" clause is retired; specs no longer inherit at all. **Retains unchanged:** `spec_def` / `spec_option` row shape, `manufacturer_part_spec`, `estimate_scope_spec` / `_zone_spec` / `_line_spec`, the tiered bucket merge (line → zone → scope), and the part-matching algorithm from [value types (2026-07-02)](#decision-spec_def-value-types-and-part-matching-rules-2026-07-02).
+
+**Problem:** the ownership + branch-exclude model (a spec owned by one tree node, inherited down, cut by an exclude row with no re-include) required an ancestor walk to compute "effective" specs anywhere, tied editing rights to wherever a def happened to be owned, and made every category-level participation edit a potential fan-out across every descendant leaf and every part linked to any of them. That is exactly the "nightmare to maintain" failure mode this area is trying to avoid. A discussion pass converged on a simpler shape that decouples *who can edit a dimension* from *who uses it*.
+
+**Choice:**
+
+| # | Topic | Choice |
+|---|--------|--------|
+| **S1** | Definition scope | **`spec_def.scope_root_item_id`** — FK → `item` where `node_type = 'scope'`. Flat namespace per scope; **no owning node inside the tree**, no inheritance semantics on the definition itself. |
+| **S2** | Where definitions are edited | **`item_detail` Specs tab** — `spec_definitions` Field on scope roots (`node_type = 'scope'`) only; sortable `FieldArrayTable` + enum options via tags `Select`. **Amended 2026-07-08:** interim `/specs` master-detail Surface (`spec_list` / `spec_detail`) **retired** — definitions return to the scope node's detail form. |
+| **S3** | Participation | **New `item_spec_participation (item_id, spec_def_id)`** — leaf items (`node_type = 'item'`) only. Direct opt-in against the scope's namespace. **No ancestry, no inheritance, no exclude table.** |
+| **S4** | Category role | **None.** Categories carry no spec Fields at all — pure organizational grouping, not a participation boundary. A category is not guaranteed to be spec-homogeneous (e.g. "Initiating Devices" may mix addressable and conventional devices), so forcing inheritance through it just relocates the override problem, not remove it. |
+| **S5** | Drop `item_spec_exclude` | Nothing inherits, so nothing needs excluding. Table dropped. |
+| **S6** | Part contextual union | `⋃ participation(item)` across a part's `part_item` links — a **direct join**, not a recursive ancestor walk. Simpler than the prior J6 "contextual union via `effective()`." |
+| **S7** | Estimate scope panel | **Entire `spec_def` namespace for the checked scope root** — `SELECT * FROM spec_def WHERE scope_root_item_id = R`. No subtree union, no per-node walk — this is *broader* than the old `scopePanelDefs(R)` and cheaper to compute. |
+| **S8** | Line-level narrowing | **Unchanged mechanism** — merge bucket (line → zone → scope) ∩ `participation(item)` for the line's item; filter `part_item` pool against `manufacturer_part_spec`. |
+| **S9** | Orphan tolerance | The matcher only ever reads `spec_def_id`s in the item's *current* participation — a stale `manufacturer_part_spec` row left over from a dropped participation is inert, never wrong. **Eager prune stays scoped to the part's own `item_links` save** (unchanged from [37k K1](#decision-part-spec-lifecycle-2026-07-06)); editing one item's participation can only ever affect that one item's own linked parts — no fan-out, unlike the prior category-exclude model. |
+| **S10** | Authoring convenience | Repetitive per-item picking (e.g. 15 leaves under one category all needing the same spec) is a **UI affordance** (copy picks from another item / bulk-apply on multi-select) — **not a schema feature**. Inheritance does not exist in storage. |
+
+**Rationale:** decoupling "who can edit a dimension" (always the scope root, one place) from "who uses a dimension" (always the leaf item, a direct row, bounded blast radius) removes both failure modes the old model had — ownership-position ambiguity and cross-subtree edit fan-out — at the cost of some repeated clicking during catalog authoring, which is cheaper to solve with a UI convenience than a schema-level inheritance graph. The estimate scope panel query gets **simpler and more complete** as a side effect: it becomes the scope's whole namespace, not a computed subtree union.
+
+#### Worked example — Fire Alarm
+
+```text
+Fire Alarm (scope root)              ← spec_def.scope_root_item_id = Fire Alarm
+  slc_protocol   (enum)
+  color          (enum)
+├── Initiating Devices (category — no spec Fields)
+│   ├── Pull Station        (item) → participation: { slc_protocol }
+│   └── Smoke Detector      (item) → participation: { slc_protocol, color }
+└── Notification Appliances (category — no spec Fields)
+    └── Horn/Strobe         (item) → participation: { color }
+```
+
+- **Estimate scope panel** (Fire Alarm checked): `{ slc_protocol, color }` — the whole namespace, regardless of which items are on any line yet.
+- **Line — Smoke Detector:** narrows on `{ slc_protocol, color }` (its own participation) against merged bucket values.
+- **Line — Horn/Strobe:** narrows on `{ color }` only — `slc_protocol` never applies to this item; no exclude row needed to say so.
+- **Part** linked to both Pull Station and Smoke Detector: compatibility form shows `{ slc_protocol } ∪ { slc_protocol, color } = { slc_protocol, color }`.
+
+#### Migration shape (planned — `046`, not yet applied)
+
+| Step | Action |
+|------|--------|
+| 1 | `ALTER TABLE spec_def ADD COLUMN scope_root_item_id text` — backfill by walking each row's old `item_id` to its root ancestor |
+| 2 | `ALTER TABLE spec_def DROP COLUMN item_id` (after backfill verified) |
+| 3 | `CREATE TABLE item_spec_participation (item_id text, spec_def_id uuid, PRIMARY KEY (item_id, spec_def_id))` |
+| 4 | Backfill `item_spec_participation` — for every leaf item `N` (`node_type = 'item'`) and every `spec_def_id` where the **old** `effective(N, D)` algorithm returned true, insert one row |
+| 5 | `DROP TABLE item_spec_exclude` |
+
+**Data-preservation note:** step 4 runs the *old* `computeEffectiveSpecDefIds` once, at migration time, purely to seed the new flat table with whatever was previously effective — after that, the two models never mix.
+
+**Planning:** [11-categories-scope-model.md](../planning/11-categories-scope-model.md) · **Task:** [37o](../tasks/37o-spec-participation-flatten.md) · **Spec:** [`item.md`](../surface-specs/item.md) (`spec_participation`), [`spec.md`](../surface-specs/spec.md) (new `spec_list` / `spec_detail`), [`part.md`](../surface-specs/part.md) (`part_specs` contextual union, S6).
+
+---
+
 ### Decision: part spec lifecycle (2026-07-06)
 
 **Status:** **Locked** (2026-07-06). **Task:** [37k](../tasks/37k-part-spec-lifecycle.md). **Amends:** [`part.md`](../surface-specs/part.md) § K; [`item.md`](../surface-specs/item.md) `spec_definitions` writes.
@@ -29,7 +109,7 @@
 
 ### Decision: catalog part authoring UI (2026-07-06)
 
-**Status:** **Locked** (2026-07-06). **Task:** [37j](../tasks/37j-catalog-part-authoring.md). **Amends:** [`part.md`](../surface-specs/part.md) deferred `specs`; item assignment omitted on `item_detail` v1.
+**Status:** **Locked** (2026-07-06). **Task:** [37j](../tasks/37j-catalog-part-authoring.md). **Amends:** [`part.md`](../surface-specs/part.md) deferred `specs`; item assignment omitted on `item_detail` v1. **Amended (2026-07-08):** **J3/J4** → leaf-only + multi TreeSelect — [37u](../tasks/37u-part-leaf-links-specs-ui.md) / [leaf-only + Specs UX](#decision-part-item-links-leaf-only--specs-value-ux-2026-07-08).
 
 **Choice:**
 
@@ -37,14 +117,14 @@
 |---|--------|--------|
 | **J1** | Link table | **`part_item`** only — not `item_part_link` (assemblies v2 / D7) |
 | **J2** | Authoring Surface | **`part_detail` only** — Field `item_links`; no writable part pool on `item_detail` v1 |
-| **J3** | Linkable nodes | **Any** item tree node (root, branch, leaf) |
-| **J4** | `item_links` UX | Replace-array + item tree picker |
+| **J3** | Linkable nodes | **`node_type = item` only** (amended 37u — was any tree node) |
+| **J4** | `item_links` UX | Replace-array + **one multi leaf-only TreeSelect** (amended 37u) |
 | **J5** | Part specs | **`part_specs`** on `part_detail` (same form) |
-| **J6** | Visible spec defs | **Contextual union** — defs effective on scope roots of linked items |
+| **J6** | Visible spec defs | **Contextual union** — `⋃ participation` of linked **leaves** (37o direct join) |
 | **J7** | Enum on part | **One row per `spec_option_id`** per [matching rules](#decision-spec_def-value-types-and-part-matching-rules-2026-07-02) |
-| **J8** | `number` type | **Deferred** — 37j ships enum / boolean / text; migration `044` + UI follow-up |
+| **J8** | `number` / `range` type | **Amended 2026-07-08** — ship in [37p–37r](../tasks/37p-spec-value-types-ddl.md); drop `text`; band polish in [37u](../tasks/37u-part-leaf-links-specs-ui.md) |
 
-**Rationale:** Estimators consume `part_item` + `manufacturer_part_spec` via the existing resolver (37f/37i). Admins maintain both from the part form — assign MPN → items, set compatibility rows — without editing pools on `/items`. Fire-alarm path is enum-heavy; number specs can land when HVAC-style catalog needs them.
+**Rationale:** Estimators consume `part_item` + `manufacturer_part_spec` via the existing resolver (37f/37i). Admins maintain both from the part form — assign MPN → items, set compatibility rows — without editing pools on `/items`. Fire-alarm path is enum-heavy; number/range + units land in 37p–37r for HVAC/electrical dims.
 
 ---
 
@@ -57,7 +137,7 @@
 - **D4 (amend):** `resolveRate` drops the **descendant-max** step → `self → ancestry walk-up → neutral`. Because selection is leaf-only, cost (material/labor on the leaf) resolves via `self`, and margin policy (markup/freight/incidental authored high) resolves via ancestry. The mixed-UOM branch-material guard (Q2.2) is retired — no branch material fan-out remains.
 - **D8c (reverse):** Item picker offers **quotable leaves only**; scopes + categories render expandable but **non-selectable**.
 - **ROM:** rough quoting uses explicit quotable **allowance items** authored under a category (own `fallback_unit_cost` / labor group), not `descendantMax`. Keeps ROM deterministic, auditable, and node+PN reportable (D10).
-- **Labor:** resolves as an **atomic group** — the leaf's `item_labor_phase` set, else the first ancestor's whole set. No per-phase merge/override across levels (v2 if needed).
+- **Labor:** resolves as an **atomic group** — the leaf's `item_labor_phase` set, else the first ancestor's whole set. No per-phase merge/override across levels. **Estimate scope/zone** filters which phases count for `unit_labor` and job `scope_phase` seed — see [37n labor phase inclusion](../tasks/37n-labor-phase-inclusion.md).
 
 **On lock, supersedes / amends:**
 
@@ -475,110 +555,180 @@ Fire Alarm          ← spec_def.category_id = Fire Alarm  (SLC protocol)
 
 ---
 
-### Decision: `spec_def` value types and part-matching rules (2026-07-02)
+### Decision: numeric specs — drop `range` type; band is part-authored (2026-07-08)
 
-**Status:** **Locked** (pending DDL migration in task **37f** follow-on). **Amends** [C10 in planning 11](../planning/11-categories-scope-model.md) (`filter_mode` behavior). **Supersedes** enum-only assumptions in [system specs C2 (2026-06-27)](#decision-system-specs-and-part-compatibility-c2-locked-2026-06-27) for **storage shape** only — FK-based defs unchanged.
+**Status:** **Locked** (2026-07-08). **Task:** [37s](../tasks/37s-spec-defs-ui-drop-range.md). **Amends:** [spec value types, units table, and locks (2026-07-08)](#decision-spec-value-types-units-table-and-locks-2026-07-08) **T1, T2, T8, match table, and defs UI**. **Retains:** `spec_unit`, `decimal_places`, type/unit locks, estimate point bucket, blank-bucket ignore, enum multi-option part rows.
+
+**Problem:** Shipping `number` and `range` as separate `spec_def.value_type`s put “exact vs band” on the **definition**. Smoke + product review showed that is the wrong altitude: a part may already conform to **multiple enum options**; likewise a part may claim a **single rating** or a **capability band** for the same numeric dimension. The def only needs to say “this is numeric,” plus unit and display precision. Estimate narrowing always runs against **part specs** ∩ bucket — so a def-level `range` type is unnecessary and confusing in the Specs table (unit/decimals columns + a fourth type).
 
 **Choice:**
 
-#### `spec_def.value_type` (catalog dimension)
+| # | Topic | Choice |
+|---|--------|--------|
+| **N1** | Type set | **`enum` \| `boolean` \| `number`** — **drop `range`** from `value_type` |
+| **N2** | Def numeric metadata | **`unit_id`** (required) + **`decimal_places`** (optional, display-only) — **no def min/max** (T6 stays deferred) |
+| **N3** | Part numeric shape | Part may store **`value_number` only** (exact) **or** **`value_number` + `value_number_max`** (band) — parallel to enum multi-option rows for *labeled* discrete sets |
+| **N4** | Estimate bucket | Unchanged — single nullable **point** `value_number`; blank = no filter |
+| **N5** | Match | Blank → pass; point + part exact → equality; point + part band → `min ≤ point ≤ max`; no part row → fail |
+| **N6** | Specs table UI | Columns: **Name · Type · Details** (rename from “Options”). Drop Unit / Decimals columns. Type-aware **popover** on Details |
+| **N7** | Details popover | **`enum`:** option list (as today). **`boolean`:** cell blank; no popover. **`number`:** unit picker + decimal places |
+| **N8** | Migrate | `UPDATE spec_def SET value_type = 'number' WHERE value_type = 'range'`; tighten CHECK; no part/bucket column drops |
+| **N9** | Part UI this round | **Closed by [37u](../tasks/37u-part-leaf-links-specs-ui.md)** — Spec · Value; number min + optional max popover (was deferred polish) |
+| **N10** | Resolver this round | Treat all numeric defs as `number`; branch match on whether part row has `value_number_max` |
 
-| `value_type` | `spec_option` | Part storage (`manufacturer_part_spec`) | Bucket storage (scope / zone / line) |
-|--------------|---------------|----------------------------------------|--------------------------------------|
-| **`enum`** | required (`options[]`) | **One row per allowed option** — same `spec_def_id`, distinct `spec_option_id` (part may list multiple compatible values) | **Single** `spec_option_id` per `spec_def_id` (project picks one) |
-| **`boolean`** | omit | `value_boolean` on one row per part | `value_boolean` |
-| **`text`** | omit | `value_text` on one row per part | `value_text` |
-| **`number`** | omit | `value_number` on one row; optional `value_number_max` for inclusive range (**v1:** exact match only; range match deferred) | `value_number` |
+#### `spec_def.value_type` (amended)
 
-**`spec_def` metadata (new columns — migration follow-on):**
+| `value_type` | `spec_option` | `unit_id` | Part storage | Bucket | Match |
+|--------------|---------------|-----------|--------------|--------|-------|
+| **`enum`** | required | omit | one row per allowed option | one `spec_option_id` | option ∈ part set |
+| **`boolean`** | omit | omit | `value_boolean` | `value_boolean` | equality |
+| **`number`** | omit | **required** | `value_number` and optional `value_number_max` (canonical) | `value_number` (point) | exact **or** point ∈ band |
+
+#### Specs tab Details cell
+
+| Type | Cell summary | Popover |
+|------|--------------|---------|
+| `enum` | option names (or “No options”) | editable option list (rename keeps `id`; add; reorder; delete unused) |
+| `boolean` | **blank** | none |
+| `number` | e.g. `mA · 0 dp` (or “Set unit…”) | unit + `decimal_places` |
+
+**Rationale:** Enum multi-select already models “part allows more than one value.” Numeric bands are the same idea at the part layer. Keeping one `number` type simplifies the def picker and Specs table; unit/decimals belong in the Details popover, not always-visible columns. Def domain min/max remains deferred validation sugar, not matching.
+
+**Out of this decision:** estimate operators (`<`, `≤`, between); wildcard enum. Part Spec · Value UX (N9) closed by [37u](../tasks/37u-part-leaf-links-specs-ui.md).
+
+**Planning / tasks:** [37s](../tasks/37s-spec-defs-ui-drop-range.md) · [37u](../tasks/37u-part-leaf-links-specs-ui.md) (part UI).
+
+---
+
+### Decision: spec value types, units table, and locks (2026-07-08)
+
+**Status:** **Amended** (2026-07-08) by [numeric specs — drop `range` type](#decision-numeric-specs--drop-range-type-band-is-part-authored-2026-07-08) (T1/T2/match). **Originally locked** 2026-07-08. **Tasks:** [37p](../tasks/37p-spec-value-types-ddl.md) → [37q](../tasks/37q-spec-units-defs-ui.md) → [37r](../tasks/37r-spec-number-range-consumers.md) → **[37s](../tasks/37s-spec-defs-ui-drop-range.md)**. **Amends:** [`spec_def` value types (2026-07-02)](#decision-spec_def-value-types-and-part-matching-rules-2026-07-02) (supersedes type set, unit columns, range deferral). **Retains:** enum multi-row part semantics, blank-bucket ignore, part-match outcomes (0/1/many), FK-based defs.
+
+**Problem:** v1 shipped `enum` \| `boolean` \| `text` only. HVAC/electrical catalogs need numeric point and band matching with units; free `text` is useless for filtering; tags UI cannot rename enum options; retyping a def with stored values corrupts part/estimate rows.
+
+**Choice (Q1–Q12 locked 2026-07-08):**
+
+| # | Topic | Choice |
+|---|--------|--------|
+| **T1** | Type set | **Amended [N1](#decision-numeric-specs--drop-range-type-band-is-part-authored-2026-07-08):** **`enum` \| `boolean` \| `number`** — drop `text` and `range` |
+| **T2** | `range` | **Amended [N1/N3](#decision-numeric-specs--drop-range-type-band-is-part-authored-2026-07-08):** not a def type — part may author optional `value_number_max` on `number` |
+| **T3** | Type/unit lock | Lock `value_type` + `unit_id` when **value-bearing** rows exist (`manufacturer_part_spec` or any `estimate_*_spec` / job spec row). **Participation alone does not lock.** |
+| **T4** | Option delete | Block when parts **or** estimate/job bucket rows reference `spec_option_id` |
+| **T5** | `decimal_places` | On `spec_def` — **display-only** (format UI; store full `numeric`; no round-on-write) |
+| **T6** | Def domain min/max | **Defer** |
+| **T7** | Units | Org table **`spec_unit`** + table Surface `spec_unit_table` (same pattern as rate tables); conversion factors on the unit row |
+| **T8** | Def unit | Single **`spec_def.unit_id`** FK → `spec_unit` (required for `number`). May be **non-canonical** (e.g. mA). Author in that unit; **convert to canonical on write**; matcher compares canonical numbers only. No separate `display_unit` column. |
+| **T9** | Task split | **37p** DDL → **37q** units Surface + defs UI → **37r** consumers → **37s** drop `range` + Specs Details popover |
+| **T10** | Migrate `text` | Migration **fails** if any `value_type = 'text'` rows exist |
+| **T11** | Wildcard option | **Defer** (`wildcard_option_id`) |
+| **T12** | Consumers | Part + estimate scope/zone + resolver in **37r** (same epic) |
+| **T13** | Enum options UI | Cell shows option names; **popover** editable list (rename keeps `id`; add; reorder; delete unused) |
+| **T14** | Notes | `manufacturer_part.specs` text remains human notes only — never filters |
+
+#### `spec_def.value_type` (amended — see [N1 table](#decision-numeric-specs--drop-range-type-band-is-part-authored-2026-07-08) for current)
+
+| `value_type` | `spec_option` | `unit_id` | Part storage | Bucket storage | Match |
+|--------------|---------------|-----------|--------------|----------------|-------|
+| **`enum`** | required | omit | one row per allowed option | one `spec_option_id` | option ∈ part set |
+| **`boolean`** | omit | omit | `value_boolean` | `value_boolean` | equality |
+| **`number`** | omit | **required** | `value_number` + optional `value_number_max` (canonical) | `value_number` | exact **or** point ∈ band |
+| ~~`range`~~ | — | — | **Removed as def type** (37s) — band is part-authored on `number` | — | — |
+
+#### `spec_unit` (org catalog)
 
 | Column | Notes |
 |--------|--------|
-| `unit` | Canonical storage unit for `number` defs — e.g. `ton`, `V`, `A`. Required when `value_type = number`. |
-| `display_unit` | Optional UI label — e.g. store amperes, display `mA`. Conversion at **catalog write** only. |
-| `wildcard_option_id` | Optional FK → `spec_option` — enum value meaning “any / N/A” on parts; always matches a non-blank or blank bucket (see matching). |
+| `id` | PK (`uuid`, default `gen_random_uuid()`) |
+| `symbol` | UI suffix — `A`, `mA`, `V`, `ton`, … |
+| `name` | Ampere, Milliamp, … |
+| `dimension` | `current` \| `voltage` \| `power` \| `pressure` \| `length` \| `refrigeration` \| `count` \| … — convert only within same dimension |
+| `canonical_unit_id` | FK → self (`uuid`); **null** when this row **is** the canonical for its dimension |
+| `to_canonical_factor` | Multiply into canonical (`mA` → `A` = `0.001`); canonical rows use `1` |
+| `sort_order` | |
 
-**Normalization:** canonical values are stored at **part admin / import** time, not at quote time. Example: `200 mA` → `value_number = 0.2`, `spec_def.unit = A`. Estimate bucket uses the same canonical unit.
+**Write normalization:** `stored = authored × to_canonical_factor` (relative to the def’s `unit_id` row). Read/display: divide back for the def’s unit; format with `decimal_places` when set.
 
-**Not v1:** `value_type = range` as a separate type; multi-number OR on bucket; JSON attribute blobs on `manufacturer_part`; using `manufacturer_part.specs` text for filtering.
+**Delete unit:** block when any `spec_def.unit_id` references it.
 
-#### Estimate bucket UX (unchanged tables, clarified semantics)
+#### Locks & option lifecycle
+
+| Action | Rule |
+|--------|------|
+| Change `value_type` / `unit_id` | **Reject** if any part or estimate/job spec **value** row exists for the def |
+| Rename def / reorder / change `decimal_places` | Allowed |
+| Add enum option | Always |
+| Rename enum option | Always (same `id`) |
+| Delete enum option | Block if part **or** bucket references it (`spec_option_in_use`) |
+| Delete def | Unchanged — block on participation or part rows (and value rows) |
+
+#### Part-matching (amended — numeric band is part-shaped; enum/boolean unchanged)
+
+| Bucket | Part | Match |
+|--------|------|-------|
+| Blank | any | Pass |
+| Number point `N` | no row | Fail |
+| Number point `N` | `value_number = N` (no max) | Pass |
+| Number point `N` | `value_number ≤ N ≤ value_number_max` | Pass |
+| Boolean | equality | Pass / Fail |
+
+**Deferred:** wildcard enum; multi-value OR on bucket; def-level domain min/max; fuzzy tolerance; ETIM EU import. Part exact/band authoring UX ([N9](#decision-numeric-specs--drop-range-type-band-is-part-authored-2026-07-08)) closed by [37u](../tasks/37u-part-leaf-links-specs-ui.md).
+
+**Rationale (original):** Numeric + units across trades; per-scope namespaces isolate fire vs HVAC vs CCTV. Units as an org table matches rate-table UX; canonical storage keeps the matcher unit-free. **Amended:** drop def-level `range` — see [numeric specs decision](#decision-numeric-specs--drop-range-type-band-is-part-authored-2026-07-08).
+
+**Planning:** [11-categories-scope-model.md](../planning/11-categories-scope-model.md) · **Specs:** [`item.md`](../surface-specs/item.md) (`spec_definitions`), [`part.md`](../surface-specs/part.md) (`part_specs`), estimate scope panel.
+
+---
+
+### Decision: `spec_def` value types and part-matching rules (2026-07-02)
+
+**Status:** **Amended** (2026-07-08) by [spec value types, units table, and locks](#decision-spec-value-types-units-table-and-locks-2026-07-08) — type set, units, range, and locks. **Historical** storage/match notes below retained for trail; **do not implement** `text`, free-text `unit`/`display_unit` columns, or deferred-only range-as-max-on-number.
+
+**Originally:** Locked pending DDL in 37f follow-on. **Amended** [C10 in planning 11](../planning/11-categories-scope-model.md). **Superseded** enum-only assumptions in [system specs C2 (2026-06-27)](#decision-system-specs-and-part-compatibility-c2-locked-2026-06-27) for storage shape only.
+
+#### Historical type table (superseded)
+
+| `value_type` | Notes (2026-07-02) |
+|--------------|-------------------|
+| `enum` / `boolean` | Unchanged intent — still current |
+| `text` | **Dropped** 2026-07-08 |
+| `number` + optional `value_number_max` | **Split:** exact `number` vs own `range` type (2026-07-08) |
+
+#### Historical unit columns (superseded)
+
+`spec_def.unit` / `display_unit` text → replaced by **`spec_unit`** table + `spec_def.unit_id` (2026-07-08). Wildcard option still deferred.
+
+#### Estimate bucket UX (still current)
 
 | Level | Table | Cardinality |
 |-------|-------|-------------|
-| Scope | `estimate_scope_spec` | At most **one row per `spec_def_id`** per scope; value **optional** (blank = no filter on that dimension) |
+| Scope | `estimate_scope_spec` | At most **one row per `spec_def_id`** per scope; value **optional** (blank = no filter) |
 | Zone | `estimate_zone_spec` | Same; overrides scope for lines in that zone |
-| Line | `estimate_line_spec` | Same; overrides zone (37f) |
+| Line | `estimate_line_spec` | Same; overrides zone |
 
-**Scope spec panel:** show the **union of effective `spec_def` ids** for the checked scope’s root subtree — see [category spec participation (2026-07-03)](#decision-category-spec-participation--assign-once-branch-exclude-2026-07-03). Values may be left blank.
+**Scope panel (37o):** entire `spec_def` namespace for the checked scope root — not a subtree union.
 
-#### Part-matching algorithm (37f resolver)
-
-**Inputs:** merged **bucket** values (resolve line → zone → scope), **effective participation** per [assign-once rules](#decision-category-spec-participation--assign-once-branch-exclude-2026-07-03), catalog `manufacturer_part` candidates in item’s category subtree.
-
-For each `spec_def_id` in the **effective participation** set for the line’s item:
-
-| Bucket value | Part rows for def | Match |
-|--------------|-------------------|-------|
-| **Blank / null** | any | **Pass** (dimension not used to filter) |
-| **Enum** `spec_option_id = X` | none | **Fail** |
-| **Enum** `X` | one or more rows including `X` | **Pass** |
-| **Enum** `X` | rows only with wildcard option | **Pass** |
-| **Enum** `X` | rows with options neither `X` nor wildcard | **Fail** |
-| **Number** `N` | no row | **Fail** |
-| **Number** `N` | `value_number = N` (exact, same unit) | **Pass** |
-| **Number** `N` | `value_number` ≤ `N` ≤ `value_number_max` | **Pass** when range columns populated (**deferred** v1) |
-| **Boolean / text** | equality on stored value | **Pass** / **Fail** |
-
-**`filter_mode` (`required` \| `prefer`):** v1 treats all participating dimensions as **required** when bucket value is non-blank. When bucket is blank, dimension is ignored. **`prefer`** scoring deferred.
-
-**Outcomes after filter:**
+#### Part-match outcomes (still current)
 
 | Matches | Line behavior |
 |---------|----------------|
-| **0** | Keep `item_id`; `part_id` null; `part_locked` false; `material_status = generic`; **`unit_material` ← `item.fallback_unit_cost`**; UI alert |
-| **1** | Set `part_id` from match; `part_locked` false (system may update on recalc); `material_status = suggested`; `unit_material` ← matched part vendor |
-| **Many** | `part_id` null until user picks from **filtered PN list**; `part_locked` true when user picks; **`unit_material` ← max vendor among filtered** or **`item.fallback_unit_cost`** |
+| **0** | `part_id` null; material ← `fallback_unit_cost`; UI alert |
+| **1** | Suggest `part_id`; material ← matched vendor |
+| **Many** | User picks from filtered set; material ← max filtered or fallback |
 
-**Line shape:** **`item_id`** required on product lines; **`part_id`** optional — set when filter yields exactly one PN or when user selects from filtered list. **`part_locked`** — when `true`, resolver/recalc **must not** change `part_id` (user-confirmed PN); when `false`, system may set/clear `part_id` on item/bucket change.
+See **2026-07-08** decision for current number/range match rows. Enum multi-row + blank-bucket ignore unchanged.
 
-**Material price resolution (v1):** pinned `part_id` → that part’s vendor path; else match-count rules in [O1](../tasks/37f-estimate-line-costing.md#decision-o1--ambiguous-part-material-cost-2026-07-04).
+#### Worked example — HVAC evaporator coil (updated types)
 
-User may **override** `part_id` only to a value in the **filtered set** (manifest-gated). User override sets **`part_locked = true`**.
+| Def | `value_type` | Part rows |
+|-----|--------------|-----------|
+| `refrigerant` | enum | `R-454B` |
+| `tonnage` | number (`unit_id` → ton) | `value_number = 3.0` |
+| `voltage` | enum | `208V`, `230V` |
+| `phase` | number | `1` |
+| `control_type` | enum | `24V`, `Communicating` |
+| `trip_band` | range (`unit_id` → A) | e.g. `10`–`20` (illustrative) |
 
-#### Worked example — HVAC evaporator coil
-
-**Part** `COIL-454B-036` (“3-Ton Evaporator Coil”), category **Cooling Infrastructure**:
-
-| `spec_def.code` | `value_type` | Part rows (`manufacturer_part_spec`) |
-|-----------------|--------------|--------------------------------------|
-| `refrigerant` | enum | one row → `R-454B` |
-| `tonnage` | number (`unit = ton`) | `value_number = 3.0` |
-| `voltage` | enum | two rows → `208V`, `230V` |
-| `phase` | number (`unit = phase`) | `value_number = 1` |
-| `control_type` | enum | two rows → `24V`, `Communicating` |
-| `finish` | enum | one row → wildcard `N/A` |
-
-**Estimate** — scope **HVAC / Cooling** checked; bucket:
-
-| Def | Scope value | Zone “Rooftop” override |
-|-----|-------------|-------------------------|
-| `refrigerant` | `R-454B` | — |
-| `tonnage` | `3.0` | — |
-| `voltage` | `208V` | — |
-| `phase` | `1` | — |
-| `control_type` | *(blank)* | `Communicating` |
-| `finish` | *(blank)* | — |
-
-**Line** — item “Evaporator coil 3 ton”, zone Rooftop:
-
-1. Effective bucket: `control_type = Communicating` (zone), others from scope as above; `finish` blank → ignored.
-2. Filter parts: voltage must include `208V`; tonnage `3.0`; refrigerant `R-454B`; phase `1`; control includes `Communicating`; finish wildcard passes.
-3. `COIL-454B-036` matches → suggested `part_id` pin; user may override to another PN in the filtered set only.
-
-**Rationale:** Enum multi-rows model “part supports A or B”; bucket picks one project assumption. Numbers need canonical units for HVAC tonnage and electrical dims. Blank bucket + wildcard options avoid over-constraining ROM quotes. Normalized rows preserve manifest, audit, and win→job spec snapshots — JSON blobs do not.
-
-**Planning:** [11-categories-scope-model.md](../planning/11-categories-scope-model.md) · **Tasks:** [37f](../tasks/37f-estimate-line-costing.md) *(TBD)* · **Spec:** [`category.md`](../surface-specs/category.md), [`estimate.md`](../surface-specs/estimate.md).
+**Rationale (original):** Enum multi-rows model “part supports A or B”; bucket picks one project assumption. Numbers need canonical units. Normalized rows preserve manifest/audit — JSON blobs do not.
 
 ---
 
@@ -905,7 +1055,43 @@ Knowledge and use can diverge only at an **exclude** node: the node that wrote `
 **Rationale:** Protocol/spec dimensions filter parts; manufacturer brand is wrong knob; UUID spec defs align part and estimate rows.
 
 
+### Decision: labor phase inclusion — catalog → estimate → job (2026-07-07)
+
+**Status:** **Locked** (2026-07-07). **Task:** [37n](../tasks/37n-labor-phase-inclusion.md). **Amends:** [37l labor atomic group](#decision-unified-item-tree--merge-category--item-node-anchored-estimate-lines-2026-07-05); [commercial costing](#decision-commercial-costing--org-tables-category-defaults-estimate-overrides-2026-07-04); [J5 phase templates](#decision-phase-templates--per-root-category-default--item-override-j5-locked-2026-06-27) (**superseded**); legacy [labor phases catalog](#decision-labor-phases--catalog-only-in-v1-2026-06-17) org **`phase`** table.
+
+**Choice:**
+
+| # | Topic | Choice |
+|---|--------|--------|
+| **N1** | **Single phase catalog** | Org **`labor_phase`** + **`labor_rate_type`** stay as shipped (040b). One id bridges **costing** (`item_labor_phase`) and **progress** (`scope_phase`). Retire org **`phase`**, **`phase_template`**, **`phase_template_step`**, `estimate_line.phase_id`, `scope_phase.phase_template_step_id`. |
+| **N2** | **Item matrix** | **`item_labor_phase`**: `labor_phase_id` + `labor_rate_type_id` + `hours_per_unit` per node. **Author on `category` and `item`** (not scope roots). Leaf resolution unchanged (37l): leaf's whole set, else **first ancestor's whole set** — atomic, no per-phase merge across levels. |
+| **N3** | **Item UI — inherit + override** | Leaf with **no own rows** and ancestor has rows → **read-only** inherited table (phase, rate, hrs) + source label. **Add labor phase** → **override mode** (writable replace-array on leaf). Delete all own rows → revert to inherited display (no leaf rows in DB). |
+| **N4** | **Estimate inclusion** | Per **`estimate_scope`** and optional **`estimate_zone`**: pick which **`labor_phase`** ids apply to lines in that bucket (e.g. Parts & Smarts → Program + Test only; omit Install / Prewire). Junction: `estimate_scope_labor_phase`, `estimate_zone_labor_phase`. **Default:** all phases in the resolved item labor group (unset = include all). **Zone overrides scope** when zone has rows (same tier rule as `complexity_factor`). |
+| **N5** | **`unit_labor` recalc** | `resolved = resolveLaborGroup(item)` → filter rows where `labor_phase_id ∈ includedPhases(scope, zone)` → `Σ hours × rate` × complexity. Frozen when `lock = line` or `sent` (D6a). |
+| **N6** | **Job `scope_phase` seed** | On win / job line create: one **`scope_phase`** per **included** `labor_phase` on the line's resolved group. `scope_phase.labor_phase_id` FK → `labor_phase`; `planned_qty` = line `quantity`; `name` denormalized from catalog. `progress_weight` / `billing_weight` default from matching `hours_per_unit` (J3 tuning deferred). |
+| **N7** | **Progress %** | Field progress rolls up on **`scope_phase.completed_qty`** per phase. Scope/zone labor % = weighted rollup across job lines in that geography using included phases only. Billing reads same rollups when auto-generator ships (B4 deferred). |
+| **N8** | **Freeze** | Phase inclusion on estimate scope/zone follows estimate lifecycle (D6a): editable in **`draft`**; frozen at **`sent`** / **`won`**. |
+
+**Flow:**
+
+```text
+labor_phase (org) ──► item_labor_phase (category/item defaults)
+                           │
+estimate_scope_labor_phase / estimate_zone_labor_phase (which phases count here)
+                           │
+              estimate_line.unit_labor (filtered Σ hours × rate × complexity)
+                           │
+              win ──► scope_phase per included labor_phase (job progress + billing)
+```
+
+**Rationale:** Costing and field progress share one phase vocabulary. Estimate scope/zone inclusion models "we're only programming and testing here, not installing" without duplicate labor lines. Category-level defaults + leaf override mirrors margin-policy authoring altitude and 37l ancestry resolution.
+
+**Supersedes:** [phase templates (J5)](#decision-phase-templates--per-root-category-default--item-override-j5-locked-2026-06-27); `default_phase_template_id` on scope roots (040b retired); org **`phase`** table for new work.
+
+
 ### Decision: phase templates — per root category default + item override (J5 locked 2026-06-27)
+
+**Status:** **Superseded** (2026-07-07) by [labor phase inclusion](#decision-labor-phase-inclusion--catalog--estimate--job-2026-07-07). `phase_template` / `phase_template_step` dropped in 040b; job seeding now from `item_labor_phase` + estimate phase inclusion.
 
 **Choice:** `item.phase_template_id` when set; else **`category.default_phase_template_id`** on scope root; else org fallback. Job line create / win copies steps → `scope_phase`.
 
@@ -921,7 +1107,9 @@ Knowledge and use can diverge only at an **exclude** node: the node that wrote `
 
 ### Decision: labor phases — catalog only in v1 (2026-06-17)
 
-**Amended (2026-06-27):** org **`phase`** evolves toward **`phase_template_step`** for scope phase seeding — see [trade/system (2026-06-27)](#decision-trade-system-type-assumptions-and-part-tags-2026-06-27).
+**Amended (2026-07-07):** org **`labor_phase`** + **`item_labor_phase`** replace legacy **`phase`** for costing and progress — see [labor phase inclusion](#decision-labor-phase-inclusion--catalog--estimate--job-2026-07-07). Estimate scope/zone picks which phases apply; `scope_phase` instances reference `labor_phase_id`.
+
+**Amended (2026-06-27):** org **`phase`** evolved toward **`phase_template_step`** — both retired in 040b / 37n.
 
 **Choice:** Org catalog **`phase`** (prewire, installation, programming, testing, …). Attach on **labor** `estimate_line` / `job_line` via `phase_id` and on **`job_work_item`**.
 

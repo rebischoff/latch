@@ -2,8 +2,16 @@
 
 import { fieldAllows, type Manifest } from "@latch/contracts";
 import { FieldControl } from "@latch/react";
-import { Input, Select, Skeleton, Switch, Table, Typography } from "antd";
-import { useEffect, useMemo, useRef } from "react";
+import {
+  Checkbox,
+  InputNumber,
+  Popover,
+  Select,
+  Skeleton,
+  Table,
+  Typography,
+} from "antd";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Controller, useFormContext, useWatch } from "react-hook-form";
 
 import { FormSection } from "@/components/form/FormSection";
@@ -44,6 +52,121 @@ const enumOptionLabels = (
     .join(", ");
 };
 
+const formatNumberDisplay = (
+  value: number | null | undefined,
+  def: PartSpecDefPickerRow,
+): string => {
+  if (value === null || value === undefined) {
+    return "—";
+  }
+
+  const formatted =
+    def.decimal_places != null ? value.toFixed(def.decimal_places) : String(value);
+
+  return def.unit_symbol ? `${formatted} ${def.unit_symbol}` : formatted;
+};
+
+const formatNumberValueSummary = (
+  row: PartSpecFormRow | undefined,
+  def: PartSpecDefPickerRow,
+): string => {
+  const hasMin = row?.value_number !== null && row?.value_number !== undefined;
+  const hasMax =
+    row?.value_number_max !== null && row?.value_number_max !== undefined;
+
+  if (!hasMin && !hasMax) {
+    return "Set value…";
+  }
+
+  if (hasMax) {
+    const min = formatNumberDisplay(row?.value_number, def);
+    const max = formatNumberDisplay(row?.value_number_max, def);
+    if (min === "—" && max === "—") {
+      return "Set value…";
+    }
+    return `${min} – ${max}`;
+  }
+
+  return formatNumberDisplay(row?.value_number, def);
+};
+
+const NumberValuePopover = ({
+  index,
+  def,
+  row,
+  disabled,
+}: {
+  index: number;
+  def: PartSpecDefPickerRow;
+  row: PartSpecFormRow | undefined;
+  disabled: boolean;
+}) => {
+  const { control } = useFormContext<PartSpecsFormValues>();
+  const [open, setOpen] = useState(false);
+  const summary = formatNumberValueSummary(row, def);
+
+  const content = (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12, minWidth: 240 }}>
+      <Controller
+        control={control}
+        name={`part_specs.${index}.value_number`}
+        render={({ field, fieldState }) => (
+          <div>
+            <Typography.Text type="secondary" style={{ display: "block", marginBottom: 4 }}>
+              Value
+            </Typography.Text>
+            <InputNumber
+              addonAfter={def.unit_symbol ?? undefined}
+              disabled={disabled}
+              placeholder="Min / exact"
+              precision={def.decimal_places ?? undefined}
+              status={fieldState.error ? "error" : undefined}
+              style={{ width: "100%" }}
+              value={field.value ?? null}
+              onChange={(value) => field.onChange(value ?? null)}
+            />
+          </div>
+        )}
+      />
+      <Controller
+        control={control}
+        name={`part_specs.${index}.value_number_max`}
+        render={({ field, fieldState }) => (
+          <div>
+            <Typography.Text type="secondary" style={{ display: "block", marginBottom: 4 }}>
+              Max (optional)
+            </Typography.Text>
+            <InputNumber
+              addonAfter={def.unit_symbol ?? undefined}
+              disabled={disabled}
+              placeholder="Empty = exact"
+              precision={def.decimal_places ?? undefined}
+              status={fieldState.error ? "error" : undefined}
+              style={{ width: "100%" }}
+              value={field.value ?? null}
+              onChange={(value) => field.onChange(value ?? null)}
+            />
+          </div>
+        )}
+      />
+    </div>
+  );
+
+  return (
+    <Popover
+      content={content}
+      open={open}
+      onOpenChange={setOpen}
+      trigger="click"
+      title="Number value"
+    >
+      <Typography.Link disabled={disabled && summary === "Set value…"}>
+        {summary}
+      </Typography.Link>
+    </Popover>
+  );
+};
+
 const SpecValueControl = ({
   index,
   def,
@@ -78,7 +201,15 @@ const SpecValueControl = ({
         </Typography.Text>
       );
     }
-    return <Typography.Text>{row?.value_text?.trim() ? row.value_text : "—"}</Typography.Text>;
+    if (def.value_type === "number") {
+      const summary = formatNumberValueSummary(row, def);
+      return (
+        <Typography.Text>
+          {summary === "Set value…" ? "—" : summary}
+        </Typography.Text>
+      );
+    }
+    return <Typography.Text>—</Typography.Text>;
   }
 
   if (def.value_type === "enum") {
@@ -115,34 +246,28 @@ const SpecValueControl = ({
         control={control}
         name={`part_specs.${index}.value_boolean`}
         render={({ field }) => (
-          <Switch
-            size="small"
+          <Checkbox
             checked={field.value === true}
             disabled={disabled}
-            onChange={(checked) => field.onChange(checked)}
+            onChange={(event) => field.onChange(event.target.checked)}
           />
         )}
       />
     );
   }
 
-  return (
-    <Controller
-      control={control}
-      name={`part_specs.${index}.value_text`}
-      render={({ field, fieldState }) => (
-        <Input
-          size="small"
-          value={typeof field.value === "string" ? field.value : ""}
-          disabled={disabled}
-          placeholder="Compatible text value"
-          status={fieldState.error ? "error" : undefined}
-          onChange={field.onChange}
-          onBlur={field.onBlur}
-        />
-      )}
-    />
-  );
+  if (def.value_type === "number") {
+    return (
+      <NumberValuePopover
+        def={def}
+        disabled={disabled}
+        index={index}
+        row={row}
+      />
+    );
+  }
+
+  return <Typography.Text>—</Typography.Text>;
 };
 
 export const PartSpecsField = ({ manifest, syncKey }: PartSpecsFieldProps) => {
@@ -166,10 +291,11 @@ export const PartSpecsField = ({ manifest, syncKey }: PartSpecsFieldProps) => {
     () =>
       JSON.stringify(
         partSpecs.map((row) => ({
-          spec_def_id: row.spec_def_id,
-          spec_option_ids: row.spec_option_ids,
-          value_boolean: row.value_boolean,
-          value_text: row.value_text,
+          spec_def_id: row?.spec_def_id,
+          spec_option_ids: row?.spec_option_ids,
+          value_boolean: row?.value_boolean,
+          value_number: row?.value_number,
+          value_number_max: row?.value_number_max,
         })),
       ),
     [partSpecs],
@@ -303,7 +429,7 @@ export const PartSpecsField = ({ manifest, syncKey }: PartSpecsFieldProps) => {
               },
               {
                 key: "value",
-                title: "Compatible with",
+                title: "Value",
                 render: (_value, row, index) => {
                   const def = defs?.find((entry) => entry.spec_def_id === row.spec_def_id);
                   if (defsLoading || !def) {

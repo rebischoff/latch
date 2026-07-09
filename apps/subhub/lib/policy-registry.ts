@@ -27,6 +27,7 @@ import { freightRateTypeTableSurfacePolicyDef } from "../modules/catalog/generat
 import { incidentalRateTypeTableSurfacePolicyDef } from "../modules/catalog/generated/incidental_rate_type_table.schema.generated";
 import { laborPhaseTableSurfacePolicyDef } from "../modules/catalog/generated/labor_phase_table.schema.generated";
 import { laborRateTypeTableSurfacePolicyDef } from "../modules/catalog/generated/labor_rate_type_table.schema.generated";
+import { specUnitTableSurfacePolicyDef } from "../modules/catalog/generated/spec_unit_table.schema.generated";
 import { markupTypeTableSurfacePolicyDef } from "../modules/catalog/generated/markup_type_table.schema.generated";
 import { siteContactRelationTableSurfacePolicyDef } from "../modules/site/generated/site_contact_relation_table.schema.generated";
 import { siteDetailSurfacePolicyDef } from "../modules/site/generated/site_detail.schema.generated";
@@ -64,4 +65,5 @@ export const subhubRegistry = definePolicyRegistry(
   markupTypeTableSurfacePolicyDef,
   complexityFactorTableSurfacePolicyDef,
   laborPhaseTableSurfacePolicyDef,
+  specUnitTableSurfacePolicyDef,
 );

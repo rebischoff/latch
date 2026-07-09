@@ -22,7 +22,7 @@
 | D12 | **Migration** | **Big-bang `033`** — no backward compatibility |
 | D13 | **UI labels** | Site **Scopes & zones**; estimate **Scope** |
 | D14 | **Checkbox cascade** | Check zone → auto-check parent scope; check scope → **not** auto-check zones |
-| D15 | **Deferred** | `spec_def.filter_mode` required vs prefer behavior (Q11); full costing engine (37f) |
+| D15 | **Removed** | `spec_def.filter_mode` dropped (047) — all non-blank bucket values are hard filters |
 
 ### Decision block (paste into docs)
 

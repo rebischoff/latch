@@ -10,8 +10,11 @@ export const ItemListListQuerySchema = z.object({
 
 export type ItemTreeNode = {
   children: ItemTreeNode[];
+  freight_rate_type_id: string | null;
   id: string;
+  incidental_rate_type_id: string | null;
   is_root: boolean;
+  markup_type_id: string | null;
   name: string;
   node_type: "scope" | "category" | "item";
   parent_id: string | null;

@@ -4,7 +4,6 @@ export type BucketSpecValue = {
   spec_def_id: string;
   spec_option_id: string | null;
   value_boolean: boolean | null;
-  value_text: string | null;
   value_number: number | null;
 };
 
@@ -26,9 +25,8 @@ export const loadScopeBucketSpecs = async (
   const result = await client.query<BucketSpecValue>(
     `SELECT spec_def_id::text,
             spec_option_id,
-            value_text,
             value_boolean,
-            NULL::numeric AS value_number
+            value_number
      FROM estimate_scope_spec
      WHERE estimate_scope_id = $1`,
     [estimateScopeId],
@@ -45,9 +43,8 @@ export const loadZoneBucketSpecs = async (
   const result = await client.query<BucketSpecValue>(
     `SELECT spec_def_id::text,
             spec_option_id,
-            value_text,
             value_boolean,
-            NULL::numeric AS value_number
+            value_number
      FROM estimate_zone_spec
      WHERE estimate_scope_id = $1
        AND site_zone_id = $2`,
@@ -64,9 +61,8 @@ export const loadLineBucketSpecs = async (
   const result = await client.query<BucketSpecValue>(
     `SELECT spec_def_id::text,
             spec_option_id,
-            value_text,
             value_boolean,
-            NULL::numeric AS value_number
+            value_number
      FROM estimate_line_spec
      WHERE estimate_line_id = $1`,
     [estimateLineId],
@@ -107,5 +103,4 @@ export const loadMergedBucketForLine = async (
 export const isBucketValueBlank = (spec: BucketSpecValue): boolean =>
   spec.spec_option_id === null &&
   spec.value_boolean === null &&
-  spec.value_text === null &&
   spec.value_number === null;

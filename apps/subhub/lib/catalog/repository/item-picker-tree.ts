@@ -135,7 +135,7 @@ export const loadOrgItemTree = async (
       value: itemId,
       label: item.name,
       type: "node",
-      selectable: item.node_type !== "scope",
+      selectable: item.node_type === "item",
       ...(childNodes.length > 0 ? { children: childNodes } : {}),
     };
   };

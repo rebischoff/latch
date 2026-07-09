@@ -3,6 +3,7 @@
 import { ExportOutlined } from "@ant-design/icons";
 import { type FieldId } from "@latch/contracts";
 import { Button, Select, Skeleton, Space, Typography } from "antd";
+import type { ReactNode } from "react";
 import type { DefaultOptionType, SelectProps } from "antd/es/select";
 import {
   Controller,
@@ -35,7 +36,15 @@ type LinkedSelectControlProps = {
   addNewLabel?: string;
   selectProps?: Omit<SelectProps, "options" | "value" | "onChange" | "mode">;
   mode?: "write" | "read";
+  suffix?: ReactNode;
 };
+
+const controlRowStyle = {
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+  width: "100%",
+} as const;
 
 const buildDisplayOptions = (
   options: SelectProps["options"],
@@ -80,6 +89,7 @@ export const LinkedSelectControl = ({
   addNewLabel = "Add",
   selectProps,
   mode = "write",
+  suffix,
 }: LinkedSelectControlProps) => {
   const confirmNavigate = useConfirmDirtyNavigate();
   const selectedId = value || undefined;
@@ -111,22 +121,32 @@ export const LinkedSelectControl = ({
   if (mode === "read") {
     if (canLink && selectedId) {
       return (
-        <Space.Compact block>
-          <Typography.Text style={{ flex: 1, lineHeight: "32px" }}>{readLabel}</Typography.Text>
-          <Button
-            aria-label="Open record"
-            icon={<ExportOutlined />}
-            onClick={handleOpen}
-          />
-        </Space.Compact>
+        <div style={controlRowStyle}>
+          <Space.Compact block style={{ flex: 1, minWidth: 0 }}>
+            <Typography.Text style={{ flex: 1, lineHeight: "32px" }}>{readLabel}</Typography.Text>
+            <Button
+              aria-label="Open record"
+              icon={<ExportOutlined />}
+              onClick={handleOpen}
+            />
+          </Space.Compact>
+          {suffix}
+        </div>
       );
     }
 
-    return <Typography.Text>{readLabel}</Typography.Text>;
+    return (
+      <div style={controlRowStyle}>
+        <Typography.Text style={{ flex: 1, minWidth: 0 }}>{readLabel}</Typography.Text>
+        {suffix}
+      </div>
+    );
   }
 
-  return (
-    <Space.Compact block>
+  const selectWidth = canLink ? "calc(100% - 32px)" : "100%";
+
+  const control = (
+    <Space.Compact block style={{ flex: 1, minWidth: 0 }}>
       <Select
         {...selectProps}
         showSearch={selectProps?.showSearch ?? true}
@@ -140,7 +160,7 @@ export const LinkedSelectControl = ({
         loading={loading}
         placeholder={placeholder}
         status={status}
-        style={{ width: canLink ? "calc(100% - 32px)" : "100%", ...selectProps?.style }}
+        style={{ width: selectWidth, ...selectProps?.style }}
       />
       {canLink ? (
         <Button
@@ -152,6 +172,17 @@ export const LinkedSelectControl = ({
       ) : null}
     </Space.Compact>
   );
+
+  if (!suffix) {
+    return control;
+  }
+
+  return (
+    <div style={controlRowStyle}>
+      {control}
+      {suffix}
+    </div>
+  );
 };
 
 type LinkedSelectInputProps<T extends FieldValues> = {
@@ -159,6 +190,7 @@ type LinkedSelectInputProps<T extends FieldValues> = {
   name: FieldPath<T>;
   label: string;
   options: SelectProps["options"];
+  suffix?: ReactNode;
   loading?: boolean;
   selectProps?: Omit<SelectProps, "options" | "value" | "onChange" | "mode">;
   canLink?: boolean;
@@ -173,6 +205,7 @@ export const LinkedSelectInput = <T extends FieldValues>({
   name,
   label,
   options,
+  suffix,
   loading: loadingOverride,
   selectProps,
   canLink,
@@ -206,6 +239,7 @@ export const LinkedSelectInput = <T extends FieldValues>({
             disabled={disabled}
             status={fieldState.error ? "error" : undefined}
             selectProps={selectProps}
+            suffix={suffix}
             canLink={canLink}
             linkHref={linkHref}
             canAddNew={canAddNew}

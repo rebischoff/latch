@@ -20,8 +20,11 @@ export type ItemFlatRow = {
 
 export type ItemTreeNode = {
   children: ItemTreeNode[];
+  freight_rate_type_id: string | null;
   id: string;
+  incidental_rate_type_id: string | null;
   is_root: boolean;
+  markup_type_id: string | null;
   name: string;
   node_type: "scope" | "category" | "item";
   parent_id: string | null;
@@ -92,6 +95,9 @@ export const nestItemTree = (
     node_type: row.node_type,
     sort_order: row.sort_order,
     is_root: row.parent_id === null,
+    freight_rate_type_id: row.freight_rate_type_id,
+    incidental_rate_type_id: row.incidental_rate_type_id,
+    markup_type_id: row.markup_type_id,
     children: nestItemTree(rows, row.id),
   }));
 };

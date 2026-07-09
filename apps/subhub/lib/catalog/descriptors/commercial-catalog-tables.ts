@@ -30,6 +30,11 @@ export {
   type IncidentalRateTypeTableRow,
 } from "../../../modules/catalog/generated/incidental_rate_type_table.glue.generated";
 
+export {
+  specUnitTableDescriptor,
+  type SpecUnitTableRow,
+} from "../../../modules/catalog/generated/spec_unit_table.glue.generated";
+
 const nameField = z.object({ name: z.string().min(1) }).strict();
 
 export const LaborRateTypeTableCreateSchema = z
@@ -242,4 +247,62 @@ export const mapCostAddOnReplaceBody = (
     name: row.name,
     percent: row.percent ?? 0,
     amount_cents: row.amount_cents ?? 0,
+  }));
+
+export const SpecUnitTableCreateSchema = z
+  .object({
+    symbol: z.object({ symbol: z.string().min(1) }).strict(),
+    name: z.object({ name: z.string().min(1) }).strict(),
+    dimension: z.object({ dimension: z.string().min(1) }).strict(),
+    canonical_unit_id: z
+      .object({ canonical_unit_id: z.string().nullable() })
+      .strict()
+      .optional(),
+    to_canonical_factor: z
+      .object({ to_canonical_factor: z.number() })
+      .strict()
+      .optional(),
+    sort_order: z.object({ sort_order: z.number().int() }).strict().optional(),
+  })
+  .strict();
+
+export const SpecUnitTableReplaceSchema = z
+  .object({
+    rows: z.array(
+      z
+        .object({
+          id: z.string().optional(),
+          symbol: z.string().min(1),
+          name: z.string().min(1),
+          dimension: z.string().min(1),
+          canonical_unit_id: z.string().nullable().optional(),
+          to_canonical_factor: z.number().optional(),
+        })
+        .strict(),
+    ),
+  })
+  .strict();
+
+export const mapSpecUnitCreateBody = (body: unknown): Record<string, unknown> => {
+  const parsed = SpecUnitTableCreateSchema.parse(body);
+  return {
+    symbol: parsed.symbol.symbol,
+    name: parsed.name.name,
+    dimension: parsed.dimension.dimension,
+    canonical_unit_id: parsed.canonical_unit_id?.canonical_unit_id ?? null,
+    to_canonical_factor: parsed.to_canonical_factor?.to_canonical_factor ?? 1,
+    sort_order: parsed.sort_order?.sort_order ?? 0,
+  };
+};
+
+export const mapSpecUnitReplaceBody = (
+  body: unknown,
+): Array<Record<string, unknown>> =>
+  SpecUnitTableReplaceSchema.parse(body).rows.map((row) => ({
+    id: row.id,
+    symbol: row.symbol,
+    name: row.name,
+    dimension: row.dimension,
+    canonical_unit_id: row.canonical_unit_id ?? null,
+    to_canonical_factor: row.to_canonical_factor ?? 1,
   }));

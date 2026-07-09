@@ -2,8 +2,8 @@ import { ValidationError } from "@latch/contracts";
 import { withPermissionDb } from "@latch/pg-session";
 import type { Pool, PoolClient } from "pg";
 
-import { tableExists } from "../../sites/repository/sql-utils";
 import type { JobLineItemPatchRow } from "../descriptors/job-detail";
+import { seedScopePhasesForJobLineTx } from "./scope-phase-seed";
 
 const validateLineItems = async (
   client: PoolClient,
@@ -50,21 +50,6 @@ const validateLineItems = async (
       });
     }
 
-    if (row.line_kind === "labor" && row.phase_id) {
-      if (await tableExists(client, "phase")) {
-        const phaseResult = await client.query<{ id: string }>(
-          `SELECT id FROM phase WHERE id = $1`,
-          [row.phase_id],
-        );
-        if (phaseResult.rows.length === 0) {
-          throw new ValidationError("Unknown phase_id on labor line", {
-            field: "line_items",
-            code: "unknown_phase",
-            id: row.id,
-          });
-        }
-      }
-    }
   }
 
   return normalized;
@@ -99,7 +84,6 @@ export const replaceJobLineItemsTx = async (
          unit_price,
          site_zone_id,
          site_asset_id,
-         phase_id,
          item_id,
          part_id,
          vendor_part_id,
@@ -110,7 +94,7 @@ export const replaceJobLineItemsTx = async (
          superseded_by_job_line_id,
          sort_order
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)`,
       [
         row.id,
         jobId,
@@ -125,7 +109,6 @@ export const replaceJobLineItemsTx = async (
         row.unit_price,
         row.site_zone_id ?? null,
         row.site_asset_id ?? null,
-        row.phase_id ?? null,
         row.item_id ?? null,
         row.part_id ?? null,
         row.vendor_part_id ?? null,
@@ -137,6 +120,28 @@ export const replaceJobLineItemsTx = async (
         sortOrder,
       ],
     );
+
+    if (row.item_id && row.estimate_line_id) {
+      const estimateLine = await client.query<{
+        estimate_scope_id: string;
+        site_zone_id: string | null;
+      }>(
+        `SELECT estimate_scope_id, site_zone_id
+         FROM estimate_line
+         WHERE id = $1`,
+        [row.estimate_line_id],
+      );
+      const lineRef = estimateLine.rows[0];
+      if (lineRef) {
+        await seedScopePhasesForJobLineTx(client, {
+          job_line_id: row.id,
+          item_id: row.item_id,
+          estimate_scope_id: lineRef.estimate_scope_id,
+          site_zone_id: lineRef.site_zone_id,
+          quantity: row.quantity,
+        });
+      }
+    }
   }
 };
 

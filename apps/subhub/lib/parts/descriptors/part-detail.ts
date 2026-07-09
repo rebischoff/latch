@@ -24,7 +24,8 @@ const PartSpecPatchElementSchema = z
   .object({
     spec_def_id: z.string(),
     spec_option_id: z.string().nullable().optional(),
-    value_text: z.string().nullable().optional(),
+    value_number: z.number().nullable().optional(),
+    value_number_max: z.number().nullable().optional(),
     value_boolean: z.boolean().nullable().optional(),
   })
   .strict();
@@ -104,8 +105,9 @@ export type PartSpecRow = {
   spec_def_id: string;
   spec_option_id: string | null;
   value_boolean: boolean | null;
-  value_text: string | null;
-  value_type: "boolean" | "enum" | "text";
+  value_number: number | null;
+  value_number_max: number | null;
+  value_type: "boolean" | "enum" | "number";
 };
 
 export type PartDetailRelated = {

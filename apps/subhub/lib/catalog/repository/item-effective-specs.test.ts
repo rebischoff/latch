@@ -1,204 +1,51 @@
+import type { Pool } from "pg";
 import { describe, expect, it } from "vitest";
 
-import type { ItemFlatRow } from "./item-tree";
-import {
-  computeEffectiveSpecDefIds,
-  hasExcludeOnAssignPath,
-  isEffectiveSpecDef,
-} from "./item-effective-specs";
+import { scopePanelDefs, unionEffectiveForItems } from "./item-effective-specs";
 
-const fireAlarmRows: ItemFlatRow[] = [
-  {
-    id: "fa-root",
-    name: "Fire Alarm",
-    parent_id: null,
-    sort_order: 1,
-    csi_code: null,
-    freight_rate_type_id: null,
-    incidental_rate_type_id: null,
-    markup_type_id: null,
-  },
-  {
-    id: "fa-initiating",
-    name: "Initiating devices",
-    parent_id: "fa-root",
-    sort_order: 1,
-    csi_code: null,
-    freight_rate_type_id: null,
-    incidental_rate_type_id: null,
-    markup_type_id: null,
-  },
-  {
-    id: "fa-notification",
-    name: "Notification appliances",
-    parent_id: "fa-root",
-    sort_order: 2,
-    csi_code: null,
-    freight_rate_type_id: null,
-    incidental_rate_type_id: null,
-    markup_type_id: null,
-  },
-];
+describe("scopePanelDefs", () => {
+  it("returns the full namespace for a scope root", async () => {
+    const pool = {
+      query: async () => ({
+        rows: [
+          {
+            spec_def_id: "slc",
+            display_name: "SLC protocol",
+            value_type: "enum",
+          },
+          {
+            spec_def_id: "color",
+            display_name: "Color",
+            value_type: "enum",
+          },
+        ],
+      }),
+    } as unknown as Pool;
 
-const chainRows: ItemFlatRow[] = [
-  {
-    id: "a",
-    name: "a",
-    parent_id: null,
-    sort_order: 1,
-    csi_code: null,
-    freight_rate_type_id: null,
-    incidental_rate_type_id: null,
-    markup_type_id: null,
-  },
-  {
-    id: "b",
-    name: "b",
-    parent_id: "a",
-    sort_order: 1,
-    csi_code: null,
-    freight_rate_type_id: null,
-    incidental_rate_type_id: null,
-    markup_type_id: null,
-  },
-  {
-    id: "c",
-    name: "c",
-    parent_id: "b",
-    sort_order: 1,
-    csi_code: null,
-    freight_rate_type_id: null,
-    incidental_rate_type_id: null,
-    markup_type_id: null,
-  },
-  {
-    id: "d",
-    name: "d",
-    parent_id: "c",
-    sort_order: 1,
-    csi_code: null,
-    freight_rate_type_id: null,
-    incidental_rate_type_id: null,
-    markup_type_id: null,
-  },
-];
-
-const slc = "00000000-0000-4000-8000-000000000001";
-const color = "00000000-0000-4000-8000-000000000002";
-const series = "00000000-0000-4000-8000-000000000003";
-const defX = "00000000-0000-4000-8000-000000000010";
-
-const fireAlarmParticipation = {
-  assignByDef: new Map<string, string>([
-    [slc, "fa-root"],
-    [color, "fa-notification"],
-    [series, "fa-notification"],
-  ]),
-  excludesByItem: new Map<string, Set<string>>([
-    ["fa-notification", new Set([slc])],
-  ]),
-};
-
-describe("computeEffectiveSpecDefIds — Fire Alarm", () => {
-  const categoriesById = new Map(fireAlarmRows.map((row) => [row.id, row]));
-
-  it("inherits assignment from root when child has no rows", () => {
-    const effective = computeEffectiveSpecDefIds(
-      "fa-initiating",
-      categoriesById,
-      fireAlarmParticipation,
-    );
-
-    expect([...effective]).toEqual([slc]);
-  });
-
-  it("applies branch exclude and local assignments on nested nodes", () => {
-    const effective = computeEffectiveSpecDefIds(
-      "fa-notification",
-      categoriesById,
-      fireAlarmParticipation,
-    );
-
-    expect([...effective].sort()).toEqual([color, series].sort());
-  });
-
-  it("unions effective sets across multiple category links", () => {
-    const itemCategories = ["fa-initiating", "fa-notification"];
-    const union = new Set<string>();
-
-    for (const categoryId of itemCategories) {
-      for (const specDefId of computeEffectiveSpecDefIds(
-        categoryId,
-        categoriesById,
-        fireAlarmParticipation,
-      )) {
-        union.add(specDefId);
-      }
-    }
-
-    expect([...union].sort()).toEqual([slc, color, series].sort());
+    const defs = await scopePanelDefs(pool, "fa-root");
+    expect(defs.map((row) => row.spec_def_id)).toEqual(["slc", "color"]);
   });
 });
 
-describe("computeEffectiveSpecDefIds — assign-once chain", () => {
-  const categoriesById = new Map(chainRows.map((row) => [row.id, row]));
+describe("unionEffectiveForItems", () => {
+  it("joins item_spec_participation for linked items", async () => {
+    const pool = {
+      query: async (sql: string, params?: unknown[]) => {
+        expect(sql).toContain("item_spec_participation");
+        expect(params?.[0]).toEqual(["leaf-a", "leaf-b"]);
+        return {
+          rows: [
+            {
+              spec_def_id: "slc",
+              display_name: "SLC protocol",
+              value_type: "enum",
+            },
+          ],
+        };
+      },
+    } as unknown as Pool;
 
-  const chainParticipation = {
-    assignByDef: new Map<string, string>([[defX, "b"]]),
-    excludesByItem: new Map<string, Set<string>>([["c", new Set([defX])]]),
-  };
-
-  it("assign(D) is unique per def", () => {
-    expect(chainParticipation.assignByDef.get(defX)).toBe("b");
-    expect([...chainParticipation.assignByDef.keys()]).toHaveLength(1);
-  });
-
-  it("exclude on c removes def for c and d", () => {
-    expect(
-      [...computeEffectiveSpecDefIds("c", categoriesById, chainParticipation)],
-    ).toEqual([]);
-    expect(
-      [...computeEffectiveSpecDefIds("d", categoriesById, chainParticipation)],
-    ).toEqual([]);
-  });
-
-  it("effective on b without rows on descendants", () => {
-    expect(
-      [...computeEffectiveSpecDefIds("b", categoriesById, chainParticipation)],
-    ).toEqual([defX]);
-  });
-
-  it("d cannot restore def after exclude on c", () => {
-    const effectiveAtD = isEffectiveSpecDef(
-      "d",
-      defX,
-      "b",
-      chainParticipation,
-      categoriesById,
-    );
-    expect(effectiveAtD).toBe(false);
-    expect(
-      hasExcludeOnAssignPath("b", "d", defX, chainParticipation.excludesByItem, categoriesById),
-    ).toBe(true);
-  });
-});
-
-describe("scopePanelDefs union", () => {
-  it("collects effective participation across the subtree", () => {
-    const categoriesById = new Map(fireAlarmRows.map((row) => [row.id, row]));
-    const subtreeIds = ["fa-root", "fa-initiating", "fa-notification"];
-    const union = new Set<string>();
-
-    for (const categoryId of subtreeIds) {
-      for (const specDefId of computeEffectiveSpecDefIds(
-        categoryId,
-        categoriesById,
-        fireAlarmParticipation,
-      )) {
-        union.add(specDefId);
-      }
-    }
-
-    expect([...union].sort()).toEqual([slc, color, series].sort());
+    const defs = await unionEffectiveForItems(pool, ["leaf-a", "leaf-b"]);
+    expect(defs).toHaveLength(1);
   });
 });

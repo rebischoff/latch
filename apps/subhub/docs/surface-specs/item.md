@@ -1,10 +1,10 @@
 # Catalog — `item_list` · `item_detail`
 
-> **Wave:** 3b · **Status:** shipped (37i unified tree + 37g commercial + **37l leaf-quotable**, 2026-07-06) · **Planning:** [11-categories-scope-model.md](../planning/11-categories-scope-model.md) · **DBML:** `item`, `item_labor_phase`, `spec_def`, … · **Decisions:** [unified item tree](../decisions/catalog.md#decision-unified-item-tree--merge-category--item-node-anchored-estimate-lines-2026-07-05) · [commercial costing](../decisions/catalog.md#decision-commercial-costing--org-tables-category-defaults-estimate-overrides-2026-07-04)
+> **Wave:** 3b · **Status:** shipped (37i unified tree + 37g commercial + **37l leaf-quotable**, 2026-07-06); spec Fields **pending 37o** (2026-07-07) · **Planning:** [11-categories-scope-model.md](../planning/11-categories-scope-model.md) · **DBML:** `item`, `item_labor_phase`, `spec_def`, `item_spec_participation`, … · **Decisions:** [unified item tree](../decisions/catalog.md#decision-unified-item-tree--merge-category--item-node-anchored-estimate-lines-2026-07-05) · [commercial costing](../decisions/catalog.md#decision-commercial-costing--org-tables-category-defaults-estimate-overrides-2026-07-04) · [labor phase inclusion](../decisions/catalog.md#decision-labor-phase-inclusion--catalog--estimate--job-2026-07-07) ([37n](../tasks/37n-labor-phase-inclusion.md)) · [spec participation flatten](../decisions/catalog.md#decision-spec-definitions-scoped-to-root-flat-item-participation--no-ownershipinheritance-2026-07-07) ([37o](../tasks/37o-spec-participation-flatten.md))
 >
-> **Note:** Former `category_*` surfaces renamed to `item_*` (040a). **`item.node_type`** (`scope` \| `category` \| `item`, 044) gates authoring + estimate picker (leaves only). Commercial block on `item_detail`: policy FKs on branches; `fallback_unit_cost` + `item_labor_phase` on quotable leaves.
+> **Note:** Former `category_*` surfaces renamed to `item_*` (040a). **`item.node_type`** (`scope` \| `category` \| `item`, 044) gates authoring + estimate picker (leaves only). Commercial block on `item_detail`: policy FKs on **scope/category**; **`item_labor_phase`** on **category** (defaults) + **item** (override); `fallback_unit_cost` on quotable leaves. **Specs (37o + UI pivot 2026-07-08):** `spec_definitions` on scope roots (**Specs** tab); leaf **`spec_participation`** as multi-select labeled **Specs** on **General** tab. **Categories carry no spec Fields.** `spec_def.code` / `spec_option.code` dropped (048) — matching uses FK ids only. **Next (37p–37r):** value types `enum` \| `boolean` \| `number` \| `range` (drop `text`); org `spec_unit` table; options popover editor — see [decision](../decisions/catalog.md#decision-spec-value-types-units-table-and-locks-2026-07-08).
 
-**Related:** [`part.md`](./part.md) — part pool assignment (`part_item`) is authored on **`part_detail.item_links`** v1; **`item_detail` omits writable `part_pool`**. Site scope picker reads **root items** ([`site.md`](./site.md) task 37c).
+**Related:** [`part.md`](./part.md) — part pool assignment (`part_item`) is authored on **`part_detail.item_links`** v1; **`item_detail` omits writable `part_pool`**. [`spec.md`](./spec.md) *(37o, new)* — **primary editing Surface** for `spec_def` / `spec_option`; `item_detail` only consumes it (leaf `spec_participation` picks from the owning scope's namespace). Site scope picker reads **root items** ([`site.md`](./site.md) task 37c).
 
 ---
 
@@ -15,13 +15,14 @@
 | 1 | **Scope roots** | `category.parent_id IS NULL` — Fire Alarm, Intrusion, HVAC, … |
 | 2 | **List pane** | **Tree**, not flat table — full org category forest in list-detail **left pane** |
 | 3 | **Detail — all nodes** | **`name`**, `sort_order` editable; **`node_type`** badge + promote/demote (`category` ↔ `item`); **`parent_id`** reparent within same scope root (non-quotable parents only) |
-| 4 | **Detail — nested nodes** | **`spec_participation`** — visible defs per [owner-branch knowledge](../decisions/catalog.md#decision-category-spec-visibility--owner-branch-knowledge-2026-07-03); read-only def unless owner; participates toggle on inherited / exclude |
-| 5 | **Detail — root nodes** | **`spec_definitions`** — CRUD for defs visible at root (owned here + unassigned namespace); defs assigned only on descendant branches hidden |
-| 6 | **Create** | Toolbar **New root** + **New child** (child requires selected tree node) |
-| 7 | **Delete** | Block when referenced (`site_scope`, `estimate_scope`, `item_category`, `part_category`, `manufacturer_part_spec`, children) — structured `ConflictError` |
-| 8 | **Search** | Filter tree by **`name`** contains (client-side or `q` param flattening matches — v1 client filter OK) |
-| 9 | **CSI** | `csi_code` on category — **optional**, editable on detail when manifest grants; not list column v1 |
-| 10 | **Phase template** | **Retired 040b** — use `item_labor_phase` matrix instead |
+| 4 | **Detail — leaf items** | **`spec_participation`** *(37o)* — multi-select labeled **Specs** on **General** tab against the ancestor scope's `spec_def` namespace; direct opt-in rows in `item_spec_participation`; no inheritance |
+| 5 | **Detail — scope roots** | **`spec_definitions`** *(37o UI pivot)* — **Specs** tab: sortable `FieldArrayTable` (Name, Type, Unit, Decimals, Options). Types: `enum` \| `boolean` \| `number` \| `range` (no `text`). Unit picker from org `spec_unit_table`; options **popover** editor (rename preserves option `id`). Type/unit locked when `in_use_part_count` &gt; 0 |
+| 6 | **Detail — category nodes** | **No spec Fields** — pure organizational grouping |
+| 7 | **Create** | Toolbar **New root** + **New child** (child requires selected tree node) |
+| 8 | **Delete** | Block when referenced (`site_scope`, `estimate_scope`, `item_category`, `part_category`, `manufacturer_part_spec`, children) — structured `ConflictError` |
+| 9 | **Search** | Filter tree by **`name`** contains (client-side or `q` param flattening matches — v1 client filter OK) |
+| 10 | **CSI** | `csi_code` on category — **optional**, editable on detail when manifest grants; not list column v1 |
+| 11 | **Labor phases** | **`item_labor_phase`** matrix on **category** (defaults) + **item** (leaf override). Org catalogs: `labor_phase`, `labor_rate_type`. Leaf with no own rows **inherits** first ancestor's group (read-only table + source caption); leaf with no own rows and no ancestry shows *No labor phases configured on this node.* + **Add labor phase** (no editable table chrome). **Add labor phase** enters override mode; deleting all own rows reverts immediately to inherited or empty using cached `inherited_labor_phase` ([37n](../tasks/37n-labor-phase-inclusion.md)). Estimate scope/zone picks **included** phases for recalc + job seed. Retired: `phase_template`. |
 
 ---
 
@@ -93,11 +94,11 @@
 | Field id | Type | Writable | When | Notes |
 |----------|------|----------|------|-------|
 | `profile` | scalar | read + write | always | `name`, `sort_order`, `parent_id` (read), `csi_code`, commercial FKs (040b) |
-| `spec_definitions` | collection | read + write | **`is_root`** | Replace-array `spec_def[]` with nested `options[]` for enum defs |
-| `spec_participation` | collection | read + write | nested (+ optional root) | **Participates** per root-namespace def → assign / branch exclude |
+| `spec_participation` | collection | read + write | **`node_type = item`** *(37o)* | Flat multi-select `{ spec_def_id }[]` against the ancestor scope's namespace ([`spec.md`](./spec.md)); replace-array into `item_spec_participation`; **no** inherited/exclude states |
+| — | — | — | — | **`spec_definitions` moved off this Surface** *(37o)* — see [`spec_detail`](./spec.md); scope roots and categories show no spec Fields here |
 | — | — | — | — | **No `part_pool` v1** — assign parts on `/parts/[id]` via `item_links` ([37j](../tasks/37j-catalog-part-authoring.md)) |
 
-**Omit on detail v1:** writable part pool / `part_item` assignment on this Surface; drag reparent; duplicate subtree.
+**Omit on detail v1:** writable part pool / `part_item` assignment on this Surface; duplicate subtree. List pane owns drag reparent; detail keeps parent TreeSelect.
 
 ### `profile` element
 
@@ -119,35 +120,13 @@
 - **`root_category_id` / `root_category_name`:** denormalized read — ancestor root for nested nodes (spec namespace).
 - **`default_phase_template_id`:** writable on POST/PATCH **only when** `parent_id IS NULL`; reject on nested nodes.
 
-### `spec_definitions` element (root only)
+### `spec_definitions` — moved (37o)
 
-```json
-{
-  "id": "<uuid>",
-  "code": "slc_protocol",
-  "display_name": "SLC protocol",
-  "value_type": "enum",
-  "filter_mode": "required",
-  "sort_order": 1,
-  "options": [
-    {
-      "id": "<uuid>",
-      "code": "fire_lite_litespeed",
-      "display_name": "Fire-Lite LiteSpeed",
-      "sort_order": 1
-    }
-  ],
-  "value_text": null,
-  "value_boolean": null
-}
-```
+**Superseded here.** Definitions are authored on the new [`spec_detail`](./spec.md) Surface (`spec_def` + nested `options[]`), which carries its own `scope_root_id` picker — `item_detail` no longer hosts this Field on scope roots. See `spec.md` for the element shape.
 
-- **`value_type`:** `enum` \| `boolean` \| `text` \| **`number`** — enum uses `options[]`; boolean/text/number omit options. **`number`** requires `unit` ([decision](../decisions/catalog.md#decision-spec_def-value-types-and-part-matching-rules-2026-07-02)).
-- **`filter_mode`:** stored; when bucket value is non-blank, participating defs must match ([C10](../planning/11-categories-scope-model.md)); `prefer` scoring deferred.
+### `spec_participation` element (leaf items only, 37o)
 
-### `spec_participation` element (nested; optional on root)
-
-**Read DTO** — one row per root-namespace def (nested shows read-only def fields + participates):
+**Read DTO** — one row per def in the item's ancestor scope's namespace, flat (no inherited/excluded states):
 
 ```json
 {
@@ -156,37 +135,25 @@
       "spec_def_id": "<uuid>",
       "display_name": "SLC protocol",
       "value_type": "enum",
-      "active": true,
-      "state": "inherited"
+      "active": true
     },
     {
       "spec_def_id": "<uuid>",
       "display_name": "Color",
       "value_type": "enum",
-      "active": false,
-      "state": "excluded"
+      "active": false
     }
   ]
 }
 ```
 
-- **`active`:** participates in **effective** set at this node.
-- **`state`:** `assigned` \| `inherited` \| `excluded` \| `inactive` — UI hint only; not persisted. **Visibility:** GET returns only defs the node [knows](../decisions/catalog.md#decision-category-spec-visibility--owner-branch-knowledge-2026-07-03) (owner branch; exclude node; not below exclude; unassigned namespace at scope root only).
+- **`active`:** row exists in `item_spec_participation` for this item + def. That's the entire semantic — no `state`, no owner/exclude concepts.
+- **Namespace source:** GET resolves the item's ancestor scope root (walk `parent_id`), then returns every `spec_def` where `scope_root_item_id` = that root, each flagged `active` per the item's own `item_spec_participation` rows.
+- **Visibility:** only on `node_type = item` (leaf). Categories and scope roots return no `spec_participation` Field at all.
 
-**Per-node visibility (37d4):**
+**PATCH:** `participates[]` replace-array — each `{ spec_def_id, active }`. `active: true` → upsert `item_spec_participation (item_id, spec_def_id)`; `active: false` / omitted → delete row if present. Reject `spec_def_id` outside the item's ancestor-scope namespace (`invalid_spec_namespace`). No assign-once check, no exclude semantics — this is a plain per-item toggle set.
 
-| Node vs def `D` | In GET response? | Def editable? |
-|-----------------|------------------|---------------|
-| Owner | yes | yes |
-| Descendant on path (uses) | yes | read-only |
-| Exclude node (knows, does not use) | yes | read-only; participates toggle |
-| Below exclude | no | — |
-| Ancestor / sibling / other branch | no | — |
-| Unassigned namespace def | scope root only | yes at root |
-
-**PATCH:** `participates[]` replace-array — each `{ spec_def_id, active }`. Maps to assign (`category_spec_def`), exclude (`category_spec_exclude`), or delete rows per [assign-once decision](../decisions/catalog.md#decision-category-spec-participation--assign-once-branch-exclude-2026-07-03). At most one assignment per `spec_def_id` globally. **No re-include** below an ancestor exclude.
-
-**Effective set:** computed — not persisted.
+**Authoring convenience (UI, not schema):** "Copy from item…" picker duplicates another item's `participates[]` as a starting point — a client-side convenience, not a stored relationship.
 
 ---
 
@@ -200,7 +167,7 @@
 | `category_detail` | `write` | grant on detail + Field | Each PATCH / POST |
 | `category_detail` | `delete` | grant on detail | Each DELETE |
 
-**Field grants (v1):** single **`write`** on detail covers `profile`, `spec_definitions`, `spec_participation` — no per-Field split until IAM needs it.
+**Field grants (v1):** single **`write`** on detail covers `profile`, `spec_participation` — no per-Field split until IAM needs it. `spec_definitions` grant lives on `spec_detail` (37o), not here.
 
 **403 vs 404:** platform default.
 
@@ -217,8 +184,8 @@
 ### `category_detail`
 
 - **`get(ctx, id)`** — load category row; compute `is_root`, `root_category_id`, labels walking ancestors.
-- **If root:** load visible `spec_def` + `spec_option` for `root_category_id = id` (owner-branch filter).
-- **If nested:** load visible root-namespace defs + computed `participates[]` per assign-once algorithm.
+- **If leaf item (37o):** walk to ancestor scope root; load `spec_def` where `scope_root_item_id = root`; join `item_spec_participation` for this item to flag `active` — flat, no ancestor walk beyond finding the root once.
+- **If scope root or category (37o):** no spec Fields returned — definitions live on `spec_detail`.
 
 **Picker API (37c):** **`listRoots(ctx)`** — `SELECT id, name FROM category WHERE parent_id IS NULL ORDER BY sort_order` — may live on same route module or `GET /api/categories/roots`.
 
@@ -228,21 +195,21 @@
 
 | Operation | Body keys | Semantics |
 |-----------|-----------|-----------|
-| `create` | `profile` (`name`, `parent_id` optional), optional `spec_definitions` / `spec_participation` | Insert category; root when `parent_id` null/omitted |
-| `patch` | manifest-narrowed `profile`, `spec_definitions`, `spec_participation` | Scalar profile; **replace-array** collections |
+| `create` | `profile` (`name`, `parent_id` optional), optional `spec_participation` (leaves only) | Insert category; root when `parent_id` null/omitted |
+| `patch` | manifest-narrowed `profile`, `spec_participation` | Scalar profile; **replace-array** collection |
 | `delete` | — | Hard delete when allowed |
 
 **Create root:** POST with `profile.name`, no `parent_id`.
 
 **Create child:** POST with `profile.name`, `profile.parent_id` = selected node (must exist).
 
-**PATCH `spec_definitions`:** scope root or **owning** nested category only — replace-array `spec_def` + nested `options`; cascade delete removed defs only when owner or unassigned; reject edits to defs owned elsewhere (`owner_only`). **Enum options:** diff upsert by `id` — update in place, insert new, delete only unreferenced; **block** removal of options referenced by `manufacturer_part_spec` (`spec_option_in_use`).
+**`spec_definitions` — moved (37o):** definition CRUD (`spec_def` + `options[]`, enum diff-upsert, `spec_option_in_use` block) now lives on `spec_detail` — see [`spec.md`](./spec.md) § E.
 
-**PATCH `spec_participation`:** `participates[]` replace-array — assign-once + branch exclude; reject duplicate assign, re-include below exclude, overlap on same node.
+**PATCH `spec_participation` (37o):** `participates[]` replace-array — plain upsert/delete against `item_spec_participation`; reject `spec_def_id` outside the item's ancestor-scope namespace (`invalid_spec_namespace`). **No** assign-once check, **no** exclude/re-include rules — every leaf item's participation is independent.
 
 **Strict writable schemas:** `.strict()` on POST/PATCH.
 
-**Sibling `sort_order`:** v1 manual numeric on profile; tree DnD reorder deferred.
+**Sibling `sort_order`:** list-pane drag sets `parent_id` + `sort_order` via immediate PATCH on drop (single-node `sort_order` v1); detail form still exposes manual `sort_order` when manifest grants write.
 
 ---
 
@@ -256,21 +223,20 @@
 | Site scope | `site_scope.root_category_id` |
 | Estimate scope | `estimate_scope.root_category_id` |
 | Item / part links | `item_category`, `part_category` |
-| Part specs | `manufacturer_part_spec` referencing defs under this root (roots only) |
-| Spec participation | Other categories’ `category_spec_def` referencing defs (when deleting spec_def on root PATCH omit) |
+| Delete leaf item with participation rows | Cascade `item_spec_participation` — no blocker, just delete (37o) |
+| Delete scope root with defs in its namespace | Block — list sample `spec_def.display_name`; delete/reassign defs on `spec_detail` first (37o) |
 
 ### Root vs nested PATCH guards
 
 | Rule | Server |
 |------|--------|
-| Nested node PATCH `spec_definitions` | **Reject** — 400 |
-| Assign same `spec_def_id` at second category | **Reject** — 400 (`assign_once_violation`) |
-| Re-include def below ancestor exclude | **Reject** — 400 |
+| `spec_definitions` PATCH on `item_detail` (any node) | **Reject** — 400; use `spec_detail` (37o) |
+| `spec_participation` PATCH on non-leaf (`scope` \| `category`) | **Reject** — 400 |
 | Nested PATCH `default_phase_template_id` | **Reject** — 400 |
 
 ### Audit
 
-Mutations on `category`, `spec_def`, `spec_option`, `category_spec_def`.
+Mutations on `category`, `item_spec_participation` (37o). `spec_def` / `spec_option` audit moved to `spec_detail`.
 
 ---
 
@@ -282,19 +248,24 @@ Master-detail per [routing-and-libraries.md](../routing-and-libraries.md). **Lis
 ┌─ /categories ─────────────────────────────────────────────────────────┐
 │ SurfaceToolbar — New root | New child | Save | Revert | Delete        │
 ├─ Tree (list pane) ──────────────┬─ Detail pane ───────────────────────┤
-│ ▼ Fire Alarm            [root]  │  Profile                            │
+│ ▼ Fire Alarm                    │  Profile                            │
 │   Initiating                    │    Name [________]                  │
 │   Wire                          │    Sort order [__]                  │
-│     FPLR                        │  ── Spec participation ──           │
-│ ▼ Intrusion             [root]  │    ☑ SLC protocol                   │
+│     FPLR ●                      │  ── Spec participation (leaf only) ─│
+│ ▼ Intrusion                     │    ☑ SLC protocol                   │
 │                                 │    ☐ Notification color             │
-│                                 │  (root only: Spec definitions table) │
+│                                 │  (specs edited on /specs — 37o)      │
 └─────────────────────────────────┴─────────────────────────────────────┘
 ```
+
+- **Bold** = scope root (`node_type === "scope"`).
+- **●** = quotable leaf indicator (`node_type === "item"`).
+- **Tree drag** — reorder siblings (gap drop) or reparent as last child (drop on `scope` / `category`); immediate PATCH + toast; independent of detail **Save**.
 
 | Control | Behavior |
 |---------|----------|
 | **Tree select** | Sets detail route `/categories/[id]`; highlights node |
+| **Tree drag** | When `item_detail` grants write on `profile`: gap = sibling reorder; drop on node = reparent under target; PATCH `{ profile: { parent_id, sort_order } }` on drop; toast feedback; disabled while name filter active |
 | **New root** | Navigate to `/categories/new?returnTo=…`; **Save** on detail form (POST with no `parent_id`) |
 | **New child** | Enabled when tree node selected (`MasterDetailSelectionContext` ref at click; pathname id fallback on deep link); navigate to `/categories/new?returnTo=…&parent_id=<id>`; **Save** includes `parent_id` |
 | **Save** | Create: POST then `/categories/[id]`; edit: PATCH detail Fields; list tree refetch on success |
@@ -303,9 +274,7 @@ Master-detail per [routing-and-libraries.md](../routing-and-libraries.md). **Lis
 
 **Empty detail:** placeholder *“Select a category”* when no selection.
 
-**Root detail — spec definitions:** inline table — `display_name`, `value_type`, enum options editor.
-
-**Nested detail — spec participation:** read-only copy of root def table + **Participates** checkbox per row.
+**Leaf detail — spec participation (37o):** flat checkbox list against the ancestor scope's namespace (loaded from `spec_detail`'s tables); no read-only/inherited rows. **Scope root / category detail:** no spec section at all — link to `/specs?scope=<root-id>` when the user needs to manage the namespace.
 
 **Pattern reuse:** Tree chrome similar to [`SiteGeographyTree`](../../components/sites/SiteGeographyTree.tsx) but **read-only structure in list** with **select** (not site PATCH); detail is standard `SurfaceFormRoot`.
 
@@ -354,3 +323,4 @@ Master-detail per [routing-and-libraries.md](../routing-and-libraries.md). **Lis
 - [37b](../tasks/37b-category-scope-migration-apply.md) — apply `033`
 - [37d](../tasks/37d-category-catalog-dal-surfaces.md) — implementation
 - [37c](../tasks/37c-site-scopes-zones.md) — consumes root picker via `GET /api/sites/pickers/category-roots`
+- [37o](../tasks/37o-spec-participation-flatten.md) — **pending** — moves `spec_definitions` off this Surface to `spec_detail`; flattens `spec_participation` to leaf-only, no inheritance ([decision](../decisions/catalog.md#decision-spec-definitions-scoped-to-root-flat-item-participation--no-ownershipinheritance-2026-07-07))

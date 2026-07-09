@@ -8,6 +8,188 @@
 
 ---
 
+### Decision: estimate Line Items tab — merge Scope config into line tree (2026-07-08)
+
+**Status:** **Locked.** **Supersedes UI of:** [scope tab (2026-07-02)](#decision-estimate-scope-tab--junction-zones-general-scope-row-block-uncheck-2026-07-02) and [37e](../tasks/37e-estimate-scope-tab.md) Scope tab. **No schema change.** **Task:** [37v](../tasks/37v-estimate-structure-tab.md).
+
+**Problem:** Scope config (spec filters, complexity, labor phases) and line editing lived on two tabs over the same scope→zone hierarchy. Filters that drive part resolution and labor $ were invisible while editing lines.
+
+**Choice:**
+
+| # | Topic | Choice |
+|---|--------|--------|
+| **V1** | Surface | Tabs **General \| Line Items** only — retire **Scope** tab. Scope/zone config + lines in one Ant `Table` + `treeData` on **Line Items**. |
+| **V2** | Rows | Parents `scope` / `zone` via `colSpan`; leaves = `estimate_line`. Unzoned lines (`site_zone_id` null) sit **directly under scope** (no synthetic unzoned parent). **≥1 scope required** per line — no estimate-root lines ([scope required](#decision-estimate-scope-required--pricing-overrides-2026-07-04)). |
+| **V3** | Include | Toolbar **Add scope ▾** — include existing `site_scope` on quote (`scopes[]`). Scope header **Add zone ▾** — include `site_zone` under scope. Tree shows **included scopes/zones only** (no dimmed unchecked rows). Estimate PATCH does **not** create site geography. Empty `site_tree.scopes` → disabled dropdown + CTA to site **Scopes & zones**. Remove scope/zone blocked when lines reference (existing rule). |
+| **V4** | Bucket config | Ant **`Popover`** on scope + zone parent rows (**⚙** trigger). Reuses `EstimateScopeSpecFields`, `EstimateScopeLaborPhaseFields`, `LinkedSelectInput`. Writable gated on Field **`scopes`**. **No Drawer** this pass. |
+| **V5** | Summary chips | **Deferred** — no chips in 37v; ⚙ only. |
+| **V6** | Kits | **UI removed** — standalone lines only. Schema + DAL kit validation **unchanged** (payload never emits kit rows). Full kit retirement = separate decision. |
+| **V7** | Persistence | Unchanged — one RHF form; Add scope/zone dirty client-side; single PATCH → `replaceEstimateCollectionsTx` (scopes then lines + recalc). Fields `scopes` and `line_items` gated independently. |
+| **V8** | Line-level specs (O5) | **Deferred** — if adopted later, per-line override is a **leaf** popover, not scope Configure. |
+
+**Open tension:** [shared line editor](./job.md#decision-job-wave-5--implementation-order-2026-06-23) (wave 4d′) — scope/zone chrome is an estimate **wrapper** around the leaf grid; do not fork the grid in a way that blocks shared editor.
+
+**Rationale:** One surface for quote structure; include via dropdowns (not checkbox tree); Configure in context; no DB change.
+
+**Amendment (2026-07-08):** **UI superseded** by [three-panel Line Items layout](#decision-estimate-line-items-tab--three-panel-layout-2026-07-08) ([37w](../tasks/37w-estimate-line-items-panels.md)). **Retained:** V3 include semantics, V6 kits UI removed, V7 persistence, V8 deferred; DAL unchanged. Tree table + Configure popover implementation from [37v](../tasks/37v-estimate-structure-tab.md) is interim until 37w ships.
+
+---
+
+### Decision: estimate Line Items tab — three-panel layout (2026-07-08)
+
+**Status:** **Locked (decisions W1–W9).** Implementation: [37w](../tasks/37w-estimate-line-items-panels.md). **Supersedes UI of:** [37v tree table](#decision-estimate-line-items-tab--merge-scope-config-into-line-tree-2026-07-08). **No schema change.**
+
+**Problem:** Single tree `Table` with scope/zone parent rows (`colSpan`) couples quote structure, bucket config, and line editing in one horizontally scrolling grid. Parent-row chrome fights column pinning, viewport width, and header alignment.
+
+**Choice (decision log):**
+
+| # | Topic | Status | Choice |
+|---|--------|--------|--------|
+| **W1** | Shell topology | **Locked** | Line Items tab = **three panels** — left rail (**S** + **C** stacked), right pane (**LI** flat). See diagram below. Tabs **General \| Line Items** unchanged. |
+| **W2** | S panel — tree content | **Locked** | Same **hierarchy** as site **Scopes & zones**; **full `site_tree`** scopes/zones; **select only** — no add/delete/rename/reorder. See [W5](#w5--s-panel-actions-locked) for include semantics. |
+| **W3** | Selection → LI filter | **Locked** | **Scope** selected → lines with that `estimate_scope_id` and **`site_zone_id` null** (unzoned). **Zone** selected → lines matching scope + zone. No pseudo “Unzoned” node in **S**. |
+| **W4** | C panel — config binding | **Locked** | Permanent bucket config for **S** selection; popover **retired**. Fields: complexity, labor phases (multi-select), specs. |
+| **W5** | S panel — quote include/remove UI | **Locked** | **No** Add scope / Add zone / Remove from quote on Line Items tab. **S** is selection only; **LI** + **C** target selected node. |
+| **W6** | LI panel — flat grid | **Locked** | Flat **37f** columns; **Add line** = `FieldArrayTable` footer (`dashed` / `block` / `PlusOutlined`); requires **S** selection; implicit include ([W5](#w5--s-panel-actions-locked)). |
+| **W7** | Responsive / narrow viewports | **Locked** | **Desktop-only v1** — defer responsive breakpoints; ship three-panel layout at desktop widths. |
+| **W8** | Persistence | **Locked** | Unchanged 37v **V7** — one RHF form; `scopes[]` + `line_items[]`; dirty until Save; `replaceEstimateCollectionsTx`; **S** selection client-only. |
+| **W9** | Deferred carry-forward | **Locked** | V5 chips defer; V6 kits UI removed retain; V8 O5 defer; LI drag→**S** defer; **4d′** grid must not block shared editor. |
+
+#### W1 — Shell topology (locked)
+
+```
+┌─────────────────┬────────────────────────────────────┐
+│        S        │                                    │
+│  quote structure│                                    │
+│  tree           │           LI                       │
+│                 │   flat line-item table             │
+│                 │   (no tree / no parent rows)       │
+├─────────────────┤                                    │
+│        C        │                                    │
+│  bucket config  │                                    │
+│  (scope or zone)│                                    │
+└─────────────────┴────────────────────────────────────┘
+```
+
+| Panel | Id | Role |
+|-------|-----|------|
+| **S** | structure | Navigate **included** scopes/zones on this quote; primary selection drives **C** and **LI**. |
+| **C** | config | Edit bucket fields for the selected scope or zone (specs, complexity, labor phases). Replaces 37v Configure **Popover**. |
+| **LI** | lines | Edit `estimate_line` rows for the current selection only — standard flat `Table`, shared column set from 37f. |
+
+**Supersedes (37v UI only):** V1 single tree `Table`; V2 scope/zone parent rows + `colSpan`; V4 Configure popover on parent rows.
+
+**Explicitly not in W1:** selection rules, add/remove UX, column list, responsive breakpoints, persistence shape — see W2–W9.
+
+**Rationale:** Separates navigation, configuration, and line editing into viewport-stable regions; flat **LI** avoids tree-table layout hacks; **C** always visible when a bucket is selected.
+
+**Task:** [37w](../tasks/37w-estimate-line-items-panels.md).
+
+#### W2 — S panel tree (locked)
+
+**Choice:**
+
+- **Structure:** Mirror site [`SiteScopesZonesTree`](../components/sites/SiteScopesZonesTree.tsx) — scope parents, nested zone children (same nesting as `site_tree`).
+- **Nodes shown:** Full site geography from **`site_tree`** (all scopes/zones on the anchored site), same shape as site **Scopes & zones**. Not limited to scopes already on `scopes[]` — selection drives work surface.
+- **Interaction:** **Selection only** — no rename, delete, add-zone inline, reorder, and **no** Add scope / Add zone / Remove from quote affordances ([W5](#w5--s-panel-actions-locked)). Site geography CRUD remains on **site** Scopes & zones.
+- **Panel title:** **Scopes & zones** (parity with site tab).
+- **No pseudo-node** for unzoned lines — selecting a **scope** is how you work unzoned lines ([W3](#w3--selection--li-filter-locked)).
+
+**Open (non-blocking):** line-count badges on nodes; default selection on load — decide in W4/W6 pass or ship first scope selected.
+
+**Rationale:** Familiar site geography shape; estimate panel is navigation not site editing.
+
+#### W3 — Selection → LI filter (locked)
+
+| **S** selection | **LI** shows | New line targets |
+|-----------------|--------------|------------------|
+| **Scope** | `line_items` where `estimate_scope_id` = scope and `site_zone_id` **null** | Same — unzoned under scope |
+| **Zone** | `line_items` where `estimate_scope_id` + `site_zone_id` match zone | Same zone bucket |
+
+Aligns with [37v V2](../tasks/37v-estimate-structure-tab.md) unzoned-under-scope rule and [scope required](#decision-estimate-scope-required--pricing-overrides-2026-07-04).
+
+**Empty LI copy (draft):** scope — “No unzoned lines in this scope”; zone — “No lines in this zone”; nothing selected — “Select a scope or zone”.
+
+#### W4 — C panel config (locked)
+
+**Choice:**
+
+- **Binding:** **C** always reflects the current **S** selection. Scope selected → scope bucket; zone selected → zone bucket (zone overrides via `zoneIndex`).
+- **Content:** Same bucket configuration as 37v Configure **Popover** — promote [`EstimateBucketConfigurePanel`](../components/estimates/EstimateBucketConfigurePanel.tsx) to the permanent **C** panel (not a popover).
+- **Fields (in order):**
+  1. **Complexity factor** — `LinkedSelectInput` (clearable).
+  2. **Labor phases** — **multi-select** `Select` (replace checkbox list in popover); same `included_labor_phases` RHF path; empty selection = include all phases from item labor group (existing 37n rule).
+  3. **Specs** — `EstimateScopeSpecFields` (scope/zone bucket spec filters).
+- **Permissions:** Editable when Field **`scopes`** has `write` (37v V4); read-only otherwise.
+- **Empty state:** No **S** selection → “Select a scope or zone to configure filters and phases.” **C** panel disabled/placeholder, not hidden.
+- **37v popover:** **Retired** — no ⚙ fallback in 37w (W7 may stack panels instead).
+
+**Rationale:** Config visible while editing lines in **LI**; single surface replaces easy-to-miss popover.
+
+#### W5 — S panel actions (locked)
+
+**Choice:**
+
+- **No include/remove UI** on Line Items tab — retire 37v toolbar **Add scope ▾**, header **Add zone ▾**, and **Remove from quote**.
+- **S** is the site scope/zone tree for **selection only**. Whatever scope or zone is selected is the active bucket for **LI** (add / edit / delete lines) and **C** (bucket config).
+- **Implicit include:** When the user adds a line or edits **C** for a site scope/zone not yet on `scopes[]`, the client **auto-includes** that bucket (`addScopeToQuote` / `addZoneToQuote` helpers) — dirty until Save; no separate “add to quote” step.
+- **Site geography** is never created from the estimate — only existing `site_tree` nodes are selectable. Empty `site_tree.scopes` → CTA to site **Scopes & zones** (37v V3 empty state retained).
+- **Remove scope/zone from quote:** Not exposed in 37w Line Items UI (scopes/zones drop from `scopes[]` only via Save replace when no longer referenced, or a future General-tab action — **out of scope for 37w**).
+
+**Supersedes (37v UI):** V3 explicit Add scope / Add zone dropdowns and remove-from-quote on parent rows.
+
+**Rationale:** Selection is the quote structure UX; avoids duplicate include chrome alongside navigation tree.
+
+#### W6 — LI flat grid (locked)
+
+**Choice:**
+
+- **Table:** Flat `Table` only — no `treeData`, no scope/zone parent rows. Shows lines filtered per [W3](#w3--selection--li-filter-locked) for current **S** selection.
+- **Columns:** Reuse **37f** shared column set (item, part, description, qty, unit, material/freight/incidental/labor, target, cost, lock, sell, ext sell, delete). Do not fork grid in a way that blocks **4d′** shared line editor.
+- **Add line:** Same affordance as other collection tables — [`FieldArrayTable`](../components/form/FieldArrayTable.tsx) footer pattern: `Button` **`type="dashed"`** **`block`** **`icon={<PlusOutlined />}`** label **Add line** (see stakeholders, spec definitions, labor phases). Placed in **LI** panel table footer, not a scope header or floating toolbar.
+- **Add line enabled when:** Field `line_items` writable, form not disabled, and a scope or zone is selected in **S**. Disabled with helper copy if nothing selected.
+- **On add:** Append to `line_items[]` with `estimate_scope_id` / `site_zone_id` from **S** + [implicit include](#w5--s-panel-actions-locked) if bucket not yet on `scopes[]`.
+- **Remove line:** Per-row delete in actions column (37f / `FieldArrayTable` pattern).
+- **Scroll:** Horizontal scroll within **LI** pane only when needed; table may grow with viewport (no forced min-width scroll from tree chrome).
+- **Drag retarget:** [Deferred](#w6-note--drag-to-reassign-deferred) — optional drop on **S** only if row drag ships later.
+
+**Supersedes (37v UI):** Parent-row **+ Line** buttons; bottom/tree Add line affordances.
+
+**Rationale:** Matches established SubHub table UX; flat grid fits **LI** pane without colspan hacks.
+
+#### W7 — Responsive layout (locked)
+
+**Choice:** **Desktop-only v1** — no breakpoint-specific layout in 37w. Ship S | LI / C three-panel at desktop widths; narrow viewports may scroll horizontally or clip — **responsive stack/drawer deferred** to a follow-up task.
+
+**Rationale:** Unblocks panel layout without mobile design pass; estimator primary surface is desktop.
+
+#### W8 — Persistence (locked)
+
+**Choice:** Unchanged from 37v **V7**:
+
+- One RHF form on `estimate_detail`; `scopes[]` + `line_items[]` + `site_tree` read model.
+- Dirty until Save; single PATCH → `replaceEstimateCollectionsTx`.
+- Fields `scopes` and `line_items` gated independently on manifest.
+- **S** selection (`selectedSiteScopeId` / `selectedSiteZoneId` or equivalent) is **client UI state only** — not persisted.
+
+**No schema change.**
+
+#### W9 — Deferred carry-forward (locked)
+
+| Item | 37w disposition |
+|------|-----------------|
+| 37v **V5** summary chips | **Defer** — optional line-count badges on **S** nodes remain open |
+| 37v **V6** kits UI removed | **Retain** — standalone lines only in **LI** |
+| 37v **V8** line-level specs (O5) | **Defer** |
+| LI drag → **S** drop retarget | **Defer** ([note](#w6-note--drag-to-reassign-deferred)) |
+| **4d′** shared line editor | **LI** must not fork grid in a way that blocks retrofit |
+
+#### W6 note — drag to reassign (deferred)
+
+If **LI** row drag is implemented, **optional:** drop on **S** scope/zone node retargets `estimate_scope_id` / `site_zone_id` on dragged line(s). **Not required for 37w v1** — record under W6/W9; no row drag in current UI.
+
+---
+
 ### Decision: estimate lifecycle freeze and line lock (2026-07-05)
 
 **Status:** **Locked.** **Supersedes** 37f [O4 sell lock deferred](../tasks/37f-estimate-line-costing.md#decision-o4--sell-lock-deferred-2026-07-04) for draft recalc behavior.
@@ -42,7 +224,9 @@
 
 ### Decision: estimate scope tab — junction zones, General scope row, block uncheck (2026-07-02)
 
-**Status:** **Partially superseded (2026-07-04)** — [scope required + no ROM General](./estimate.md#decision-estimate-scope-required--pricing-overrides-2026-07-04). **Retained:** `estimate_zone` junction, block uncheck when lines reference scope/zone, Scope tab UX.
+**Status:** **UI superseded (2026-07-08)** by [Line Items tab merge](#decision-estimate-line-items-tab--merge-scope-config-into-line-tree-2026-07-08) ([37v](../tasks/37v-estimate-structure-tab.md)). **Retained at DAL:** `estimate_zone` junction, block remove when lines reference scope/zone. **Scope tab checkbox UX retired.**
+
+**Status (historical):** **Partially superseded (2026-07-04)** — [scope required + no ROM General](./estimate.md#decision-estimate-scope-required--pricing-overrides-2026-07-04).
 
 **Choice:**
 

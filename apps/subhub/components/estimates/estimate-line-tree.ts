@@ -29,18 +29,28 @@ export type EstimateScopeSpecOptionFormRow = {
 };
 
 export type EstimateScopeSpecFormRow = {
-  spec_def_id: string;
+  decimal_places?: number | null;
   def_display_name?: string;
-  value_type?: "enum" | "boolean" | "text";
+  spec_def_id: string;
   spec_option_id: string | null;
   option_display_name?: string | null;
-  value_text: string | null;
+  to_canonical_factor?: number;
+  unit_symbol?: string | null;
+  value_number: number | null;
   value_boolean: boolean | null;
+  value_type?: "enum" | "boolean" | "number";
   options?: EstimateScopeSpecOptionFormRow[];
+};
+
+export type EstimateScopeLaborPhaseFormRow = {
+  labor_phase_id: string;
+  labor_phase_name?: string;
+  sort_order?: number;
 };
 
 export type EstimateScopeZoneFormRow = {
   complexity_factor_id: string | null;
+  included_labor_phases: EstimateScopeLaborPhaseFormRow[];
   site_zone_id: string;
   sort_order: number;
   specs: EstimateScopeSpecFormRow[];
@@ -49,6 +59,7 @@ export type EstimateScopeZoneFormRow = {
 export type EstimateScopeFormRow = {
   complexity_factor_id: string | null;
   id: string;
+  included_labor_phases: EstimateScopeLaborPhaseFormRow[];
   site_scope_id: string;
   root_item_id: string;
   root_item_name: string | null;
@@ -93,33 +104,42 @@ export type EstimateLineTreeNode = {
   scopeId?: string;
   scopeIndex?: number;
   siteZoneId?: string | null;
+  zoneIndex?: number;
 };
 
 export const makeLine = (
   overrides: Partial<EstimateLineFormRow> = {},
-): EstimateLineFormRow => ({
-  id: crypto.randomUUID(),
-  line_role: "standalone",
-  description: "",
-  quantity: 1,
-  unit: "ea",
-  unit_cost: 0,
-  unit_price: 0,
-  unit_material: 0,
-  unit_labor: 0,
-  unit_freight: 0,
-  unit_incidental: 0,
-  unit_price_target: 0,
-  parent_line_id: null,
-  estimate_scope_id: null,
-  site_zone_id: null,
-  lock: "none",
-  phase_id: null,
-  item_id: null,
-  part_id: null,
-  vendor_part_id: null,
-  ...overrides,
-});
+): EstimateLineFormRow => {
+  const {
+    line_role: _ignoredRole,
+    parent_line_id: _ignoredParent,
+    ...rest
+  } = overrides;
+
+  return {
+    id: crypto.randomUUID(),
+    line_role: "standalone",
+    description: "",
+    quantity: 1,
+    unit: "ea",
+    unit_cost: 0,
+    unit_price: 0,
+    unit_material: 0,
+    unit_labor: 0,
+    unit_freight: 0,
+    unit_incidental: 0,
+    unit_price_target: 0,
+    parent_line_id: null,
+    estimate_scope_id: null,
+    site_zone_id: null,
+    lock: "none",
+    phase_id: null,
+    item_id: null,
+    part_id: null,
+    vendor_part_id: null,
+    ...rest,
+  };
+};
 
 const linesForParent = (
   lineItems: EstimateLineFormRow[],
@@ -149,14 +169,16 @@ const zoneTreeNodes = (
   lineItems: EstimateLineFormRow[],
   estimateScopeId: string,
   zones: EstimateScopeZoneFormRow[],
-  siteTreeZones: EstimateSiteZoneTreeFormRow[] | undefined,
   labelByZoneId: Map<string, string>,
+  scopeIndex: number,
 ): EstimateLineTreeNode[] =>
-  zones.map((zone) => ({
+  zones.map((zone, zoneIndex) => ({
     key: `zone:${estimateScopeId}:${zone.site_zone_id}`,
     rowKind: "zone",
     label: labelByZoneId.get(zone.site_zone_id) ?? "Zone",
     scopeId: estimateScopeId,
+    scopeIndex,
+    zoneIndex,
     siteZoneId: zone.site_zone_id,
     children: lineTreeNodes(lineItems, estimateScopeId, zone.site_zone_id),
   }));
@@ -177,6 +199,7 @@ export const buildLineTree = (
   lineItems: EstimateLineFormRow[],
   siteTree?: EstimateSiteTreeFormRow | null,
 ): EstimateLineTreeNode[] => {
+  const standaloneLines = lineItems.filter((line) => line.line_role === "standalone");
   const sortedScopes = [...scopes].sort((left, right) => left.sort_order - right.sort_order);
 
   return sortedScopes.map((scope, scopeIndex) => {
@@ -191,14 +214,14 @@ export const buildLineTree = (
     const labelByZoneId = buildZoneLabelMap(siteScopeTree?.zones);
 
     const zoneNodes = zoneTreeNodes(
-      lineItems,
+      standaloneLines,
       scope.id,
       scope.zones,
-      siteScopeTree?.zones,
       labelByZoneId,
+      scopeIndex,
     );
 
-    const unzonedLines = lineTreeNodes(lineItems, scope.id, null);
+    const unzonedLines = lineTreeNodes(standaloneLines, scope.id, null);
 
     return {
       key: `scope:${scope.id}`,

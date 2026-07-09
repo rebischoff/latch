@@ -5,7 +5,6 @@ import { describe, expect, it, vi } from "vitest";
 import { assertParentItemExists, assertParentNotQuotable, assertReparentAllowed } from "./item-write";
 import { nestItemTree, resolveRootItemId } from "./item-tree";
 import { assertSpecDefsBelongToRoot } from "./item-spec-participation-write";
-import { assertRootSpecDefinitionsPatch } from "./spec-def-write";
 
 const flatItem = (
   id: string,
@@ -62,12 +61,6 @@ describe("assertParentItemExists", () => {
     await expect(assertParentItemExists(client, "missing")).rejects.toBeInstanceOf(
       ValidationError,
     );
-  });
-});
-
-describe("assertRootSpecDefinitionsPatch", () => {
-  it("rejects spec_definitions on nested nodes", () => {
-    expect(() => assertRootSpecDefinitionsPatch(false)).toThrow(ValidationError);
   });
 });
 

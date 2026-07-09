@@ -18,10 +18,9 @@ import {
   type ItemDetailWriteRow,
 } from "../descriptors/item-detail";
 import { loadItemDetail } from "../repository/item-detail";
-import { loadAllItems, resolveRootItemId } from "../repository/item-tree";
 import { applyCategorySpecParticipationTx } from "../repository/item-spec-participation-write";
-import { applyCategorySpecDefinitionsTx } from "../repository/spec-def-write";
-import { insertItem } from "../repository/item-write";
+import { loadAllItems, resolveRootItemId } from "../repository/item-tree";
+import { insertItem, replaceItemLaborPhases } from "../repository/item-write";
 
 export const parseCategoryCreateBody = (
   ctx: PermissionContext,
@@ -47,13 +46,14 @@ export const createCategoryRowFromBody = (
   id,
   name: body.profile.name,
   parent_id: body.profile.parent_id ?? null,
-  node_type: body.profile.parent_id ? "category" : "scope",
+  node_type:
+    body.profile.node_type ?? (body.profile.parent_id ? "category" : "scope"),
   sort_order: body.profile.sort_order ?? 0,
   csi_code: body.profile.csi_code ?? null,
-  freight_rate_type_id: null,
-  incidental_rate_type_id: null,
-  markup_type_id: null,
-  fallback_unit_cost: 0,
+  freight_rate_type_id: body.commercial?.freight_rate_type_id ?? null,
+  incidental_rate_type_id: body.commercial?.incidental_rate_type_id ?? null,
+  markup_type_id: body.commercial?.markup_type_id ?? null,
+  fallback_unit_cost: body.commercial?.fallback_unit_cost ?? 0,
 });
 
 const applySpecParticipationCreate = async (
@@ -77,7 +77,6 @@ const applySpecParticipationCreate = async (
       categoryId,
       rootItemId,
       specParticipation.participates,
-      allRows,
     );
   });
 };
@@ -114,15 +113,6 @@ export const extendItemDetailDal = (
     const actorId = await getActorId();
     await insertItem(pool, actorId, row);
 
-    if (input.spec_definitions !== undefined) {
-      const created = await loadItemDetail(pool, id);
-      if (created) {
-        await withPermissionDb(pool, actorId, async (client) => {
-          await applyCategorySpecDefinitionsTx(client, created, input.spec_definitions!);
-        });
-      }
-    }
-
     if (input.spec_participation !== undefined) {
       await applySpecParticipationCreate(
         pool,
@@ -133,9 +123,25 @@ export const extendItemDetailDal = (
       );
     }
 
+    if (input.item_labor_phase !== undefined) {
+      await withPermissionDb(pool, actorId, async (client) => {
+        await replaceItemLaborPhases(
+          client,
+          id,
+          input.item_labor_phase!.map((laborRow, index) => ({
+            ...laborRow,
+            sort_order: laborRow.sort_order ?? index + 1,
+          })),
+        );
+      });
+    }
+
     const fieldIds = ["profile"];
-    if (input.spec_definitions !== undefined) {
-      fieldIds.push("spec_definitions");
+    if (input.commercial !== undefined) {
+      fieldIds.push("commercial");
+    }
+    if (input.item_labor_phase !== undefined) {
+      fieldIds.push("item_labor_phase");
     }
     if (input.spec_participation !== undefined) {
       fieldIds.push("spec_participation");
@@ -157,6 +163,8 @@ export const extendItemDetailDal = (
         root_item_id: row.parent_id === null ? row.id : null,
         root_item_name: null,
         fallback_unit_cost: row.fallback_unit_cost,
+        has_children: false,
+        in_use: false,
       }),
     });
 

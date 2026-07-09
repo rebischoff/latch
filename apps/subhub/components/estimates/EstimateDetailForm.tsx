@@ -16,17 +16,23 @@ import { z } from "zod";
 
 import { DatePickerInput } from "@/components/form/DatePickerInput";
 import {
-  EstimateLineTreeTable,
-  type EstimateLineFormRow,
-  type EstimateScopeFormRow,
-} from "@/components/estimates/EstimateLineTreeTable";
+  EstimateLineItemsPanels,
+} from "@/components/estimates/EstimateLineItemsPanels";
+import type {
+  EstimateLineFormRow,
+  EstimateScopeFormRow,
+} from "@/components/estimates/estimate-line-tree";
 import {
   orderLineItemsForPatch,
+  type EstimateScopeLaborPhaseFormRow,
   type EstimateScopeSpecFormRow,
   type EstimateSiteScopeTreeFormRow,
   type EstimateSiteTreeFormRow,
 } from "@/components/estimates/estimate-line-tree";
-import { EstimateScopeTab } from "@/components/estimates/EstimateScopeTab";
+import {
+  estimateScopeSpecToPatchBody,
+  estimateScopeSpecsToDisplay,
+} from "@/lib/estimates/estimate-scope-spec-form";
 import {
   EstimateStakeholderFields,
   validateEstimateStakeholderDuplicates,
@@ -121,14 +127,14 @@ const mapScopes = (rows: unknown): EstimateScopeFormRow[] => {
 
   return rows.map((row, index) => {
     const item = row as Record<string, unknown>;
-    const mapSpecs = (specRows: unknown): EstimateScopeSpecFormRow[] =>
-      Array.isArray(specRows)
+    const mapSpecs = (specRows: unknown): EstimateScopeSpecFormRow[] => {
+      const mapped = Array.isArray(specRows)
         ? specRows.map((specRow) => {
             const spec = specRow as Record<string, unknown>;
             const valueType =
               spec.value_type === "enum" ||
               spec.value_type === "boolean" ||
-              spec.value_type === "text"
+              spec.value_type === "number"
                 ? spec.value_type
                 : undefined;
 
@@ -144,9 +150,18 @@ const mapScopes = (rows: unknown): EstimateScopeFormRow[] => {
                 typeof spec.option_display_name === "string"
                   ? spec.option_display_name
                   : undefined,
-              value_text: typeof spec.value_text === "string" ? spec.value_text : null,
+              value_number:
+                typeof spec.value_number === "number" ? spec.value_number : null,
               value_boolean:
                 typeof spec.value_boolean === "boolean" ? spec.value_boolean : null,
+              unit_symbol:
+                typeof spec.unit_symbol === "string" ? spec.unit_symbol : null,
+              to_canonical_factor:
+                typeof spec.to_canonical_factor === "number"
+                  ? spec.to_canonical_factor
+                  : undefined,
+              decimal_places:
+                typeof spec.decimal_places === "number" ? spec.decimal_places : null,
               options: Array.isArray(spec.options)
                 ? spec.options
                     .map((optionRow) => {
@@ -171,6 +186,35 @@ const mapScopes = (rows: unknown): EstimateScopeFormRow[] => {
           })
         : [];
 
+      return estimateScopeSpecsToDisplay(mapped as EstimateScopeSpecFormRow[]);
+    };
+
+    const mapLaborPhases = (phaseRows: unknown): EstimateScopeLaborPhaseFormRow[] => {
+      if (!Array.isArray(phaseRows)) {
+        return [];
+      }
+
+      const mapped: Array<EstimateScopeLaborPhaseFormRow | null> = phaseRows.map(
+        (phaseRow) => {
+          const phase = phaseRow as Record<string, unknown>;
+          if (typeof phase.labor_phase_id !== "string") {
+            return null;
+          }
+          return {
+            labor_phase_id: phase.labor_phase_id,
+            labor_phase_name:
+              typeof phase.labor_phase_name === "string"
+                ? phase.labor_phase_name
+                : undefined,
+            sort_order:
+              typeof phase.sort_order === "number" ? phase.sort_order : undefined,
+          };
+        },
+      );
+
+      return mapped.filter((row): row is EstimateScopeLaborPhaseFormRow => row !== null);
+    };
+
     const zones = Array.isArray(item.zones)
       ? item.zones.map((zoneRow, zoneIndex) => {
           const zone = zoneRow as Record<string, unknown>;
@@ -183,6 +227,7 @@ const mapScopes = (rows: unknown): EstimateScopeFormRow[] => {
               typeof zone.complexity_factor_id === "string"
                 ? zone.complexity_factor_id
                 : null,
+            included_labor_phases: mapLaborPhases(zone.included_labor_phases),
             specs: mapSpecs(zone.specs),
           };
         })
@@ -201,6 +246,7 @@ const mapScopes = (rows: unknown): EstimateScopeFormRow[] => {
       sort_order: typeof item.sort_order === "number" ? item.sort_order : index + 1,
       complexity_factor_id:
         typeof item.complexity_factor_id === "string" ? item.complexity_factor_id : null,
+      included_labor_phases: mapLaborPhases(item.included_labor_phases),
       specs: mapSpecs(item.specs),
       zones,
     };
@@ -263,7 +309,7 @@ const mapLineItems = (rows: unknown): EstimateLineFormRow[] => {
 
     return {
       id: typeof item.id === "string" ? item.id : crypto.randomUUID(),
-      line_role: (item.line_role as EstimateLineFormRow["line_role"]) ?? "standalone",
+      line_role: "standalone" as const,
       description: typeof item.description === "string" ? item.description : "",
       quantity: typeof item.quantity === "number" ? item.quantity : 0,
       unit: typeof item.unit === "string" ? item.unit : "ea",
@@ -275,7 +321,7 @@ const mapLineItems = (rows: unknown): EstimateLineFormRow[] => {
       unit_incidental: typeof item.unit_incidental === "number" ? item.unit_incidental : 0,
       unit_price_target:
         typeof item.unit_price_target === "number" ? item.unit_price_target : 0,
-      parent_line_id: asString(item.parent_line_id),
+      parent_line_id: null,
       estimate_scope_id: asString(item.estimate_scope_id),
       site_zone_id: asString(item.site_zone_id),
       lock:
@@ -509,8 +555,6 @@ export const EstimateDetailForm = ({
   const saving = patch.isPending || create.isPending;
   const showAddSite =
     canCreateSite && fieldAllows(activeManifest, "profile", "write");
-  const showScopeTab =
-    fieldAllows(activeManifest, "scopes", "read") && Boolean(siteId);
   const showLineItemsTab =
     fieldAllows(activeManifest, "line_items", "read") && Boolean(siteId);
 
@@ -552,22 +596,18 @@ export const EstimateDetailForm = ({
           root_item_id: row.root_item_id,
           sort_order: index + 1,
           complexity_factor_id: row.complexity_factor_id,
-          specs: row.specs.map((spec) => ({
-            spec_def_id: spec.spec_def_id,
-            spec_option_id: spec.spec_option_id,
-            value_text: spec.value_text,
-            value_boolean: spec.value_boolean,
+          included_labor_phases: row.included_labor_phases.map((phase) => ({
+            labor_phase_id: phase.labor_phase_id,
           })),
+          specs: row.specs.map((spec) => estimateScopeSpecToPatchBody(spec)),
           zones: row.zones.map((zone, zoneIndex) => ({
             site_zone_id: zone.site_zone_id,
             sort_order: zoneIndex + 1,
             complexity_factor_id: zone.complexity_factor_id,
-            specs: zone.specs.map((spec) => ({
-              spec_def_id: spec.spec_def_id,
-              spec_option_id: spec.spec_option_id,
-              value_text: spec.value_text,
-              value_boolean: spec.value_boolean,
+            included_labor_phases: zone.included_labor_phases.map((phase) => ({
+              labor_phase_id: phase.labor_phase_id,
             })),
+            specs: zone.specs.map((spec) => estimateScopeSpecToPatchBody(spec)),
           })),
         }));
       }
@@ -575,18 +615,18 @@ export const EstimateDetailForm = ({
       if (fieldAllows(activeManifest, "line_items", "write")) {
         const orderedLines = orderLineItemsForPatch(
           values.scopes ?? [],
-          values.line_items ?? [],
+          (values.line_items ?? []).filter((row) => row.line_role === "standalone"),
         );
 
         body.line_items = orderedLines.map((row) => ({
           id: row.id,
-          line_role: row.line_role,
+          line_role: "standalone",
           description: row.description,
           quantity: row.quantity,
           unit: row.unit,
           unit_cost: row.unit_cost,
           unit_price: row.unit_price,
-          parent_line_id: row.parent_line_id,
+          parent_line_id: null,
           estimate_scope_id: row.estimate_scope_id,
           site_zone_id: row.site_zone_id,
           lock: row.lock,
@@ -792,7 +832,7 @@ export const EstimateDetailForm = ({
 
       {fieldAllows(activeManifest, "line_items", "read") && !siteId ? (
         <Typography.Paragraph type="secondary" style={{ marginBottom: 16 }}>
-          Select a site to configure scopes and line items.
+          Select a site to add scopes and line items.
         </Typography.Paragraph>
       ) : null}
 
@@ -802,12 +842,11 @@ export const EstimateDetailForm = ({
     </>
   );
 
-  const scopeTab = showScopeTab ? <EstimateScopeTab manifest={activeManifest} /> : null;
-
   const lineItemsTab = showLineItemsTab ? (
-    <EstimateLineTreeTable
+    <EstimateLineItemsPanels
       key={siteId}
       manifest={activeManifest}
+      siteId={siteId}
       siteSelected={Boolean(siteId)}
     />
   ) : null;
@@ -816,9 +855,6 @@ export const EstimateDetailForm = ({
     ...(fieldAllows(activeManifest, "profile", "read") ||
     fieldAllows(activeManifest, "stakeholders", "read")
       ? [{ key: "general", label: "General", children: generalTab }]
-      : []),
-    ...(showScopeTab
-      ? [{ key: "scope", label: "Scope", children: scopeTab }]
       : []),
     ...(showLineItemsTab
       ? [{ key: "line-items", label: "Line Items", children: lineItemsTab }]
@@ -830,7 +866,7 @@ export const EstimateDetailForm = ({
       manifest={activeManifest}
       loading={initialLoading}
       blocking={blocking}
-      disabled={saving}
+      disabled={saving || status === "sent" || status === "won"}
       form={form}
       defaultValues={defaultValues}
       resetKey={isCreate ? "create" : `${estimateId}:${detail?.data?.id ?? ""}`}

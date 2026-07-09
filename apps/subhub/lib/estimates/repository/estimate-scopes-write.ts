@@ -3,6 +3,7 @@ import { withPermissionDb } from "@latch/pg-session";
 import type { Pool, PoolClient } from "pg";
 
 import { loadScopePanelDefIdSet } from "@/lib/catalog/repository/item-effective-specs";
+import { tableExists } from "@/lib/sites/repository/sql-utils";
 
 import type {
   EstimateLineItemPatchRow,
@@ -175,6 +176,92 @@ const assertSpecOptionBelongsToDef = async (
   }
 };
 
+const assertLaborPhasesExist = async (
+  client: PoolClient,
+  laborPhaseIds: string[],
+): Promise<void> => {
+  if (laborPhaseIds.length === 0) {
+    return;
+  }
+
+  const result = await client.query<{ id: string }>(
+    `SELECT id FROM labor_phase WHERE id = ANY($1::text[])`,
+    [laborPhaseIds],
+  );
+  if (result.rows.length !== laborPhaseIds.length) {
+    throw new ValidationError("Unknown labor_phase_id in included_labor_phases", {
+      field: "scopes",
+      code: "unknown_labor_phase",
+    });
+  }
+};
+
+const assertNoDuplicateLaborPhases = (
+  rows: Array<{ labor_phase_id: string }>,
+  context: string,
+): void => {
+  const seen = new Set<string>();
+  for (const row of rows) {
+    if (seen.has(row.labor_phase_id)) {
+      throw new ValidationError("Duplicate labor_phase_id in included_labor_phases", {
+        field: "scopes",
+        code: "duplicate_labor_phase",
+        context,
+      });
+    }
+    seen.add(row.labor_phase_id);
+  }
+};
+
+const replaceScopeLaborPhasesTx = async (
+  client: PoolClient,
+  estimateScopeId: string,
+  rows: Array<{ labor_phase_id: string }>,
+): Promise<void> => {
+  if (!(await tableExists(client, "estimate_scope_labor_phase"))) {
+    return;
+  }
+
+  await client.query(`DELETE FROM estimate_scope_labor_phase WHERE estimate_scope_id = $1`, [
+    estimateScopeId,
+  ]);
+
+  for (const [index, row] of rows.entries()) {
+    await client.query(
+      `INSERT INTO estimate_scope_labor_phase (
+         estimate_scope_id, labor_phase_id, sort_order
+       ) VALUES ($1, $2, $3)`,
+      [estimateScopeId, row.labor_phase_id, index + 1],
+    );
+  }
+};
+
+const replaceZoneLaborPhasesTx = async (
+  client: PoolClient,
+  estimateScopeId: string,
+  siteZoneId: string,
+  rows: Array<{ labor_phase_id: string }>,
+): Promise<void> => {
+  if (!(await tableExists(client, "estimate_zone_labor_phase"))) {
+    return;
+  }
+
+  await client.query(
+    `DELETE FROM estimate_zone_labor_phase
+     WHERE estimate_scope_id = $1 AND site_zone_id = $2`,
+    [estimateScopeId, siteZoneId],
+  );
+
+  for (const [index, row] of rows.entries()) {
+    await client.query(
+      `INSERT INTO estimate_zone_labor_phase (
+         estimate_scope_id, site_zone_id, labor_phase_id, sort_order
+       ) VALUES ($1, $2, $3, $4)`,
+      [estimateScopeId, siteZoneId, row.labor_phase_id, index + 1],
+    );
+  }
+};
+
 const loadReferencedScopeAndZoneIds = async (
   client: PoolClient,
   estimateId: string,
@@ -301,9 +388,11 @@ export const replaceEstimateScopesTx = async (
     ...row,
     id: row.id ?? crypto.randomUUID(),
     complexity_factor_id: row.complexity_factor_id ?? null,
+    included_labor_phases: row.included_labor_phases ?? [],
     zones: row.zones.map((zone) => ({
       ...zone,
       complexity_factor_id: zone.complexity_factor_id ?? null,
+      included_labor_phases: zone.included_labor_phases ?? [],
     })),
   }));
 
@@ -340,6 +429,11 @@ export const replaceEstimateScopesTx = async (
     }
 
     assertNoDuplicateSpecDefs(row.specs, row.id);
+    assertNoDuplicateLaborPhases(row.included_labor_phases, row.id);
+    await assertLaborPhasesExist(
+      client,
+      row.included_labor_phases.map((phase) => phase.labor_phase_id),
+    );
     for (const spec of row.specs) {
       await assertSpecDefInScopePanel(
         client,
@@ -372,6 +466,14 @@ export const replaceEstimateScopesTx = async (
       );
 
       assertNoDuplicateSpecDefs(zone.specs, `${row.id}:${zone.site_zone_id}`);
+      assertNoDuplicateLaborPhases(
+        zone.included_labor_phases,
+        `${row.id}:${zone.site_zone_id}`,
+      );
+      await assertLaborPhasesExist(
+        client,
+        zone.included_labor_phases.map((phase) => phase.labor_phase_id),
+      );
       for (const spec of zone.specs) {
         await assertSpecDefInScopePanel(
           client,
@@ -488,19 +590,21 @@ export const replaceEstimateScopesTx = async (
            estimate_scope_id,
            spec_def_id,
            spec_option_id,
-           value_text,
-           value_boolean
+           value_boolean,
+           value_number
          )
          VALUES ($1, $2, $3, $4, $5)`,
         [
           row.id,
           spec.spec_def_id,
           spec.spec_option_id ?? null,
-          spec.value_text ?? null,
           spec.value_boolean ?? null,
+          spec.value_number ?? null,
         ],
       );
     }
+
+    await replaceScopeLaborPhasesTx(client, row.id, row.included_labor_phases);
 
     await client.query(`DELETE FROM estimate_zone WHERE estimate_scope_id = $1`, [row.id]);
 
@@ -524,8 +628,8 @@ export const replaceEstimateScopesTx = async (
              site_zone_id,
              spec_def_id,
              spec_option_id,
-             value_text,
-             value_boolean
+             value_boolean,
+             value_number
            )
            VALUES ($1, $2, $3, $4, $5, $6)`,
           [
@@ -533,11 +637,18 @@ export const replaceEstimateScopesTx = async (
             zone.site_zone_id,
             spec.spec_def_id,
             spec.spec_option_id ?? null,
-            spec.value_text ?? null,
             spec.value_boolean ?? null,
+            spec.value_number ?? null,
           ],
         );
       }
+
+      await replaceZoneLaborPhasesTx(
+        client,
+        row.id,
+        zone.site_zone_id,
+        zone.included_labor_phases,
+      );
     }
   }
 

@@ -263,4 +263,12 @@ export const SURFACE_NAV_CATALOG: SurfaceNavEntry[] = [
     group: "Catalog",
     icon: "part",
   },
+  {
+    surfaceId: "spec_unit_table",
+    href: "/spec-units",
+    navKey: "/spec-units",
+    label: "Spec units",
+    group: "Catalog",
+    icon: "part",
+  },
 ];

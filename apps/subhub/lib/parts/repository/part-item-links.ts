@@ -55,7 +55,7 @@ const assertNoDuplicateItemLinks = (rows: ItemLinkPatchRow[]): void => {
   }
 };
 
-const assertItemsExist = async (
+const assertItemsExistAndLeaf = async (
   client: PoolClient,
   rows: ItemLinkPatchRow[],
 ): Promise<void> => {
@@ -64,17 +64,25 @@ const assertItemsExist = async (
   }
 
   const itemIds = rows.map((row) => row.item_id);
-  const result = await client.query<{ id: string }>(
-    `SELECT id FROM item WHERE id = ANY($1::text[])`,
+  const result = await client.query<{ id: string; node_type: string }>(
+    `SELECT id, node_type FROM item WHERE id = ANY($1::text[])`,
     [itemIds],
   );
 
-  const found = new Set(result.rows.map((row) => row.id));
+  const byId = new Map(result.rows.map((row) => [row.id, row]));
   for (const itemId of itemIds) {
-    if (!found.has(itemId)) {
+    const item = byId.get(itemId);
+    if (!item) {
       throw new ValidationError("Unknown item_id in item_links", {
         field: "item_links",
         code: "unknown_item",
+        item_id: itemId,
+      });
+    }
+    if (item.node_type !== "item") {
+      throw new ValidationError("item_links may only reference leaf items", {
+        field: "item_links",
+        code: "not_leaf_item",
         item_id: itemId,
       });
     }
@@ -119,7 +127,7 @@ export const replaceItemLinksTx = async (
   rows: ItemLinkPatchRow[],
 ): Promise<void> => {
   assertNoDuplicateItemLinks(rows);
-  await assertItemsExist(client, rows);
+  await assertItemsExistAndLeaf(client, rows);
 
   await client.query(`DELETE FROM part_item WHERE part_id = $1`, [partId]);
 

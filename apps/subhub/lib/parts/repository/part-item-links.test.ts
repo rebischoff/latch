@@ -14,15 +14,17 @@ vi.mock("./part-specs", () => ({
 import { prunePartSpecsToContextTx } from "./part-specs";
 
 const createMockClient = (state: {
-  items: Set<string>;
+  items: Map<string, "scope" | "category" | "item">;
   links: Array<{ part_id: string; item_id: string; sort_order: number }>;
 }) => {
   const client = {
     query: vi.fn(async (sql: string, params?: unknown[]) => {
-      if (sql.includes("SELECT id FROM item")) {
+      if (sql.includes("SELECT id, node_type FROM item")) {
         const itemIds = params?.[0] as string[];
         return {
-          rows: itemIds.filter((id) => state.items.has(id)).map((id) => ({ id })),
+          rows: itemIds
+            .filter((id) => state.items.has(id))
+            .map((id) => ({ id, node_type: state.items.get(id) })),
         };
       }
 
@@ -51,7 +53,10 @@ const createMockClient = (state: {
 describe("replaceItemLinksTx", () => {
   it("replaces rows and assigns sort_order from index", async () => {
     const state = {
-      items: new Set(["item-a", "item-b"]),
+      items: new Map([
+        ["item-a", "item" as const],
+        ["item-b", "item" as const],
+      ]),
       links: [{ part_id: "part-1", item_id: "old-item", sort_order: 1 }],
     };
     const client = createMockClient(state);
@@ -71,7 +76,7 @@ describe("replaceItemLinksTx", () => {
 
   it("deletes omitted rows on replace", async () => {
     const state = {
-      items: new Set(["item-a"]),
+      items: new Map([["item-a", "item" as const]]),
       links: [
         { part_id: "part-1", item_id: "item-a", sort_order: 1 },
         { part_id: "part-1", item_id: "item-b", sort_order: 2 },
@@ -87,7 +92,7 @@ describe("replaceItemLinksTx", () => {
 
   it("rejects duplicate item_id values", async () => {
     const state = {
-      items: new Set(["item-a"]),
+      items: new Map([["item-a", "item" as const]]),
       links: [],
     };
     const client = createMockClient(state);
@@ -102,7 +107,7 @@ describe("replaceItemLinksTx", () => {
 
   it("rejects unknown item_id", async () => {
     const state = {
-      items: new Set(["item-a"]),
+      items: new Map([["item-a", "item" as const]]),
       links: [],
     };
     const client = createMockClient(state);
@@ -112,5 +117,50 @@ describe("replaceItemLinksTx", () => {
     ).rejects.toMatchObject({
       details: { field: "item_links", code: "unknown_item" },
     });
+  });
+
+  it("rejects category item_id", async () => {
+    const state = {
+      items: new Map([
+        ["cat-1", "category" as const],
+        ["item-a", "item" as const],
+      ]),
+      links: [],
+    };
+    const client = createMockClient(state);
+
+    await expect(
+      replaceItemLinksTx(client, "part-1", [{ item_id: "cat-1" }]),
+    ).rejects.toMatchObject({
+      details: { field: "item_links", code: "not_leaf_item" },
+    });
+  });
+
+  it("rejects scope item_id", async () => {
+    const state = {
+      items: new Map([["scope-1", "scope" as const]]),
+      links: [],
+    };
+    const client = createMockClient(state);
+
+    await expect(
+      replaceItemLinksTx(client, "part-1", [{ item_id: "scope-1" }]),
+    ).rejects.toMatchObject({
+      details: { field: "item_links", code: "not_leaf_item" },
+    });
+  });
+
+  it("accepts leaf item_id", async () => {
+    const state = {
+      items: new Map([["item-a", "item" as const]]),
+      links: [],
+    };
+    const client = createMockClient(state);
+
+    await replaceItemLinksTx(client, "part-1", [{ item_id: "item-a" }]);
+
+    expect(state.links).toEqual([
+      { part_id: "part-1", item_id: "item-a", sort_order: 1 },
+    ]);
   });
 });

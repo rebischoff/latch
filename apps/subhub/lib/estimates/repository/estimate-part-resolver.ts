@@ -11,7 +11,8 @@ export type PartSpecRow = {
   spec_def_id: string;
   spec_option_id: string | null;
   value_boolean: boolean | null;
-  value_text: string | null;
+  value_number: number | null;
+  value_number_max: number | null;
 };
 
 export type FilteredPartRow = {
@@ -38,7 +39,7 @@ export type MaterialResolveResult = {
 
 type SpecDefMeta = {
   spec_def_id: string;
-  value_type: "boolean" | "enum" | "text";
+  value_type: "boolean" | "enum" | "number";
   wildcard_option_id: string | null;
 };
 
@@ -74,8 +75,9 @@ const loadPartSpecs = async (
     `SELECT manufacturer_part_id,
             spec_def_id::text,
             spec_option_id,
-            value_text,
-            value_boolean
+            value_boolean,
+            value_number,
+            value_number_max
      FROM manufacturer_part_spec
      WHERE manufacturer_part_id = ANY($1::text[])`,
     [partIds],
@@ -87,8 +89,9 @@ const loadPartSpecs = async (
     bucket.push({
       spec_def_id: row.spec_def_id,
       spec_option_id: row.spec_option_id,
-      value_text: row.value_text,
       value_boolean: row.value_boolean,
+      value_number: row.value_number,
+      value_number_max: row.value_number_max,
     });
     byPart.set(row.manufacturer_part_id, bucket);
   }
@@ -143,8 +146,16 @@ const enumMatches = (
 const booleanMatches = (bucketValue: boolean, partRows: PartSpecRow[]): boolean =>
   partRows.some((row) => row.value_boolean === bucketValue);
 
-const textMatches = (bucketValue: string, partRows: PartSpecRow[]): boolean =>
-  partRows.some((row) => row.value_text === bucketValue);
+const numericMatches = (bucketValue: number, partRows: PartSpecRow[]): boolean =>
+  partRows.some((row) => {
+    if (row.value_number === null) {
+      return false;
+    }
+    if (row.value_number_max !== null) {
+      return row.value_number <= bucketValue && bucketValue <= row.value_number_max;
+    }
+    return row.value_number === bucketValue;
+  });
 
 export const partMatchesBucket = (
   partSpecs: PartSpecRow[],
@@ -179,11 +190,11 @@ export const partMatchesBucket = (
       if (!booleanMatches(bucketValue.value_boolean, rowsForDef)) {
         return false;
       }
-    } else if (meta.value_type === "text") {
-      if (bucketValue.value_text === null) {
+    } else if (meta.value_type === "number") {
+      if (bucketValue.value_number === null) {
         continue;
       }
-      if (!textMatches(bucketValue.value_text, rowsForDef)) {
+      if (!numericMatches(bucketValue.value_number, rowsForDef)) {
         return false;
       }
     }

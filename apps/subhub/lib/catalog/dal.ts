@@ -1,4 +1,3 @@
-import { ValidationError, type PermissionContext } from "@latch/contracts";
 import { createSurfaceDal, type SurfaceDal } from "@latch/dal";
 import type { Pool } from "pg";
 
@@ -17,6 +16,7 @@ import {
   createCommercialCatalogDals,
   type CommercialCatalogDals,
 } from "./stores/commercial-catalog-dals";
+import { ValidationError, type PermissionContext } from "@latch/contracts";
 
 export type ItemListDal = SurfaceDal & {
   list: (

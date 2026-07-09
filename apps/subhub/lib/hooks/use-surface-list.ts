@@ -11,13 +11,11 @@ import {
 
 import { surfaceListKey } from "./surface-query-keys";
 
-type SurfaceListQuery = {
-  q?: string;
-};
+type SurfaceListQuery = Record<string, string | undefined>;
 
 export const useSurfaceList = (surfaceId: SurfaceId, query?: SurfaceListQuery) =>
   useQuery<SurfaceQueryResult<SurfaceListData>>({
-    queryKey: surfaceListKey(surfaceId, query?.q),
+    queryKey: surfaceListKey(surfaceId, JSON.stringify(query ?? {})),
     queryFn: async () => {
       const response = await fetchSurfaceList(surfaceId, query);
       return { data: response.data, manifest: response.manifest };

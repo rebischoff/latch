@@ -1,8 +1,10 @@
 import type { Pool } from "pg";
 
 import { scopePanelDefs } from "@/lib/catalog/repository/item-effective-specs";
+import { tableExists } from "@/lib/sites/repository/sql-utils";
 
 import type {
+  EstimateScopeLaborPhaseRow,
   EstimateScopeRow,
   EstimateScopeSpecRow,
   EstimateScopeZoneRow,
@@ -68,7 +70,7 @@ const loadSavedScopeSpecs = async (
     spec_def_id: string;
     spec_option_id: string | null;
     value_boolean: boolean | null;
-    value_text: string | null;
+    value_number: number | null;
   }>
 > => {
   if (scopeIds.length === 0) {
@@ -81,13 +83,13 @@ const loadSavedScopeSpecs = async (
     spec_def_id: string;
     spec_option_id: string | null;
     value_boolean: boolean | null;
-    value_text: string | null;
+    value_number: number | null;
   }>(
     `SELECT
        ess.estimate_scope_id,
        ess.spec_def_id,
        ess.spec_option_id,
-       ess.value_text,
+       ess.value_number,
        ess.value_boolean,
        so.display_name AS option_display_name
      FROM estimate_scope_spec ess
@@ -145,8 +147,11 @@ const mergeScopeSpecs = async (
           value_type: def.value_type,
           spec_option_id: saved?.spec_option_id ?? null,
           option_display_name: saved?.option_display_name ?? null,
-          value_text: saved?.value_text ?? null,
+          value_number: saved?.value_number ?? null,
           value_boolean: saved?.value_boolean ?? null,
+          unit_symbol: def.unit_symbol,
+          to_canonical_factor: def.to_canonical_factor,
+          decimal_places: def.decimal_places,
           options: optionsByDefId.get(def.spec_def_id) ?? [],
         };
       }),
@@ -167,7 +172,7 @@ const loadSavedZoneSpecs = async (
     spec_def_id: string;
     spec_option_id: string | null;
     value_boolean: boolean | null;
-    value_text: string | null;
+    value_number: number | null;
   }>
 > => {
   if (scopeIds.length === 0) {
@@ -181,14 +186,14 @@ const loadSavedZoneSpecs = async (
     spec_def_id: string;
     spec_option_id: string | null;
     value_boolean: boolean | null;
-    value_text: string | null;
+    value_number: number | null;
   }>(
     `SELECT
        ezs.estimate_scope_id,
        ezs.site_zone_id,
        ezs.spec_def_id,
        ezs.spec_option_id,
-       ezs.value_text,
+       ezs.value_number,
        ezs.value_boolean,
        so.display_name AS option_display_name
      FROM estimate_zone_spec ezs
@@ -258,8 +263,11 @@ const mergeZoneSpecs = async (
           value_type: def.value_type,
           spec_option_id: saved?.spec_option_id ?? null,
           option_display_name: saved?.option_display_name ?? null,
-          value_text: saved?.value_text ?? null,
+          value_number: saved?.value_number ?? null,
           value_boolean: saved?.value_boolean ?? null,
+          unit_symbol: def.unit_symbol,
+          to_canonical_factor: def.to_canonical_factor,
+          decimal_places: def.decimal_places,
           options: optionsByDefId.get(def.spec_def_id) ?? [],
         };
       }),
@@ -267,6 +275,80 @@ const mergeZoneSpecs = async (
   }
 
   return specsByZoneKey;
+};
+
+const loadScopeLaborPhasesByScopeId = async (
+  pool: Pool,
+  scopeIds: string[],
+): Promise<Map<string, EstimateScopeLaborPhaseRow[]>> => {
+  const byScopeId = new Map<string, EstimateScopeLaborPhaseRow[]>();
+  if (scopeIds.length === 0 || !(await tableExists(pool, "estimate_scope_labor_phase"))) {
+    return byScopeId;
+  }
+
+  const result = await pool.query<EstimateScopeLaborPhaseRow & { estimate_scope_id: string }>(
+    `SELECT
+       eslp.estimate_scope_id,
+       eslp.labor_phase_id,
+       lp.name AS labor_phase_name,
+       eslp.sort_order
+     FROM estimate_scope_labor_phase eslp
+     INNER JOIN labor_phase lp ON lp.id = eslp.labor_phase_id
+     WHERE eslp.estimate_scope_id = ANY($1::text[])
+     ORDER BY eslp.sort_order ASC, lp.name ASC`,
+    [scopeIds],
+  );
+
+  for (const row of result.rows) {
+    const rows = byScopeId.get(row.estimate_scope_id) ?? [];
+    rows.push({
+      labor_phase_id: row.labor_phase_id,
+      labor_phase_name: row.labor_phase_name,
+      sort_order: row.sort_order,
+    });
+    byScopeId.set(row.estimate_scope_id, rows);
+  }
+
+  return byScopeId;
+};
+
+const loadZoneLaborPhasesByKey = async (
+  pool: Pool,
+  scopeIds: string[],
+): Promise<Map<string, EstimateScopeLaborPhaseRow[]>> => {
+  const byKey = new Map<string, EstimateScopeLaborPhaseRow[]>();
+  if (scopeIds.length === 0 || !(await tableExists(pool, "estimate_zone_labor_phase"))) {
+    return byKey;
+  }
+
+  const result = await pool.query<
+    EstimateScopeLaborPhaseRow & { estimate_scope_id: string; site_zone_id: string }
+  >(
+    `SELECT
+       ezlp.estimate_scope_id,
+       ezlp.site_zone_id,
+       ezlp.labor_phase_id,
+       lp.name AS labor_phase_name,
+       ezlp.sort_order
+     FROM estimate_zone_labor_phase ezlp
+     INNER JOIN labor_phase lp ON lp.id = ezlp.labor_phase_id
+     WHERE ezlp.estimate_scope_id = ANY($1::text[])
+     ORDER BY ezlp.sort_order ASC, lp.name ASC`,
+    [scopeIds],
+  );
+
+  for (const row of result.rows) {
+    const key = `${row.estimate_scope_id}:${row.site_zone_id}`;
+    const rows = byKey.get(key) ?? [];
+    rows.push({
+      labor_phase_id: row.labor_phase_id,
+      labor_phase_name: row.labor_phase_name,
+      sort_order: row.sort_order,
+    });
+    byKey.set(key, rows);
+  }
+
+  return byKey;
 };
 
 export const loadEstimateScopes = async (
@@ -296,16 +378,19 @@ export const loadEstimateScopes = async (
 
   const scopeIds = scopesResult.rows.map((scope) => scope.id);
 
-  const [scopeSpecsByScopeId, zoneRowsResult] = await Promise.all([
-    mergeScopeSpecs(pool, scopesResult.rows),
-    pool.query<EstimateZoneRow>(
-      `SELECT estimate_scope_id, site_zone_id, sort_order, complexity_factor_id
+  const [scopeSpecsByScopeId, zoneRowsResult, scopeLaborByScopeId, zoneLaborByKey] =
+    await Promise.all([
+      mergeScopeSpecs(pool, scopesResult.rows),
+      pool.query<EstimateZoneRow>(
+        `SELECT estimate_scope_id, site_zone_id, sort_order, complexity_factor_id
        FROM estimate_zone
        WHERE estimate_scope_id = ANY($1::text[])
        ORDER BY sort_order ASC, site_zone_id ASC`,
-      [scopeIds],
-    ),
-  ]);
+        [scopeIds],
+      ),
+      loadScopeLaborPhasesByScopeId(pool, scopeIds),
+      loadZoneLaborPhasesByKey(pool, scopeIds),
+    ]);
   const zoneSpecsByKey = await mergeZoneSpecs(
     pool,
     scopesResult.rows,
@@ -320,6 +405,7 @@ export const loadEstimateScopes = async (
       site_zone_id: zone.site_zone_id,
       sort_order: zone.sort_order,
       complexity_factor_id: zone.complexity_factor_id,
+      included_labor_phases: zoneLaborByKey.get(specKey) ?? [],
       specs: zoneSpecsByKey.get(specKey) ?? [],
     });
     zonesByScopeId.set(zone.estimate_scope_id, zones);
@@ -327,6 +413,7 @@ export const loadEstimateScopes = async (
 
   return scopesResult.rows.map((scope) => ({
     ...scope,
+    included_labor_phases: scopeLaborByScopeId.get(scope.id) ?? [],
     specs: scopeSpecsByScopeId.get(scope.id) ?? [],
     zones: zonesByScopeId.get(scope.id) ?? [],
   }));

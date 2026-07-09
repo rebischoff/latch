@@ -5,7 +5,6 @@ import { z } from "zod";
 const SpecOptionPatchElementSchema = z
   .object({
     id: z.string().optional(),
-    code: z.string().nullable().optional(),
     display_name: z.string(),
     sort_order: z.number().optional(),
   })
@@ -14,10 +13,10 @@ const SpecOptionPatchElementSchema = z
 const SpecDefinitionPatchElementSchema = z
   .object({
     id: z.string().optional(),
-    code: z.string().nullable().optional(),
     display_name: z.string(),
-    value_type: z.enum(["enum", "boolean", "text"]),
-    filter_mode: z.enum(["required", "prefer"]).optional(),
+    value_type: z.enum(["enum", "boolean", "number"]),
+    unit_id: z.string().nullable().optional(),
+    decimal_places: z.number().int().nullable().optional(),
     sort_order: z.number().optional(),
     options: z.array(SpecOptionPatchElementSchema),
   })
@@ -81,10 +80,21 @@ export const ItemDetailCreateSchema = z
       .object({
         name: z.string().min(1),
         parent_id: z.string().nullable().optional(),
+        node_type: z.enum(["scope", "category", "item"]).optional(),
         sort_order: z.number().optional(),
         csi_code: z.string().nullable().optional(),
       })
       .strict(),
+    commercial: z
+      .object({
+        freight_rate_type_id: z.string().nullable().optional(),
+        incidental_rate_type_id: z.string().nullable().optional(),
+        markup_type_id: z.string().nullable().optional(),
+        fallback_unit_cost: z.number().optional(),
+      })
+      .strict()
+      .optional(),
+    item_labor_phase: z.array(ItemLaborPhasePatchElementSchema).optional(),
     spec_definitions: z.array(SpecDefinitionPatchElementSchema).optional(),
     spec_participation: SpecParticipationPatchSchema.optional(),
   })
@@ -94,7 +104,9 @@ export type ItemDetailRow = {
   csi_code: string | null;
   fallback_unit_cost: number;
   freight_rate_type_id: string | null;
+  has_children: boolean;
   id: string;
+  in_use: boolean;
   incidental_rate_type_id: string | null;
   is_root: boolean;
   markup_type_id: string | null;
@@ -108,39 +120,48 @@ export type ItemDetailRow = {
 };
 
 export type SpecOptionRow = {
-  code: string | null;
   display_name: string;
   id: string;
   sort_order: number;
 };
 
 export type SpecDefinitionRow = {
-  code: string | null;
+  decimal_places: number | null;
   display_name: string;
-  filter_mode: "prefer" | "required";
   id: string;
+  in_use_part_count: number;
+  in_use_participation_count: number;
   options: SpecOptionRow[];
   sort_order: number;
-  value_boolean: boolean | null;
-  value_text: string | null;
-  value_type: "boolean" | "enum" | "text";
+  unit_id: string | null;
+  unit_symbol: string | null;
+  value_type: "boolean" | "enum" | "number";
 };
-
-export type SpecParticipationState = "assigned" | "excluded" | "inherited" | "inactive";
 
 export type SpecParticipationRow = {
   participates: Array<{
     active: boolean;
-    assign_item_id: string | null;
     display_name: string;
-    excluded_here: boolean;
     spec_def_id: string;
-    state: SpecParticipationState;
-    value_type: "boolean" | "enum" | "text";
+    value_type: "boolean" | "enum" | "number";
   }>;
 };
 
+export type InheritedLaborPhaseRow = {
+  hours_per_unit: number;
+  labor_phase_id: string;
+  labor_phase_name: string;
+  labor_rate_type_id: string;
+  labor_rate_type_name: string;
+  sort_order: number;
+  source_item_id: string;
+  source_item_name: string;
+};
+
+export type LaborPhaseMode = "empty" | "inherited" | "override";
+
 export type ItemDetailRelated = {
+  inherited_labor_phase: InheritedLaborPhaseRow[];
   item_labor_phase: Array<{
     hours_per_unit: number;
     labor_phase_id: string;
@@ -149,11 +170,13 @@ export type ItemDetailRelated = {
     labor_rate_type_name: string;
     sort_order: number;
   }>;
+  labor_phase_mode: LaborPhaseMode;
+  labor_phase_source_item_id: string | null;
+  labor_phase_source_item_name: string | null;
   spec_definitions: SpecDefinitionRow[];
   spec_participation: SpecParticipationRow;
 };
 
-export type SpecOptionPatchRow = z.infer<typeof SpecOptionPatchElementSchema>;
 export type SpecDefinitionPatchRow = z.infer<typeof SpecDefinitionPatchElementSchema>;
 export type SpecParticipationPatchRow = z.infer<typeof SpecParticipationPatchElementSchema>;
 export type SpecParticipationPatchBody = z.infer<typeof SpecParticipationPatchSchema>;
@@ -191,7 +214,9 @@ const formatItemDetailRow = (row: ItemDetailRow): Record<string, unknown> => ({
   csi_code: row.csi_code,
   fallback_unit_cost: row.fallback_unit_cost,
   freight_rate_type_id: row.freight_rate_type_id,
+  has_children: row.has_children,
   id: row.id,
+  in_use: row.in_use,
   incidental_rate_type_id: row.incidental_rate_type_id,
   is_root: row.is_root,
   markup_type_id: row.markup_type_id,
@@ -208,11 +233,19 @@ const emptySpecParticipation = (): SpecParticipationRow => ({
   participates: [],
 });
 
+const emptySpecDefinitions = (): SpecDefinitionRow[] => [];
+
 const normalizeItemDetailRelated = (
   related: ItemDetailStoreRelated,
 ): ItemDetailRelated => ({
   item_labor_phase: (related.item_labor_phase ?? []) as ItemDetailRelated["item_labor_phase"],
-  spec_definitions: (related.spec_definitions ?? []) as SpecDefinitionRow[],
+  inherited_labor_phase: (related as ItemDetailRelated).inherited_labor_phase ?? [],
+  labor_phase_mode: (related as ItemDetailRelated).labor_phase_mode ?? "empty",
+  labor_phase_source_item_id:
+    (related as ItemDetailRelated).labor_phase_source_item_id ?? null,
+  labor_phase_source_item_name:
+    (related as ItemDetailRelated).labor_phase_source_item_name ?? null,
+  spec_definitions: (related.spec_definitions ?? emptySpecDefinitions()) as SpecDefinitionRow[],
   spec_participation: (related.spec_participation ??
     emptySpecParticipation()) as SpecParticipationRow,
 });
@@ -240,6 +273,8 @@ export const projectItemDetailRow = (
       incidental_rate_type_id: row.incidental_rate_type_id,
       markup_type_id: row.markup_type_id,
       is_root: row.is_root,
+      has_children: row.has_children,
+      in_use: row.in_use,
     };
   }
 
@@ -254,6 +289,9 @@ export const projectItemDetailRow = (
 
   if (manifest.fields.item_labor_phase?.includes("read")) {
     dto.item_labor_phase = normalized.item_labor_phase;
+    dto.inherited_labor_phase = normalized.inherited_labor_phase;
+    dto.labor_phase_mode = normalized.labor_phase_mode;
+    dto.labor_phase_source_item_name = normalized.labor_phase_source_item_name;
   }
 
   if (manifest.fields.spec_definitions?.includes("read")) {
