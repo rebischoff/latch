@@ -84,24 +84,15 @@ export const complexityFactorConfig: CatalogTableConfig = {
   ],
   updateSet: "name = $2, factor_percent = $3, sort_order = $4",
   deleteBlockers: async (client, id) => {
-    const scopeCount = await countCatalogTableUsage(
+    const conditionCount = await countCatalogTableUsage(
       client,
-      "estimate_scope",
-      "complexity_factor_id",
-      id,
-    );
-    const zoneCount = await countCatalogTableUsage(
-      client,
-      "estimate_zone",
+      "estimate_condition",
       "complexity_factor_id",
       id,
     );
     const blockers: Array<{ type: string; count: number }> = [];
-    if (scopeCount > 0) {
-      blockers.push({ type: "estimate_scope", count: scopeCount });
-    }
-    if (zoneCount > 0) {
-      blockers.push({ type: "estimate_zone", count: zoneCount });
+    if (conditionCount > 0) {
+      blockers.push({ type: "estimate_condition", count: conditionCount });
     }
     return blockers;
   },

@@ -55,10 +55,11 @@ const loadReferencedZoneIds = async (
 ): Promise<{ ids: Set<string>; blockers: Map<string, ReferenceRow["blocker"]> }> => {
   const result = await pool.query<ReferenceRow>(
     `SELECT site_zone_id, blocker FROM (
-       SELECT site_zone_id, 'estimate'::text AS blocker
-       FROM estimate_line el
+       SELECT ela.site_zone_id, 'estimate'::text AS blocker
+       FROM estimate_line_allocation ela
+       INNER JOIN estimate_line el ON el.id = ela.estimate_line_id
        INNER JOIN estimate e ON e.id = el.estimate_id
-       WHERE e.site_id = $1 AND el.site_zone_id IS NOT NULL
+       WHERE e.site_id = $1
        UNION
        SELECT site_zone_id, 'job'::text AS blocker
        FROM job_line jl

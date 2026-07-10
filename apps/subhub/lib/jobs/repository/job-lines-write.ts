@@ -123,10 +123,9 @@ export const replaceJobLineItemsTx = async (
 
     if (row.item_id && row.estimate_line_id) {
       const estimateLine = await client.query<{
-        estimate_scope_id: string;
-        site_zone_id: string | null;
+        estimate_condition_id: string;
       }>(
-        `SELECT estimate_scope_id, site_zone_id
+        `SELECT estimate_condition_id
          FROM estimate_line
          WHERE id = $1`,
         [row.estimate_line_id],
@@ -136,8 +135,8 @@ export const replaceJobLineItemsTx = async (
         await seedScopePhasesForJobLineTx(client, {
           job_line_id: row.id,
           item_id: row.item_id,
-          estimate_scope_id: lineRef.estimate_scope_id,
-          site_zone_id: lineRef.site_zone_id,
+          estimate_condition_id: lineRef.estimate_condition_id,
+          site_zone_id: null,
           quantity: row.quantity,
         });
       }

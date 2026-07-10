@@ -28,26 +28,27 @@ export const GET = async (request: Request): Promise<Response> =>
     const pool = getPool();
     const estimateId = params.get("estimate_id")?.trim();
     const lineId = params.get("line_id")?.trim();
-    const estimateScopeId = params.get("estimate_scope_id")?.trim();
-    const siteZoneId = params.get("site_zone_id")?.trim() ?? null;
+    const estimateConditionId = params.get("estimate_condition_id")?.trim();
 
     let parts;
 
     if (estimateId && lineId) {
       parts = await loadFilteredPartsForEstimateLine(pool, estimateId, lineId, itemId);
-    } else if (estimateScopeId) {
+    } else if (estimateConditionId) {
       const bucket = await loadMergedBucketForLine(
         pool,
-        estimateScopeId,
-        siteZoneId,
+        estimateConditionId,
         lineId ?? null,
       );
       parts = await resolveFilteredParts(pool, itemId, bucket);
     } else {
-      throw new ValidationError("estimate_id+line_id or estimate_scope_id is required", {
-        field: "estimate_scope_id",
-        code: "required",
-      });
+      throw new ValidationError(
+        "estimate_id+line_id or estimate_condition_id is required",
+        {
+          field: "estimate_condition_id",
+          code: "required",
+        },
+      );
     }
 
     return jsonSuccess({ parts }, ctx.manifest);

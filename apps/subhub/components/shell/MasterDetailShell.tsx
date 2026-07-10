@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 
 const { Sider, Content } = Layout;
 
-const LIST_SIDER_WIDTH = 320;
+const LIST_SIDER_WIDTH = 256;
 
 type MasterDetailShellProps = {
   list: ReactNode;

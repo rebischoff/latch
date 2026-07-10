@@ -258,16 +258,16 @@ export const loadItemDeleteBlockers = async (
     }
   }
 
-  if (await tableExists(pool, "estimate_scope")) {
+  if (await tableExists(pool, "estimate_condition")) {
     const countResult = await pool.query<{ count: number }>(
       `SELECT COUNT(*)::int AS count
-       FROM estimate_scope
+       FROM estimate_condition
        WHERE root_item_id = $1`,
       [categoryId],
     );
     const count = countResult.rows[0]?.count ?? 0;
     if (count > 0) {
-      blockers.push({ type: "estimate_scope", count });
+      blockers.push({ type: "estimate_condition", count });
     }
   }
 

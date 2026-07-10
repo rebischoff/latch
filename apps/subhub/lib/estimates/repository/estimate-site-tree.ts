@@ -86,7 +86,8 @@ export const loadEstimateSiteTree = async (
   };
 };
 
-const loadSpecTemplatesForRoots = async (
+/** Blank scope-panel rows for catalog root(s) — used by site_tree and Add scope. */
+export const loadSpecTemplatesForRoots = async (
   pool: Pool,
   rootItemIds: string[],
 ): Promise<Record<string, EstimateScopeSpecRow[]>> => {

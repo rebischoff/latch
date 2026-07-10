@@ -878,11 +878,12 @@ TableGroup estimate [color: #f39c12] {
   job_party_relation
   estimate
   estimate_party
-  estimate_scope
-  estimate_scope_spec
-  estimate_zone_spec
+  estimate_condition
+  estimate_condition_spec
+  estimate_condition_labor_phase
   estimate_line_spec
   estimate_line
+  estimate_line_allocation
 }
 
 Table job_party_relation {
@@ -935,81 +936,45 @@ Table estimate_party {
   Note: 'Per-quote stakeholder graph. Copied to `job_party` when estimate is won.'
 }
 
-Table estimate_scope {
+Table estimate_condition {
   id text [pk, default: `gen_random_uuid()::text`]
-  estimate_id text [not null]
-  root_item_id text [not null, note: 'FK → item (parent_id IS NULL) — Fire alarm, CCTV, …']
-  site_scope_id text [note: 'nullable FK → site_scope — checked scope instance on quote site']
-  complexity_factor_id text [note: 'nullable FK → complexity_factor — labor multiplier (040b)']
+  estimate_id text [not null, note: 'FK → estimate — forest owner (37y Y1)']
+  parent_condition_id text [note: 'nullable FK → estimate_condition — null = root']
+  root_item_id text [note: 'FK → item (parent_id IS NULL); NOT NULL on roots; null on children (inherit tree root)']
+  name text [not null]
+  complexity_factor_id text [note: 'nullable FK → complexity_factor — null = inherit ancestry / 100% at root']
+  labor_phases_explicit boolean [not null, default: false, note: 'Y4 sentinel: true = own phase set (junction may be empty = no phases); false = inherit']
   sort_order int [not null, default: 0]
 
   Note: '''
-    Checked **scope root** on a quote. Links to site scope instance when user checks a site scope row.
-    Complexity on scope/zone only — zone overrides scope (040b).
+    Estimate-owned commercial node (37y). Forest of trees under an estimate. Roots carry
+    `root_item_id` (catalog root). Children nest via `parent_condition_id`. Every node holds
+    name, complexity, labor phases, and specs. Cascade: line → leaf → … → root → catalog.
   '''
 }
 
-Table estimate_zone {
-  estimate_scope_id text [not null]
-  site_zone_id text [not null]
-  complexity_factor_id text [note: 'nullable FK → complexity_factor — overrides scope (040b)']
-  sort_order int [not null, default: 0]
-
-  indexes {
-    (estimate_scope_id, site_zone_id) [pk]
-  }
-
-  Note: 'Zone checkbox membership — row existence = checked; uncheck = delete row.'
-}
-
-Table estimate_scope_spec {
+Table estimate_condition_spec {
   id text [pk, default: `gen_random_uuid()::text`]
-  estimate_scope_id text [not null]
-  spec_def_id uuid [not null]
-  spec_option_id uuid [note: 'nullable — enum defs']
-  value_boolean boolean [note: 'nullable — boolean defs']
-  value_number numeric [note: 'nullable — number/range bucket point (canonical, 37p)']
-  value_number_max numeric [note: 'nullable — unused on buckets (range is point-in-band match)']
-
-  Note: 'Scope-root spec values — inherited by lines unless overridden at zone or line level.'
-}
-
-Table estimate_zone_spec {
-  id text [pk, default: `gen_random_uuid()::text`]
-  estimate_scope_id text [not null]
-  site_zone_id text [not null]
+  estimate_condition_id text [not null]
   spec_def_id uuid [not null]
   spec_option_id uuid [note: 'nullable — enum defs']
   value_boolean boolean [note: 'nullable — boolean defs']
   value_number numeric [note: 'nullable — number/range bucket point (canonical, 37p)']
   value_number_max numeric [note: 'nullable — unused on buckets']
 
-  Note: 'Per-zone spec override within a scope — applies to lines with matching `site_zone_id`.'
+  Note: 'Per-condition spec. Resolution: line → condition leaf→root → catalog (37y Y3).'
 }
 
-Table estimate_scope_labor_phase {
-  estimate_scope_id text [not null]
+Table estimate_condition_labor_phase {
+  estimate_condition_id text [not null]
   labor_phase_id text [not null]
   sort_order int [not null, default: 0]
 
   indexes {
-    (estimate_scope_id, labor_phase_id) [pk]
+    (estimate_condition_id, labor_phase_id) [pk]
   }
 
-  Note: 'Which org labor phases count for lines in this scope bucket. Empty = include all resolved phases (37n).'
-}
-
-Table estimate_zone_labor_phase {
-  estimate_scope_id text [not null]
-  site_zone_id text [not null]
-  labor_phase_id text [not null]
-  sort_order int [not null, default: 0]
-
-  indexes {
-    (estimate_scope_id, site_zone_id, labor_phase_id) [pk]
-  }
-
-  Note: 'Zone override for included labor phases — overrides scope when rows exist (37n).'
+  Note: 'Own labor phases when `labor_phases_explicit` — empty junction = explicit no phases (Y4).'
 }
 
 Table estimate_line_spec {
@@ -1021,18 +986,19 @@ Table estimate_line_spec {
   value_number numeric [note: 'nullable — number/range bucket point (canonical, 37p)']
   value_number_max numeric [note: 'nullable — unused on buckets']
 
-  Note: 'Per-line spec override. Resolution: line → zone → `estimate_scope_spec`.'
+  Note: 'Per-line spec override. Resolution: line → condition leaf→root → catalog (37y Y3).'
 }
 
 Table estimate_line {
   id text [pk, default: `gen_random_uuid()::text`]
   estimate_id text [not null]
-  estimate_scope_id text [note: 'nullable FK → estimate_scope — checked scope root']
+  estimate_condition_id text [not null, note: 'FK → estimate_condition — required (37y Y2)']
   parent_line_id text [note: 'nullable FK → estimate_line — kit header/component']
   line_number int [not null]
   line_role text [not null, default: 'standalone', note: 'CHECK: standalone | kit_header | kit_component']
   description text [not null, default: '']
   quantity numeric [not null, default: 1]
+  qty_manual boolean [not null, default: false, note: 'false = allocations drive quantity (37x X3)']
   unit text [not null, default: 'ea', note: 'snapshotted UOM — from manufacturer_part.unit or labor/expense default']
   unit_cost numeric [not null, default: 0]
   unit_price numeric [not null, default: 0]
@@ -1041,7 +1007,6 @@ Table estimate_line {
   unit_labor numeric [not null, default: 0]
   unit_freight numeric [not null, default: 0]
   unit_incidental numeric [not null, default: 0]
-  site_zone_id text [note: 'nullable FK → site_zone — zone bucket placement']
   site_asset_id text [note: 'nullable FK → site_asset — device-level scope']
   lock text [not null, default: 'none', note: 'CHECK: none | sell | line — recalc gate (040b D6b)']
   item_id text [not null, note: 'FK → item — required on product lines']
@@ -1055,8 +1020,21 @@ Table estimate_line {
 
   Note: '''
     Quote line — **item_id** at any tree depth; commercial snapshots M/L/freight/incidental/target.
-    **lock** — none=fluid recalc; sell=freeze unit_price; line=skip recalc (040b).
+    Places via `estimate_line_allocation` (not a single site_zone_id). **lock** — none/sell/line (040b).
   '''
+}
+
+Table estimate_line_allocation {
+  id text [pk, default: `gen_random_uuid()::text`]
+  estimate_line_id text [not null]
+  site_zone_id text [not null]
+  quantity numeric [not null, default: 1]
+
+  indexes {
+    (estimate_line_id, site_zone_id) [unique]
+  }
+
+  Note: 'Optional place rows: site zone × qty-per-zone. sum(qty) ≤ line.quantity when qty_manual (G3).'
 }
 
 // ─── Business (SubHub Slice 5 — jobs) ─────────────────────────────────────────
@@ -1256,7 +1234,7 @@ Table job_system_spec {
   value_number numeric [note: 'nullable — number/range (canonical, 37p)']
   value_number_max numeric [note: 'nullable — range part rows only']
 
-  Note: 'Spec snapshot on win — copied from `estimate_scope_spec` per scope group.'
+  Note: 'Spec snapshot on win — copied from `estimate_condition_spec` per condition tree (37y).'
 }
 
 Table job_area_spec {
@@ -1752,35 +1730,27 @@ Ref: estimate_party.party_id > party.id [delete: cascade]
 Ref: estimate_party.relation_id > job_party_relation.id [delete: restrict]
 Ref: part_item.part_id > manufacturer_part.id [delete: cascade]
 Ref: part_item.item_id > item.id [delete: cascade]
-Ref: estimate_scope.estimate_id > estimate.id [delete: cascade]
-Ref: estimate_scope.root_item_id > item.id [delete: restrict]
-Ref: estimate_scope.site_scope_id > site_scope.id [delete: set null]
-Ref: estimate_scope.complexity_factor_id > complexity_factor.id [delete: set null]
-Ref: estimate_scope_spec.estimate_scope_id > estimate_scope.id [delete: cascade]
-Ref: estimate_scope_spec.spec_def_id > spec_def.id [delete: restrict]
-Ref: estimate_scope_spec.spec_option_id > spec_option.id [delete: set null]
-Ref: estimate_zone.estimate_scope_id > estimate_scope.id [delete: cascade]
-Ref: estimate_zone.site_zone_id > site_zone.id [delete: cascade]
-Ref: estimate_zone.complexity_factor_id > complexity_factor.id [delete: set null]
-Ref: estimate_zone_spec.estimate_scope_id > estimate_scope.id [delete: cascade]
-Ref: estimate_zone_spec.site_zone_id > site_zone.id [delete: cascade]
-Ref: estimate_zone_spec.spec_def_id > spec_def.id [delete: restrict]
-Ref: estimate_zone_spec.spec_option_id > spec_option.id [delete: set null]
-Ref: estimate_scope_labor_phase.estimate_scope_id > estimate_scope.id [delete: cascade]
-Ref: estimate_scope_labor_phase.labor_phase_id > labor_phase.id [delete: restrict]
-Ref: estimate_zone_labor_phase.estimate_scope_id > estimate_zone.estimate_scope_id [delete: cascade]
-Ref: estimate_zone_labor_phase.labor_phase_id > labor_phase.id [delete: restrict]
+Ref: estimate_condition.estimate_id > estimate.id [delete: cascade]
+Ref: estimate_condition.parent_condition_id > estimate_condition.id [delete: cascade]
+Ref: estimate_condition.root_item_id > item.id [delete: restrict]
+Ref: estimate_condition.complexity_factor_id > complexity_factor.id [delete: set null]
+Ref: estimate_condition_spec.estimate_condition_id > estimate_condition.id [delete: cascade]
+Ref: estimate_condition_spec.spec_def_id > spec_def.id [delete: restrict]
+Ref: estimate_condition_spec.spec_option_id > spec_option.id [delete: set null]
+Ref: estimate_condition_labor_phase.estimate_condition_id > estimate_condition.id [delete: cascade]
+Ref: estimate_condition_labor_phase.labor_phase_id > labor_phase.id [delete: restrict]
 Ref: estimate_line_spec.estimate_line_id > estimate_line.id [delete: cascade]
 Ref: estimate_line_spec.spec_def_id > spec_def.id [delete: restrict]
 Ref: estimate_line_spec.spec_option_id > spec_option.id [delete: set null]
 Ref: estimate_line.estimate_id > estimate.id [delete: cascade]
-Ref: estimate_line.estimate_scope_id > estimate_scope.id [delete: set null]
+Ref: estimate_line.estimate_condition_id > estimate_condition.id [delete: restrict]
 Ref: estimate_line.parent_line_id > estimate_line.id [delete: set null]
-Ref: estimate_line.site_zone_id > site_zone.id [delete: set null]
 Ref: estimate_line.site_asset_id > site_asset.id [delete: set null]
 Ref: estimate_line.item_id > item.id [delete: set null]
 Ref: estimate_line.part_id > manufacturer_part.id [delete: set null]
 Ref: estimate_line.vendor_part_id > vendor_part.id [delete: set null]
+Ref: estimate_line_allocation.estimate_line_id > estimate_line.id [delete: cascade]
+Ref: estimate_line_allocation.site_zone_id > site_zone.id [delete: restrict]
 
 Ref: job.site_id > site.id [delete: restrict]
 Ref: job.estimate_id > estimate.id [delete: set null]

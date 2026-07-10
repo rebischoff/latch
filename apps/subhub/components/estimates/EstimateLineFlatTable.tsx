@@ -10,9 +10,9 @@ import { useFieldArray, useFormContext, useWatch } from "react-hook-form";
 import {
   collectLineRemoveIndices,
   makeLine,
+  type EstimateConditionFormRow,
   type EstimateLineEditorFormValues,
   type EstimateLineFormRow,
-  type EstimateScopeFormRow,
 } from "@/components/estimates/estimate-line-tree";
 import {
   DescriptionCell,
@@ -30,10 +30,10 @@ import {
 } from "@/components/estimates/estimate-line-cells";
 import {
   emptyLineItemsCopy,
-  ensureBucketIncluded,
   filterLinesForSelection,
   type EstimateBucketSelection,
 } from "@/components/estimates/estimate-line-selection";
+import { EstimateLinePlacesButton } from "@/components/estimates/EstimateLinePlacesButton";
 import { useFormUi } from "@/components/surface/useFormUi";
 
 type FlatLineRow = {
@@ -43,13 +43,11 @@ type FlatLineRow = {
 
 type EstimateLineFlatTableProps = {
   manifest: Manifest;
-  onEnsureIncluded: () => void;
   selection: EstimateBucketSelection | null;
 };
 
 export const EstimateLineFlatTable = ({
   manifest,
-  onEnsureIncluded,
   selection,
 }: EstimateLineFlatTableProps) => {
   const { control, getValues } = useFormContext<EstimateLineEditorFormValues>();
@@ -57,11 +55,12 @@ export const EstimateLineFlatTable = ({
     control,
     name: "line_items",
   });
-  const { replace: replaceScopes } = useFieldArray({ control, name: "scopes" });
   const { disabled } = useFormUi();
 
-  const scopes = (useWatch({ control, name: "scopes" }) ?? []) as EstimateScopeFormRow[];
-  const lineItems = (useWatch({ control, name: "line_items" }) ?? []) as EstimateLineFormRow[];
+  const conditions = (useWatch({ control, name: "conditions" }) ??
+    []) as EstimateConditionFormRow[];
+  const lineItems = (useWatch({ control, name: "line_items" }) ??
+    []) as EstimateLineFormRow[];
   const siteTree = useWatch({ control, name: "site_tree" });
 
   const writableLines = fieldAllows(manifest, "line_items", "write");
@@ -69,8 +68,8 @@ export const EstimateLineFlatTable = ({
   const showActionsColumn = writableLines || allowRemoveLine;
 
   const filteredLines = useMemo(
-    () => (selection ? filterLinesForSelection(lineItems, scopes, selection) : []),
-    [lineItems, scopes, selection],
+    () => (selection ? filterLinesForSelection(lineItems, selection) : []),
+    [lineItems, selection],
   );
 
   const flatRows = useMemo((): FlatLineRow[] => {
@@ -83,45 +82,17 @@ export const EstimateLineFlatTable = ({
     return rows;
   }, [filteredLines, lineItems]);
 
-  const ensureAndGetTarget = useCallback(() => {
-    if (!selection) {
-      return null;
-    }
-
-    const result = ensureBucketIncluded(scopes, siteTree, selection);
-    if (!result) {
-      return null;
-    }
-
-    if (result.scopes !== scopes) {
-      replaceScopes(result.scopes);
-      onEnsureIncluded();
-    }
-
-    const estimateScopeId = result.scopes[result.binding.scopeIndex]?.id;
-    if (!estimateScopeId) {
-      return null;
-    }
-
-    return {
-      estimate_scope_id: estimateScopeId,
-      site_zone_id: selection.siteZoneId,
-    };
-  }, [onEnsureIncluded, replaceScopes, scopes, selection, siteTree]);
-
   const handleAddLine = useCallback(() => {
-    const target = ensureAndGetTarget();
-    if (!target) {
+    if (!selection) {
       return;
     }
 
     appendLine(
       makeLine({
-        estimate_scope_id: target.estimate_scope_id,
-        site_zone_id: target.site_zone_id,
+        estimate_condition_id: selection.estimateConditionId,
       }),
     );
-  }, [appendLine, ensureAndGetTarget]);
+  }, [appendLine, selection]);
 
   const removeLineAt = useCallback(
     (lineIndex: number) => {
@@ -143,7 +114,7 @@ export const EstimateLineFlatTable = ({
             index={record.index}
             writable={writableLines}
             disabled={disabled}
-            scopes={scopes}
+            conditions={conditions}
           />
         ),
       },
@@ -156,7 +127,6 @@ export const EstimateLineFlatTable = ({
             index={record.index}
             writable={writableLines}
             disabled={disabled}
-            scopes={scopes}
           />
         ),
       },
@@ -296,9 +266,16 @@ export const EstimateLineFlatTable = ({
       base.push({
         key: "_actions",
         title: "",
-        width: LINE_TABLE_COLUMN_WIDTHS.actions,
+        width: LINE_TABLE_COLUMN_WIDTHS.actions + 72,
         render: (_value, record) => (
           <Space size={0}>
+            {writableLines ? (
+              <EstimateLinePlacesButton
+                index={record.index}
+                disabled={disabled}
+                siteTree={siteTree}
+              />
+            ) : null}
             {allowRemoveLine ? (
               <Button
                 type="text"
@@ -318,10 +295,11 @@ export const EstimateLineFlatTable = ({
     return base;
   }, [
     allowRemoveLine,
+    conditions,
     disabled,
     removeLineAt,
-    scopes,
     showActionsColumn,
+    siteTree,
     writableLines,
   ]);
 

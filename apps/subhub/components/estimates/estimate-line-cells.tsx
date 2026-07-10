@@ -10,10 +10,11 @@ import {
 } from "react-hook-form";
 
 import type {
+  EstimateConditionFormRow,
   EstimateLineEditorFormValues,
   EstimateLineFormRow,
-  EstimateScopeFormRow,
 } from "@/components/estimates/estimate-line-tree";
+import { rootItemIdForCondition } from "@/components/estimates/estimate-line-tree";
 import {
   useEstimateItemPicker,
   useEstimatePartPicker,
@@ -68,13 +69,14 @@ export const ItemCell = ({
   index,
   writable,
   disabled,
-  scopes,
-}: CellProps & { scopes: EstimateScopeFormRow[] }) => {
-  const estimateScopeId = useWatch({
-    name: lineFieldPath(index, "estimate_scope_id"),
-  }) as string | null | undefined;
-  const rootItemId =
-    scopes.find((scope) => scope.id === estimateScopeId)?.root_item_id ?? null;
+  conditions,
+}: CellProps & { conditions: EstimateConditionFormRow[] }) => {
+  const estimateConditionId = useWatch({
+    name: lineFieldPath(index, "estimate_condition_id"),
+  }) as string | undefined;
+  const rootItemId = estimateConditionId
+    ? rootItemIdForCondition(estimateConditionId, conditions)
+    : null;
   const { data: itemTree, isLoading } = useEstimateItemPicker(
     rootItemId,
     Boolean(rootItemId),
@@ -92,7 +94,7 @@ export const ItemCell = ({
             treeData={toAntdItemTree(itemTree ?? [])}
             value={value ?? undefined}
             disabled={disabled || !rootItemId}
-            placeholder={rootItemId ? "Select item" : "Scope required"}
+            placeholder={rootItemId ? "Select item" : "Condition required"}
             onChange={onChange}
             treeDefaultExpandAll
           />
@@ -108,20 +110,17 @@ export const PartCell = ({
   index,
   writable,
   disabled,
-  scopes,
-}: CellProps & { scopes: EstimateScopeFormRow[] }) => {
+}: CellProps) => {
   const itemId = useWatch({ name: lineFieldPath(index, "item_id") }) as string | null;
-  const estimateScopeId = useWatch({
-    name: lineFieldPath(index, "estimate_scope_id"),
-  }) as string | null;
-  const siteZoneId = useWatch({ name: lineFieldPath(index, "site_zone_id") }) as string | null;
+  const estimateConditionId = useWatch({
+    name: lineFieldPath(index, "estimate_condition_id"),
+  }) as string | undefined;
   const { setValue } = useFormContext<EstimateLineEditorFormValues>();
 
   const { data: parts } = useEstimatePartPicker(
     itemId,
-    estimateScopeId,
-    siteZoneId,
-    Boolean(itemId && estimateScopeId),
+    estimateConditionId ?? null,
+    Boolean(itemId && estimateConditionId),
   );
 
   if (!itemId) {
@@ -190,25 +189,32 @@ export const DescriptionCell = ({ index, writable, disabled }: CellProps) => (
   />
 );
 
-export const QuantityCell = ({ index, writable, disabled }: CellProps) => (
-  <Controller<EstimateLineEditorFormValues>
-    name={lineFieldPath(index, "quantity")}
-    render={({ field: { value, onChange } }) =>
-      writable ? (
-        <InputNumber
-          size="small"
-          min={0}
-          style={{ width: "100%" }}
-          value={Number(value)}
-          disabled={disabled}
-          onChange={(next) => onChange(next ?? 0)}
-        />
-      ) : (
-        <Typography.Text>{Number(value)}</Typography.Text>
-      )
-    }
-  />
-);
+export const QuantityCell = ({ index, writable, disabled }: CellProps) => {
+  const { setValue } = useFormContext<EstimateLineEditorFormValues>();
+
+  return (
+    <Controller<EstimateLineEditorFormValues>
+      name={lineFieldPath(index, "quantity")}
+      render={({ field: { value, onChange } }) =>
+        writable ? (
+          <InputNumber
+            size="small"
+            min={0}
+            style={{ width: "100%" }}
+            value={Number(value)}
+            disabled={disabled}
+            onChange={(next) => {
+              onChange(next ?? 0);
+              setValue(lineFieldPath(index, "qty_manual"), true, { shouldDirty: true });
+            }}
+          />
+        ) : (
+          <Typography.Text>{Number(value)}</Typography.Text>
+        )
+      }
+    />
+  );
+};
 
 export const UnitCell = ({ index, writable, disabled }: CellProps) => (
   <Controller<EstimateLineEditorFormValues>

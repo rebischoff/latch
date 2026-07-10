@@ -1,4 +1,4 @@
-# Estimate profile + stakeholders + system blocks + flat line items
+# Estimate profile + stakeholders + condition forest + flat line items
 id: estimate_detail
 displayName: Estimate detail
 anchorTable: estimate
@@ -16,11 +16,11 @@ surfaceActions:
 
 tables:
   - estimate
-  - estimate_scope
-  - estimate_scope_spec
-  - estimate_zone
-  - estimate_zone_spec
+  - estimate_condition
+  - estimate_condition_spec
+  - estimate_condition_labor_phase
   - estimate_line
+  - estimate_line_allocation
   - estimate_party
   - job_party_relation
   - site
@@ -51,8 +51,8 @@ fields:
   - id: stakeholders
     # logical — DAL maps to estimate_party; see docs/child-collections.md
     columns: []
-  - id: scopes
-    # logical — DAL maps to estimate_scope + estimate_zone + specs; see docs/child-collections.md
+  - id: conditions
+    # logical — DAL maps to estimate_condition forest + specs/phases (37y)
     columns: []
   - id: line_items
     # logical — DAL maps to estimate_line; see docs/child-collections.md

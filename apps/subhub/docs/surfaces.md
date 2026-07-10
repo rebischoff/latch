@@ -456,11 +456,11 @@ Applies to **customer, vendor, manufacturer, property_owner** detail lenses — 
 | **Route** | `/estimates`, `/estimates/[id]` |
 | **Nav group** | Sales |
 | **Anchor** | `estimate` |
-| **Tables** | `estimate`, `estimate_scope`, `estimate_zone`, `estimate_line`, `estimate_party` |
+| **Tables** | `estimate`, `estimate_condition`, `estimate_line`, `estimate_line_allocation`, `estimate_party` |
 
-**Tabs (`estimate_detail`, 37w):** **General** · **Line Items** — Scope tab retired; three-panel **S** / **C** / **LI** on Line Items.
+**Tabs (`estimate_detail`, 37y):** **General** · **Line Items** — three-panel **S** / **C** / **LI**; S = condition forest.
 
-**Prerequisite:** `site_id` on estimate → site's `site_scope` / `site_zone` registry ([`site_detail`](#site_list--site_detail)). Quote includes existing site geography via implicit include on line/config edit; estimate PATCH does not create site scopes/zones.
+**Prerequisite:** `site_id` on estimate (immutable after create). Site `site_zone` registry used only for line **Places…** allocations — not for commercial structure.
 
 **`estimate_list` columns:** `title`, `site` name, `status`, `estimate_date`
 
@@ -470,22 +470,22 @@ Applies to **customer, vendor, manufacturer, property_owner** detail lenses — 
 |-------|------|-------|
 | `profile` | scalar | `title`, `site_id`, `status`, `estimate_date`, `valid_until`, `source_estimate_id`, optional `category_id` |
 | `stakeholders` | collection | `estimate_party` — `party_id`, `relation_id` |
-| `scopes` | collection | `estimate_scope` + `estimate_zone` junction + bucket specs/phases — configured in **C** panel on Line Items tab |
-| `line_items` | collection | `estimate_line` — flat grid in **LI** panel; filtered by **S** selection |
+| `conditions` | collection | `estimate_condition` forest (specs/phases/complexity; roots have `root_item_id`) — configured in **C** |
+| `line_items` | collection | `estimate_line` + `allocations[]` — flat grid in **LI**; filtered by **S** |
 
-**`line_items` editor (37w):**
+**`line_items` editor (37y):**
 
 | Panel | When | UI |
 |-------|------|-----|
-| **S** | Site selected | Ant `Tree` — full `site_tree`; select scope/zone only |
-| **C** | **S** selection | Permanent bucket config — complexity, labor phases multi-select, specs |
-| **LI** | **S** selection | Flat `Table` — 37f columns; dashed **Add line** footer |
+| **S** | Site selected | Ant `Tree` — condition forest; Add root / Add condition / Delete |
+| **C** | **S** selection | Name; complexity; labor phases; specs — inherit checkboxes on children |
+| **LI** | **S** selection | Flat `Table` — 37f columns; **Places…**; dashed **Add line** |
 
-**Line element:** `line_role` (`standalone` only in UI), `description`, `quantity`, `unit`, `unit_cost`, `unit_price`, `estimate_scope_id`, `site_zone_id`, `phase_id`, `item_id`, `part_id`, `vendor_part_id`, `lock`
+**Line element:** `line_role` (`standalone` only in UI), `description`, `quantity`, `qty_manual`, `unit`, `unit_cost`, `unit_price`, `estimate_condition_id`, `allocations[]`, `phase_id`, `item_id`, `part_id`, `vendor_part_id`, `lock`
 
 **Surface actions:** + `win` / `lose` — DAL creates job on win with line snapshots
 
-**Notes:** Kit UI removed (37v); DAL still validates kit rows if sent. Lines require non-null `estimate_scope_id`.
+**Notes:** Kit UI removed (37v); DAL still validates kit rows if sent. Lines require non-null `estimate_condition_id`. Complexity on every condition (null → ancestry → 100%).
 
 ---
 

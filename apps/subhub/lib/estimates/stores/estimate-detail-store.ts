@@ -57,7 +57,7 @@ export const createEstimateDetailStore = (
     if (!estimate) {
       return {
         stakeholders: [],
-        scopes: [],
+        conditions: [],
         site_tree: null,
         line_items: [],
       };
@@ -78,9 +78,9 @@ export const createEstimateDetailStore = (
       await replaceEstimateStakeholders(pool, actorId, estimateId, patch.stakeholders);
     }
 
-    if (patch.scopes !== undefined || patch.line_items !== undefined) {
+    if (patch.conditions !== undefined || patch.line_items !== undefined) {
       await replaceEstimateCollections(pool, actorId, estimateId, estimate.site_id, {
-        scopes: patch.scopes,
+        conditions: patch.conditions,
         line_items: patch.line_items,
       });
     }

@@ -1,176 +1,158 @@
 import type {
+  EstimateConditionFormRow,
   EstimateLineFormRow,
-  EstimateScopeFormRow,
-  EstimateSiteTreeFormRow,
 } from "@/components/estimates/estimate-line-tree";
-import {
-  addScopeToQuote,
-  addZoneToQuote,
-  findScopeIndexBySiteScopeId,
-} from "@/components/estimates/estimate-scope-tree";
+import { flattenConditions } from "@/components/estimates/estimate-line-tree";
 
 export type EstimateBucketSelection = {
-  siteScopeId: string;
-  siteZoneId: string | null;
+  estimateConditionId: string;
 };
 
 export type EstimateBucketBinding = {
-  scopeIndex: number;
-  zoneIndex?: number;
+  /** Indices into nested conditions forest, e.g. [0] root, [0,1] child. */
+  conditionPath: number[];
 };
 
 export const parseSelectionFromTreeKey = (
   key: string,
 ): EstimateBucketSelection | null => {
-  if (key.startsWith("zone:")) {
-    const [, siteScopeId, siteZoneId] = key.split(":");
-    if (!siteScopeId || !siteZoneId) {
-      return null;
-    }
-    return { siteScopeId, siteZoneId };
+  if (!key.startsWith("condition:")) {
+    return null;
   }
 
-  if (key.startsWith("scope:")) {
-    const siteScopeId = key.replace(/^scope:/, "");
-    if (!siteScopeId) {
-      return null;
-    }
-    return { siteScopeId, siteZoneId: null };
+  const estimateConditionId = key.replace(/^condition:/, "");
+  if (!estimateConditionId) {
+    return null;
   }
 
-  return null;
+  return { estimateConditionId };
 };
 
 export const selectionToTreeKey = (selection: EstimateBucketSelection): string =>
-  selection.siteZoneId === null
-    ? `scope:${selection.siteScopeId}`
-    : `zone:${selection.siteScopeId}:${selection.siteZoneId}`;
+  `condition:${selection.estimateConditionId}`;
 
 export const defaultBucketSelection = (
-  siteTree: EstimateSiteTreeFormRow | null | undefined,
+  conditions: EstimateConditionFormRow[],
 ): EstimateBucketSelection | null => {
-  const firstScope = siteTree?.scopes[0];
-  if (!firstScope) {
+  const first = conditions[0];
+  if (!first) {
     return null;
   }
+  return { estimateConditionId: first.id };
+};
 
-  return { siteScopeId: firstScope.id, siteZoneId: null };
+export const findConditionPath = (
+  conditions: EstimateConditionFormRow[],
+  conditionId: string,
+  path: number[] = [],
+): number[] | null => {
+  for (const [index, condition] of conditions.entries()) {
+    if (condition.id === conditionId) {
+      return [...path, index];
+    }
+    const nested = findConditionPath(condition.conditions, conditionId, [
+      ...path,
+      index,
+    ]);
+    if (nested) {
+      return nested;
+    }
+  }
+  return null;
 };
 
 export const resolveBucketBinding = (
-  scopes: EstimateScopeFormRow[],
+  conditions: EstimateConditionFormRow[],
   selection: EstimateBucketSelection,
 ): EstimateBucketBinding | null => {
-  const scopeIndex = findScopeIndexBySiteScopeId(scopes, selection.siteScopeId);
-  if (scopeIndex < 0) {
+  const path = findConditionPath(conditions, selection.estimateConditionId);
+  if (!path) {
     return null;
   }
-
-  if (selection.siteZoneId === null) {
-    return { scopeIndex };
-  }
-
-  const zoneIndex = scopes[scopeIndex]?.zones.findIndex(
-    (zone) => zone.site_zone_id === selection.siteZoneId,
-  );
-  if (zoneIndex === undefined || zoneIndex < 0) {
-    return null;
-  }
-
-  return { scopeIndex, zoneIndex };
+  return { conditionPath: path };
 };
 
 export const filterLinesForSelection = (
   lineItems: EstimateLineFormRow[],
-  scopes: EstimateScopeFormRow[],
   selection: EstimateBucketSelection,
-): EstimateLineFormRow[] => {
-  const binding = resolveBucketBinding(scopes, selection);
-  if (!binding) {
-    return [];
-  }
-
-  const estimateScopeId = scopes[binding.scopeIndex]?.id;
-  if (!estimateScopeId) {
-    return [];
-  }
-
-  return lineItems.filter((line) => {
-    if (line.line_role !== "standalone") {
-      return false;
-    }
-
-    if (line.estimate_scope_id !== estimateScopeId) {
-      return false;
-    }
-
-    if (selection.siteZoneId === null) {
-      return (line.site_zone_id ?? null) === null;
-    }
-
-    return line.site_zone_id === selection.siteZoneId;
-  });
-};
-
-export const ensureBucketIncluded = (
-  scopes: EstimateScopeFormRow[],
-  siteTree: EstimateSiteTreeFormRow | null | undefined,
-  selection: EstimateBucketSelection,
-): { scopes: EstimateScopeFormRow[]; binding: EstimateBucketBinding } | null => {
-  if (!siteTree) {
-    return null;
-  }
-
-  const siteScope = siteTree.scopes.find((scope) => scope.id === selection.siteScopeId);
-  if (!siteScope) {
-    return null;
-  }
-
-  let nextScopes = scopes;
-  let scopeIndex = findScopeIndexBySiteScopeId(nextScopes, selection.siteScopeId);
-
-  if (scopeIndex < 0) {
-    nextScopes = addScopeToQuote(nextScopes, siteScope, siteTree.spec_templates);
-    scopeIndex = findScopeIndexBySiteScopeId(nextScopes, selection.siteScopeId);
-  }
-
-  if (scopeIndex < 0) {
-    return null;
-  }
-
-  if (selection.siteZoneId === null) {
-    return { scopes: nextScopes, binding: { scopeIndex } };
-  }
-
-  nextScopes = addZoneToQuote(
-    nextScopes,
-    selection.siteScopeId,
-    selection.siteZoneId,
-    siteTree,
+): EstimateLineFormRow[] =>
+  lineItems.filter(
+    (line) =>
+      line.line_role === "standalone" &&
+      line.estimate_condition_id === selection.estimateConditionId,
   );
-  scopeIndex = findScopeIndexBySiteScopeId(nextScopes, selection.siteScopeId);
-  const scope = nextScopes[scopeIndex];
-  const zoneIndex = scope?.zones.findIndex(
-    (zone) => zone.site_zone_id === selection.siteZoneId,
-  );
-
-  if (!scope || zoneIndex === undefined || zoneIndex < 0) {
-    return null;
-  }
-
-  return { scopes: nextScopes, binding: { scopeIndex, zoneIndex } };
-};
 
 export const emptyLineItemsCopy = (
   selection: EstimateBucketSelection | null,
 ): string => {
   if (!selection) {
-    return "Select a scope or zone";
+    return "Select a condition";
   }
 
-  if (selection.siteZoneId === null) {
-    return "No unzoned lines in this scope";
+  return "No lines in this condition";
+};
+
+export const conditionReferencedByLines = (
+  lineItems: Array<{ estimate_condition_id: string }>,
+  conditionId: string,
+  conditions: EstimateConditionFormRow[],
+): boolean => {
+  const findNode = (
+    rows: EstimateConditionFormRow[],
+  ): EstimateConditionFormRow | null => {
+    for (const row of rows) {
+      if (row.id === conditionId) {
+        return row;
+      }
+      const nested = findNode(row.conditions);
+      if (nested) {
+        return nested;
+      }
+    }
+    return null;
+  };
+
+  const root = findNode(conditions);
+  if (!root) {
+    return lineItems.some((line) => line.estimate_condition_id === conditionId);
   }
 
-  return "No lines in this zone";
+  const subtreeIds = new Set(flattenConditions([root]).map((c) => c.id));
+  return lineItems.some((line) => subtreeIds.has(line.estimate_condition_id));
+};
+
+export const getConditionAtPath = (
+  conditions: EstimateConditionFormRow[],
+  conditionPath: number[],
+): EstimateConditionFormRow | null => {
+  if (conditionPath.length === 0) {
+    return null;
+  }
+
+  let current: EstimateConditionFormRow | undefined =
+    conditions[conditionPath[0]!];
+  for (let i = 1; i < conditionPath.length; i += 1) {
+    current = current?.conditions[conditionPath[i]!];
+  }
+  return current ?? null;
+};
+
+/** Walk ancestry from root → selected (inclusive). */
+export const getConditionAncestry = (
+  conditions: EstimateConditionFormRow[],
+  conditionPath: number[],
+): EstimateConditionFormRow[] => {
+  const ancestry: EstimateConditionFormRow[] = [];
+  let rows = conditions;
+
+  for (const index of conditionPath) {
+    const node = rows[index];
+    if (!node) {
+      break;
+    }
+    ancestry.push(node);
+    rows = node.conditions;
+  }
+
+  return ancestry;
 };

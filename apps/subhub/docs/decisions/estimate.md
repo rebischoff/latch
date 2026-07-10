@@ -5,6 +5,306 @@
 [Index](./README.md) · [All decisions](../decisions/README.md)
 
 > **Amended (2026-07-05):** [unified item tree — lifecycle + line lock](./catalog.md#decision-unified-item-tree--merge-category--item-node-anchored-estimate-lines-2026-07-05) (**D6a–D6b**) — see [estimate lifecycle freeze](#decision-estimate-lifecycle-freeze-and-line-lock-2026-07-05).
+>
+> **Amended (2026-07-09):** [scope / condition / zone / qty](#decision-estimate-scope-condition-zone-and-line-qty-2026-07-09) — site zones = place only; estimate **conditions** hold commercial knobs; line qty + zone allocations.
+>
+> **Amended (2026-07-09):** [condition-only commercial tree](#decision-condition-only-commercial-tree-2026-07-09) — drop `estimate_scope`; every commercial node is `estimate_condition`; lines require `estimate_condition_id` ([37y](../tasks/37y-condition-only-commercial-tree.md)).
+
+---
+
+### Decision: condition-only commercial tree (2026-07-09)
+
+**Status:** **Locked (Y1–Y5).** **Amends:** [G2 / G5a–G5e](#decision-estimate-scope-condition-zone-and-line-qty-2026-07-09) (scope instance as commercial root); [D3 / D5 / D6f](./catalog.md#decision-unified-item-tree--merge-category--item-node-anchored-estimate-lines-2026-07-05). **Keeps:** G1 (site place-only), G3 (qty + allocations), G4 (win/job deferred), X1 block-delete, X3 `qty_manual`, X4 estimate-path-only. **Implementation:** [37y](../tasks/37y-condition-only-commercial-tree.md).
+
+**Problem:** 37x split commercial roots (`estimate_scope`) from children (`estimate_condition`). Complexity lived only on conditions; phases/specs lived on both. Product intent is one nestable condition tree — every node carries the same knobs; children optionally override parents.
+
+#### Vocabulary (amended)
+
+| Term | Role |
+|------|------|
+| **Condition** | Estimate-owned commercial node. Forest of trees under an estimate. Root conditions link a **catalog root item** (`root_item_id`). Children nest via `parent_condition_id`. Holds **name**, **complexity**, **labor phases**, **spec values**. |
+| **Scope** (catalog) | Catalog root **item** (`item` with scope node type) — not an estimate table. Multiple root conditions may share the same `root_item_id` (Bldg A / Bldg B Intrusion). |
+| **Site scope / zone** | Unchanged — place only (G1). |
+
+**Do not** reintroduce `estimate_scope` for quoting.
+
+#### Y1 — Schema: condition forest only (locked)
+
+**Choice:**
+
+| Change | Rule |
+|--------|------|
+| **Drop** | `estimate_scope`, `estimate_scope_spec`, `estimate_scope_labor_phase` |
+| **`estimate_condition`** | `estimate_id`, `parent_condition_id` (null = root), `root_item_id` (**required on roots**; null on children — inherit from tree root), `name`, `complexity_factor_id`, `sort_order` |
+| **Keep** | `estimate_condition_spec`, `estimate_condition_labor_phase` |
+| **`estimate_line`** | **`estimate_condition_id` NOT NULL**; **drop `estimate_scope_id`** |
+| **Migrate** | Each existing `estimate_scope` → one **root** condition (`root_item_id` + name + specs + phases copied); nested conditions reparent under that root; lines with null condition → attach to migrated root; then drop scope tables/columns |
+
+**Invariant:** Child `root_item_id` is null (or must match ancestry root). Spec keys for a tree come from the root’s `root_item_id`.
+
+#### Y2 — Lines always on a condition (locked)
+
+**Choice:** No condition → no line items. Add-line disabled until a condition is selected. Removes “scope defaults / condition null → complexity 100%” path.
+
+#### Y3 — Knobs on every condition (locked)
+
+**Choice:** Every selected condition (root or child) shows in **C**: **name** + **complexity** + **labor phases** + **specs**.
+
+**Cascade:** `line → condition (leaf) → … → condition (root) → catalog/org`.
+
+| Field | Own | Inherit |
+|-------|-----|---------|
+| Spec | row in `estimate_condition_spec` | walk ancestors |
+| Complexity | non-null `complexity_factor_id` | nearest ancestor with non-null; else **100%** |
+| Phases | junction rows present (**including empty set**) | nearest ancestor with an explicit phase set; else catalog/item default |
+
+#### Y4 — C inherit checkbox (locked)
+
+**Choice:** On **child** conditions, each overrideable control has a checkbox:
+
+| State | Meaning | Control |
+|-------|---------|---------|
+| **unchecked** | use ancestry | **read-only**; display resolved ancestor value |
+| **checked** | own override | editable; persist on this condition |
+
+On **root** conditions: no ancestry — checkbox hidden / N/A; controls always own.
+
+**Phases detail:** unchecked = inherit; checked + empty multi-select = explicit “no phases” (distinct from inherit).
+
+#### Y5 — S panel (locked)
+
+**Choice:** **S** is a condition forest only.
+
+| Action | Behavior |
+|--------|----------|
+| **Add root** | Pick catalog root item → create root condition (`root_item_id`, name prefill, seed specs) |
+| **Add condition** | Child under selected condition |
+| **Delete** | Block if lines reference node or descendants (X1) |
+| **Select** | Filters LI to lines with that `estimate_condition_id` (and optionally descendants — lock in 37y Step 4 if needed; default: **selected node only**) |
+| **Rename** | Name edits in **C** (X2) |
+
+**Out of scope (still X4):** win → job condition copy; job unresolved queue (G4).
+
+**Task:** [37y — condition-only commercial tree](../tasks/37y-condition-only-commercial-tree.md).
+
+---
+
+### Decision: estimate scope, condition, zone, and line qty (2026-07-09)
+
+**Status:** **Locked (G1–G4, G5a–G5e).** **Amended (2026-07-09)** by [condition-only commercial tree](#decision-condition-only-commercial-tree-2026-07-09) (**Y1–Y5**) — commercial roots are conditions, not `estimate_scope`. **Amends:** commercial use of `estimate_zone` / line `site_zone_id` in [D5](./catalog.md#decision-unified-item-tree--merge-category--item-node-anchored-estimate-lines-2026-07-05) / D6g; [37w W2–W4](#decision-estimate-line-items-tab--three-panel-layout-2026-07-08). **Does not** change site ownership of scopes/zones. **Implementation:** [37x](../tasks/37x-estimate-conditions-allocations.md) (shipped); superseding schema/UI in [37y](../tasks/37y-condition-only-commercial-tree.md).
+
+**Problem:** Site **zones** (building → floor → door) were overloaded as both **install place** and **commercial override** (complexity, phases, spec values). Estimators need different knobs for Warehouse vs Office without inventing fake geography; ops need fine places and incremental place/PN resolve after win.
+
+**Vocabulary (locked):**
+
+| Term | Owner | Role |
+|------|--------|------|
+| **Cost bucket** | Line snapshots | Material / labor / freight / incidental $ — **not** this decision’s “condition” |
+| **Scope instance** | Estimate (`estimate_scope`) | Quote instance of a catalog root (e.g. two “Intrusion Alarm” scopes: Bldg A / Bldg B). Drives the commercial tree root and **spec keys** (defs from that root). Multiple instances per root OK. |
+| **Condition** | Estimate only | Costing / filter partition under a scope instance. Holds **spec values**, **labor complexity** (only place complexity is set), **included labor phases**. Children **override** parents. **Must not** coincide with site zones. |
+| **Site scope / zone** | Site | **Where** work takes place (building, floor, door, room). Narrow geography only — **no** complexity / phases / spec values on site rows. |
+| **Allocation** | Estimate / job line | Optional place rows: `site_zone` × qty-per-zone. |
+
+**Do not call conditions “buckets”** — bucket already means cost composition (M/L/F/I).
+
+#### G1 — Site geography stays place-only (locked)
+
+**Choice:** Keep **site-owned** `site_scope` / `site_zone` tree **as-is** for where work takes place. Zones may be deep (building → section → door). Estimate does **not** move this tree onto the quote. Site geography CRUD remains on site **Scopes & zones**.
+
+**Rationale:** Fine install places belong on the site registry across estimates/jobs; commercial overrides are quote-local.
+
+#### G2 — Estimate conditions (locked)
+
+**Choice:**
+
+- Under each **scope instance**, estimators may create a **condition tree** (nesting allowed so children override parents).
+- **Scope instance** drives: tree root, catalog root, **which spec keys** apply.
+- **Condition** drives: **spec values**, **labor complexity** (condition-only — not on scope or site), **which labor phases to include**.
+- Lines with no condition use **scope-level** defaults for phases/specs; **complexity = 100%** when no condition (or condition has null factor).
+- Conditions are **orthogonal** to site zones — “Warehouse” condition need not match a site zone named Warehouse.
+
+**Example:**
+
+```
+Bldg A Intrusion          ← scope instance (Intrusion Alarm root — spec keys)
+  Office                  ← condition (values / complexity / phases)
+  Warehouse               ← condition (child overrides)
+Bldg B Intrusion          ← scope instance (same catalog root, second instance)
+  (scope defaults only)
+```
+
+→ **2** scope instances, **2** conditions under the first — not “4 conditions.”
+
+**Cascade (values):** `line → condition (leaf) → … → condition (ancestor) → scope defaults → catalog/org`.
+
+**Rationale:** Accurate numbers when different parts of the job need different knobs, without polluting site geography.
+
+#### G3 — Line quantity and zone allocations (locked)
+
+**Choice:**
+
+| Field | Role |
+|-------|------|
+| **Line `quantity`** | Commercial qty (what you sell / cost against) |
+| **Allocations** | Optional rows: site zone × qty-per-zone (default **1** when a location is added; editable per location) |
+| **Allocated** | `sum(allocation.qty)` |
+| **Unallocated** | `quantity − allocated` when `quantity` is set — **derived**, not a substitute for the qty column |
+
+**Qty modes:**
+
+1. **Qty unset** (new line / never manually typed) — allocating **drives** quantity (`quantity` follows `allocated`).
+2. **Qty manually set** — quantity is source of truth; invariant **`quantity ≥ allocated`**; unallocated = remainder for job/ops.
+3. **Optional sync** — user may re-enable “keep qty in sync with locations” (behaves like unset again).
+
+**Invalid:** `allocated > quantity` (e.g. qty 0 with 43 allocated) — **over-allocated**, not negative unallocated. Block or confirm bump of quantity; never persist over-allocate on save/send/win.
+
+**Rationale:** Supports ROM (qty only), door schedules (allocations), and qty > 1 per location without exploding lines.
+
+#### G4 — Job handoff (locked)
+
+**Choice:**
+
+- **Win** copies **all** estimate lines to the job (sold scope).
+- Lines **may** already have zone allocation(s) and/or `part_id`.
+- Job must still **link each item to zone(s)** and **pick specific parts** — **not all at once**.
+- **Unresolved pool** = job lines (or remaining qty) that are **unplaced** and/or **part-open** — a **filter/queue** over job lines, not a second copy of inventory.
+- Progress / individual tracking uses places + qty (existing job progress model); estimate need not explode to one line per door.
+
+**Rationale:** Ops can finish place/PN after sale; estimate stays usable without a complete door schedule.
+
+#### G5 — Schema + panel binding
+
+Work **one sub-decision at a time.** **G5a–G5e locked** — implement via [37x](../tasks/37x-estimate-conditions-allocations.md).
+
+##### G5a — Persist conditions (locked 2026-07-09)
+
+**Choice: A — new `estimate_condition`.**
+
+| Table | Role |
+|-------|------|
+| `estimate_condition` | `id`, `estimate_scope_id`, `parent_condition_id` (nullable), `name`, **`complexity_factor_id` (nullable — only table that stores complexity)**, `sort_order` |
+| `estimate_condition_spec` | Spec **values** for a condition (same shape as today’s `estimate_zone_spec`) |
+| `estimate_condition_labor_phase` | Included phases override for a condition |
+
+**Fate of commercial `estimate_zone` / `_spec` / `_labor_phase`:** Retire in the same epic (dev DB — migrate away or drop). Do **not** repurpose the junction as conditions. Site zone remains place-only; optional later “scope includes site zone” membership is a separate concern if needed.
+
+**Rationale:** Clean vocabulary (condition ≠ zone); nesting via `parent_condition_id`; hard cut from checkbox-site-zone-as-commercial-bucket.
+
+##### G5b — Line FKs + allocations (locked 2026-07-09)
+
+**Choice: A — condition FK + allocation child table.**
+
+| Column / table | Role |
+|----------------|------|
+| `estimate_line.estimate_condition_id` | Nullable — commercial partition; null = scope defaults |
+| `estimate_line_allocation` | `estimate_line_id`, `site_zone_id`, `quantity` (default 1) — G3 places |
+| `estimate_line.site_zone_id` | **Drop** after migrating any existing single-zone rows into one allocation row |
+
+**Invariant:** `sum(allocation.quantity) ≤ line.quantity` when quantity is set (G3). Condition must belong to the line’s `estimate_scope_id`.
+
+**Rationale:** Matches multi-place / qty-per-zone / unallocated; severs dual-duty `site_zone_id`.
+
+##### G5c — Structure (S) panel (locked 2026-07-09)
+
+**Choice: A — manually built commercial tree (not site geography).** Amends 37w **W2**.
+
+**S shows:** Estimate **scope instances** as roots, with **condition** children (nestable). Built **per estimate** — not imported from `site_tree`.
+
+| Behavior | Rule |
+|----------|------|
+| **Add** | Add scope instance (pick catalog root; name prefills like site) and/or add condition under a scope or under another condition |
+| **Delete** | Nodes deletable — **block** if lines reference ([X1](#x1--delete-when-lines-reference-locked-2026-07-09)) |
+| **Select** | Selection filters **LI** to lines for that node |
+| **Add line** | Lines may attach to a **scope** (`estimate_condition_id` null → scope defaults) **or** to a **condition** (parent or child) |
+| **Rename** | Node **name** edits in **C** (not inline in tree) — [X2](#x2--scope--condition-tree-ownership--ui-locked-2026-07-09) |
+| **Places** | Site zones **not** in S — only via line **Places…** / allocations (G3/G5b) |
+
+**Clarification:** Colloquially “the conditions tree,” but roots remain **scope instances** (spec **keys** + default phases/spec values). Children are **conditions** (spec **values** / **complexity** / phases). Selecting the scope root shows lines with `estimate_condition_id` null under that scope (scope-default lines; complexity 100%). Tree chrome mirrors site Scopes & zones; ownership is estimate-only ([X2](#x2--scope--condition-tree-ownership--ui-locked-2026-07-09)).
+
+**Rationale:** Estimator builds the costing structure for this quote; site zones stay place-only.
+
+##### G5d — Config (C) panel (locked 2026-07-09)
+
+**Choice:** **C** is a separate form bound to the **S** selection — **scope or condition**, never site zone. Amends 37w **W4**.
+
+| Selection | C shows |
+|-----------|---------|
+| **Scope instance** | **Name** + included labor phases + spec **values**. **No** labor complexity control. |
+| **Condition** | **Name** + complexity + phases + spec values (child overrides parent / scope for phases & specs per G2) |
+| **Nothing selected** | Empty / placeholder copy |
+
+**C fields by selection:** **name** always (for selected node). Complexity picker **only** when a **condition** is selected. Scope selection shows name + phases + specs only.
+
+**Rationale:** Config stays visible while editing lines; commercial knobs live with the commercial tree; complexity is a property of the work **condition**, not the scope root or site place.
+
+##### G5e — D5 / D6g / DBML wording (locked 2026-07-09)
+
+**Choice:** Confirm implementer package as proposed.
+
+| Topic | Locked |
+|-------|--------|
+| **D5** | **`complexity_factor_id` only on `estimate_condition`** — not on `estimate_scope`, not on site. Null / no condition → **100%**. Child condition overrides parent when nested. |
+| **D3 / D6g** | Spec values: **line → condition → scope**; place = **allocations** only; drop commercial role of `site_zone_id` |
+| **DBML** | Add `estimate_condition*` (incl. `complexity_factor_id`) + `estimate_line_allocation` + `estimate_scope.name` + `estimate_line.qty_manual`; drop commercial `estimate_zone*`; **drop `estimate_scope.complexity_factor_id`**; drop `estimate_line.site_zone_id` after migrate |
+| **37w W1–W3** | S/C/LI topology kept; S = commercial tree (G5c); C complexity only for condition selection (G5d) |
+
+**Task:** [37x — estimate conditions + allocations](../tasks/37x-estimate-conditions-allocations.md).
+
+#### X — Implementation forks (37x)
+
+Work **one at a time** while implementing [37x](../tasks/37x-estimate-conditions-allocations.md).
+
+##### X1 — Delete when lines reference (locked 2026-07-09)
+
+**Choice: A — Block.**
+
+- Refuse delete of a **scope instance** or **condition** while any line references it (`estimate_scope_id` / `estimate_condition_id`), or while any **descendant** condition has referencing lines.
+- Empty condition subtrees (no lines on node or descendants) may be deleted.
+- UI shows why (e.g. line count). Same spirit as prior scope/zone remove-blocked rule.
+
+**Rationale:** Prevents accidental wipe of quote lines; user moves or deletes lines first.
+
+##### X2 — Scope / condition tree ownership + UI (locked 2026-07-09)
+
+**Choice: A — estimate-owned tree; UI mirrors site Scopes & zones; names edit in C.**
+
+| Topic | Rule |
+|-------|------|
+| **Ownership** | Commercial tree is **owned by the estimate** — nothing to do with site `site_scope` / `site_zone` for structure. No require/link `site_scope_id` when adding a scope instance. |
+| **Schema** | `estimate_scope`: `root_item_id` + editable **`name`** (prefill from root, like site). `estimate_condition`: nested under scope (`parent_condition_id`), editable **`name`**. `site_scope_id` unused for quoting (nullable / ignore). |
+| **Tree UX** | Same pattern as site [`SiteScopesZonesTree`](../../components/sites/SiteScopesZonesTree.tsx): Add scope ▾ (catalog root), add child under selection, select node, delete (X1 block if lines). |
+| **Label edit** | **Not** inline in the tree (unlike site). Selected node’s **name** edits in the adjacent **C** form together with labor complexity (conditions only), phases, and specs. |
+
+**Rationale:** Parity with site tree chrome for add/select/delete; keep C as the single edit surface for node identity + commercial knobs.
+
+##### X3 — Qty “unset” vs DB (locked 2026-07-09)
+
+**Choice: A — `qty_manual` flag.**
+
+| Column | Rule |
+|--------|------|
+| `estimate_line.quantity` | Remains `NOT NULL` (default 1) — always a number for costing |
+| `estimate_line.qty_manual` | `boolean NOT NULL default false` |
+
+| Mode | Behavior |
+|------|----------|
+| **`qty_manual = false`** | Allocations **drive** `quantity` (`quantity` follows `sum(allocation.qty)`, or 1 when no allocations) |
+| **User edits quantity** | Set `qty_manual = true`; thereafter invariant **`quantity ≥ allocated`** (G3) |
+| **Optional sync on** | Clear `qty_manual` (back to allocate-driven) |
+
+**Rationale:** Persists G3 across reload without nullable qty in every cost path.
+
+##### X4 — 37x delivery scope (locked 2026-07-09)
+
+**Choice: A — Estimate path only.**
+
+| In 37x | Deferred |
+|--------|----------|
+| DBML + migration; DAL/PATCH; costing merge; S/C/LI + Places/allocations UI | Win → job condition/allocation copy; job unresolved queue UI (G4) |
+
+**Rationale:** Land estimate commercial tree + allocations first; win/job handoff is a follow-on task (job wave / after 37h as needed).
+
+**X1–X4 complete** — [37x](../tasks/37x-estimate-conditions-allocations.md) is executable from Step 1.
 
 ---
 

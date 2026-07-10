@@ -1,229 +1,331 @@
 "use client";
 
-import { InputNumber, Select, Switch, Typography } from "antd";
-import { Controller, useWatch, type FieldPath } from "react-hook-form";
+import { Checkbox, InputNumber, Select, Switch, Typography } from "antd";
+import { useEffect, useState } from "react";
+import { Controller, useFormContext, useWatch, type FieldPath } from "react-hook-form";
 
+import { conditionPathToRhf } from "@/components/estimates/estimate-bucket-paths";
+import type { EstimateBucketBinding } from "@/components/estimates/estimate-line-selection";
 import {
+  type EstimateConditionSpecFormRow,
   type EstimateLineEditorFormValues,
-  type EstimateScopeSpecFormRow,
 } from "@/components/estimates/estimate-line-tree";
+import { FormFieldItem } from "@/components/form/FormFieldItem";
+import {
+  isBucketSpecValueSet,
+  resolveEffectiveBucketSpecs,
+} from "@/lib/estimates/estimate-bucket-specs-form";
 
 type EstimateScopeSpecFieldsProps = {
+  binding: EstimateBucketBinding;
   disabled: boolean;
-  scopeIndex: number;
+  isChild: boolean;
   writable: boolean;
-  zoneIndex?: number;
 };
 
 const specFieldPath = (
-  scopeIndex: number,
+  binding: EstimateBucketBinding,
   specIndex: number,
-  key: keyof EstimateScopeSpecFormRow,
-  zoneIndex?: number,
-): FieldPath<EstimateLineEditorFormValues> => {
-  if (zoneIndex !== undefined) {
-    return `scopes.${scopeIndex}.zones.${zoneIndex}.specs.${specIndex}.${key}` as FieldPath<EstimateLineEditorFormValues>;
-  }
+  key: keyof EstimateConditionSpecFormRow,
+): FieldPath<EstimateLineEditorFormValues> =>
+  conditionPathToRhf(binding.conditionPath, `specs.${specIndex}.${key}`);
 
-  return `scopes.${scopeIndex}.specs.${specIndex}.${key}` as FieldPath<EstimateLineEditorFormValues>;
+const clearOwnSpecValue = (
+  setValue: ReturnType<typeof useFormContext<EstimateLineEditorFormValues>>["setValue"],
+  binding: EstimateBucketBinding,
+  specIndex: number,
+  valueType: EstimateConditionSpecFormRow["value_type"],
+) => {
+  if (valueType === "boolean") {
+    setValue(specFieldPath(binding, specIndex, "value_boolean"), null, {
+      shouldDirty: true,
+    });
+    return;
+  }
+  if (valueType === "number") {
+    setValue(specFieldPath(binding, specIndex, "value_number"), null, {
+      shouldDirty: true,
+    });
+    return;
+  }
+  setValue(specFieldPath(binding, specIndex, "spec_option_id"), null, {
+    shouldDirty: true,
+  });
+  setValue(specFieldPath(binding, specIndex, "option_display_name"), null, {
+    shouldDirty: true,
+  });
 };
 
-const formatDisplayNumber = (
-  value: number | null | undefined,
-  spec: EstimateScopeSpecFormRow,
-): string => {
-  if (value === null || value === undefined) {
-    return "—";
+const seedOwnSpecValue = (
+  setValue: ReturnType<typeof useFormContext<EstimateLineEditorFormValues>>["setValue"],
+  binding: EstimateBucketBinding,
+  specIndex: number,
+  effective: EstimateConditionSpecFormRow,
+) => {
+  if (effective.value_type === "boolean") {
+    setValue(
+      specFieldPath(binding, specIndex, "value_boolean"),
+      effective.value_boolean,
+      { shouldDirty: true },
+    );
+    return;
   }
-
-  const formatted =
-    spec.decimal_places != null ? value.toFixed(spec.decimal_places) : String(value);
-
-  return spec.unit_symbol ? `${formatted} ${spec.unit_symbol}` : formatted;
+  if (effective.value_type === "number") {
+    setValue(
+      specFieldPath(binding, specIndex, "value_number"),
+      effective.value_number,
+      { shouldDirty: true },
+    );
+    return;
+  }
+  setValue(
+    specFieldPath(binding, specIndex, "spec_option_id"),
+    effective.spec_option_id,
+    { shouldDirty: true },
+  );
 };
 
 type SpecControlProps = {
+  binding: EstimateBucketBinding;
   disabled: boolean;
-  scopeIndex: number;
-  spec: EstimateScopeSpecFormRow;
-  specIndex: number;
+  effectiveSpec: EstimateConditionSpecFormRow;
+  isChild: boolean;
+  ownSpec: EstimateConditionSpecFormRow | null;
+  ownSpecIndex: number | null;
   writable: boolean;
-  zoneIndex?: number;
 };
 
 const SpecControl = ({
+  binding,
   disabled,
-  scopeIndex,
-  spec,
-  specIndex,
+  effectiveSpec,
+  isChild,
+  ownSpec,
+  ownSpecIndex,
   writable,
-  zoneIndex,
 }: SpecControlProps) => {
-  const label = spec.def_display_name ?? "Spec";
-  const valueType = spec.value_type ?? "enum";
+  const { setValue } = useFormContext<EstimateLineEditorFormValues>();
+  const label = effectiveSpec.def_display_name ?? "Spec";
+  const valueType = effectiveSpec.value_type ?? "enum";
+  const hasStoredOverride = ownSpec ? isBucketSpecValueSet(ownSpec) : false;
+  // Session override intent — needed when ancestry is unset (seeding null cannot flip hasOverride).
+  const [forceOverride, setForceOverride] = useState(false);
+  const pathKey = `${binding.conditionPath.join(".")}:${effectiveSpec.spec_def_id}`;
+  useEffect(() => {
+    setForceOverride(false);
+  }, [pathKey]);
+  const hasOverride = !isChild || hasStoredOverride || forceOverride;
+  const editable = writable && ownSpecIndex !== null && hasOverride;
+  const effectiveIsSet = isBucketSpecValueSet(effectiveSpec);
+
+  const controlPrefix =
+    isChild && ownSpecIndex !== null ? (
+      <Checkbox
+        checked={hasOverride}
+        disabled={disabled || !writable}
+        onChange={(event) => {
+          if (event.target.checked) {
+            setForceOverride(true);
+            if (effectiveIsSet) {
+              seedOwnSpecValue(setValue, binding, ownSpecIndex, effectiveSpec);
+            }
+          } else {
+            setForceOverride(false);
+            clearOwnSpecValue(setValue, binding, ownSpecIndex, valueType);
+          }
+        }}
+      />
+    ) : undefined;
 
   if (valueType === "enum") {
-    const options = (spec.options ?? []).map((option) => ({
+    const options = (effectiveSpec.options ?? []).map((option) => ({
       value: option.id,
       label: option.display_name,
     }));
+    const shownOptionId =
+      (ownSpec && isBucketSpecValueSet(ownSpec) ? ownSpec.spec_option_id : null) ??
+      effectiveSpec.spec_option_id;
+
+    if (ownSpecIndex === null) {
+      return (
+        <FormFieldItem label={label} controlPrefix={controlPrefix}>
+          <Select
+            allowClear={false}
+            style={{ width: "100%" }}
+            placeholder="Select…"
+            options={options}
+            value={shownOptionId}
+            disabled
+          />
+        </FormFieldItem>
+      );
+    }
 
     return (
       <Controller<EstimateLineEditorFormValues>
-        name={specFieldPath(scopeIndex, specIndex, "spec_option_id", zoneIndex)}
-        render={({ field: { value, onChange } }) =>
-          writable ? (
-            <div>
-              <Typography.Text type="secondary" style={{ display: "block", marginBottom: 4 }}>
-                {label}
-              </Typography.Text>
+        name={specFieldPath(binding, ownSpecIndex, "spec_option_id")}
+        render={({ field: { value, onChange } }) => {
+          const ownOptionId = typeof value === "string" ? value : null;
+          const controlValue = ownOptionId ?? effectiveSpec.spec_option_id;
+
+          return (
+            <FormFieldItem label={label} controlPrefix={controlPrefix}>
               <Select
-                allowClear
-                size="small"
+                allowClear={editable}
                 style={{ width: "100%" }}
                 placeholder="Select…"
                 options={options}
-                value={typeof value === "string" ? value : null}
-                disabled={disabled}
-                onChange={(next) => onChange(next ?? null)}
+                value={controlValue}
+                disabled={disabled || !editable}
+                onChange={(next) => {
+                  if (!editable) return;
+                  onChange(next ?? null);
+                }}
               />
-            </div>
-          ) : (
-            <div>
-              <Typography.Text type="secondary" style={{ display: "block", marginBottom: 4 }}>
-                {label}
-              </Typography.Text>
-              <Typography.Text>
-                {spec.option_display_name ??
-                  options.find((option) => option.value === value)?.label ??
-                  "—"}
-              </Typography.Text>
-            </div>
-          )
-        }
+            </FormFieldItem>
+          );
+        }}
       />
     );
   }
 
   if (valueType === "boolean") {
+    const shownValue =
+      (ownSpec && isBucketSpecValueSet(ownSpec) ? ownSpec.value_boolean : null) ??
+      effectiveSpec.value_boolean;
+
+    if (ownSpecIndex === null) {
+      return (
+        <FormFieldItem label={label} controlPrefix={controlPrefix}>
+          <Switch checked={shownValue === true} disabled />
+        </FormFieldItem>
+      );
+    }
+
     return (
       <Controller<EstimateLineEditorFormValues>
-        name={specFieldPath(scopeIndex, specIndex, "value_boolean", zoneIndex)}
-        render={({ field: { value, onChange } }) =>
-          writable ? (
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 12,
-              }}
-            >
-              <Typography.Text type="secondary">{label}</Typography.Text>
+        name={specFieldPath(binding, ownSpecIndex, "value_boolean")}
+        render={({ field: { value, onChange } }) => {
+          const ownValue = value === true || value === false ? value : null;
+          const controlValue = ownValue ?? effectiveSpec.value_boolean;
+
+          return (
+            <FormFieldItem label={label} controlPrefix={controlPrefix}>
               <Switch
-                size="small"
-                checked={value === true}
-                disabled={disabled}
-                onChange={(checked) => onChange(checked)}
+                checked={controlValue === true}
+                disabled={disabled || !editable}
+                onChange={(checked) => {
+                  if (!editable) return;
+                  onChange(checked);
+                }}
               />
-            </div>
-          ) : (
-            <div>
-              <Typography.Text type="secondary" style={{ display: "block", marginBottom: 4 }}>
-                {label}
-              </Typography.Text>
-              <Typography.Text>{value === true ? "Yes" : value === false ? "No" : "—"}</Typography.Text>
-            </div>
-          )
-        }
+            </FormFieldItem>
+          );
+        }}
       />
     );
   }
 
   if (valueType === "number") {
+    const shownValue =
+      (ownSpec && isBucketSpecValueSet(ownSpec) ? ownSpec.value_number : null) ??
+      effectiveSpec.value_number;
+
+    if (ownSpecIndex === null) {
+      return (
+        <FormFieldItem label={label} controlPrefix={controlPrefix}>
+          <InputNumber
+            addonAfter={effectiveSpec.unit_symbol ?? undefined}
+            disabled
+            placeholder="No filter"
+            precision={effectiveSpec.decimal_places ?? undefined}
+            style={{ width: "100%" }}
+            value={shownValue}
+          />
+        </FormFieldItem>
+      );
+    }
+
     return (
       <Controller<EstimateLineEditorFormValues>
-        name={specFieldPath(scopeIndex, specIndex, "value_number", zoneIndex)}
-        render={({ field: { value, onChange } }) =>
-          writable ? (
-            <div>
-              <Typography.Text type="secondary" style={{ display: "block", marginBottom: 4 }}>
-                {label}
-              </Typography.Text>
+        name={specFieldPath(binding, ownSpecIndex, "value_number")}
+        render={({ field: { value, onChange } }) => {
+          const ownValue = typeof value === "number" ? value : null;
+          const controlValue = ownValue ?? effectiveSpec.value_number;
+
+          return (
+            <FormFieldItem label={label} controlPrefix={controlPrefix}>
               <InputNumber
-                addonAfter={spec.unit_symbol ?? undefined}
-                disabled={disabled}
+                addonAfter={effectiveSpec.unit_symbol ?? undefined}
+                disabled={disabled || !editable}
                 placeholder="No filter"
-                precision={spec.decimal_places ?? undefined}
-                size="small"
+                precision={effectiveSpec.decimal_places ?? undefined}
                 style={{ width: "100%" }}
-                value={typeof value === "number" ? value : null}
-                onChange={(next) => onChange(next ?? null)}
+                value={controlValue}
+                onChange={(next) => {
+                  if (!editable) return;
+                  onChange(next ?? null);
+                }}
               />
-            </div>
-          ) : (
-            <div>
-              <Typography.Text type="secondary" style={{ display: "block", marginBottom: 4 }}>
-                {label}
-              </Typography.Text>
-              <Typography.Text>{formatDisplayNumber(value as number | null, spec)}</Typography.Text>
-            </div>
-          )
-        }
+            </FormFieldItem>
+          );
+        }}
       />
     );
   }
 
   return (
-    <div>
-      <Typography.Text type="secondary" style={{ display: "block", marginBottom: 4 }}>
-        {label}
-      </Typography.Text>
+    <FormFieldItem label={label} controlPrefix={controlPrefix}>
       <Typography.Text>—</Typography.Text>
-    </div>
+    </FormFieldItem>
   );
 };
 
 export const EstimateScopeSpecFields = ({
+  binding,
   disabled,
-  scopeIndex,
+  isChild,
   writable,
-  zoneIndex,
 }: EstimateScopeSpecFieldsProps) => {
-  const specsPath =
-    zoneIndex !== undefined
-      ? (`scopes.${scopeIndex}.zones.${zoneIndex}.specs` as const)
-      : (`scopes.${scopeIndex}.specs` as const);
+  const specsPath = conditionPathToRhf(binding.conditionPath, "specs");
+  const conditions = useWatch({ name: "conditions" }) as
+    | EstimateLineEditorFormValues["conditions"]
+    | undefined;
+  const ownSpecs =
+    (useWatch({
+      name: specsPath,
+    }) as EstimateConditionSpecFormRow[] | undefined) ?? [];
 
-  const specs = useWatch({
-    name: specsPath,
-  }) as EstimateScopeSpecFormRow[] | undefined;
+  const effectiveSpecs = resolveEffectiveBucketSpecs(
+    conditions ?? [],
+    binding.conditionPath,
+  );
 
-  if (!specs?.length) {
+  if (!effectiveSpecs.length) {
     return null;
   }
 
   return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
-        gap: 12,
-        padding: "4px 0",
-        width: "100%",
-      }}
-    >
-      {specs.map((spec, specIndex) => (
-        <SpecControl
-          key={spec.spec_def_id}
-          disabled={disabled}
-          spec={spec}
-          specIndex={specIndex}
-          scopeIndex={scopeIndex}
-          writable={writable}
-          zoneIndex={zoneIndex}
-        />
-      ))}
-    </div>
+    <>
+      {effectiveSpecs.map((effectiveSpec) => {
+        const ownSpecIndex = ownSpecs.findIndex(
+          (spec) => spec.spec_def_id === effectiveSpec.spec_def_id,
+        );
+        const ownSpec = ownSpecIndex >= 0 ? ownSpecs[ownSpecIndex]! : null;
+
+        return (
+          <SpecControl
+            key={effectiveSpec.spec_def_id}
+            binding={binding}
+            disabled={disabled}
+            effectiveSpec={effectiveSpec}
+            isChild={isChild}
+            ownSpec={ownSpec}
+            ownSpecIndex={ownSpecIndex >= 0 ? ownSpecIndex : null}
+            writable={writable}
+          />
+        );
+      })}
+    </>
   );
 };

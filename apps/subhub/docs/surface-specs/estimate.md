@@ -1,6 +1,6 @@
 # Estimates — `estimate_list` · `estimate_detail`
 
-> **Wave:** 4e · **Status:** backbone + **37w three-panel Line Items** (2026-07-08) · **Implementation:** [task 32](../tasks/32-estimate-wave-4e.md) wave 4e; [task 37w](../tasks/37w-estimate-line-items-panels.md) Line Items panels · **Planning:** [`02-estimates.md`](../planning/02-estimates.md) · **Catalog:** [`surfaces.md`](../surfaces.md#estimate_list--estimate_detail) · **DBML:** `estimate`, `estimate_party`, `estimate_scope`, `estimate_zone`, `estimate_line` · **Decisions:** [three-panel layout](../decisions/estimate.md#decision-estimate-line-items-tab--three-panel-layout-2026-07-08), [Line Items merge](../decisions/estimate.md#decision-estimate-line-items-tab--merge-scope-config-into-line-tree-2026-07-08) (37v UI superseded), [site anchor](../decisions/estimate.md#decision-estimate-site-anchor--gate-lines-immutable-after-create-2026-06-30)
+> **Wave:** 4e · **Status:** backbone + **37y condition-only commercial tree** (2026-07-09) · **Implementation:** [task 32](../tasks/32-estimate-wave-4e.md) wave 4e; [task 37w](../tasks/37w-estimate-line-items-panels.md) three-panel shell; [task 37x](../tasks/37x-estimate-conditions-allocations.md) (superseded for roots); [task 37y](../tasks/37y-condition-only-commercial-tree.md) condition forest · **Planning:** [`02-estimates.md`](../planning/02-estimates.md) · **Catalog:** [`surfaces.md`](../surfaces.md#estimate_list--estimate_detail) · **DBML:** `estimate`, `estimate_party`, `estimate_condition`, `estimate_line`, `estimate_line_allocation` · **Decisions:** [condition-only tree Y1–Y5](../decisions/estimate.md#decision-condition-only-commercial-tree-2026-07-09), [scope / condition / zone / qty](../decisions/estimate.md#decision-estimate-scope-condition-zone-and-line-qty-2026-07-09), [three-panel layout](../decisions/estimate.md#decision-estimate-line-items-tab--three-panel-layout-2026-07-08), [site anchor](../decisions/estimate.md#decision-estimate-site-anchor--gate-lines-immutable-after-create-2026-06-30)
 
 **Related:** Site anchor via `profile.site_id` → [`site_detail`](./site.md). Stakeholder catalog: [`job-party-relation.md`](./job-party-relation.md). Win → job copy in wave **4b** → [`job.md`](./job.md).
 
@@ -346,56 +346,57 @@ Master-detail: list in `estimates/layout.tsx`, detail in `[id]/page.tsx` ([`rout
 ├──────────────────────────────────────────────────────────────┤
 │ Line Items tab (desktop three-panel):                        │
 │ ┌──────────────────────┬──────────────────────┐              │
-│ │ S — Scopes & zones   │ C — Configuration    │              │
+│ │ S — Structure        │ C — Configuration    │              │
 │ ├──────────────────────┴──────────────────────┤              │
-│ │ LI — flat line table (full width)            │              │
+│ │ LI — flat line table (full width) + Places…  │              │
 │ │ FieldArrayTable-style Add line footer        │              │
 │ └──────────────────────────────────────────────┘              │
 │ ── footer ── total ext sell (visible bucket)               │
 └──────────────────────────────────────────────────────────────┘
 ```
 
-**Shared components:** `EstimateDetailForm` + `EstimateLineItemsPanels` (`EstimateQuoteStructureTree`, `EstimateBucketConfigurePanel`, `EstimateLineFlatTable`).
+**Shared components:** `EstimateDetailForm` + `EstimateLineItemsPanels` (`EstimateQuoteStructureTree`, `EstimateBucketConfigurePanel`, `EstimateLineFlatTable`, `EstimateLinePlacesButton`).
 
-### Three panels (37w)
+### Three panels (37w topology · 37y content)
 
 | Panel | Id | Role |
 |-------|-----|------|
-| **S** | structure | Full `site_tree` scope/zone hierarchy; **select only** — no add/remove quote UI |
-| **C** | config | Permanent bucket config for **S** selection — complexity, labor phases (multi-select), specs |
-| **LI** | lines | Flat **37f** column grid; filtered by **S** selection; **Add line** footer |
+| **S** | structure | Estimate-owned **condition forest** — Add root ▾ / Add condition / Delete (X1 block if lines); names edit in **C** |
+| **C** | config | Bound to **S** selection — **name**, **complexity**, labor phases, specs on every node; child inherit checkboxes (Y4) |
+| **LI** | lines | Flat **37f** column grid; filtered by **S** selection; **Add line** footer; **Places…** allocations |
 
-### Selection → LI filter (37w W3)
+### Selection → LI filter (37y Y5)
 
 | **S** selection | **LI** shows | New line targets |
 |-----------------|--------------|------------------|
-| **Scope** | Lines with matching `estimate_scope_id` and **`site_zone_id` null** (unzoned) | Same |
-| **Zone** | Lines matching scope + zone | Same zone bucket |
+| **Condition** | Lines with matching `estimate_condition_id` (selected node only) | Same condition |
 
-**S** selection is **client-only** (not persisted). Default on load: first site scope (unzoned bucket).
+**S** selection is **client-only** (not persisted). Default on load: first root condition. Add-line gated until a condition is selected.
 
-### Implicit include (37w W5)
+### Commercial tree (37y Y1 / Y5)
 
-No **Add scope** / **Add zone** / **Remove from quote** on Line Items. When the user **Add line** or edits **C** for a site scope/zone not yet on `scopes[]`, the client auto-includes via `addScopeToQuote` / `addZoneToQuote` — dirty until Save.
+Tree is **estimate-owned condition forest** — roots carry `root_item_id` (catalog root); children nest via `parent_condition_id`. Site geography is place-only via line **Places…** / `estimate_line_allocation`.
 
-Empty `site_tree.scopes` → CTA link to site **Scopes & zones**.
+Empty forest → prompt to **Add root** (catalog root picker).
 
 ### Add / delete (client until Save)
 
 | Action | Control | Behavior |
 |--------|---------|----------|
-| **Select bucket** | **S** tree click | Filters **LI**; binds **C** |
-| **Configure** | **C** panel fields | Complexity, labor phases, spec filters; implicit include on first edit |
-| **Add line** | **LI** dashed **Add line** footer | Append standalone row for **S** selection; implicit include if needed |
+| **Select node** | **S** tree click | Filters **LI**; binds **C** |
+| **Configure** | **C** panel fields | Name; complexity; labor phases; specs — child inherit checkboxes |
+| **Add line** | **LI** dashed **Add line** footer | Append standalone row for selected condition |
+| **Places** | **Places…** on line | Allocations (default qty 1); `qty_manual` sync rules (G3/X3) |
+| **Delete node** | **S** Delete | Blocked if lines reference node or descendants (X1) |
 | **Delete line** | Row delete in **LI** | Remove line only |
 
-**Not in 37w:** kit UI; summary chips; 37v tree parent rows; Configure popover; explicit include/remove chrome; LI drag→**S** retarget (deferred).
+**Not in 37y:** kit UI; summary chips; win→job condition/allocation copy (X4); LI drag→**S** retarget (deferred).
 
 ### Line columns (37f / LI)
 
 | Column | Notes |
 |--------|-------|
-| Item | `TreeSelect` — root category subtree for line's scope |
+| Item | `TreeSelect` — root category subtree for condition tree’s `root_item_id` |
 | Part | `Select` or text — resolver output |
 | Description | `Input` |
 | Qty | `InputNumber` |
@@ -409,9 +410,9 @@ Empty `site_tree.scopes` → CTA link to site **Scopes & zones**.
 
 **Kit UI removed (37v).** PATCH emits `line_role: standalone` only.
 
-### Superseded UI (37v — historical)
+### Superseded UI (37v / 37w site-tree — historical)
 
-37v used a single `Table` with `treeData` — scope/zone parent rows (`colSpan`) + Configure **Popover** + toolbar **Add scope ▾**. Replaced by 37w panels; DAL/persistence unchanged.
+37v used a single `Table` with `treeData` — scope/zone parent rows + Configure **Popover**. 37w kept three panels but bound **S** to `site_tree`. **37x** replaces commercial `estimate_zone*` with estimate-owned conditions + allocations.
 
 ---
 

@@ -6,8 +6,7 @@ import {
   computeUnitPriceTarget,
   loadCommercialCatalog,
   loadComplexityContext,
-  loadScopeLaborPhases,
-  loadZoneLaborPhases,
+  loadConditionLaborPhases,
   resolveComplexityPercent,
   resolveFilteredLaborCost,
   resolveRate,
@@ -34,14 +33,14 @@ export type RecalcLineOutput = RecalcLineInput & {
 
 const loadEstimateStatus = async (
   client: Pool | PoolClient,
-  estimateScopeId: string,
+  estimateConditionId: string,
 ): Promise<string | null> => {
   const result = await client.query<{ status: string }>(
     `SELECT e.status
      FROM estimate e
-     INNER JOIN estimate_scope es ON es.estimate_id = e.id
-     WHERE es.id = $1`,
-    [estimateScopeId],
+     INNER JOIN estimate_condition ec ON ec.estimate_id = e.id
+     WHERE ec.id = $1`,
+    [estimateConditionId],
   );
   return result.rows[0]?.status ?? null;
 };
@@ -53,7 +52,7 @@ export const recalcProductLine = async (
 ): Promise<RecalcLineOutput> => {
   const commercialCatalog = catalog ?? (await loadCommercialCatalog(client));
   const lock = line.lock ?? "none";
-  const status = await loadEstimateStatus(client, line.estimate_scope_id as string);
+  const status = await loadEstimateStatus(client, line.estimate_condition_id);
 
   if (status && status !== "draft") {
     return {
@@ -98,8 +97,7 @@ export const recalcProductLine = async (
 
   const bucket = await loadMergedBucketForLine(
     client,
-    line.estimate_scope_id as string,
-    line.site_zone_id ?? null,
+    line.estimate_condition_id,
     line.is_new ? null : line.id,
   );
 
@@ -128,26 +126,14 @@ export const recalcProductLine = async (
   const unitFreight = computeAddOnUnit(freightProfile, unitMaterial);
   const unitIncidental = computeAddOnUnit(incidentalProfile, unitMaterial);
 
-  const [scopeLaborPhases, zoneLaborPhases, complexity] = await Promise.all([
-    loadScopeLaborPhases(client, line.estimate_scope_id as string),
-    line.site_zone_id
-      ? loadZoneLaborPhases(
-          client,
-          line.estimate_scope_id as string,
-          line.site_zone_id,
-        )
-      : Promise.resolve([]),
-    loadComplexityContext(
-      client,
-      line.estimate_scope_id as string,
-      line.site_zone_id ?? null,
-    ),
+  const [conditionLaborPhases, complexity] = await Promise.all([
+    loadConditionLaborPhases(client, line.estimate_condition_id),
+    loadComplexityContext(client, line.estimate_condition_id),
   ]);
   const baseLabor = resolveFilteredLaborCost(
     commercialCatalog,
     line.item_id,
-    scopeLaborPhases,
-    zoneLaborPhases.length > 0 ? zoneLaborPhases : null,
+    conditionLaborPhases,
   );
   const complexityPercent = resolveComplexityPercent(complexity);
   const unitLabor = baseLabor * (complexityPercent / 100);
@@ -188,20 +174,20 @@ export const recalcProductLine = async (
 export const recalcLineItems = async (
   client: Pool | PoolClient,
   lines: RecalcLineInput[],
-  existingLineIds: Set<string>,
+  priorIds: Set<string>,
 ): Promise<RecalcLineOutput[]> => {
   const catalog = await loadCommercialCatalog(client);
-  const results: RecalcLineOutput[] = [];
+  const out: RecalcLineOutput[] = [];
 
   for (const line of lines) {
-    const isNew = !existingLineIds.has(line.id);
-    results.push(
-      await recalcProductLine(client, {
-        ...line,
-        is_new: isNew,
-      }, catalog),
+    out.push(
+      await recalcProductLine(
+        client,
+        { ...line, is_new: !priorIds.has(line.id) },
+        catalog,
+      ),
     );
   }
 
-  return results;
+  return out;
 };

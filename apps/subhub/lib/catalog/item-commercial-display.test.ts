@@ -3,9 +3,12 @@ import { describe, expect, it } from "vitest";
 import type { ItemTreeNode } from "./descriptors/item-list";
 import {
   buildAncestorChain,
+  displayCommercialRateTypeId,
   flattenItemTreeCommercial,
   formatAddOnRateSummary,
   formatMarkupRateSummary,
+  hasCommercialRateOverride,
+  resolveAncestryRateTypeId,
   resolveEffectiveRateTypeId,
 } from "./item-commercial-display";
 
@@ -87,5 +90,65 @@ describe("resolveEffectiveRateTypeId", () => {
     expect(resolveEffectiveRateTypeId(index, createChain, "freight", null)).toBe(
       "freight-root",
     );
+  });
+});
+
+describe("resolveAncestryRateTypeId", () => {
+  const tree: ItemTreeNode[] = [
+    treeNode("root", null, {
+      freight_rate_type_id: "freight-root",
+      markup_type_id: "markup-root",
+      children: [
+        treeNode("child", "root", {
+          freight_rate_type_id: "freight-child",
+          children: [treeNode("leaf", "child")],
+        }),
+      ],
+    }),
+  ];
+
+  const index = flattenItemTreeCommercial(tree);
+  const leafChain = buildAncestorChain(index, "leaf", "child");
+
+  it("skips self and walks ancestors only", () => {
+    expect(resolveAncestryRateTypeId(index, leafChain, "freight")).toBe(
+      "freight-child",
+    );
+  });
+
+  it("returns null when no ancestor has a value", () => {
+    expect(resolveAncestryRateTypeId(index, ["leaf"], "markup")).toBeNull();
+  });
+});
+
+describe("hasCommercialRateOverride", () => {
+  it("root always overrides", () => {
+    expect(hasCommercialRateOverride(false, null, false)).toBe(true);
+  });
+
+  it("child inherits when own is null and not forced", () => {
+    expect(hasCommercialRateOverride(true, null, false)).toBe(false);
+  });
+
+  it("child overrides when own is set", () => {
+    expect(hasCommercialRateOverride(true, "rate-1", false)).toBe(true);
+  });
+
+  it("child overrides when forced", () => {
+    expect(hasCommercialRateOverride(true, null, true)).toBe(true);
+  });
+});
+
+describe("displayCommercialRateTypeId", () => {
+  it("shows own value when overriding", () => {
+    expect(displayCommercialRateTypeId(true, "own", "ancestry")).toBe("own");
+  });
+
+  it("shows ancestry when inheriting", () => {
+    expect(displayCommercialRateTypeId(false, null, "ancestry")).toBe("ancestry");
+  });
+
+  it("shows null own when forced override with no selection", () => {
+    expect(displayCommercialRateTypeId(true, null, "ancestry")).toBeNull();
   });
 });

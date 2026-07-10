@@ -1,6 +1,6 @@
 # 37w — Estimate Line Items three-panel layout
 
-> **Status:** Complete (2026-07-08). Next: [37h](./37a-category-scope-decision-dbml-migration.md) — job `site_zone_id` FK renames (37a chain).
+> **Status:** Complete (2026-07-08). Next: [37x](./37x-estimate-conditions-allocations.md) — conditions + allocations (G1–G5e).
 >
 > **Decision:** [three-panel layout](../decisions/estimate.md#decision-estimate-line-items-tab--three-panel-layout-2026-07-08) (W1–W9). **Supersedes UI of:** [37v](./37v-estimate-structure-tab.md) tree table + Configure popover. **Builds on:** [37f](./37f-estimate-line-costing.md) line columns, [37n](./37n-labor-phase-inclusion.md) phase fields, `EstimateBucketConfigurePanel`. **No schema change.** **Touches:** `estimate_detail` Line Items tab UI only.
 

@@ -7,7 +7,7 @@ import {
   patchableFieldIds,
   type Manifest,
 } from "@latch/contracts";
-import { App, Space, Tabs, Tag, Typography } from "antd";
+import { App, Space, Tag, Typography } from "antd";
 import Link from "next/link";
 import { notFound, useRouter } from "next/navigation";
 import { useCallback, useMemo } from "react";
@@ -19,6 +19,7 @@ import { SURFACE_FORM_MAX_WIDTH } from "@/components/form/formLayout";
 import { SelectInput } from "@/components/form/SelectInput";
 import { TextInput } from "@/components/form/TextInput";
 import { useSurfaceFormChrome } from "@/components/surface/SurfaceFormChromeContext";
+import { DetailHeader } from "@/components/surface/DetailHeader";
 import { SurfaceFormLayout } from "@/components/surface/SurfaceFormLayout";
 import { SurfaceFormRoot } from "@/components/surface/SurfaceFormRoot";
 import { useFieldMode } from "@/components/surface/useFieldMode";
@@ -517,11 +518,8 @@ export const JobDetailForm = ({
     >
       <form onSubmit={onSave}>
         <SurfaceFormLayout maxWidth={SURFACE_FORM_MAX_WIDTH}>
-          <Typography.Title level={4} style={{ marginTop: 0 }}>
-            {isCreate ? "New job" : (profile?.title ?? "Job")}
-          </Typography.Title>
-
-          <Tabs
+          <DetailHeader
+            title={isCreate ? "New job" : (profile?.title ?? "Job")}
             items={[
               { key: "overview", label: "Overview", children: overviewTab },
               { key: "scope", label: "Scope", children: scopeTab },

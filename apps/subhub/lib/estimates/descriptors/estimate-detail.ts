@@ -9,13 +9,13 @@ const EstimateStakeholderPatchElementSchema = z
   })
   .strict();
 
-const EstimateScopeLaborPhasePatchElementSchema = z
+const EstimateConditionLaborPhasePatchElementSchema = z
   .object({
     labor_phase_id: z.string(),
   })
   .strict();
 
-const EstimateScopeSpecPatchElementSchema = z
+const EstimateConditionSpecPatchElementSchema = z
   .object({
     spec_def_id: z.string(),
     spec_option_id: z.string().nullable().optional(),
@@ -24,28 +24,43 @@ const EstimateScopeSpecPatchElementSchema = z
   })
   .strict();
 
-const EstimateScopeZonePatchElementSchema = z
+const EstimateConditionPatchElementSchema: z.ZodType<{
+  complexity_factor_id?: string | null;
+  conditions?: unknown[];
+  id?: string;
+  included_labor_phases?: Array<{ labor_phase_id: string }>;
+  labor_phases_explicit?: boolean;
+  name: string;
+  parent_condition_id?: string | null;
+  root_item_id?: string | null;
+  sort_order: number;
+  specs: Array<{
+    spec_def_id: string;
+    spec_option_id?: string | null;
+    value_boolean?: boolean | null;
+    value_number?: number | null;
+  }>;
+}> = z.lazy(() =>
+  z
+    .object({
+      id: z.string().optional(),
+      name: z.string().min(1),
+      parent_condition_id: z.string().nullable().optional(),
+      root_item_id: z.string().nullable().optional(),
+      sort_order: z.number(),
+      complexity_factor_id: z.string().nullable().optional(),
+      labor_phases_explicit: z.boolean().optional(),
+      included_labor_phases: z.array(EstimateConditionLaborPhasePatchElementSchema).optional(),
+      specs: z.array(EstimateConditionSpecPatchElementSchema),
+      conditions: z.array(EstimateConditionPatchElementSchema).optional(),
+    })
+    .strict(),
+);
+
+const EstimateLineAllocationPatchElementSchema = z
   .object({
     site_zone_id: z.string(),
-    sort_order: z.number(),
-    complexity_factor_id: z.string().nullable().optional(),
-    included_labor_phases: z.array(EstimateScopeLaborPhasePatchElementSchema).optional(),
-    specs: z.array(EstimateScopeSpecPatchElementSchema),
-  })
-  .strict();
-
-const EstimateScopePatchElementSchema = z
-  .object({
-    id: z.string().optional(),
-    site_scope_id: z.string(),
-    root_item_id: z.string(),
-    sort_order: z.number(),
-    labor_context_type_id: z.string().nullable().optional(),
-    markup_type_id: z.string().nullable().optional(),
-    complexity_factor_id: z.string().nullable().optional(),
-    included_labor_phases: z.array(EstimateScopeLaborPhasePatchElementSchema).optional(),
-    specs: z.array(EstimateScopeSpecPatchElementSchema),
-    zones: z.array(EstimateScopeZonePatchElementSchema),
+    quantity: z.number().positive(),
   })
   .strict();
 
@@ -55,6 +70,7 @@ const EstimateLineItemPatchElementSchema = z
     line_role: z.enum(["standalone", "kit_header", "kit_component"]),
     description: z.string(),
     quantity: z.number(),
+    qty_manual: z.boolean().optional(),
     unit: z.string(),
     unit_cost: z.number(),
     unit_price: z.number(),
@@ -63,8 +79,8 @@ const EstimateLineItemPatchElementSchema = z
     unit_incidental: z.number().optional(),
     unit_freight: z.number().optional(),
     unit_price_target: z.number().optional(),
-    estimate_scope_id: z.string(),
-    site_zone_id: z.string().nullable().optional(),
+    estimate_condition_id: z.string(),
+    allocations: z.array(EstimateLineAllocationPatchElementSchema).optional(),
     lock: z.enum(["none", "sell", "line"]).optional(),
     phase_id: z.string().nullable().optional(),
     item_id: z.string().nullable().optional(),
@@ -90,7 +106,7 @@ export const EstimateDetailPatchSchema = z
       .strict()
       .optional(),
     stakeholders: z.array(EstimateStakeholderPatchElementSchema).optional(),
-    scopes: z.array(EstimateScopePatchElementSchema).optional(),
+    conditions: z.array(EstimateConditionPatchElementSchema).optional(),
     line_items: z.array(EstimateLineItemPatchElementSchema).optional(),
   })
   .strict();
@@ -109,7 +125,7 @@ export const EstimateDetailCreateSchema = z
       })
       .strict(),
     stakeholders: z.array(EstimateStakeholderPatchElementSchema).optional(),
-    scopes: z.array(EstimateScopePatchElementSchema).optional(),
+    conditions: z.array(EstimateConditionPatchElementSchema).optional(),
     line_items: z.array(EstimateLineItemPatchElementSchema).optional(),
   })
   .strict();
@@ -150,16 +166,16 @@ export type EstimateSiteScopeTreeRow = {
 
 export type EstimateSiteTreeRow = {
   scopes: EstimateSiteScopeTreeRow[];
-  spec_templates: Record<string, EstimateScopeSpecRow[]>;
+  spec_templates: Record<string, EstimateConditionSpecRow[]>;
 };
 
-export type EstimateScopeLaborPhaseRow = {
+export type EstimateConditionLaborPhaseRow = {
   labor_phase_id: string;
   labor_phase_name: string;
   sort_order: number;
 };
 
-export type EstimateScopeSpecRow = {
+export type EstimateConditionSpecRow = {
   decimal_places: number | null;
   def_display_name: string;
   option_display_name: string | null;
@@ -173,30 +189,35 @@ export type EstimateScopeSpecRow = {
   value_type: "enum" | "boolean" | "number";
 };
 
-export type EstimateScopeZoneRow = {
+/** @deprecated Alias — prefer EstimateConditionSpecRow / EstimateConditionLaborPhaseRow. */
+export type EstimateScopeSpecRow = EstimateConditionSpecRow;
+/** @deprecated Alias — prefer EstimateConditionLaborPhaseRow. */
+export type EstimateScopeLaborPhaseRow = EstimateConditionLaborPhaseRow;
+
+export type EstimateConditionRow = {
   complexity_factor_id: string | null;
-  included_labor_phases: EstimateScopeLaborPhaseRow[];
-  site_zone_id: string;
+  conditions: EstimateConditionRow[];
+  id: string;
+  included_labor_phases: EstimateConditionLaborPhaseRow[];
+  labor_phases_explicit: boolean;
+  name: string;
+  parent_condition_id: string | null;
+  root_item_id: string | null;
+  root_item_name: string | null;
   sort_order: number;
-  specs: EstimateScopeSpecRow[];
+  specs: EstimateConditionSpecRow[];
 };
 
-export type EstimateScopeRow = {
-  complexity_factor_id: string | null;
-  id: string;
-  included_labor_phases: EstimateScopeLaborPhaseRow[];
-  root_item_id: string;
-  root_item_name: string | null;
-  site_scope_id: string;
-  site_scope_name: string | null;
-  sort_order: number;
-  specs: EstimateScopeSpecRow[];
-  zones: EstimateScopeZoneRow[];
+export type EstimateLineAllocationRow = {
+  quantity: number;
+  site_zone_id: string;
+  site_zone_name?: string | null;
 };
 
 export type EstimateLineItemRow = {
+  allocations: EstimateLineAllocationRow[];
   description: string;
-  estimate_scope_id: string;
+  estimate_condition_id: string;
   id: string;
   item_id: string | null;
   line_number: number;
@@ -205,8 +226,8 @@ export type EstimateLineItemRow = {
   parent_line_id: string | null;
   part_id: string | null;
   phase_id: string | null;
+  qty_manual: boolean;
   quantity: number;
-  site_zone_id: string | null;
   sort_order: number;
   unit: string;
   unit_cost: number;
@@ -220,8 +241,8 @@ export type EstimateLineItemRow = {
 };
 
 export type EstimateDetailRelated = {
+  conditions: EstimateConditionRow[];
   line_items: EstimateLineItemRow[];
-  scopes: EstimateScopeRow[];
   site_tree: EstimateSiteTreeRow | null;
   stakeholders: EstimateStakeholderRow[];
 };
@@ -231,15 +252,20 @@ export type EstimateStakeholderPatchRow = {
   relation_id: string;
 };
 
-export type EstimateScopeSpecPatchRow = z.infer<
-  typeof EstimateScopeSpecPatchElementSchema
+export type EstimateConditionSpecPatchRow = z.infer<
+  typeof EstimateConditionSpecPatchElementSchema
 >;
 
-export type EstimateScopeZonePatchRow = z.infer<
-  typeof EstimateScopeZonePatchElementSchema
+/** @deprecated Prefer EstimateConditionSpecPatchRow. */
+export type EstimateScopeSpecPatchRow = EstimateConditionSpecPatchRow;
+
+export type EstimateConditionPatchRow = z.infer<
+  typeof EstimateConditionPatchElementSchema
 >;
 
-export type EstimateScopePatchRow = z.infer<typeof EstimateScopePatchElementSchema>;
+export type EstimateLineAllocationPatchRow = z.infer<
+  typeof EstimateLineAllocationPatchElementSchema
+>;
 
 export type EstimateLineItemPatchRow = z.infer<
   typeof EstimateLineItemPatchElementSchema
@@ -257,8 +283,8 @@ export type EstimateDetailWriteRow = Pick<
 >;
 
 export type EstimateDetailRelatedPatch = {
+  conditions?: EstimateConditionPatchRow[];
   line_items?: EstimateLineItemPatchRow[];
-  scopes?: EstimateScopePatchRow[];
   stakeholders?: EstimateStakeholderPatchRow[];
 };
 
@@ -282,7 +308,7 @@ const normalizeEstimateDetailRelated = (
   related: EstimateDetailStoreRelated,
 ): EstimateDetailRelated => ({
   stakeholders: (related.stakeholders ?? []) as EstimateStakeholderRow[],
-  scopes: (related.scopes ?? []) as EstimateScopeRow[],
+  conditions: (related.conditions ?? []) as EstimateConditionRow[],
   site_tree: (related as EstimateDetailRelated).site_tree ?? null,
   line_items: (related.line_items ?? []) as EstimateLineItemRow[],
 });
@@ -313,8 +339,8 @@ export const projectEstimateDetailRow = (
     dto.stakeholders = normalized.stakeholders;
   }
 
-  if (manifest.fields.scopes?.includes("read")) {
-    dto.scopes = normalized.scopes;
+  if (manifest.fields.conditions?.includes("read")) {
+    dto.conditions = normalized.conditions;
     if (normalized.site_tree) {
       dto.site_tree = normalized.site_tree;
     }
@@ -377,8 +403,8 @@ export const estimateDetailDescriptor: SurfaceDescriptor<
     if (typed.stakeholders !== undefined) {
       related.stakeholders = typed.stakeholders;
     }
-    if (typed.scopes !== undefined) {
-      related.scopes = typed.scopes;
+    if (typed.conditions !== undefined) {
+      related.conditions = typed.conditions;
     }
     if (typed.line_items !== undefined) {
       related.line_items = typed.line_items;
@@ -390,7 +416,7 @@ export const estimateDetailDescriptor: SurfaceDescriptor<
   deleteAuditSnapshot: (row, related) => ({
     ...formatEstimateDetailRow(row),
     stakeholders: normalizeEstimateDetailRelated(related).stakeholders,
-    scopes: normalizeEstimateDetailRelated(related).scopes,
+    conditions: normalizeEstimateDetailRelated(related).conditions,
     line_items: normalizeEstimateDetailRelated(related).line_items,
   }),
   canDelete: (ctx) => ctx.manifest.actions.includes("delete"),

@@ -138,6 +138,37 @@ export const resolveEffectiveRateTypeId = (
   return null;
 };
 
+/** Walk ancestors only (skip chain[0] = self) — for inherit-mode display. */
+export const resolveAncestryRateTypeId = (
+  index: Map<string, ItemCommercialIndexRow>,
+  chain: string[],
+  family: CommercialFamily,
+): string | null => {
+  const field = familyField[family];
+  for (let indexOffset = 1; indexOffset < chain.length; indexOffset += 1) {
+    const id = chain[indexOffset]!;
+    const value = index.get(id)?.[field];
+    if (value) {
+      return value;
+    }
+  }
+
+  return null;
+};
+
+export const hasCommercialRateOverride = (
+  isChild: boolean,
+  ownRateTypeId: string | null | undefined,
+  forceOverride: boolean,
+): boolean => !isChild || ownRateTypeId != null || forceOverride;
+
+export const displayCommercialRateTypeId = (
+  hasOverride: boolean,
+  ownRateTypeId: string | null | undefined,
+  ancestryRateTypeId: string | null,
+): string | null =>
+  hasOverride ? (ownRateTypeId ?? null) : ancestryRateTypeId;
+
 export const unwrapCatalogPercent = (row: Record<string, unknown>): number => {
   const field = row.percent as { percent?: number } | undefined;
   return Number(field?.percent ?? 0);

@@ -1,22 +1,24 @@
 "use client";
 
-import { Select, Typography } from "antd";
+import { Checkbox, Select } from "antd";
 import { useMemo } from "react";
-import { Controller, useFormContext } from "react-hook-form";
+import { Controller, useFormContext, useWatch } from "react-hook-form";
 
+import { conditionPathToRhf } from "@/components/estimates/estimate-bucket-paths";
 import type {
+  EstimateConditionLaborPhaseFormRow,
   EstimateLineEditorFormValues,
-  EstimateScopeLaborPhaseFormRow,
 } from "@/components/estimates/estimate-line-tree";
 import type { EstimateBucketBinding } from "@/components/estimates/estimate-line-selection";
+import { FormFieldItem } from "@/components/form/FormFieldItem";
+import { resolveEffectiveLaborPhases } from "@/lib/estimates/estimate-bucket-specs-form";
 import { useSurfaceList } from "@/lib/hooks/use-surface-list";
 
 type EstimateScopeLaborPhaseFieldsProps = {
+  binding: EstimateBucketBinding;
   disabled: boolean;
-  scopeIndex: number;
+  isChild: boolean;
   writable: boolean;
-  zoneIndex?: number;
-  ensureIncluded?: () => EstimateBucketBinding | null;
 };
 
 const unwrapCatalogName = (row: Record<string, unknown>): string => {
@@ -25,25 +27,31 @@ const unwrapCatalogName = (row: Record<string, unknown>): string => {
 };
 
 export const EstimateScopeLaborPhaseFields = ({
+  binding,
   disabled,
-  scopeIndex,
+  isChild,
   writable,
-  zoneIndex,
-  ensureIncluded,
 }: EstimateScopeLaborPhaseFieldsProps) => {
-  const { control, setValue, watch } = useFormContext<EstimateLineEditorFormValues>();
+  const { control, setValue } = useFormContext<EstimateLineEditorFormValues>();
 
-  const fieldPath =
-    scopeIndex >= 0
-      ? zoneIndex === undefined
-        ? (`scopes.${scopeIndex}.included_labor_phases` as const)
-        : (`scopes.${scopeIndex}.zones.${zoneIndex}.included_labor_phases` as const)
-      : ("scopes.0.included_labor_phases" as const);
+  const phasesPath = conditionPathToRhf(
+    binding.conditionPath,
+    "included_labor_phases",
+  );
+  const explicitPath = conditionPathToRhf(
+    binding.conditionPath,
+    "labor_phases_explicit",
+  );
 
-  const selected =
-    scopeIndex >= 0
-      ? ((watch(fieldPath) ?? []) as EstimateScopeLaborPhaseFormRow[])
-      : [];
+  const conditions = useWatch({ name: "conditions" }) as
+    | EstimateLineEditorFormValues["conditions"]
+    | undefined;
+  const selected = (useWatch({ name: phasesPath }) ??
+    []) as EstimateConditionLaborPhaseFormRow[];
+  const laborPhasesExplicit = useWatch({ name: explicitPath }) as boolean | undefined;
+  // Roots always own their phases control; children use the explicit flag as inherit checkbox.
+  const hasOverride = isChild ? laborPhasesExplicit === true : true;
+
   const selectedIds = useMemo(
     () => selected.map((row) => row.labor_phase_id),
     [selected],
@@ -59,17 +67,15 @@ export const EstimateScopeLaborPhaseFields = ({
     [laborPhases?.data.rows],
   );
 
-  const updatePhases = (nextIds: string[]) => {
-    const binding = ensureIncluded?.() ?? { scopeIndex, zoneIndex };
-    if (!binding) {
-      return;
-    }
+  const resolvedPhases = resolveEffectiveLaborPhases(
+    conditions ?? [],
+    binding.conditionPath,
+  );
+  const displayIds = hasOverride
+    ? selectedIds
+    : (resolvedPhases ?? []).map((phase) => phase.labor_phase_id);
 
-    const path =
-      binding.zoneIndex === undefined
-        ? (`scopes.${binding.scopeIndex}.included_labor_phases` as const)
-        : (`scopes.${binding.scopeIndex}.zones.${binding.zoneIndex}.included_labor_phases` as const);
-
+  const updatePhases = (nextIds: string[], shouldDirty = true) => {
     const next = nextIds.map((laborPhaseId, index) => {
       const label = options.find((option) => option.value === laborPhaseId)?.label ?? "";
       return {
@@ -79,33 +85,63 @@ export const EstimateScopeLaborPhaseFields = ({
       };
     });
 
-    setValue(path, next, { shouldDirty: true });
+    setValue(phasesPath, next, { shouldDirty });
   };
+
+  const editable = writable && hasOverride;
 
   return (
     <Controller
       control={control}
-      name={fieldPath}
+      name={phasesPath}
       render={() => (
-        <div style={{ marginBottom: 16 }}>
-          <Typography.Text strong style={{ display: "block", marginBottom: 4 }}>
-            Included labor phases
-          </Typography.Text>
-          <Typography.Paragraph type="secondary" style={{ marginBottom: 8 }}>
-            Leave empty to include every phase from the item labor group.
-          </Typography.Paragraph>
+        <FormFieldItem
+          label="Labor Phases"
+          controlPrefix={
+            isChild ? (
+              <Checkbox
+                checked={hasOverride}
+                disabled={disabled || !writable}
+                onChange={(event) => {
+                  if (event.target.checked) {
+                    setValue(explicitPath, true, { shouldDirty: true });
+                    // Seed from resolved ancestry (or empty if none).
+                    updatePhases(
+                      (resolvedPhases ?? []).map((phase) => phase.labor_phase_id),
+                    );
+                  } else {
+                    setValue(explicitPath, false, { shouldDirty: true });
+                    setValue(phasesPath, [], { shouldDirty: true });
+                  }
+                }}
+              />
+            ) : undefined
+          }
+        >
           <Select
             mode="multiple"
-            allowClear
+            allowClear={editable}
             style={{ width: "100%" }}
-            placeholder={isLoading ? "Loading phases…" : "All phases (default)"}
+            placeholder={
+              isLoading
+                ? "Loading phases…"
+                : displayIds.length === 0
+                  ? resolvedPhases === null && !hasOverride
+                    ? "Catalog default"
+                    : "No phases"
+                  : undefined
+            }
             loading={isLoading}
-            disabled={disabled || !writable}
+            disabled={disabled || !editable}
             options={options}
-            value={selectedIds}
-            onChange={(nextIds) => updatePhases(nextIds)}
+            value={displayIds}
+            onChange={(nextIds) => {
+              if (!editable) return;
+              setValue(explicitPath, true, { shouldDirty: true });
+              updatePhases(nextIds);
+            }}
           />
-        </div>
+        </FormFieldItem>
       )}
     />
   );

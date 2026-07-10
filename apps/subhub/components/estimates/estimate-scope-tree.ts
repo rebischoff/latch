@@ -1,313 +1,136 @@
 import type { DataNode } from "antd/es/tree";
 
 import type {
-  EstimateScopeFormRow,
-  EstimateSiteScopeTreeFormRow,
-  EstimateSiteTreeFormRow,
-  EstimateSiteZoneTreeFormRow,
+  EstimateConditionFormRow,
+  EstimateConditionSpecFormRow,
 } from "@/components/estimates/estimate-line-tree";
+import { makeCondition } from "@/components/estimates/estimate-line-tree";
 
-export type EstimateScopeTreeRowKind = "scope" | "zone";
-
-export type EstimateScopeTreeNode = {
-  children?: EstimateScopeTreeNode[];
+export type EstimateCommercialTreeNode = {
+  children?: EstimateCommercialTreeNode[];
+  conditionId: string;
   key: string;
-  label?: string;
-  rowKind: EstimateScopeTreeRowKind;
-  scopeIndex?: number;
-  siteScopeId?: string;
-  zoneId?: string;
+  label: string;
+  rowKind: "condition";
 };
 
-export type EstimateScopeAntdTreeNode = DataNode & {
-  depth: number;
-  rowKind: EstimateScopeTreeRowKind;
-  scopeIndex?: number;
-  siteScopeId?: string;
-  zoneId?: string;
+export type EstimateConditionAntdTreeNode = DataNode & {
+  key: string;
+  title: string;
+  children?: EstimateConditionAntdTreeNode[];
 };
 
-const zoneTreeNodes = (
-  zones: EstimateSiteZoneTreeFormRow[] | undefined,
-  scopeIndex: number | undefined,
-  siteScopeId: string,
-): EstimateScopeTreeNode[] =>
-  (zones ?? []).map((zone) => ({
-    key: `zone:${siteScopeId}:${zone.id}`,
-    rowKind: "zone",
-    label: zone.name,
-    zoneId: zone.id,
-    scopeIndex,
-    siteScopeId,
-    children:
-      zone.zones && zone.zones.length > 0
-        ? zoneTreeNodes(zone.zones, scopeIndex, siteScopeId)
-        : undefined,
+/** @deprecated Prefer EstimateConditionAntdTreeNode. */
+export type EstimateScopeAntdTreeNode = EstimateConditionAntdTreeNode;
+
+const conditionNodes = (
+  conditions: EstimateConditionFormRow[],
+): EstimateCommercialTreeNode[] =>
+  [...conditions]
+    .sort((a, b) => a.sort_order - b.sort_order)
+    .map((condition) => ({
+      key: `condition:${condition.id}`,
+      rowKind: "condition" as const,
+      label: condition.name || condition.root_item_name || "Condition",
+      conditionId: condition.id,
+      children: conditionNodes(condition.conditions),
+    }));
+
+export const buildCommercialTree = (
+  conditions: EstimateConditionFormRow[],
+): EstimateCommercialTreeNode[] => conditionNodes(conditions);
+
+export const toAntdConditionTreeData = (
+  nodes: EstimateCommercialTreeNode[],
+): EstimateConditionAntdTreeNode[] =>
+  nodes.map((node) => ({
+    key: node.key,
+    title: node.label,
+    children: node.children ? toAntdConditionTreeData(node.children) : undefined,
   }));
 
-export const buildEstimateScopeTree = (
-  siteTree: EstimateSiteTreeFormRow | null | undefined,
-): EstimateScopeTreeNode[] => {
-  if (!siteTree) {
-    return [];
-  }
+/** @deprecated Prefer toAntdConditionTreeData. */
+export const toAntdScopeTreeData = toAntdConditionTreeData;
 
-  return siteTree.scopes.map((scope, scopeIndex) => ({
-    key: `scope:${scope.id}`,
-    rowKind: "scope",
-    label: scope.name,
-    siteScopeId: scope.id,
-    scopeIndex,
-    children: zoneTreeNodes(scope.zones, scopeIndex, scope.id),
-  }));
-};
+/** @deprecated Prefer buildCommercialTree. */
+export const buildEstimateScopeTree = buildCommercialTree;
 
-export const toAntdScopeTreeData = (
-  nodes: EstimateScopeTreeNode[],
-  depth = 0,
-): EstimateScopeAntdTreeNode[] =>
-  nodes.map((node) => {
-    const childNodes =
-      node.children && node.children.length > 0
-        ? toAntdScopeTreeData(node.children, depth + 1)
-        : undefined;
+export const addRootCondition = (
+  conditions: EstimateConditionFormRow[],
+  rootItemId: string,
+  rootItemName: string,
+  specTemplate: EstimateConditionSpecFormRow[] = [],
+): EstimateConditionFormRow[] => [
+  ...conditions,
+  makeCondition({
+    name: rootItemName,
+    parent_condition_id: null,
+    root_item_id: rootItemId,
+    root_item_name: rootItemName,
+    sort_order: conditions.length + 1,
+    labor_phases_explicit: false,
+    specs: specTemplate.map((spec) => ({ ...spec })),
+  }),
+];
 
-    return {
-      key: node.key,
-      title: node.label ?? "",
-      rowKind: node.rowKind,
-      zoneId: node.zoneId,
-      scopeIndex: node.scopeIndex,
-      siteScopeId: node.siteScopeId,
-      depth,
-      isLeaf: childNodes === undefined ? true : undefined,
-      children: childNodes,
-    };
+/** @deprecated Prefer addRootCondition. */
+export const addScopeInstance = addRootCondition;
+
+export const addConditionUnder = (
+  conditions: EstimateConditionFormRow[],
+  parentConditionId: string,
+  name = "New condition",
+): { conditions: EstimateConditionFormRow[]; conditionId: string } | null => {
+  const newCondition = makeCondition({
+    name,
+    parent_condition_id: parentConditionId,
+    root_item_id: null,
   });
 
-export const findScopeIndexBySiteScopeId = (
-  scopes: EstimateScopeFormRow[],
-  siteScopeId: string,
-): number => scopes.findIndex((scope) => scope.site_scope_id === siteScopeId);
+  let inserted = false;
 
-export const isScopeChecked = (
-  scopes: EstimateScopeFormRow[],
-  siteScopeId: string,
-): boolean => findScopeIndexBySiteScopeId(scopes, siteScopeId) >= 0;
+  const insert = (rows: EstimateConditionFormRow[]): EstimateConditionFormRow[] =>
+    rows.map((row) => {
+      if (row.id === parentConditionId) {
+        inserted = true;
+        const child = {
+          ...newCondition,
+          sort_order: row.conditions.length + 1,
+          specs: row.specs.map((spec) => ({
+            ...spec,
+            spec_option_id: null,
+            value_number: null,
+            value_boolean: null,
+            option_display_name: null,
+          })),
+        };
+        return { ...row, conditions: [...row.conditions, child] };
+      }
+      return { ...row, conditions: insert(row.conditions) };
+    });
 
-export const isZoneChecked = (
-  scopes: EstimateScopeFormRow[],
-  siteScopeId: string,
-  zoneId: string,
-): boolean => {
-  const scopeIndex = findScopeIndexBySiteScopeId(scopes, siteScopeId);
-  if (scopeIndex < 0) {
-    return false;
-  }
-
-  return scopes[scopeIndex]?.zones.some((zone) => zone.site_zone_id === zoneId) ?? false;
-};
-
-export const scopeReferencedByLines = (
-  scopes: EstimateScopeFormRow[],
-  lineItems: Array<{ estimate_scope_id: string | null }>,
-  siteScopeId: string,
-): boolean => {
-  const scopeIndex = findScopeIndexBySiteScopeId(scopes, siteScopeId);
-  if (scopeIndex < 0) {
-    return false;
-  }
-
-  const scopeId = scopes[scopeIndex]?.id;
-  if (!scopeId) {
-    return false;
-  }
-
-  return lineItems.some((line) => line.estimate_scope_id === scopeId);
-};
-
-export const zoneReferencedByLines = (
-  lineItems: Array<{ site_zone_id: string | null }>,
-  zoneId: string,
-): boolean => lineItems.some((line) => line.site_zone_id === zoneId);
-
-export const makeScopeRow = (
-  siteScopeId: string,
-  rootItemId: string,
-  rootCategoryName: string | null,
-  siteScopeName: string | null,
-  sortOrder: number,
-  specs: EstimateScopeFormRow["specs"] = [],
-): EstimateScopeFormRow => ({
-  id: crypto.randomUUID(),
-  site_scope_id: siteScopeId,
-  root_item_id: rootItemId,
-  root_item_name: rootCategoryName,
-  site_scope_name: siteScopeName,
-  sort_order: sortOrder,
-  complexity_factor_id: null,
-  included_labor_phases: [],
-  specs,
-  zones: [],
-});
-
-export const makeZoneMembership = (siteZoneId: string, sortOrder: number) => ({
-  site_zone_id: siteZoneId,
-  sort_order: sortOrder,
-  complexity_factor_id: null,
-  included_labor_phases: [],
-  specs: [],
-});
-
-export type FlatSiteZone = {
-  id: string;
-  label: string;
-};
-
-export const flattenSiteZones = (
-  zones: EstimateSiteZoneTreeFormRow[] | undefined,
-  prefix = "",
-): FlatSiteZone[] => {
-  const result: FlatSiteZone[] = [];
-
-  for (const zone of zones ?? []) {
-    const label = prefix ? `${prefix} / ${zone.name}` : zone.name;
-    result.push({ id: zone.id, label });
-    if (zone.zones && zone.zones.length > 0) {
-      result.push(...flattenSiteZones(zone.zones, label));
-    }
-  }
-
-  return result;
-};
-
-export const scopesNotOnQuote = (
-  siteTree: EstimateSiteTreeFormRow | null | undefined,
-  scopes: EstimateScopeFormRow[],
-): EstimateSiteScopeTreeFormRow[] => {
-  const included = new Set(scopes.map((scope) => scope.site_scope_id));
-  return (siteTree?.scopes ?? []).filter((scope) => !included.has(scope.id));
-};
-
-export const zonesNotOnQuote = (
-  siteScopeId: string,
-  siteTree: EstimateSiteTreeFormRow | null | undefined,
-  scope: EstimateScopeFormRow,
-): FlatSiteZone[] => {
-  const siteScope = siteTree?.scopes.find((row) => row.id === siteScopeId);
-  if (!siteScope) {
-    return [];
-  }
-
-  const included = new Set(scope.zones.map((zone) => zone.site_zone_id));
-  return flattenSiteZones(siteScope.zones).filter((zone) => !included.has(zone.id));
-};
-
-export const addScopeToQuote = (
-  scopes: EstimateScopeFormRow[],
-  siteScope: EstimateSiteScopeTreeFormRow,
-  specTemplates?: EstimateSiteTreeFormRow["spec_templates"],
-): EstimateScopeFormRow[] => {
-  if (findScopeIndexBySiteScopeId(scopes, siteScope.id) >= 0) {
-    return scopes;
-  }
-
-  const specs =
-    siteScope.root_item_id && specTemplates?.[siteScope.root_item_id]
-      ? specTemplates[siteScope.root_item_id].map((spec) => ({ ...spec }))
-      : [];
-
-  return [
-    ...scopes,
-    makeScopeRow(
-      siteScope.id,
-      siteScope.root_item_id,
-      null,
-      siteScope.name,
-      scopes.length + 1,
-      specs,
-    ),
-  ];
-};
-
-export const addZoneToQuote = (
-  scopes: EstimateScopeFormRow[],
-  siteScopeId: string,
-  zoneId: string,
-  siteTree: EstimateSiteTreeFormRow | null | undefined,
-): EstimateScopeFormRow[] => {
-  const siteScope = siteTree?.scopes.find((scope) => scope.id === siteScopeId);
-  if (!siteScope) {
-    return scopes;
-  }
-
-  let next = addScopeToQuote(scopes, siteScope, siteTree?.spec_templates);
-  const scopeIndex = findScopeIndexBySiteScopeId(next, siteScopeId);
-  if (scopeIndex < 0) {
-    return next;
-  }
-
-  const scope = next[scopeIndex];
-  if (!scope || scope.zones.some((zone) => zone.site_zone_id === zoneId)) {
-    return next;
-  }
-
-  const zoneSpecs =
-    siteScope.root_item_id && siteTree?.spec_templates?.[siteScope.root_item_id]
-      ? siteTree.spec_templates[siteScope.root_item_id].map((spec) => ({ ...spec }))
-      : [];
-
-  const updated = [...next];
-  updated[scopeIndex] = {
-    ...scope,
-    zones: [
-      ...scope.zones,
-      {
-        ...makeZoneMembership(zoneId, scope.zones.length + 1),
-        specs: zoneSpecs,
-      },
-    ],
-  };
-
-  return updated;
-};
-
-export const removeScopeFromQuote = (
-  scopes: EstimateScopeFormRow[],
-  lineItems: Array<{ estimate_scope_id: string | null }>,
-  estimateScopeId: string,
-): EstimateScopeFormRow[] | null => {
-  const scope = scopes.find((row) => row.id === estimateScopeId);
-  if (!scope) {
+  const next = insert(conditions);
+  if (!inserted) {
     return null;
   }
 
-  if (scopeReferencedByLines(scopes, lineItems, scope.site_scope_id)) {
-    return null;
-  }
-
-  return scopes
-    .filter((row) => row.id !== estimateScopeId)
-    .map((row, index) => ({ ...row, sort_order: index + 1 }));
+  return { conditions: next, conditionId: newCondition.id };
 };
 
-export const removeZoneFromQuote = (
-  scopes: EstimateScopeFormRow[],
-  lineItems: Array<{ site_zone_id: string | null }>,
-  scopeIndex: number,
-  zoneId: string,
-): EstimateScopeFormRow[] | null => {
-  if (zoneReferencedByLines(lineItems, zoneId)) {
-    return null;
-  }
+export const removeConditionById = (
+  conditions: EstimateConditionFormRow[],
+  conditionId: string,
+): EstimateConditionFormRow[] => {
+  const filterTree = (rows: EstimateConditionFormRow[]): EstimateConditionFormRow[] =>
+    rows
+      .filter((row) => row.id !== conditionId)
+      .map((row) => ({
+        ...row,
+        conditions: filterTree(row.conditions),
+      }));
 
-  const scope = scopes[scopeIndex];
-  if (!scope) {
-    return null;
-  }
-
-  const nextZones = scope.zones.filter((zone) => zone.site_zone_id !== zoneId);
-  const next = [...scopes];
-  next[scopeIndex] = { ...scope, zones: nextZones };
-  return next;
+  return filterTree(conditions);
 };
+
+/** @deprecated Prefer removeConditionById on roots. */
+export const removeScopeInstance = removeConditionById;

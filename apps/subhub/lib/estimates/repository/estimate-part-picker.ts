@@ -5,15 +5,13 @@ import { resolveFilteredParts } from "./estimate-part-resolver";
 
 export const loadFilteredPartsForLine = async (
   client: Pool | PoolClient,
-  estimateScopeId: string,
-  siteZoneId: string | null,
+  estimateConditionId: string,
   estimateLineId: string | null,
   itemId: string,
 ) => {
   const bucket = await loadMergedBucketForLine(
     client,
-    estimateScopeId,
-    siteZoneId,
+    estimateConditionId,
     estimateLineId,
   );
 
@@ -27,10 +25,9 @@ export const loadFilteredPartsForEstimateLine = async (
   itemId: string,
 ) => {
   const lineResult = await pool.query<{
-    estimate_scope_id: string;
-    site_zone_id: string | null;
+    estimate_condition_id: string;
   }>(
-    `SELECT estimate_scope_id, site_zone_id
+    `SELECT estimate_condition_id
      FROM estimate_line
      WHERE id = $1 AND estimate_id = $2`,
     [lineId, estimateId],
@@ -43,8 +40,7 @@ export const loadFilteredPartsForEstimateLine = async (
 
   return loadFilteredPartsForLine(
     pool,
-    line.estimate_scope_id,
-    line.site_zone_id,
+    line.estimate_condition_id,
     lineId,
     itemId,
   );

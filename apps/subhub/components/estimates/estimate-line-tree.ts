@@ -1,10 +1,18 @@
 export type EstimateLineRole = "standalone" | "kit_header" | "kit_component";
 
+export type EstimateLineAllocationFormRow = {
+  quantity: number;
+  site_zone_id: string;
+  site_zone_name?: string | null;
+};
+
 export type EstimateLineFormRow = {
+  allocations: EstimateLineAllocationFormRow[];
   id: string;
   line_role: EstimateLineRole;
   description: string;
   quantity: number;
+  qty_manual: boolean;
   unit: string;
   unit_cost: number;
   unit_price: number;
@@ -14,8 +22,7 @@ export type EstimateLineFormRow = {
   unit_incidental: number;
   unit_price_target: number;
   parent_line_id: string | null;
-  estimate_scope_id: string | null;
-  site_zone_id: string | null;
+  estimate_condition_id: string;
   lock: "line" | "none" | "sell";
   phase_id: string | null;
   item_id: string | null;
@@ -23,12 +30,12 @@ export type EstimateLineFormRow = {
   vendor_part_id: string | null;
 };
 
-export type EstimateScopeSpecOptionFormRow = {
+export type EstimateConditionSpecOptionFormRow = {
   display_name: string;
   id: string;
 };
 
-export type EstimateScopeSpecFormRow = {
+export type EstimateConditionSpecFormRow = {
   decimal_places?: number | null;
   def_display_name?: string;
   spec_def_id: string;
@@ -39,36 +46,31 @@ export type EstimateScopeSpecFormRow = {
   value_number: number | null;
   value_boolean: boolean | null;
   value_type?: "enum" | "boolean" | "number";
-  options?: EstimateScopeSpecOptionFormRow[];
+  options?: EstimateConditionSpecOptionFormRow[];
 };
 
-export type EstimateScopeLaborPhaseFormRow = {
+export type EstimateConditionLaborPhaseFormRow = {
   labor_phase_id: string;
   labor_phase_name?: string;
   sort_order?: number;
 };
 
-export type EstimateScopeZoneFormRow = {
+export type EstimateConditionFormRow = {
   complexity_factor_id: string | null;
-  included_labor_phases: EstimateScopeLaborPhaseFormRow[];
-  site_zone_id: string;
-  sort_order: number;
-  specs: EstimateScopeSpecFormRow[];
-};
-
-export type EstimateScopeFormRow = {
-  complexity_factor_id: string | null;
+  conditions: EstimateConditionFormRow[];
   id: string;
-  included_labor_phases: EstimateScopeLaborPhaseFormRow[];
-  site_scope_id: string;
-  root_item_id: string;
-  root_item_name: string | null;
-  site_scope_name: string | null;
+  included_labor_phases: EstimateConditionLaborPhaseFormRow[];
+  labor_phases_explicit: boolean;
+  name: string;
+  parent_condition_id: string | null;
+  /** Required on roots; null on children (resolve from tree root in UI). */
+  root_item_id: string | null;
+  root_item_name?: string | null;
   sort_order: number;
-  specs: EstimateScopeSpecFormRow[];
-  zones: EstimateScopeZoneFormRow[];
+  specs: EstimateConditionSpecFormRow[];
 };
 
+/** Site geography for Places… picker (not commercial tree). */
 export type EstimateSiteZoneTreeFormRow = {
   id: string;
   name: string;
@@ -84,27 +86,24 @@ export type EstimateSiteScopeTreeFormRow = {
 
 export type EstimateSiteTreeFormRow = {
   scopes: EstimateSiteScopeTreeFormRow[];
-  spec_templates?: Record<string, EstimateScopeSpecFormRow[]>;
+  spec_templates?: Record<string, EstimateConditionSpecFormRow[]>;
 };
 
 export type EstimateLineEditorFormValues = {
-  scopes: EstimateScopeFormRow[];
+  conditions: EstimateConditionFormRow[];
   line_items: EstimateLineFormRow[];
   site_tree?: EstimateSiteTreeFormRow | null;
 };
 
-export type TreeRowKind = "scope" | "zone" | "line";
+export type TreeRowKind = "condition" | "line";
 
 export type EstimateLineTreeNode = {
   children?: EstimateLineTreeNode[];
+  conditionId?: string;
   key: string;
   label?: string;
   lineId?: string;
   rowKind: TreeRowKind;
-  scopeId?: string;
-  scopeIndex?: number;
-  siteZoneId?: string | null;
-  zoneIndex?: number;
 };
 
 export const makeLine = (
@@ -121,6 +120,7 @@ export const makeLine = (
     line_role: "standalone",
     description: "",
     quantity: 1,
+    qty_manual: false,
     unit: "ea",
     unit_cost: 0,
     unit_price: 0,
@@ -130,8 +130,8 @@ export const makeLine = (
     unit_incidental: 0,
     unit_price_target: 0,
     parent_line_id: null,
-    estimate_scope_id: null,
-    site_zone_id: null,
+    estimate_condition_id: "",
+    allocations: [],
     lock: "none",
     phase_id: null,
     item_id: null,
@@ -141,124 +141,96 @@ export const makeLine = (
   };
 };
 
-const linesForParent = (
+export const makeCondition = (
+  overrides: Partial<EstimateConditionFormRow> = {},
+): EstimateConditionFormRow => ({
+  id: crypto.randomUUID(),
+  name: "New condition",
+  parent_condition_id: null,
+  root_item_id: null,
+  root_item_name: null,
+  sort_order: 1,
+  complexity_factor_id: null,
+  labor_phases_explicit: false,
+  included_labor_phases: [],
+  specs: [],
+  conditions: [],
+  ...overrides,
+});
+
+const linesForCondition = (
   lineItems: EstimateLineFormRow[],
-  estimateScopeId: string,
-  siteZoneId: string | null,
+  estimateConditionId: string,
 ): EstimateLineFormRow[] =>
-  lineItems.filter(
-    (line) =>
-      line.estimate_scope_id === estimateScopeId &&
-      (line.site_zone_id ?? null) === siteZoneId,
-  );
+  lineItems.filter((line) => line.estimate_condition_id === estimateConditionId);
 
 const lineTreeNodes = (
   lineItems: EstimateLineFormRow[],
-  estimateScopeId: string,
-  siteZoneId: string | null,
+  estimateConditionId: string,
 ): EstimateLineTreeNode[] =>
-  linesForParent(lineItems, estimateScopeId, siteZoneId).map((line) => ({
+  linesForCondition(lineItems, estimateConditionId).map((line) => ({
     key: `line:${line.id}`,
     rowKind: "line",
     lineId: line.id,
-    scopeId: estimateScopeId,
-    siteZoneId,
+    conditionId: estimateConditionId,
   }));
 
-const zoneTreeNodes = (
+const conditionTreeNodes = (
   lineItems: EstimateLineFormRow[],
-  estimateScopeId: string,
-  zones: EstimateScopeZoneFormRow[],
-  labelByZoneId: Map<string, string>,
-  scopeIndex: number,
+  conditions: EstimateConditionFormRow[],
 ): EstimateLineTreeNode[] =>
-  zones.map((zone, zoneIndex) => ({
-    key: `zone:${estimateScopeId}:${zone.site_zone_id}`,
-    rowKind: "zone",
-    label: labelByZoneId.get(zone.site_zone_id) ?? "Zone",
-    scopeId: estimateScopeId,
-    scopeIndex,
-    zoneIndex,
-    siteZoneId: zone.site_zone_id,
-    children: lineTreeNodes(lineItems, estimateScopeId, zone.site_zone_id),
+  conditions.map((condition) => ({
+    key: `condition:${condition.id}`,
+    rowKind: "condition" as const,
+    label: condition.name,
+    conditionId: condition.id,
+    children: [
+      ...conditionTreeNodes(lineItems, condition.conditions),
+      ...lineTreeNodes(lineItems, condition.id),
+    ],
   }));
-
-const buildZoneLabelMap = (
-  zones: EstimateSiteZoneTreeFormRow[] | undefined,
-  map = new Map<string, string>(),
-): Map<string, string> => {
-  for (const zone of zones ?? []) {
-    map.set(zone.id, zone.name);
-    buildZoneLabelMap(zone.zones, map);
-  }
-  return map;
-};
 
 export const buildLineTree = (
-  scopes: EstimateScopeFormRow[],
+  conditions: EstimateConditionFormRow[],
   lineItems: EstimateLineFormRow[],
-  siteTree?: EstimateSiteTreeFormRow | null,
 ): EstimateLineTreeNode[] => {
   const standaloneLines = lineItems.filter((line) => line.line_role === "standalone");
-  const sortedScopes = [...scopes].sort((left, right) => left.sort_order - right.sort_order);
+  const sorted = [...conditions].sort((left, right) => left.sort_order - right.sort_order);
+  return conditionTreeNodes(standaloneLines, sorted);
+};
 
-  return sortedScopes.map((scope, scopeIndex) => {
-    const label =
-      scope.site_scope_name ??
-      scope.root_item_name ??
-      "Scope";
-
-    const siteScopeTree = siteTree?.scopes.find(
-      (row) => row.id === scope.site_scope_id,
-    );
-    const labelByZoneId = buildZoneLabelMap(siteScopeTree?.zones);
-
-    const zoneNodes = zoneTreeNodes(
-      standaloneLines,
-      scope.id,
-      scope.zones,
-      labelByZoneId,
-      scopeIndex,
-    );
-
-    const unzonedLines = lineTreeNodes(standaloneLines, scope.id, null);
-
-    return {
-      key: `scope:${scope.id}`,
-      rowKind: "scope",
-      label,
-      scopeId: scope.id,
-      scopeIndex,
-      children: [...zoneNodes, ...unzonedLines],
-    };
-  });
+export const flattenConditions = (
+  conditions: EstimateConditionFormRow[],
+): EstimateConditionFormRow[] => {
+  const out: EstimateConditionFormRow[] = [];
+  const walk = (rows: EstimateConditionFormRow[]) => {
+    for (const row of rows) {
+      out.push(row);
+      walk(row.conditions);
+    }
+  };
+  walk(conditions);
+  return out;
 };
 
 export const orderLineItemsForPatch = (
-  scopes: EstimateScopeFormRow[],
+  conditions: EstimateConditionFormRow[],
   lineItems: EstimateLineFormRow[],
 ): EstimateLineFormRow[] => {
   const buckets = new Map<string, EstimateLineFormRow[]>();
 
   for (const line of lineItems) {
-    if (!line.estimate_scope_id) {
+    if (!line.estimate_condition_id) {
       continue;
     }
-    const zoneKey = line.site_zone_id ?? "__unzoned__";
-    const key = `${line.estimate_scope_id}:${zoneKey}`;
-    const bucket = buckets.get(key) ?? [];
+    const bucket = buckets.get(line.estimate_condition_id) ?? [];
     bucket.push(line);
-    buckets.set(key, bucket);
+    buckets.set(line.estimate_condition_id, bucket);
   }
 
   const ordered: EstimateLineFormRow[] = [];
-  const sortedScopes = [...scopes].sort((left, right) => left.sort_order - right.sort_order);
-
-  for (const scope of sortedScopes) {
-    ordered.push(...(buckets.get(`${scope.id}:__unzoned__`) ?? []));
-    for (const zone of scope.zones) {
-      ordered.push(...(buckets.get(`${scope.id}:${zone.site_zone_id}`) ?? []));
-    }
+  for (const condition of flattenConditions(conditions)) {
+    ordered.push(...(buckets.get(condition.id) ?? []));
   }
 
   return ordered;
@@ -285,14 +257,14 @@ export const collectLineRemoveIndices = (
   return [...new Set(indices)].sort((left, right) => right - left);
 };
 
-export const collectScopeLineRemoveIndices = (
+export const collectConditionLineRemoveIndices = (
   lineItems: EstimateLineFormRow[],
-  scopeId: string,
+  conditionId: string,
 ): number[] => {
   const indices: number[] = [];
 
   lineItems.forEach((line, index) => {
-    if (line.estimate_scope_id === scopeId) {
+    if (line.estimate_condition_id === conditionId) {
       indices.push(index);
       if (line.line_role === "kit_header") {
         lineItems.forEach((child, childIndex) => {
@@ -312,52 +284,73 @@ export const findLineIndex = (
   lineId: string,
 ): number => lineItems.findIndex((line) => line.id === lineId);
 
-export const parentKeyForScopeId = (scopeId: string): string => `scope:${scopeId}`;
-
-export const parentKeyForZone = (scopeId: string, siteZoneId: string): string =>
-  `zone:${scopeId}:${siteZoneId}`;
+export const parentKeyForCondition = (conditionId: string): string =>
+  `condition:${conditionId}`;
 
 export type ParentTarget = {
-  estimate_scope_id: string;
-  site_zone_id: string | null;
+  estimate_condition_id: string;
 };
 
 export const parentTargetForKey = (
   parentKey: string,
-  scopes: EstimateScopeFormRow[],
+  conditions: EstimateConditionFormRow[],
 ): ParentTarget | null => {
-  if (parentKey.startsWith("zone:")) {
-    const [, scopeId, siteZoneId] = parentKey.split(":");
-    if (!scopeId || !siteZoneId) {
-      return null;
+  if (!parentKey.startsWith("condition:")) {
+    return null;
+  }
+
+  const conditionId = parentKey.replace(/^condition:/, "");
+  const found = flattenConditions(conditions).find((c) => c.id === conditionId);
+  return found ? { estimate_condition_id: conditionId } : null;
+};
+
+/** Resolve catalog root item id for a condition (walk to forest root). */
+export const rootItemIdForCondition = (
+  conditionId: string,
+  conditions: EstimateConditionFormRow[],
+): string | null => {
+  const findPath = (
+    rows: EstimateConditionFormRow[],
+    path: EstimateConditionFormRow[] = [],
+  ): EstimateConditionFormRow[] | null => {
+    for (const row of rows) {
+      const next = [...path, row];
+      if (row.id === conditionId) {
+        return next;
+      }
+      const nested = findPath(row.conditions, next);
+      if (nested) {
+        return nested;
+      }
     }
-    return scopes.some((scope) => scope.id === scopeId)
-      ? { estimate_scope_id: scopeId, site_zone_id: siteZoneId }
-      : null;
+    return null;
+  };
+
+  const path = findPath(conditions);
+  if (!path || path.length === 0) {
+    return null;
   }
 
-  if (parentKey.startsWith("scope:")) {
-    const scopeId = parentKey.replace(/^scope:/, "");
-    return scopes.some((scope) => scope.id === scopeId)
-      ? { estimate_scope_id: scopeId, site_zone_id: null }
-      : null;
-  }
-
-  return null;
+  return path[0]?.root_item_id ?? null;
 };
 
 export const rootItemIdForParentKey = (
   parentKey: string,
-  scopes: EstimateScopeFormRow[],
+  conditions: EstimateConditionFormRow[],
 ): string | null => {
-  const target = parentTargetForKey(parentKey, scopes);
+  const target = parentTargetForKey(parentKey, conditions);
   if (!target) {
     return null;
   }
-
-  return scopes.find((scope) => scope.id === target.estimate_scope_id)?.root_item_id ?? null;
+  return rootItemIdForCondition(target.estimate_condition_id, conditions);
 };
 
-// Legacy aliases for gradual migration in tests/docs
-export type EstimateSystemFormRow = EstimateScopeFormRow;
-export type EstimateSystemSpecFormRow = EstimateScopeSpecFormRow;
+/** @deprecated Prefer flattenConditions. */
+export const flattenConditionsForScope = flattenConditions;
+
+/** @deprecated Prefer EstimateConditionSpecFormRow. */
+export type EstimateScopeSpecFormRow = EstimateConditionSpecFormRow;
+/** @deprecated Prefer EstimateConditionLaborPhaseFormRow. */
+export type EstimateScopeLaborPhaseFormRow = EstimateConditionLaborPhaseFormRow;
+/** @deprecated Prefer EstimateConditionSpecOptionFormRow. */
+export type EstimateScopeSpecOptionFormRow = EstimateConditionSpecOptionFormRow;

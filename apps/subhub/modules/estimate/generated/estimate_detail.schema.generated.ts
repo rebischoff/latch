@@ -6,7 +6,7 @@ import { z } from "zod";
 export const EstimateDetailFieldIds = {
   profile: "profile",
   stakeholders: "stakeholders",
-  scopes: "scopes",
+  conditions: "conditions",
   line_items: "line_items",
 } as const;
 
@@ -15,7 +15,7 @@ export type EstimateDetailFieldId = (typeof EstimateDetailFieldIds)[keyof typeof
 export const estimateDetailColumnMap = {
   profile: ["estimate.id", "estimate.title", "estimate.site_id", "estimate.status", "estimate.estimate_date", "estimate.valid_until", "estimate.source_estimate_id", "estimate.category_id"],
   stakeholders: [],
-  scopes: [],
+  conditions: [],
   line_items: [],
 } as const satisfies Record<EstimateDetailFieldId, readonly string[]>;
 
@@ -33,7 +33,7 @@ export const EstimateDetailSchema = z.object({
     category_id: z.string().nullable(),
   }),
   stakeholders: z.array(z.object({ user_id: z.string() })),
-  scopes: z.array(z.object({ user_id: z.string() })),
+  conditions: z.array(z.object({ user_id: z.string() })),
   line_items: z.array(z.object({ user_id: z.string() })),
 });
 
@@ -52,7 +52,7 @@ export const EstimateDetailPatchSchema = z.object({
     })
     .optional(),
   stakeholders: z.array(z.object({ user_id: z.string() })).optional(),
-  scopes: z.array(z.object({ user_id: z.string() })).optional(),
+  conditions: z.array(z.object({ user_id: z.string() })).optional(),
   line_items: z.array(z.object({ user_id: z.string() })).optional(),
 });
 

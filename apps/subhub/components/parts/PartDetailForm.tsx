@@ -8,7 +8,7 @@ import {
   surfaceAllows,
   type Manifest,
 } from "@latch/contracts";
-import { App, Tabs, Typography } from "antd";
+import { App, Typography } from "antd";
 import { notFound, usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useMemo, useRef } from "react";
 import { useForm, type Resolver } from "react-hook-form";
@@ -21,6 +21,7 @@ import { LinkedSelectInput } from "@/components/form/LinkedSelectInput";
 import { TextAreaInput } from "@/components/form/TextAreaInput";
 import { TextInput } from "@/components/form/TextInput";
 import { useSurfaceFormChrome } from "@/components/surface/SurfaceFormChromeContext";
+import { DetailHeader } from "@/components/surface/DetailHeader";
 import { SurfaceFormLayout } from "@/components/surface/SurfaceFormLayout";
 import { SurfaceFormRoot } from "@/components/surface/SurfaceFormRoot";
 import {
@@ -704,12 +705,9 @@ export const PartDetailForm = ({
     >
       <form onSubmit={onSave}>
         <SurfaceFormLayout maxWidth={SURFACE_FORM_MAX_WIDTH}>
-          <Typography.Title level={4} style={{ marginTop: 0 }}>
-            {isCreate ? "New part" : (profile?.mpn ?? "Part")}
-          </Typography.Title>
-
           {showPurchaseTab && showSpecsTab ? (
-            <Tabs
+            <DetailHeader
+              title={isCreate ? "New part" : (profile?.mpn ?? "Part")}
               activeKey={activeTab}
               onChange={(key) => {
                 const params = new URLSearchParams(searchParams.toString());
@@ -726,10 +724,11 @@ export const PartDetailForm = ({
                 { key: "specs", label: "Specs", children: specsContent },
               ]}
             />
-          ) : showPurchaseTab ? (
-            purchaseContent
           ) : (
-            specsContent
+            <>
+              <DetailHeader title={isCreate ? "New part" : (profile?.mpn ?? "Part")} />
+              {showPurchaseTab ? purchaseContent : specsContent}
+            </>
           )}
         </SurfaceFormLayout>
       </form>

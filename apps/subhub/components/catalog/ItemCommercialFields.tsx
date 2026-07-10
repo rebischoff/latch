@@ -2,12 +2,14 @@
 
 import { fieldAllows, type Manifest } from "@latch/contracts";
 import { FieldControl } from "@latch/react";
-import { InputNumber, Skeleton, Table, Typography } from "antd";
-import { useEffect, useMemo } from "react";
+import { Checkbox, InputNumber, Skeleton, Table, Typography } from "antd";
+import { useEffect, useMemo, useState } from "react";
 import {
   Controller,
   useFieldArray,
   useFormContext,
+  useWatch,
+  type FieldPath,
   type UseFormSetError,
 } from "react-hook-form";
 import {
@@ -15,16 +17,20 @@ import {
   LaborPhaseAddButton,
   type FieldArrayTableColumn,
 } from "@/components/form/FieldArrayTable";
+import { FormFieldItem } from "@/components/form/FormFieldItem";
 import { FormSection } from "@/components/form/FormSection";
-import { LinkedSelectControl, LinkedSelectInput } from "@/components/form/LinkedSelectInput";
+import { LinkedSelectControl } from "@/components/form/LinkedSelectInput";
 import { findSelectLabel } from "@/components/form/optionHelpers";
 import type { ItemTreeNode } from "@/lib/catalog/descriptors/item-list";
 import {
   buildAncestorChain,
+  displayCommercialRateTypeId,
   flattenItemTreeCommercial,
-  resolveEffectiveRateTypeId,
+  hasCommercialRateOverride,
+  resolveAncestryRateTypeId,
   summarizeAddOnCatalogRow,
   summarizeMarkupCatalogRow,
+  type CommercialFamily,
 } from "@/lib/catalog/item-commercial-display";
 import { resolveItemLaborPhaseUiView } from "@/lib/catalog/item-labor-phase-ui-state";
 import { deriveLaborPhaseMode } from "@/lib/catalog/repository/item-labor-phase-display";
@@ -409,6 +415,121 @@ const RateFieldSuffix = ({ summary }: { summary: string | null }) =>
     </Typography.Text>
   ) : null;
 
+const commercialRateFieldName: Record<
+  CommercialFamily,
+  FieldPath<ItemDetailFormValues>
+> = {
+  freight: "commercial.freight_rate_type_id",
+  incidental: "commercial.incidental_rate_type_id",
+  markup: "commercial.markup_type_id",
+};
+
+type ItemCommercialRateFieldProps = {
+  ancestorChain: string[];
+  catalogRows: Array<Record<string, unknown>> | undefined;
+  commercialIndex: ReturnType<typeof flattenItemTreeCommercial>;
+  disabled: boolean;
+  family: CommercialFamily;
+  isChild: boolean;
+  label: string;
+  loading: boolean;
+  options: SelectOption[];
+  pathKey: string;
+  writable: boolean;
+};
+
+const ItemCommercialRateField = ({
+  ancestorChain,
+  catalogRows,
+  commercialIndex,
+  disabled,
+  family,
+  isChild,
+  label,
+  loading,
+  options,
+  pathKey,
+  writable,
+}: ItemCommercialRateFieldProps) => {
+  const { control, setValue } = useFormContext<ItemDetailFormValues>();
+  const fieldName = commercialRateFieldName[family];
+  const ownValue = useWatch({ control, name: fieldName }) as string | null | undefined;
+  const hasStoredOverride = ownValue != null && ownValue !== "";
+  const [forceOverride, setForceOverride] = useState(false);
+
+  useEffect(() => {
+    setForceOverride(false);
+  }, [pathKey]);
+
+  const ancestryRateTypeId = resolveAncestryRateTypeId(
+    commercialIndex,
+    ancestorChain,
+    family,
+  );
+  const hasOverride = hasCommercialRateOverride(isChild, ownValue, forceOverride);
+  const displayValue = displayCommercialRateTypeId(
+    hasOverride,
+    ownValue,
+    ancestryRateTypeId,
+  );
+  const editable = writable && hasOverride;
+
+  const rateSummary =
+    family === "markup"
+      ? summarizeMarkupCatalogRow(catalogRows, displayValue)
+      : summarizeAddOnCatalogRow(catalogRows, displayValue);
+
+  return (
+    <Controller
+      control={control}
+      name={fieldName}
+      render={({ field, fieldState }) => (
+        <FormFieldItem
+          label={label}
+          error={fieldState.error?.message}
+          controlPrefix={
+            isChild ? (
+              <Checkbox
+                checked={hasOverride}
+                disabled={disabled || !writable}
+                onChange={(event) => {
+                  if (event.target.checked) {
+                    setForceOverride(true);
+                    if (ancestryRateTypeId) {
+                      setValue(fieldName, ancestryRateTypeId, { shouldDirty: true });
+                    }
+                  } else {
+                    setForceOverride(false);
+                    setValue(fieldName, null, { shouldDirty: true });
+                  }
+                }}
+              />
+            ) : undefined
+          }
+        >
+          <LinkedSelectControl
+            mode="write"
+            value={displayValue}
+            options={options}
+            loading={loading}
+            disabled={disabled || !editable}
+            status={fieldState.error ? "error" : undefined}
+            selectProps={{ allowClear: editable }}
+            suffix={<RateFieldSuffix summary={rateSummary} />}
+            onChange={(next) => {
+              if (!editable) {
+                return;
+              }
+              field.onChange(next || null);
+            }}
+            onBlur={field.onBlur}
+          />
+        </FormFieldItem>
+      )}
+    />
+  );
+};
+
 export const ItemCommercialFields = ({
   categoryId,
   isCreate,
@@ -418,14 +539,14 @@ export const ItemCommercialFields = ({
   const { watch, setValue } = useFormContext<ItemDetailFormValues>();
   const { disabled } = useFormUi();
   const parentId = watch("profile.parent_id");
-  const freightRateTypeId = watch("commercial.freight_rate_type_id");
-  const incidentalRateTypeId = watch("commercial.incidental_rate_type_id");
-  const markupTypeId = watch("commercial.markup_type_id");
   const isQuotableLeaf = nodeType === "item";
-  const isPolicyNode = nodeType === "scope" || nodeType === "category";
+  const isChild = Boolean(parentId);
   const showCategoryLabor = nodeType === "category";
   const showLeafLabor = isQuotableLeaf;
   const laborPhaseRows = watch("item_labor_phase") ?? [];
+  const commercialReadable = fieldAllows(manifest, "commercial", "read");
+  const commercialWritable = fieldAllows(manifest, "commercial", "write");
+  const marginPathKey = `${isCreate ? "create" : categoryId}:${parentId ?? "root"}`;
 
   const { data: itemList } = useSurfaceList("item_list");
   const { data: laborPhases, isLoading: laborPhasesLoading } =
@@ -495,48 +616,6 @@ export const ItemCommercialFields = ({
   const incidentalRows = incidentalRates?.data.rows as Array<Record<string, unknown>> | undefined;
   const markupRows = markupTypes?.data.rows as Array<Record<string, unknown>> | undefined;
 
-  const freightRateSummary = useMemo(
-    () =>
-      summarizeAddOnCatalogRow(
-        freightRows,
-        resolveEffectiveRateTypeId(
-          commercialIndex,
-          ancestorChain,
-          "freight",
-          freightRateTypeId,
-        ),
-      ),
-    [ancestorChain, commercialIndex, freightRateTypeId, freightRows],
-  );
-
-  const incidentalRateSummary = useMemo(
-    () =>
-      summarizeAddOnCatalogRow(
-        incidentalRows,
-        resolveEffectiveRateTypeId(
-          commercialIndex,
-          ancestorChain,
-          "incidental",
-          incidentalRateTypeId,
-        ),
-      ),
-    [ancestorChain, commercialIndex, incidentalRateTypeId, incidentalRows],
-  );
-
-  const markupRateSummary = useMemo(
-    () =>
-      summarizeMarkupCatalogRow(
-        markupRows,
-        resolveEffectiveRateTypeId(
-          commercialIndex,
-          ancestorChain,
-          "markup",
-          markupTypeId,
-        ),
-      ),
-    [ancestorChain, commercialIndex, markupTypeId, markupRows],
-  );
-
   const laborPhaseWritable = fieldAllows(manifest, "item_labor_phase", "write");
   const pickerLoading =
     laborPhasesLoading ||
@@ -595,10 +674,7 @@ export const ItemCommercialFields = ({
   );
 
   const showCommercial =
-    (isPolicyNode && fieldAllows(manifest, "commercial", "read")) ||
-    ((showCategoryLabor || showLeafLabor) &&
-      (fieldAllows(manifest, "commercial", "read") ||
-        fieldAllows(manifest, "item_labor_phase", "read")));
+    commercialReadable || fieldAllows(manifest, "item_labor_phase", "read");
 
   if (!showCommercial) {
     return null;
@@ -606,39 +682,51 @@ export const ItemCommercialFields = ({
 
   return (
     <FormSection title="Commercial">
-      {isPolicyNode && fieldAllows(manifest, "commercial", "read") ? (
+      {commercialReadable ? (
         <>
-          <LinkedSelectInput<ItemDetailFormValues>
-            field="commercial"
-            name="commercial.freight_rate_type_id"
+          <ItemCommercialRateField
+            family="freight"
             label="Freight"
-            suffix={<RateFieldSuffix summary={freightRateSummary} />}
             options={freightOptions}
+            catalogRows={freightRows}
             loading={freightRatesLoading}
-            selectProps={{ allowClear: true }}
+            ancestorChain={ancestorChain}
+            commercialIndex={commercialIndex}
+            isChild={isChild}
+            pathKey={marginPathKey}
+            writable={commercialWritable}
+            disabled={disabled}
           />
-          <LinkedSelectInput<ItemDetailFormValues>
-            field="commercial"
-            name="commercial.incidental_rate_type_id"
+          <ItemCommercialRateField
+            family="incidental"
             label="Incidental"
-            suffix={<RateFieldSuffix summary={incidentalRateSummary} />}
             options={incidentalOptions}
+            catalogRows={incidentalRows}
             loading={incidentalRatesLoading}
-            selectProps={{ allowClear: true }}
+            ancestorChain={ancestorChain}
+            commercialIndex={commercialIndex}
+            isChild={isChild}
+            pathKey={marginPathKey}
+            writable={commercialWritable}
+            disabled={disabled}
           />
-          <LinkedSelectInput<ItemDetailFormValues>
-            field="commercial"
-            name="commercial.markup_type_id"
+          <ItemCommercialRateField
+            family="markup"
             label="Markup"
-            suffix={<RateFieldSuffix summary={markupRateSummary} />}
             options={markupOptions}
+            catalogRows={markupRows}
             loading={markupTypesLoading}
-            selectProps={{ allowClear: true }}
+            ancestorChain={ancestorChain}
+            commercialIndex={commercialIndex}
+            isChild={isChild}
+            pathKey={marginPathKey}
+            writable={commercialWritable}
+            disabled={disabled}
           />
         </>
       ) : null}
 
-      {showLeafLabor && fieldAllows(manifest, "commercial", "read") ? (
+      {showLeafLabor && commercialReadable ? (
         <Controller<ItemDetailFormValues>
           name="commercial.fallback_unit_cost"
           render={({ field, fieldState }) => (
@@ -650,7 +738,7 @@ export const ItemCommercialFields = ({
                 value={field.value ?? 0}
                 onChange={field.onChange}
                 onBlur={field.onBlur}
-                disabled={disabled || !fieldAllows(manifest, "commercial", "write")}
+                disabled={disabled || !commercialWritable}
                 min={0}
                 precision={2}
                 step={0.01}

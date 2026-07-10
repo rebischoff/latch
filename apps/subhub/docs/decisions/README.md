@@ -4,7 +4,11 @@
 
 ## Open
 
-_Operations backbone forks **resolved** (2026-06-27). Optional: [J3 phase weights](../planning/07-open-decisions.md#J3). **Next: [DBML pass](../planning/09-migration-notes.md)._
+| Fork | Doc | Notes |
+|------|-----|--------|
+| _(none — Y1–Y5 locked)_ | [estimate.md](./estimate.md#decision-condition-only-commercial-tree-2026-07-09) | Implement [37y](../tasks/37y-condition-only-commercial-tree.md). |
+
+_Operations backbone forks **resolved** (2026-06-27). Optional: [J3 phase weights](../planning/07-open-decisions.md#J3)._
 
 ## Operations backbone planning (2026-06-27)
 
@@ -43,6 +47,8 @@ _Operations backbone forks **resolved** (2026-06-27). Optional: [J3 phase weight
 
 | Decision | File | Date | Status |
 |----------|------|------|--------|
+| Condition-only commercial tree (Y1–Y5) | [estimate.md](./estimate.md) | 2026-07-09 | **locked** ([37y](../tasks/37y-condition-only-commercial-tree.md)) |
+| Estimate scope / condition / zone / line qty (G1–G5e) | [estimate.md](./estimate.md) | 2026-07-09 | **locked** · **amended by Y1–Y5** ([37x](../tasks/37x-estimate-conditions-allocations.md)) |
 | Part item links leaf-only + Specs value UX | [catalog.md](./catalog.md) | 2026-07-08 | **locked** ([37u](../tasks/37u-part-leaf-links-specs-ui.md)) |
 | Numeric specs — drop `range` type; band is part-authored | [catalog.md](./catalog.md) | 2026-07-08 | **locked** ([37s](../tasks/37s-spec-defs-ui-drop-range.md)) |
 | Spec value types, units table, and locks | [catalog.md](./catalog.md) | 2026-07-08 | **amended** ([37s](../tasks/37s-spec-defs-ui-drop-range.md); was 37p → 37q → 37r) |

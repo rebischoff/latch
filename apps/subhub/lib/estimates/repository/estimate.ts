@@ -4,7 +4,7 @@ import type { EstimateDetailRelated, EstimateDetailRow } from "../descriptors/es
 import type { EstimateListRow } from "../descriptors/estimate-list";
 import { escapeLikePattern } from "../../sites/repository/sql-utils";
 import { loadEstimateLineItems } from "./estimate-lines";
-import { loadEstimateScopes } from "./estimate-scopes";
+import { loadEstimateConditions } from "./estimate-conditions";
 import { loadEstimateSiteTree } from "./estimate-site-tree";
 import { loadEstimateStakeholders } from "./estimate-stakeholders";
 
@@ -102,16 +102,16 @@ export const loadEstimateDetailRelated = async (
   estimateId: string,
   siteId: string,
 ): Promise<EstimateDetailRelated> => {
-  const [stakeholders, scopes, line_items, site_tree] = await Promise.all([
+  const [stakeholders, conditions, line_items, site_tree] = await Promise.all([
     loadEstimateStakeholders(pool, estimateId),
-    loadEstimateScopes(pool, estimateId),
+    loadEstimateConditions(pool, estimateId),
     loadEstimateLineItems(pool, estimateId),
     loadEstimateSiteTree(pool, siteId),
   ]);
 
   return {
     stakeholders,
-    scopes,
+    conditions,
     site_tree,
     line_items,
   };

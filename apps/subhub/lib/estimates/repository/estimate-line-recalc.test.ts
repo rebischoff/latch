@@ -78,8 +78,7 @@ vi.mock("./estimate-commercial", async (importOriginal) => {
     ...actual,
     loadCommercialCatalog: vi.fn(async () => buildCatalog()),
     loadComplexityContext: vi.fn(async () => ({
-      scope_factor_percent: null,
-      zone_factor_percent: 125,
+      condition_factor_percent: 125,
     })),
   };
 });
@@ -102,8 +101,7 @@ const baseLine = (): RecalcLineInput => ({
   unit: "ea",
   unit_cost: 0,
   unit_price: 0,
-  estimate_scope_id: "scope-1",
-  site_zone_id: null,
+  estimate_condition_id: "cond-1",
   item_id: "item-leaf",
   part_id: null,
   lock: "none",

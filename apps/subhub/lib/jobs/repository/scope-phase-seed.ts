@@ -3,15 +3,16 @@ import type { PoolClient } from "pg";
 import {
   filterLaborGroupByInclusion,
   loadCommercialCatalog,
-  loadScopeLaborPhases,
-  loadZoneLaborPhases,
+  loadConditionLaborPhases,
   resolveIncludedLaborPhaseIds,
   resolveLaborGroup,
 } from "../../estimates/repository/estimate-commercial";
 import { tableExists } from "../../sites/repository/sql-utils";
 
 export type SeedScopePhaseInput = {
-  estimate_scope_id: string | null;
+  /** @deprecated Prefer estimate_condition_id (37y). */
+  estimate_scope_id?: string | null;
+  estimate_condition_id: string | null;
   item_id: string | null;
   job_line_id: string;
   quantity: number;
@@ -22,7 +23,8 @@ export const seedScopePhasesForJobLineTx = async (
   client: PoolClient,
   input: SeedScopePhaseInput,
 ): Promise<void> => {
-  if (!(await tableExists(client, "scope_phase")) || !input.item_id || !input.estimate_scope_id) {
+  const conditionId = input.estimate_condition_id;
+  if (!(await tableExists(client, "scope_phase")) || !input.item_id || !conditionId) {
     return;
   }
 
@@ -40,17 +42,9 @@ export const seedScopePhasesForJobLineTx = async (
     return;
   }
 
-  const [scopePhases, zonePhases] = await Promise.all([
-    loadScopeLaborPhases(client, input.estimate_scope_id),
-    input.site_zone_id
-      ? loadZoneLaborPhases(client, input.estimate_scope_id, input.site_zone_id)
-      : Promise.resolve([]),
-  ]);
-  const included = resolveIncludedLaborPhaseIds(
-    scopePhases,
-    zonePhases.length > 0 ? zonePhases : null,
-    laborGroup,
-  );
+  // 37x X4 / 37y: win→job condition handoff still deferred — seed from condition phases.
+  const conditionPhases = await loadConditionLaborPhases(client, conditionId);
+  const included = resolveIncludedLaborPhaseIds(conditionPhases, laborGroup);
   const filtered = filterLaborGroupByInclusion(laborGroup, included);
   if (filtered.length === 0) {
     return;

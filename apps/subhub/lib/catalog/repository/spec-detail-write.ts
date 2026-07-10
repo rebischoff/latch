@@ -94,8 +94,7 @@ const countBucketOptionReferences = async (
 ): Promise<number> => {
   const result = await client.query<{ count: number }>(
     `SELECT (
-       (SELECT COUNT(*)::int FROM estimate_scope_spec WHERE spec_option_id = $1)
-       + (SELECT COUNT(*)::int FROM estimate_zone_spec WHERE spec_option_id = $1)
+       (SELECT COUNT(*)::int FROM estimate_condition_spec WHERE spec_option_id = $1)
        + (SELECT COUNT(*)::int FROM estimate_line_spec WHERE spec_option_id = $1)
      ) AS count`,
     [specOptionId],
@@ -147,8 +146,7 @@ export const loadSpecDefValueRowCount = async (
   const result = await client.query<{ count: number }>(
     `SELECT (
        (SELECT COUNT(*)::int FROM manufacturer_part_spec WHERE spec_def_id = $1)
-       + (SELECT COUNT(*)::int FROM estimate_scope_spec WHERE spec_def_id = $1)
-       + (SELECT COUNT(*)::int FROM estimate_zone_spec WHERE spec_def_id = $1)
+       + (SELECT COUNT(*)::int FROM estimate_condition_spec WHERE spec_def_id = $1)
        + (SELECT COUNT(*)::int FROM estimate_line_spec WHERE spec_def_id = $1)
      ) AS count`,
     [specDefId],

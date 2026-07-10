@@ -23,18 +23,16 @@ export const useEstimateItemPicker = (rootItemId: string | null, enabled: boolea
 
 export const useEstimatePartPicker = (
   itemId: string | null,
-  estimateScopeId: string | null,
-  siteZoneId: string | null,
+  estimateConditionId: string | null,
   enabled: boolean,
 ) =>
   useQuery({
-    queryKey: ["estimate-part-picker", itemId, estimateScopeId, siteZoneId],
-    enabled: enabled && Boolean(itemId && estimateScopeId),
+    queryKey: ["estimate-part-picker", itemId, estimateConditionId],
+    enabled: enabled && Boolean(itemId && estimateConditionId),
     queryFn: async () => {
       const result = await fetchEstimatePartPicker({
         itemId: itemId as string,
-        estimateScopeId: estimateScopeId as string,
-        siteZoneId,
+        estimateConditionId: estimateConditionId as string,
       });
       return result.data.parts;
     },

@@ -32,8 +32,8 @@ export type MarkupProfile = {
 };
 
 export type ComplexityContext = {
-  scope_factor_percent: number | null;
-  zone_factor_percent: number | null;
+  /** Nearest condition factor walking leaf → ancestor; null = 100%. */
+  condition_factor_percent: number | null;
 };
 
 export type CommercialCatalog = {
@@ -137,16 +137,20 @@ export const resolveLaborGroup = (
   return [];
 };
 
+/**
+ * Resolve which labor phases count for a line.
+ * - `null` / undefined = no explicit override in ancestry → all catalog phases
+ * - `[]` = explicit empty (Y4 checked + empty) → no phases
+ * - `[...]` = those phase ids
+ */
 export const resolveIncludedLaborPhaseIds = (
-  scopePhaseIds: string[] | null | undefined,
-  zonePhaseIds: string[] | null | undefined,
+  explicitPhaseIds: string[] | null | undefined,
   laborGroup: ItemLaborPhaseRow[],
 ): Set<string> => {
-  const explicit = zonePhaseIds ?? scopePhaseIds;
-  if (!explicit || explicit.length === 0) {
+  if (explicitPhaseIds === null || explicitPhaseIds === undefined) {
     return new Set(laborGroup.map((row) => row.labor_phase_id));
   }
-  return new Set(explicit);
+  return new Set(explicitPhaseIds);
 };
 
 export const filterLaborGroupByInclusion = (
@@ -158,15 +162,10 @@ export const filterLaborGroupByInclusion = (
 export const resolveFilteredLaborCost = (
   catalog: CommercialCatalog,
   itemId: string,
-  scopePhaseIds: string[] | null | undefined,
-  zonePhaseIds: string[] | null | undefined,
+  explicitPhaseIds: string[] | null | undefined,
 ): number => {
   const laborGroup = resolveLaborGroup(catalog, itemId);
-  const included = resolveIncludedLaborPhaseIds(
-    scopePhaseIds,
-    zonePhaseIds,
-    laborGroup,
-  );
+  const included = resolveIncludedLaborPhaseIds(explicitPhaseIds, laborGroup);
   return laborCostForRows(filterLaborGroupByInclusion(laborGroup, included));
 };
 
@@ -230,11 +229,8 @@ export const resolveRate = (
 export const resolveComplexityPercent = (
   context: ComplexityContext,
 ): number => {
-  if (context.zone_factor_percent !== null) {
-    return context.zone_factor_percent;
-  }
-  if (context.scope_factor_percent !== null) {
-    return context.scope_factor_percent;
+  if (context.condition_factor_percent !== null) {
+    return context.condition_factor_percent;
   }
   return 100;
 };
@@ -272,80 +268,109 @@ export const computeUnitPriceTarget = (
   );
 };
 
+/**
+ * First condition in leaf→root walk with `labor_phases_explicit` (Y3/Y4).
+ * Returns `null` when no ancestor has an explicit set (use catalog default).
+ * Returns `[]` when explicit empty (no phases).
+ */
+export const loadConditionLaborPhases = async (
+  client: Pool | PoolClient,
+  estimateConditionId: string,
+): Promise<string[] | null> => {
+  if (!(await tableExists(client, "estimate_condition_labor_phase"))) {
+    return null;
+  }
+
+  let current: string | null = estimateConditionId;
+  const seen = new Set<string>();
+
+  while (current) {
+    if (seen.has(current)) {
+      break;
+    }
+    seen.add(current);
+
+    const metaResult: {
+      rows: Array<{
+        labor_phases_explicit: boolean;
+        parent_condition_id: string | null;
+      }>;
+    } = await client.query(
+      `SELECT labor_phases_explicit, parent_condition_id
+       FROM estimate_condition
+       WHERE id = $1`,
+      [current],
+    );
+    const meta = metaResult.rows[0];
+    if (!meta) {
+      break;
+    }
+
+    if (meta.labor_phases_explicit) {
+      const result = await client.query<{ labor_phase_id: string }>(
+        `SELECT labor_phase_id
+         FROM estimate_condition_labor_phase
+         WHERE estimate_condition_id = $1
+         ORDER BY sort_order ASC, labor_phase_id ASC`,
+        [current],
+      );
+      return result.rows.map((row) => row.labor_phase_id);
+    }
+
+    current = meta.parent_condition_id;
+  }
+
+  return null;
+};
+
+/** @deprecated Scope labor phases removed in 37y — returns []. */
 export const loadScopeLaborPhases = async (
-  client: Pool | PoolClient,
-  estimateScopeId: string,
-): Promise<string[]> => {
-  if (!(await tableExists(client, "estimate_scope_labor_phase"))) {
-    return [];
-  }
+  _client: Pool | PoolClient,
+  _estimateScopeId: string,
+): Promise<string[]> => [];
 
-  const result = await client.query<{ labor_phase_id: string }>(
-    `SELECT labor_phase_id
-     FROM estimate_scope_labor_phase
-     WHERE estimate_scope_id = $1
-     ORDER BY sort_order ASC, labor_phase_id ASC`,
-    [estimateScopeId],
-  );
-  return result.rows.map((row) => row.labor_phase_id);
-};
-
-export const loadZoneLaborPhases = async (
-  client: Pool | PoolClient,
-  estimateScopeId: string,
-  siteZoneId: string,
-): Promise<string[]> => {
-  if (!(await tableExists(client, "estimate_zone_labor_phase"))) {
-    return [];
-  }
-
-  const result = await client.query<{ labor_phase_id: string }>(
-    `SELECT labor_phase_id
-     FROM estimate_zone_labor_phase
-     WHERE estimate_scope_id = $1 AND site_zone_id = $2
-     ORDER BY sort_order ASC, labor_phase_id ASC`,
-    [estimateScopeId, siteZoneId],
-  );
-  return result.rows.map((row) => row.labor_phase_id);
-};
-
+/** Nearest non-null complexity factor walking leaf → ancestor. */
 export const loadComplexityContext = async (
   client: Pool | PoolClient,
-  estimateScopeId: string,
-  siteZoneId: string | null,
+  estimateConditionId: string | null,
 ): Promise<ComplexityContext> => {
-  const scopeResult = await client.query<{ factor_percent: number | null }>(
-    `SELECT cf.factor_percent
-     FROM estimate_scope es
-     LEFT JOIN complexity_factor cf ON cf.id = es.complexity_factor_id
-     WHERE es.id = $1`,
-    [estimateScopeId],
-  );
-
-  let zoneFactor: number | null = null;
-  if (siteZoneId) {
-    const zoneResult = await client.query<{ factor_percent: number | null }>(
-      `SELECT cf.factor_percent
-       FROM estimate_zone ez
-       LEFT JOIN complexity_factor cf ON cf.id = ez.complexity_factor_id
-       WHERE ez.site_zone_id = $1 AND ez.estimate_scope_id = $2`,
-      [siteZoneId, estimateScopeId],
-    );
-    zoneFactor =
-      zoneResult.rows[0]?.factor_percent === null ||
-      zoneResult.rows[0]?.factor_percent === undefined
-        ? null
-        : Number(zoneResult.rows[0].factor_percent);
+  if (!estimateConditionId) {
+    return { condition_factor_percent: null };
   }
 
-  const scopeFactor =
-    scopeResult.rows[0]?.factor_percent === null ||
-    scopeResult.rows[0]?.factor_percent === undefined
-      ? null
-      : Number(scopeResult.rows[0].factor_percent);
+  let current: string | null = estimateConditionId;
+  const seen = new Set<string>();
 
-  return {
-    scope_factor_percent: scopeFactor,
-    zone_factor_percent: zoneFactor,
-  };
+  while (current) {
+    if (seen.has(current)) {
+      break;
+    }
+    seen.add(current);
+
+    const factorResult: {
+      rows: Array<{
+        factor_percent: number | null;
+        parent_condition_id: string | null;
+      }>;
+    } = await client.query(
+      `SELECT cf.factor_percent, ec.parent_condition_id
+       FROM estimate_condition ec
+       LEFT JOIN complexity_factor cf ON cf.id = ec.complexity_factor_id
+       WHERE ec.id = $1`,
+      [current],
+    );
+
+    const factorRow = factorResult.rows[0];
+    if (!factorRow) {
+      break;
+    }
+
+    if (factorRow.factor_percent !== null && factorRow.factor_percent !== undefined) {
+      return { condition_factor_percent: Number(factorRow.factor_percent) };
+    }
+
+    current = factorRow.parent_condition_id;
+  }
+
+  return { condition_factor_percent: null };
 };

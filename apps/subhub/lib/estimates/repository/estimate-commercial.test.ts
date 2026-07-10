@@ -135,11 +135,10 @@ describe("computeUnitPriceTarget", () => {
 });
 
 describe("resolveComplexityPercent", () => {
-  it("prefers zone over scope", () => {
+  it("uses condition factor when set", () => {
     expect(
       resolveComplexityPercent({
-        scope_factor_percent: 110,
-        zone_factor_percent: 125,
+        condition_factor_percent: 125,
       }),
     ).toBe(125);
   });
@@ -147,8 +146,7 @@ describe("resolveComplexityPercent", () => {
   it("defaults to 100", () => {
     expect(
       resolveComplexityPercent({
-        scope_factor_percent: null,
-        zone_factor_percent: null,
+        condition_factor_percent: null,
       }),
     ).toBe(100);
   });
@@ -204,7 +202,7 @@ describe("resolveFilteredLaborCost", () => {
     rate_cents: 5000,
   });
 
-  it("filters scope inclusion to selected phases", () => {
+  it("filters inclusion to selected phases", () => {
     const catalog = buildCatalog({
       items: [item("leaf", "root")],
       labor: [
@@ -213,12 +211,10 @@ describe("resolveFilteredLaborCost", () => {
       ],
     });
 
-    expect(
-      resolveFilteredLaborCost(catalog, "leaf", ["program"], null),
-    ).toBe(50);
+    expect(resolveFilteredLaborCost(catalog, "leaf", ["program"])).toBe(50);
   });
 
-  it("includes all phases when inclusion unset", () => {
+  it("includes all phases when inclusion unset (null)", () => {
     const catalog = buildCatalog({
       items: [item("leaf", "root")],
       labor: [
@@ -227,10 +223,10 @@ describe("resolveFilteredLaborCost", () => {
       ],
     });
 
-    expect(resolveFilteredLaborCost(catalog, "leaf", [], null)).toBe(150);
+    expect(resolveFilteredLaborCost(catalog, "leaf", null)).toBe(150);
   });
 
-  it("prefers zone inclusion over scope", () => {
+  it("explicit empty yields zero labor", () => {
     const catalog = buildCatalog({
       items: [item("leaf", "root")],
       labor: [
@@ -240,14 +236,12 @@ describe("resolveFilteredLaborCost", () => {
       ],
     });
 
-    expect(
-      resolveFilteredLaborCost(catalog, "leaf", ["program", "install"], ["test"]),
-    ).toBe(50);
+    expect(resolveFilteredLaborCost(catalog, "leaf", [])).toBe(0);
   });
 });
 
 describe("resolveIncludedLaborPhaseIds", () => {
-  it("defaults to all group phases", () => {
+  it("defaults to all group phases when null", () => {
     const group = [
       {
         item_id: "leaf",
@@ -257,7 +251,20 @@ describe("resolveIncludedLaborPhaseIds", () => {
         rate_cents: 100,
       },
     ];
-    expect([...resolveIncludedLaborPhaseIds([], null, group)]).toEqual(["a"]);
+    expect([...resolveIncludedLaborPhaseIds(null, group)]).toEqual(["a"]);
+  });
+
+  it("explicit empty yields empty set", () => {
+    const group = [
+      {
+        item_id: "leaf",
+        labor_phase_id: "a",
+        labor_rate_type_id: "r1",
+        hours_per_unit: 1,
+        rate_cents: 100,
+      },
+    ];
+    expect([...resolveIncludedLaborPhaseIds([], group)]).toEqual([]);
   });
 });
 

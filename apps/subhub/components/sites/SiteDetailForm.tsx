@@ -8,7 +8,7 @@ import {
   fieldAllows,
   type Manifest,
 } from "@latch/contracts";
-import { App, Tabs, Typography } from "antd";
+import { App } from "antd";
 import { notFound, useRouter } from "next/navigation";
 import { useCallback, useMemo } from "react";
 import { useForm, type Resolver } from "react-hook-form";
@@ -31,6 +31,7 @@ import {
 } from "@/components/sites/site-scopes-tree";
 import { SurfaceFormLayout } from "@/components/surface/SurfaceFormLayout";
 import { useSurfaceFormChrome } from "@/components/surface/SurfaceFormChromeContext";
+import { DetailHeader } from "@/components/surface/DetailHeader";
 import { SurfaceFormRoot } from "@/components/surface/SurfaceFormRoot";
 import { useSurfaceListCreate } from "@/lib/hooks/use-surface-list-create";
 import { useSurfaceDetail } from "@/lib/hooks/use-surface-detail";
@@ -456,11 +457,10 @@ export const SiteDetailForm = ({
     >
       <form onSubmit={onSave}>
         <SurfaceFormLayout maxWidth={SURFACE_FORM_MAX_WIDTH}>
-          <Typography.Title level={4} style={{ marginTop: 0 }}>
-            {isCreate ? "New site" : (profile?.name ?? "Site")}
-          </Typography.Title>
-
-          {tabItems.length > 0 ? <Tabs items={tabItems} /> : null}
+          <DetailHeader
+            title={isCreate ? "New site" : (profile?.name ?? "Site")}
+            items={tabItems.length > 0 ? tabItems : undefined}
+          />
         </SurfaceFormLayout>
       </form>
     </SurfaceFormRoot>

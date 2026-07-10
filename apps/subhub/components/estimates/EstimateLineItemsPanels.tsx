@@ -2,9 +2,8 @@
 
 import { fieldAllows, type Manifest } from "@latch/contracts";
 import { Typography } from "antd";
-import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useFieldArray, useFormContext, useWatch } from "react-hook-form";
+import { useEffect, useMemo, useState } from "react";
+import { useFormContext, useWatch } from "react-hook-form";
 
 import { EstimateBucketConfigurePanel } from "@/components/estimates/EstimateBucketConfigurePanel";
 import { EstimateLineFlatTable } from "@/components/estimates/EstimateLineFlatTable";
@@ -12,12 +11,8 @@ import { EstimateQuoteStructureTree } from "@/components/estimates/EstimateQuote
 import type { EstimateLineEditorFormValues } from "@/components/estimates/estimate-line-tree";
 import {
   defaultBucketSelection,
-  ensureBucketIncluded,
-  type EstimateBucketBinding,
   type EstimateBucketSelection,
 } from "@/components/estimates/estimate-line-selection";
-import { FormSection } from "@/components/form/FormSection";
-import { routes } from "@/lib/nav-routes";
 import { useFormUi } from "@/components/surface/useFormUi";
 
 type EstimateLineItemsPanelsProps = {
@@ -30,116 +25,86 @@ const TOP_ROW_MAX_HEIGHT = 320;
 
 export const EstimateLineItemsPanels = ({
   manifest,
-  siteId,
   siteSelected = true,
 }: EstimateLineItemsPanelsProps) => {
   const { control } = useFormContext<EstimateLineEditorFormValues>();
-  const { replace: replaceScopes } = useFieldArray({ control, name: "scopes" });
   const { disabled } = useFormUi();
 
-  const scopes = useWatch({ control, name: "scopes" }) ?? [];
-  const siteTree = useWatch({ control, name: "site_tree" });
+  const conditions = useWatch({ control, name: "conditions" }) ?? [];
   const [selection, setSelection] = useState<EstimateBucketSelection | null>(null);
-  const [, setIncludeTick] = useState(0);
 
-  const writableScopes = fieldAllows(manifest, "scopes", "write");
+  const writableConditions = fieldAllows(manifest, "conditions", "write");
 
-  const defaultSelection = useMemo(() => defaultBucketSelection(siteTree), [siteTree]);
+  const defaultSelection = useMemo(
+    () => defaultBucketSelection(conditions),
+    [conditions],
+  );
 
   useEffect(() => {
-    if (!siteTree?.scopes?.length) {
+    if (!conditions.length) {
       setSelection(null);
       return;
     }
 
-    setSelection((current) => current ?? defaultSelection);
-  }, [defaultSelection, siteTree?.scopes?.length]);
-
-  const ensureIncluded = useCallback((): EstimateBucketBinding | null => {
-    if (!selection) {
-      return null;
-    }
-
-    const result = ensureBucketIncluded(scopes, siteTree, selection);
-    if (!result) {
-      return null;
-    }
-
-    if (result.scopes !== scopes) {
-      replaceScopes(result.scopes);
-      setIncludeTick((tick) => tick + 1);
-    }
-
-    return result.binding;
-  }, [replaceScopes, scopes, selection, siteTree]);
-
-  const handleEnsureIncluded = useCallback(() => {
-    setIncludeTick((tick) => tick + 1);
-  }, []);
+    setSelection((current) => {
+      if (!current) {
+        return defaultSelection;
+      }
+      const stillThere = JSON.stringify(conditions).includes(
+        current.estimateConditionId,
+      );
+      return stillThere ? current : defaultSelection;
+    });
+  }, [conditions, defaultSelection]);
 
   if (!siteSelected) {
     return null;
   }
 
-  if (!siteTree?.scopes?.length) {
-    return (
-      <FormSection title="Line items">
-        <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>
-          This site has no scopes.{" "}
-          {siteId ? (
-            <Link href={routes.sites.detail(siteId)}>Add scopes &amp; zones on the site</Link>
-          ) : (
-            "Select a site with scopes to build a quote."
-          )}
-        </Typography.Paragraph>
-      </FormSection>
-    );
-  }
-
   return (
-    <FormSection title="Line items">
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 16,
+        minHeight: 480,
+      }}
+    >
       <div
         style={{
           display: "flex",
-          flexDirection: "column",
           gap: 16,
-          minHeight: 480,
+          alignItems: "stretch",
+          maxHeight: TOP_ROW_MAX_HEIGHT,
+          minHeight: 0,
         }}
       >
-        <div
-          style={{
-            display: "flex",
-            gap: 16,
-            alignItems: "stretch",
-            maxHeight: TOP_ROW_MAX_HEIGHT,
-            minHeight: 0,
-          }}
-        >
-          <div style={{ flex: 1, minWidth: 0, overflow: "auto" }}>
-            <EstimateQuoteStructureTree
-              selection={selection}
-              siteTree={siteTree}
-              onSelect={setSelection}
-            />
-          </div>
-          <div style={{ flex: 1, minWidth: 0, overflow: "auto" }}>
-            <EstimateBucketConfigurePanel
-              disabled={disabled}
-              selection={selection}
-              writable={writableScopes}
-              ensureIncluded={ensureIncluded}
-            />
-          </div>
-        </div>
-
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <EstimateLineFlatTable
-            manifest={manifest}
+        <div style={{ flex: 1, minWidth: 0, overflow: "auto" }}>
+          <EstimateQuoteStructureTree
             selection={selection}
-            onEnsureIncluded={handleEnsureIncluded}
+            writable={writableConditions}
+            disabled={disabled}
+            onSelect={setSelection}
+          />
+        </div>
+        <div style={{ flex: 1, minWidth: 0, overflow: "auto" }}>
+          <EstimateBucketConfigurePanel
+            disabled={disabled}
+            selection={selection}
+            writable={writableConditions}
           />
         </div>
       </div>
-    </FormSection>
+
+      <div style={{ flex: 1, minWidth: 0 }}>
+        {conditions.length === 0 ? (
+          <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>
+            Add a root condition in Structure to add line items.
+          </Typography.Paragraph>
+        ) : (
+          <EstimateLineFlatTable manifest={manifest} selection={selection} />
+        )}
+      </div>
+    </div>
   );
 };

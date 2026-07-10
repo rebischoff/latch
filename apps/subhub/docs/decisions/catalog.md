@@ -6,6 +6,26 @@
 
 ---
 
+### Decision: item commercial margin inherit checkbox (2026-07-09)
+
+**Status:** **Locked** (2026-07-09). **Task:** [37z](../tasks/37z-item-commercial-inherit-ui.md). **Aligns with:** estimate condition inherit UX [Y4](./estimate.md#decision-condition-only-commercial-tree-2026-07-09); unified `resolveRate` [D4](#decision-unified-item-tree--merge-category--item-node-anchored-estimate-lines-2026-07-05).
+
+**Problem:** Freight, incidental, and markup FKs on item nodes already resolve `self → ancestry → neutral` in costing, but `/items` UI only showed those pickers on scope/category nodes and gave no explicit inherit/override affordance on children — unlike estimate **C** configuration.
+
+**Choice:**
+
+| # | Topic | Choice |
+|---|--------|--------|
+| **Z1** | Fields on all nodes | Show freight / incidental / markup on **every** `node_type` (`scope`, `category`, quotable `item`) |
+| **Z2** | Child inherit checkbox | When `parent_id IS NOT NULL`: checkbox between label and control — **unchecked** = ancestry value read-only; **checked** = own FK editable |
+| **Z3** | Root | `parent_id IS NULL`: no checkbox; control always own |
+| **Z4** | Storage | **No schema change** — `null` FK = inherit; non-null = override (`resolveRate` unchanged) |
+| **Z5** | Explicit zero | Admin creates a catalog **None** rate type (0% + $0) when a child must block an ancestor's margin policy |
+
+**Rationale:** Same UX vocabulary as estimate conditions; leaves may override category margin when a subtype needs different freight/markup. Costing path stays pure — UI only makes inherit intent visible.
+
+---
+
 ### Decision: part item links leaf-only + Specs value UX (2026-07-08)
 
 **Status:** **Locked** (2026-07-08). **Task:** [37u](../tasks/37u-part-leaf-links-specs-ui.md). **Amends:** [catalog part authoring J3/J4](#decision-catalog-part-authoring-ui-2026-07-06); closes **N9** from [numeric specs — drop `range`](#decision-numeric-specs--drop-range-type-band-is-part-authored-2026-07-08). **Aligns with:** leaf-only estimate/job item pickers ([37l](../tasks/37l-leaf-quotable-item-model.md)); flat leaf participation ([37o](../tasks/37o-spec-participation-flatten.md)).
@@ -155,16 +175,16 @@ Fire Alarm (scope root)              ← spec_def.scope_root_item_id = Fire Alar
 |---|--------|--------|--------|
 | **D1** | Structural merge — one `item` tree | **Locked** · [amended 37l](#decision-unified-item-tree--merge-category--item-node-anchored-estimate-lines-2026-07-05) | Merge `category` + `item` into one self-referential table renamed **`item`**; estimate lines anchor to **quotable leaves** (`item.node_type = 'item'`) via `estimate_line.item_id`; stored `node_type` (`scope` \| `category` \| `item`); drop `item_category`, `item.kind`, `line_kind`. Scope roots excluded from line picker. |
 | **D2** | Drop `item.kind` — emergent composition | **Locked** | Remove `item.kind` and `estimate_line.line_kind`. Material + labor derived from what's attached (part pool + specs, `fallback_unit_cost`, `item_labor_phase`) — not a stored enum. Three shapes: discrete device, bulk/consumable, none (labor-only). |
-| **D3** | Specs narrow parts (separate from rates) | **Locked** | Spec defs inherit **down** (additive + branch-exclude). Spec **values** tier on estimate: scope → zone → line (line > zone > scope). Specs filter `part_item` pool only — never drive labor, markup, or freight. `estimate_line_spec` UI deferred v1. |
+| **D3** | Specs narrow parts (separate from rates) | **Locked** · **amended 2026-07-09** | Spec defs on catalog root. Spec **values** on estimate: **line → condition (leaf→root)** — no `estimate_scope` tier ([Y1–Y3](./estimate.md#decision-condition-only-commercial-tree-2026-07-09)). Was scope → condition → line (37x). Specs filter `part_item` pool only. `estimate_line_spec` UI deferred v1. |
 | **D4** | Unified `resolveRate` | **Locked** · [amended 37l](#decision-unified-item-tree--merge-category--item-node-anchored-estimate-lines-2026-07-05) | One algorithm for labor, markup, freight, incidental: **`self → ancestry walk-up → neutral`** (descendant-max dropped — leaf-only selection). Complexity + specs excluded. ROM uses explicit quotable allowance leaves with `fallback_unit_cost`. |
-| **D5** | Complexity on estimate scope/zone | **Locked** | `complexity_factor_id` on `estimate_scope` and/or `estimate_zone` only — **not** on item tree. Zone > scope > 100% default. Applies to `unit_labor` only. Estimator/PM may set. Reverses planning C23. |
+| **D5** | Complexity on estimate **condition** | **Locked** · **amended 2026-07-09** | **`complexity_factor_id` on `estimate_condition` only** (every node, incl. roots) — not on site geography; `estimate_scope` retired ([Y1](./estimate.md#decision-condition-only-commercial-tree-2026-07-09)). Null factor → walk ancestors → **100%**. Applies to `unit_labor` only. |
 | **D6a** | Estimate `status` — lifecycle freeze | **Locked** | **`sent`** = customer issued → **full structural freeze** (lines, scopes, scope/zone specs, complexity); **no recalc** (snapshots are the record). **`draft`** = fluid recalc per line-lock rules (D6b). **`won`** = immutable (existing); extends freeze to job handoff. Amends [estimate lifecycle](./estimate.md). |
 | **D6b** | Line `lock` enum (draft only) | **Locked** | `estimate_line.lock`: **`none` \| `sell` \| `line`** (hierarchy: `line` supersedes `sell`). `none` = full fluid recalc incl. sell; `sell` = freeze `unit_price` only; `line` = skip recalc entirely. Manual sell edit → `sell`; lock line → `line`; sync to target → `none`. Drops `part_locked` / `sell_locked`. |
 | **D6c** | Qty on `lock = line` | **Locked** | **Allow** `quantity` edits — operational, not policy. Unit snapshots stay frozen; ext sell = `qty × unit_price`. Changing item/scope/specs on locked line → block or force unlock (Q4). |
 | **D6d** | PN pick + structural edits | **Locked** | **Q4a:** PN pick alone does **not** lock — `part_id` may change on recalc while `lock = none` (fluid). User sets `lock = line` to freeze PN. **Q4b:** **`lock = line`** → **block** item / scope / zone changes in UI + DAL (no force-unlock prompt v1). |
 | **D6e** | `material_status` | **Locked — drop** | Remove column. UI derives part-resolution hint from `part_id` presence + filtered match count + `lock` — not persisted. |
-| **D6f** | `estimate_scope_id` | **Locked — keep** | **NOT NULL** — every line under a checked `estimate_scope`; drives item picker root + scope spec bucket. Block change when `lock = line` (D6d). |
-| **D6g** | `site_zone_id` | **Locked — keep** | **Nullable** — zone placement within scope; merges zone specs + zone complexity (D5) when set. Block change when `lock = line` (D6d). |
+| **D6f** | Line commercial FK | **Locked** · **amended 2026-07-09** | **`estimate_line.estimate_condition_id` NOT NULL** — every line under a condition; item picker root from condition tree’s `root_item_id`. **Drop `estimate_line.estimate_scope_id`** ([Y2](./estimate.md#decision-condition-only-commercial-tree-2026-07-09)). Block condition change when `lock = line` (D6d). |
+| **D6g** | `site_zone_id` | **Locked — keep** · **amended 2026-07-09** | **Nullable** place FK (and/or future allocation rows). **No longer** merges commercial specs/complexity — those live on **condition** ([G1–G3](./estimate.md#decision-estimate-scope-condition-zone-and-line-qty-2026-07-09)). Block change when `lock = line` (D6d). |
 | **D6h** | `unit` | **Locked — keep** | Snapshot on line (quote UOM). **Default from `manufacturer_part.unit`** when `part_id` set; else from item node or estimator (`ea`/`lf`/…). Canonical UOM remains on part catalog only. Editable when no part; allow edit when `lock = line` (like qty). |
 | **D6i** | `unit_material` | **Locked — keep** | Per-unit material cost snapshot; recalc from part/vendor, filtered max, or `fallback_unit_cost`. Part of M/L/freight/incidental breakdown. Frozen when `lock = line` or `sent`. |
 | **D7** | Assemblies | **Locked — defer v2** | **No assembly/kit work in v1** unified-tree pass. **Principle locked now:** tree parent → child = classification only; assemblies (*composed of*) **must not** be tree children (reject Option C). v2 delivers estimate kit lines (Option A) + catalog BOM expand (Option B) together — design D7a–c then. Existing `line_role` / `parent_line_id` columns may remain in DDL; v1 UI/DAL scope = **standalone lines only**. |

@@ -253,7 +253,10 @@ flowchart LR
 | **37t** | [37t-spec-def-type-roundtrip.md](./37t-spec-def-type-roundtrip.md) | Spec def type round-trip — preserve Details (options / unit / dp) before save — **complete** (2026-07-08) |
 | **37u** | [37u-part-leaf-links-specs-ui.md](./37u-part-leaf-links-specs-ui.md) | Part `item_links` leaf-only + multi TreeSelect; Specs Spec·Value (checkbox / number band / enum) — **complete** (2026-07-08) |
 | **37v** | [37v-estimate-structure-tab.md](./37v-estimate-structure-tab.md) | Merge Scope into **Line Items** tab (Add scope/zone dropdowns, Configure popover; kits UI removed); no schema change — **complete** (2026-07-08); **UI superseded by 37w** |
-| **37w** | [37w-estimate-line-items-panels.md](./37w-estimate-line-items-panels.md) | Line Items **three-panel layout** (S + C left, LI flat right); **W1–W9** — **complete** (2026-07-08) |
+| **37w** | [37w-estimate-line-items-panels.md](./37w-estimate-line-items-panels.md) | Line Items **three-panel layout** (S + C left, LI flat right); **W1–W9** — **complete** (2026-07-08); **S/C amended by 37x** |
+| **37x** | [37x-estimate-conditions-allocations.md](./37x-estimate-conditions-allocations.md) | Estimate **conditions** + line **allocations**; S = commercial tree; complexity on condition only — **complete** (2026-07-09); **superseded for roots by 37y** |
+| **37y** | [37y-condition-only-commercial-tree.md](./37y-condition-only-commercial-tree.md) | Drop `estimate_scope`; condition-only forest; lines require condition; C inherit checkbox (Y1–Y5) — **complete** (2026-07-09) |
+| **37z** | [37z-item-commercial-inherit-ui.md](./37z-item-commercial-inherit-ui.md) | Item F/I/M inherit checkbox on all nodes; no schema change (Z1–Z5) — **complete** (2026-07-09) |
 | **37h** | *(see 37a chain)* | Job `site_zone_id` FK renames |
 
 ### Backbone pass (estimate finish) — tasks 29–32

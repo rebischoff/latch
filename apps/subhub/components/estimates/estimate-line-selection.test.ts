@@ -1,161 +1,88 @@
 import { describe, expect, it } from "vitest";
 
-import { makeLine, type EstimateScopeFormRow } from "@/components/estimates/estimate-line-tree";
 import {
   defaultBucketSelection,
-  ensureBucketIncluded,
   filterLinesForSelection,
   parseSelectionFromTreeKey,
+  resolveBucketBinding,
   selectionToTreeKey,
 } from "@/components/estimates/estimate-line-selection";
+import {
+  makeLine,
+  makeCondition,
+  type EstimateConditionFormRow,
+} from "@/components/estimates/estimate-line-tree";
 
-const baseScope = (overrides: Partial<EstimateScopeFormRow> = {}): EstimateScopeFormRow => ({
-  id: "est-scope-1",
-  site_scope_id: "site-scope-1",
-  root_item_id: "root-1",
-  root_item_name: "HVAC",
-  site_scope_name: "Level 1",
-  sort_order: 1,
-  complexity_factor_id: null,
-  included_labor_phases: [],
-  specs: [],
-  zones: [],
-  ...overrides,
-});
-
-const siteTree = {
-  scopes: [
-    {
-      id: "site-scope-1",
-      name: "Level 1",
-      root_item_id: "root-1",
-      zones: [
-        {
-          id: "zone-a",
-          name: "North wing",
-        },
-      ],
-    },
-    {
-      id: "site-scope-2",
-      name: "Level 2",
-      root_item_id: "root-2",
-      zones: [],
-    },
-  ],
-};
-
-describe("parseSelectionFromTreeKey", () => {
-  it("parses scope and zone keys", () => {
-    expect(parseSelectionFromTreeKey("scope:site-scope-1")).toEqual({
-      siteScopeId: "site-scope-1",
-      siteZoneId: null,
-    });
-    expect(parseSelectionFromTreeKey("zone:site-scope-1:zone-a")).toEqual({
-      siteScopeId: "site-scope-1",
-      siteZoneId: "zone-a",
-    });
+const baseRoot = (
+  overrides: Partial<EstimateConditionFormRow> = {},
+): EstimateConditionFormRow =>
+  makeCondition({
+    id: "root-1",
+    name: "Intrusion",
+    root_item_id: "item-root",
+    root_item_name: "Intrusion",
+    labor_phases_explicit: true,
+    ...overrides,
   });
-});
 
-describe("selectionToTreeKey", () => {
-  it("round-trips scope and zone selections", () => {
-    const scopeSelection = { siteScopeId: "site-scope-1", siteZoneId: null };
-    expect(selectionToTreeKey(scopeSelection)).toBe("scope:site-scope-1");
-    expect(parseSelectionFromTreeKey(selectionToTreeKey(scopeSelection))).toEqual(
-      scopeSelection,
-    );
+describe("parseSelectionFromTreeKey / selectionToTreeKey", () => {
+  it("round-trips condition keys", () => {
+    const selection = parseSelectionFromTreeKey("condition:cond-1");
+    expect(selection).toEqual({
+      estimateConditionId: "cond-1",
+    });
+    expect(selectionToTreeKey(selection!)).toBe("condition:cond-1");
+  });
 
-    const zoneSelection = { siteScopeId: "site-scope-1", siteZoneId: "zone-a" };
-    expect(selectionToTreeKey(zoneSelection)).toBe("zone:site-scope-1:zone-a");
-    expect(parseSelectionFromTreeKey(selectionToTreeKey(zoneSelection))).toEqual(
-      zoneSelection,
-    );
+  it("rejects scope keys", () => {
+    expect(parseSelectionFromTreeKey("scope:est-scope-1")).toBeNull();
   });
 });
 
 describe("defaultBucketSelection", () => {
-  it("selects the first site scope", () => {
-    expect(defaultBucketSelection(siteTree)).toEqual({
-      siteScopeId: "site-scope-1",
-      siteZoneId: null,
+  it("selects first root condition", () => {
+    expect(defaultBucketSelection([baseRoot()])).toEqual({
+      estimateConditionId: "root-1",
     });
   });
 });
 
-describe("filterLinesForSelection", () => {
-  it("filters unzoned lines for scope selection and zoned lines for zone selection", () => {
-    const scopes = [
-      baseScope({
-        zones: [
-          {
-            site_zone_id: "zone-a",
-            sort_order: 1,
-            complexity_factor_id: null,
-            included_labor_phases: [],
-            specs: [],
-          },
-        ],
-      }),
-    ];
+describe("resolveBucketBinding / filterLinesForSelection", () => {
+  it("binds root and filters root lines only", () => {
+    const child = makeCondition({ id: "cond-1", name: "Office" });
+    const conditions = [baseRoot({ conditions: [child] })];
+    const selection = { estimateConditionId: "root-1" };
 
-    const lines = [
-      makeLine({ id: "line-1", estimate_scope_id: "est-scope-1", description: "Unzoned" }),
-      makeLine({
-        id: "line-2",
-        estimate_scope_id: "est-scope-1",
-        site_zone_id: "zone-a",
-        description: "Zoned",
-      }),
-    ];
-
-    expect(
-      filterLinesForSelection(lines, scopes, {
-        siteScopeId: "site-scope-1",
-        siteZoneId: null,
-      }).map((line) => line.id),
-    ).toEqual(["line-1"]);
-
-    expect(
-      filterLinesForSelection(lines, scopes, {
-        siteScopeId: "site-scope-1",
-        siteZoneId: "zone-a",
-      }).map((line) => line.id),
-    ).toEqual(["line-2"]);
-  });
-
-  it("returns no lines when the bucket is not on the quote yet", () => {
-    const lines = [
-      makeLine({ id: "line-1", estimate_scope_id: "est-scope-1", description: "Unzoned" }),
-    ];
-
-    expect(
-      filterLinesForSelection(lines, [], {
-        siteScopeId: "site-scope-1",
-        siteZoneId: null,
-      }),
-    ).toEqual([]);
-  });
-});
-
-describe("ensureBucketIncluded", () => {
-  it("implicitly includes scope and zone buckets", () => {
-    const scopeResult = ensureBucketIncluded([], siteTree, {
-      siteScopeId: "site-scope-1",
-      siteZoneId: null,
+    expect(resolveBucketBinding(conditions, selection)).toEqual({
+      conditionPath: [0],
     });
 
-    expect(scopeResult?.binding).toEqual({ scopeIndex: 0 });
-    expect(scopeResult?.scopes).toHaveLength(1);
-    expect(scopeResult?.scopes[0]?.site_scope_id).toBe("site-scope-1");
+    const lines = [
+      makeLine({ id: "a", estimate_condition_id: "root-1" }),
+      makeLine({ id: "b", estimate_condition_id: "cond-1" }),
+    ];
 
-    const zoneResult = ensureBucketIncluded([], siteTree, {
-      siteScopeId: "site-scope-1",
-      siteZoneId: "zone-a",
+    expect(filterLinesForSelection(lines, selection).map((l) => l.id)).toEqual([
+      "a",
+    ]);
+  });
+
+  it("binds child and filters child lines only", () => {
+    const child = makeCondition({ id: "cond-1", name: "Office" });
+    const conditions = [baseRoot({ conditions: [child] })];
+    const selection = { estimateConditionId: "cond-1" };
+
+    expect(resolveBucketBinding(conditions, selection)).toEqual({
+      conditionPath: [0, 0],
     });
 
-    expect(zoneResult?.binding).toEqual({ scopeIndex: 0, zoneIndex: 0 });
-    expect(zoneResult?.scopes[0]?.zones).toHaveLength(1);
-    expect(zoneResult?.scopes[0]?.zones[0]?.site_zone_id).toBe("zone-a");
+    const lines = [
+      makeLine({ id: "a", estimate_condition_id: "root-1" }),
+      makeLine({ id: "b", estimate_condition_id: "cond-1" }),
+    ];
+
+    expect(filterLinesForSelection(lines, selection).map((l) => l.id)).toEqual([
+      "b",
+    ]);
   });
 });

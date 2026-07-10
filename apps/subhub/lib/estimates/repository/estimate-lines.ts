@@ -1,14 +1,21 @@
 import type { Pool } from "pg";
 
-import type { EstimateLineItemRow } from "../descriptors/estimate-detail";
+import type {
+  EstimateLineAllocationRow,
+  EstimateLineItemRow,
+} from "../descriptors/estimate-detail";
+
+type LineQueryRow = Omit<EstimateLineItemRow, "phase_id" | "allocations">;
 
 const mapLineItemRow = (
-  row: Omit<EstimateLineItemRow, "phase_id">,
+  row: LineQueryRow,
+  allocations: EstimateLineAllocationRow[],
 ): EstimateLineItemRow => ({
   ...row,
-  // Legacy org phase_id dropped in migration 045 (37n); DTO keeps null for form compat.
+  allocations,
   phase_id: null,
   quantity: Number(row.quantity),
+  qty_manual: Boolean(row.qty_manual),
   unit_cost: Number(row.unit_cost),
   unit_price: Number(row.unit_price),
   unit_material: Number(row.unit_material),
@@ -26,8 +33,7 @@ export const loadEstimateLineItems = async (
   pool: Pool,
   estimateId: string,
 ): Promise<EstimateLineItemRow[]> => {
-  // phase_id removed from estimate_line in migration 045 — do not SELECT it.
-  const result = await pool.query<Omit<EstimateLineItemRow, "phase_id">>(
+  const result = await pool.query<LineQueryRow>(
     `SELECT
        el.id,
        el.line_number,
@@ -35,6 +41,7 @@ export const loadEstimateLineItems = async (
        el.line_role,
        el.description,
        el.quantity,
+       el.qty_manual,
        el.unit,
        el.unit_cost,
        el.unit_price,
@@ -43,8 +50,7 @@ export const loadEstimateLineItems = async (
        el.unit_freight,
        el.unit_incidental,
        el.unit_price_target,
-       el.estimate_scope_id,
-       el.site_zone_id,
+       el.estimate_condition_id,
        el.lock,
        el.item_id,
        el.part_id,
@@ -56,5 +62,41 @@ export const loadEstimateLineItems = async (
     [estimateId],
   );
 
-  return result.rows.map(mapLineItemRow);
+  if (result.rows.length === 0) {
+    return [];
+  }
+
+  const lineIds = result.rows.map((row) => row.id);
+  const allocResult = await pool.query<{
+    estimate_line_id: string;
+    quantity: number;
+    site_zone_id: string;
+    site_zone_name: string | null;
+  }>(
+    `SELECT
+       ela.estimate_line_id,
+       ela.site_zone_id,
+       ela.quantity,
+       sz.name AS site_zone_name
+     FROM estimate_line_allocation ela
+     LEFT JOIN site_zone sz ON sz.id = ela.site_zone_id
+     WHERE ela.estimate_line_id = ANY($1::text[])
+     ORDER BY ela.site_zone_id ASC`,
+    [lineIds],
+  );
+
+  const allocationsByLineId = new Map<string, EstimateLineAllocationRow[]>();
+  for (const row of allocResult.rows) {
+    const rows = allocationsByLineId.get(row.estimate_line_id) ?? [];
+    rows.push({
+      site_zone_id: row.site_zone_id,
+      site_zone_name: row.site_zone_name,
+      quantity: Number(row.quantity),
+    });
+    allocationsByLineId.set(row.estimate_line_id, rows);
+  }
+
+  return result.rows.map((row) =>
+    mapLineItemRow(row, allocationsByLineId.get(row.id) ?? []),
+  );
 };

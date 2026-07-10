@@ -3,13 +3,13 @@ export {
 } from "@/components/estimates/EstimateLineItemsPanels";
 
 export type {
+  EstimateConditionFormRow,
   EstimateLineFormRow,
-  EstimateScopeFormRow,
 } from "@/components/estimates/estimate-line-tree";
 
 export type { EstimateLineRole } from "@/components/estimates/estimate-line-tree";
 
 export type EstimateLineItemsFormValues = {
-  scopes: import("@/components/estimates/estimate-line-tree").EstimateScopeFormRow[];
+  conditions: import("@/components/estimates/estimate-line-tree").EstimateConditionFormRow[];
   line_items: import("@/components/estimates/estimate-line-tree").EstimateLineFormRow[];
 };

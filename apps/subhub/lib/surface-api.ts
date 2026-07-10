@@ -244,6 +244,35 @@ export const fetchEstimateItemPicker = async (
   return parseResponse<EstimateItemPickerData>(response);
 };
 
+export type EstimateScopeSpecTemplateRow = {
+  decimal_places?: number | null;
+  def_display_name: string;
+  option_display_name: string | null;
+  options?: Array<{ display_name: string; id: string }>;
+  spec_def_id: string;
+  spec_option_id: string | null;
+  to_canonical_factor?: number;
+  unit_symbol?: string | null;
+  value_boolean: boolean | null;
+  value_number: number | null;
+  value_type: "enum" | "boolean" | "number";
+};
+
+export type EstimateScopeSpecTemplateData = {
+  specs: EstimateScopeSpecTemplateRow[];
+};
+
+/** Catalog scope-panel defs for a root — seeds Add root condition (not site-scoped). */
+export const fetchEstimateScopeSpecTemplate = async (
+  rootItemId: string,
+): Promise<ApiSuccessBody<EstimateScopeSpecTemplateData>> => {
+  const params = new URLSearchParams({ root_item_id: rootItemId });
+  const response = await fetch(
+    `/api/estimates/pickers/scope-specs?${params.toString()}`,
+  );
+  return parseResponse<EstimateScopeSpecTemplateData>(response);
+};
+
 export type EstimatePartPickerRow = {
   description: string;
   id: string;
@@ -257,8 +286,7 @@ export type EstimatePartPickerData = {
 
 export const fetchEstimatePartPicker = async (params: {
   itemId: string;
-  estimateScopeId: string;
-  siteZoneId?: string | null;
+  estimateConditionId: string;
   estimateId?: string;
   lineId?: string;
 }): Promise<ApiSuccessBody<EstimatePartPickerData>> => {
@@ -267,10 +295,7 @@ export const fetchEstimatePartPicker = async (params: {
     search.set("estimate_id", params.estimateId);
     search.set("line_id", params.lineId);
   } else {
-    search.set("estimate_scope_id", params.estimateScopeId);
-    if (params.siteZoneId) {
-      search.set("site_zone_id", params.siteZoneId);
-    }
+    search.set("estimate_condition_id", params.estimateConditionId);
   }
   const response = await fetch(`/api/estimates/pickers/parts?${search.toString()}`);
   return parseResponse<EstimatePartPickerData>(response);

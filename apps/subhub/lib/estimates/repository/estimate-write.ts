@@ -12,13 +12,13 @@ import type {
   EstimateDetailRow,
   EstimateDetailWriteRow,
 } from "../descriptors/estimate-detail";
+import {
+  collectConditionIdsFromPatch,
+  loadEstimateConditionIds,
+  replaceEstimateConditionsTx,
+} from "./estimate-conditions-write";
 import { replaceEstimateLineItemsTx } from "./estimate-lines-write";
 import { replaceEstimateStakeholdersTx } from "./estimate-stakeholders";
-import {
-  buildCheckedZoneMembership,
-  loadEstimateScopeBlockIds,
-  replaceEstimateScopesTx,
-} from "./estimate-scopes-write";
 
 export const assertSiteIdUnchanged = (
   existing: Pick<EstimateDetailRow, "site_id">,
@@ -96,51 +96,34 @@ export const replaceEstimateCollectionsTx = async (
   client: PoolClient,
   estimateId: string,
   siteId: string,
-  related: Pick<EstimateDetailRelatedPatch, "scopes" | "line_items">,
+  related: Pick<EstimateDetailRelatedPatch, "conditions" | "line_items">,
 ): Promise<void> => {
   if (
     related.line_items !== undefined &&
     related.line_items.length > 0 &&
-    related.scopes !== undefined &&
-    related.scopes.length === 0
+    related.conditions !== undefined &&
+    related.conditions.length === 0
   ) {
-    throw new ValidationError("At least one scope is required when line_items are present", {
-      field: "scopes",
-      code: "scope_required",
-    });
+    throw new ValidationError(
+      "At least one condition is required when line_items are present",
+      {
+        field: "conditions",
+        code: "condition_required",
+      },
+    );
   }
 
-  let validScopeIds: Set<string>;
-  let checkedZones = new Map<string, Set<string>>();
+  let validConditionIds: Set<string>;
 
-  if (related.scopes !== undefined) {
-    validScopeIds = await replaceEstimateScopesTx(
+  if (related.conditions !== undefined) {
+    validConditionIds = await replaceEstimateConditionsTx(
       client,
       estimateId,
-      siteId,
-      related.scopes,
+      related.conditions,
       related.line_items,
     );
-    checkedZones = buildCheckedZoneMembership(related.scopes);
   } else {
-    validScopeIds = await loadEstimateScopeBlockIds(client, estimateId);
-
-    const zoneRows = await client.query<{
-      estimate_scope_id: string;
-      site_zone_id: string;
-    }>(
-      `SELECT ez.estimate_scope_id, ez.site_zone_id
-       FROM estimate_zone ez
-       INNER JOIN estimate_scope es ON es.id = ez.estimate_scope_id
-       WHERE es.estimate_id = $1`,
-      [estimateId],
-    );
-
-    for (const row of zoneRows.rows) {
-      const zones = checkedZones.get(row.estimate_scope_id) ?? new Set<string>();
-      zones.add(row.site_zone_id);
-      checkedZones.set(row.estimate_scope_id, zones);
-    }
+    validConditionIds = await loadEstimateConditionIds(client, estimateId);
   }
 
   if (related.line_items !== undefined) {
@@ -149,8 +132,9 @@ export const replaceEstimateCollectionsTx = async (
       estimateId,
       siteId,
       related.line_items,
-      validScopeIds,
-      checkedZones,
+      related.conditions !== undefined
+        ? collectConditionIdsFromPatch(related.conditions)
+        : validConditionIds,
     );
   }
 };
@@ -160,7 +144,7 @@ export const replaceEstimateCollections = async (
   actorId: string,
   estimateId: string,
   siteId: string,
-  related: Pick<EstimateDetailRelatedPatch, "scopes" | "line_items">,
+  related: Pick<EstimateDetailRelatedPatch, "conditions" | "line_items">,
 ): Promise<void> => {
   await withPermissionDb(pool, actorId, async (client) => {
     await replaceEstimateCollectionsTx(client, estimateId, siteId, related);
@@ -226,11 +210,11 @@ export const insertEstimate = async (
       }
 
       if (
-        related?.scopes !== undefined ||
+        related?.conditions !== undefined ||
         related?.line_items !== undefined
       ) {
         await replaceEstimateCollectionsTx(client, row.id, row.site_id, {
-          scopes: related.scopes,
+          conditions: related.conditions,
           line_items: related.line_items,
         });
       }
