@@ -14,7 +14,7 @@ import { useCallback, useMemo } from "react";
 import { useForm, type Resolver } from "react-hook-form";
 import { z } from "zod";
 
-import { SURFACE_FORM_MAX_WIDTH } from "@/components/form/formLayout";
+import { FormSection } from "@/components/form/FormSection";
 import { SelectInput } from "@/components/form/SelectInput";
 import { TextInput } from "@/components/form/TextInput";
 import {
@@ -412,18 +412,20 @@ export const SiteDetailForm = ({
 
   const generalTab = (
     <>
-      <TextInput<SiteDetailFormValues>
-        field="profile"
-        name="profile.name"
-        label="Name"
-      />
-      <SelectInput<SiteDetailFormValues>
-        field="customer_party"
-        name="customer_party.customer_party_id"
-        label="Customer"
-        options={customerOptions}
-        selectProps={{ allowClear: true, showSearch: true, optionFilterProp: "label" }}
-      />
+      <FormSection title="Profile">
+        <TextInput<SiteDetailFormValues>
+          field="profile"
+          name="profile.name"
+          label="Name"
+        />
+        <SelectInput<SiteDetailFormValues>
+          field="customer_party"
+          name="customer_party.customer_party_id"
+          label="Customer"
+          options={customerOptions}
+          selectProps={{ allowClear: true, showSearch: true, optionFilterProp: "label" }}
+        />
+      </FormSection>
       <SiteContactFields manifest={activeManifest} />
     </>
   );
@@ -456,7 +458,7 @@ export const SiteDetailForm = ({
       resetKey={isCreate ? "create" : `${siteId}:${detail?.data?.id ?? ""}`}
     >
       <form onSubmit={onSave}>
-        <SurfaceFormLayout maxWidth={SURFACE_FORM_MAX_WIDTH}>
+        <SurfaceFormLayout>
           <DetailHeader
             title={isCreate ? "New site" : (profile?.name ?? "Site")}
             items={tabItems.length > 0 ? tabItems : undefined}

@@ -24,12 +24,11 @@ export type FilteredPartRow = {
 
 export type MaterialResolveInput = {
   item_id: string;
-  lock: "line" | "none" | "sell";
+  material_locked: boolean;
   part_id: string | null;
 };
 
 export type MaterialResolveResult = {
-  lock: "line" | "none" | "sell";
   part_id: string | null;
   unit_material: number;
   part_match_alert: string | null;
@@ -308,7 +307,7 @@ export const resolveLineMaterial = async (
   const fallback = await loadItemFallbackCost(client, input.item_id);
   const filteredCount = filtered.length;
 
-  if (input.lock === "line" && input.part_id) {
+  if (input.material_locked && input.part_id) {
     const stillMatches = filtered.some((part) => part.id === input.part_id);
     const pinned = filtered.find((part) => part.id === input.part_id);
 
@@ -323,7 +322,6 @@ export const resolveLineMaterial = async (
 
     return {
       part_id: input.part_id,
-      lock: "line",
       unit_material: unitMaterial,
       part_match_alert: stillMatches
         ? null
@@ -338,7 +336,6 @@ export const resolveLineMaterial = async (
   if (filteredCount === 0) {
     return {
       part_id: null,
-      lock: input.lock,
       unit_material: fallback,
       part_match_alert: "No parts match bucket specs — using fallback cost",
       filtered_part_count: 0,
@@ -354,7 +351,6 @@ export const resolveLineMaterial = async (
 
     return {
       part_id: part.id,
-      lock: input.lock,
       unit_material: unitMaterial,
       part_match_alert: null,
       filtered_part_count: 1,
@@ -367,7 +363,6 @@ export const resolveLineMaterial = async (
 
   return {
     part_id: input.part_id,
-    lock: input.lock,
     unit_material: unitMaterial,
     part_match_alert: input.part_id ? null : "Multiple parts match — pick a PN or use max vendor cost",
     filtered_part_count: filteredCount,

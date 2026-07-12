@@ -9,6 +9,67 @@
 > **Amended (2026-07-09):** [scope / condition / zone / qty](#decision-estimate-scope-condition-zone-and-line-qty-2026-07-09) — site zones = place only; estimate **conditions** hold commercial knobs; line qty + zone allocations.
 >
 > **Amended (2026-07-09):** [condition-only commercial tree](#decision-condition-only-commercial-tree-2026-07-09) — drop `estimate_scope`; every commercial node is `estimate_condition`; lines require `estimate_condition_id` ([37y](../tasks/37y-condition-only-commercial-tree.md)).
+>
+> **Amended (2026-07-11):** [dual line locks + live preview](#decision-estimate-dual-line-locks-and-live-preview-2026-07-11) — replace `lock` enum with `sales_locked` + `material_locked`; server line-preview before Save ([37aa](../tasks/37aa-estimate-line-live-preview.md)).
+
+---
+
+### Decision: estimate dual line locks and live preview (2026-07-11)
+
+**Status:** **Locked.** **Task:** [37aa](../tasks/37aa-estimate-line-live-preview.md). **Supersedes** draft line `lock` enum behavior in [lifecycle freeze / D6b](#decision-estimate-lifecycle-freeze-and-line-lock-2026-07-05) and [catalog D6b–D6d](./catalog.md#estimate-line-locking-d6b--locked-2026-07-05). **Keeps:** estimate-level `sent`+ freeze (D6a) — no preview/recalc when not `draft`.
+
+**Problem:** Save-time costing (37f/37g) leaves material / freight / sell / part columns stale until PATCH. The `none | sell | line` enum cannot express independent “sticky sell” and “sticky item/part” while still updating underlying cost snapshots.
+
+#### Locked choices
+
+| # | Topic | Choice |
+|---|--------|--------|
+| **P1** | Preview math | **Server** — thin non-persisting endpoint reuses `recalcProductLine` / part resolver; no client formula fork |
+| **P2** | Triggers | Item select/reselect, part pick/clear, **condition configuration** change. **Not** quantity for unit costs |
+| **P3** | Fan-out | Item/part → **that line only**. Config → **all lines** under the **currently selected condition** |
+| **P4** | Quantity | Client-local **ext sell** only (`qty × unit_price`); never unit cost/sell snapshots |
+| **P5** | Preview vs locks | Preview response **never writes** lock flags; applies money/part fields **subject to** current flags |
+| **P6** | Storage | Drop `estimate_line.lock`. Add **`sales_locked`** + **`material_locked`** (`BOOLEAN NOT NULL DEFAULT false`). Independent (any combo) |
+| **P7** | Backfill | `none` → both false; `sell` → `sales_locked`; `line` → **both true** (conservative) |
+
+#### Sales lock
+
+| | |
+|---|---|
+| **On** | Manual edit of `unit_price`, or explicit sales-lock control |
+| **While on** | Recalc/preview **must not overwrite** `unit_price`. Costs + `unit_price_target` **still update** (margin may go negative). Sell remains **editable** |
+| **Off** | Explicit unlock / sync → `sales_locked = false` and `unit_price = unit_price_target` |
+
+#### Material lock
+
+| | |
+|---|---|
+| **On** | Manual PN pick, or explicit material-lock control. Auto single-match PN suggestion does **not** lock |
+| **While on** | Freeze **`item_id` + `part_id`** (block item change). **Costing still runs** from that pin |
+| **Off** | Explicit unlock → `material_locked = false` + **re-resolve** part (0/1/many); adopt suggested PN when available |
+
+#### Recalc / preview apply (draft)
+
+```text
+always: recompute unit_material, unit_labor, unit_freight, unit_incidental,
+        unit_cost, unit_price_target  (unless estimate not draft)
+
+if material_locked:
+  keep item_id + part_id from form (resolver must not swap PN)
+else:
+  apply resolver part_id / vendor_part_id
+
+if sales_locked:
+  keep unit_price
+else:
+  unit_price = unit_price_target
+```
+
+#### Preview API
+
+**One** `POST` endpoint accepting **1..n** line snapshots + draft condition config needed for costing; returns parallel results; **no DB write**. UI: one line for item/part; batch for selected-condition config fan-out. Debounce config fan-out (~300ms); per-line loading OK.
+
+**Rationale:** Estimators need immediate column feedback; dual booleans match sticky sell vs sticky catalog identity without freezing cost math; single batch endpoint avoids duplicating the commercial engine.
 
 ---
 
@@ -492,18 +553,18 @@ If **LI** row drag is implemented, **optional:** drop on **S** scope/zone node r
 
 ### Decision: estimate lifecycle freeze and line lock (2026-07-05)
 
-**Status:** **Locked.** **Supersedes** 37f [O4 sell lock deferred](../tasks/37f-estimate-line-costing.md#decision-o4--sell-lock-deferred-2026-07-04) for draft recalc behavior.
+**Status:** **Locked** for estimate-level freeze (D6a). **Draft line lock column superseded (2026-07-11)** by [dual line locks + live preview](#decision-estimate-dual-line-locks-and-live-preview-2026-07-11) (`sales_locked` + `material_locked`). **Originally superseded** 37f [O4 sell lock deferred](../tasks/37f-estimate-line-costing.md#decision-o4--sell-lock-deferred-2026-07-04).
 
-| `estimate.status` | Edit policy | Recalc on save |
-|-------------------|-------------|----------------|
-| **`draft`** | Full edit — lines, scopes, scope/zone specs, complexity | **Yes** — per `estimate_line.lock` (`none` \| `sell` \| `line`) |
+| `estimate.status` | Edit policy | Recalc / preview |
+|-------------------|-------------|------------------|
+| **`draft`** | Full edit — lines, conditions, specs, complexity | **Yes** — per dual locks ([2026-07-11](#decision-estimate-dual-line-locks-and-live-preview-2026-07-11)) |
 | **`sent`** | **Frozen** — no PATCH to quote-driving fields | **No** — snapshots are the issued quote |
 | **`won`** | Immutable (existing) | **No** |
 | **`lost` / `expired`** | Read-only (v1: same freeze as `sent`) | **No** |
 
-**`estimate_line.lock` (draft only):** `none` = full fluid recalc incl. sell; `sell` = freeze `unit_price` only; `line` = skip recalc entirely. Manual sell edit → `sell`; lock line → `line`; sync to target → `none`. Replaces `part_locked` / `sell_locked`. Estimate-level freeze (`sent`+) supersedes line lock.
+**Historical (`lock` enum, retired 2026-07-11):** `none` \| `sell` \| `line` — see catalog D6b archive notes. Estimate-level freeze (`sent`+) still supersedes per-line locks.
 
-**Source:** [catalog D6a–D6d](./catalog.md#estimate-status-and-recalc-policy-d6a--locked-2026-07-05).
+**Source:** [catalog D6a](./catalog.md#estimate-status-and-recalc-policy-d6a--locked-2026-07-05); line locks → [dual locks decision](#decision-estimate-dual-line-locks-and-live-preview-2026-07-11).
 
 ---
 

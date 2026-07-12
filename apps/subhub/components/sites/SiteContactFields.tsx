@@ -17,6 +17,7 @@ import {
 import { FieldArrayTable } from "@/components/form/FieldArrayTable";
 import type { FieldArrayTableColumn } from "@/components/form/FieldArrayTable";
 import { FormSection } from "@/components/form/FormSection";
+import { TABLE_WIDTH_LG } from "@/components/form/formLayout";
 import { findSelectLabel } from "@/components/form/optionHelpers";
 import { useSitePartyPicker } from "@/lib/hooks/use-site-party-picker";
 import { useSurfaceList } from "@/lib/hooks/use-surface-list";
@@ -266,12 +267,13 @@ export const SiteContactFields = ({ manifest }: SiteContactFieldsProps) => {
 
   return (
     <FieldControl manifest={manifest} field="contacts">
-      <FormSection title="Contacts">
+      <FormSection title="Contacts" width="full">
         {emptyState}
         <FieldArrayTable<SiteContactsFormValues, "contacts">
           field="contacts"
           name="contacts"
           columns={columns}
+          maxWidth={TABLE_WIDTH_LG}
           createRow={() => ({
             party_id: "",
             relation_id: "",

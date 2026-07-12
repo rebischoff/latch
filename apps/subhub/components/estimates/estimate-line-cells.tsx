@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, Input, InputNumber, Select, Tag, TreeSelect, Typography } from "antd";
+import { Button, Input, InputNumber, Select, Space, Tag, TreeSelect, Typography } from "antd";
 import type { TreeSelectProps } from "antd";
 import {
   Controller,
@@ -24,7 +24,6 @@ import {
 export const LINE_TABLE_COLUMN_WIDTHS = {
   item_id: 280,
   part_id: 130,
-  description: 180,
   quantity: 90,
   unit: 80,
   unit_material: 100,
@@ -33,7 +32,7 @@ export const LINE_TABLE_COLUMN_WIDTHS = {
   unit_labor: 90,
   unit_price_target: 100,
   unit_cost: 110,
-  lock: 80,
+  locks: 110,
   unit_price: 100,
   ext_sell: 100,
   actions: 48,
@@ -65,15 +64,24 @@ type CellProps = {
   disabled: boolean;
 };
 
+type PreviewAwareCellProps = CellProps & {
+  onPreview?: (index: number) => void;
+  previewing?: boolean;
+};
+
 export const ItemCell = ({
   index,
   writable,
   disabled,
   conditions,
-}: CellProps & { conditions: EstimateConditionFormRow[] }) => {
+  onPreview,
+}: PreviewAwareCellProps & { conditions: EstimateConditionFormRow[] }) => {
   const estimateConditionId = useWatch({
     name: lineFieldPath(index, "estimate_condition_id"),
   }) as string | undefined;
+  const materialLocked = useWatch({
+    name: lineFieldPath(index, "material_locked"),
+  }) as boolean | undefined;
   const rootItemId = estimateConditionId
     ? rootItemIdForCondition(estimateConditionId, conditions)
     : null;
@@ -93,9 +101,19 @@ export const ItemCell = ({
             loading={isLoading}
             treeData={toAntdItemTree(itemTree ?? [])}
             value={value ?? undefined}
-            disabled={disabled || !rootItemId}
-            placeholder={rootItemId ? "Select item" : "Condition required"}
-            onChange={onChange}
+            disabled={disabled || !rootItemId || Boolean(materialLocked)}
+            placeholder={
+              materialLocked
+                ? "Material locked"
+                : rootItemId
+                  ? "Select item"
+                  : "Condition required"
+            }
+            onChange={(next) => {
+              const raw = typeof next === "string" ? next : null;
+              onChange(raw);
+              onPreview?.(index);
+            }}
             treeDefaultExpandAll
           />
         ) : (
@@ -110,7 +128,8 @@ export const PartCell = ({
   index,
   writable,
   disabled,
-}: CellProps) => {
+  onPreview,
+}: PreviewAwareCellProps) => {
   const itemId = useWatch({ name: lineFieldPath(index, "item_id") }) as string | null;
   const estimateConditionId = useWatch({
     name: lineFieldPath(index, "estimate_condition_id"),
@@ -155,10 +174,11 @@ export const PartCell = ({
             onChange={(next) => {
               onChange(next ?? null);
               if (next) {
-                setValue(lineFieldPath(index, "lock"), "line", {
+                setValue(lineFieldPath(index, "material_locked"), true, {
                   shouldDirty: true,
                 });
               }
+              onPreview?.(index);
             }}
           />
         ) : (
@@ -168,26 +188,6 @@ export const PartCell = ({
     />
   );
 };
-
-export const DescriptionCell = ({ index, writable, disabled }: CellProps) => (
-  <Controller<EstimateLineEditorFormValues>
-    name={lineFieldPath(index, "description")}
-    render={({ field: { value, onChange, onBlur } }) =>
-      writable ? (
-        <Input
-          size="small"
-          value={String(value ?? "")}
-          disabled={disabled}
-          onChange={onChange}
-          onBlur={onBlur}
-          placeholder="Description"
-        />
-      ) : (
-        <Typography.Text>{String(value ?? "")}</Typography.Text>
-      )
-    }
-  />
-);
 
 export const QuantityCell = ({ index, writable, disabled }: CellProps) => {
   const { setValue } = useFormContext<EstimateLineEditorFormValues>();
@@ -242,6 +242,7 @@ export const MoneyCell = ({
   disabled,
   readOnly = false,
   onValueChange,
+  previewing = false,
 }: CellProps & {
   field:
     | "unit_cost"
@@ -253,6 +254,7 @@ export const MoneyCell = ({
     | "unit_labor";
   readOnly?: boolean;
   onValueChange?: (value: number) => void;
+  previewing?: boolean;
 }) => (
   <Controller<EstimateLineEditorFormValues>
     name={lineFieldPath(index, field)}
@@ -273,48 +275,93 @@ export const MoneyCell = ({
           }}
         />
       ) : (
-        <Typography.Text>${Number(value ?? 0).toFixed(2)}</Typography.Text>
+        <Typography.Text type={previewing ? "secondary" : undefined}>
+          ${Number(value ?? 0).toFixed(2)}
+          {previewing ? "…" : ""}
+        </Typography.Text>
       )
     }
   />
 );
 
-const LOCK_CYCLE: EstimateLineFormRow["lock"][] = ["none", "sell", "line"];
-
-const lockLabel = (lock: EstimateLineFormRow["lock"]): string => {
-  if (lock === "sell") {
-    return "Sell";
-  }
-  if (lock === "line") {
-    return "Line";
-  }
-  return "Fluid";
-};
-
-export const LockCell = ({ index, writable, disabled }: CellProps) => {
-  const lock = useWatch({ name: lineFieldPath(index, "lock") }) as EstimateLineFormRow["lock"];
+export const LockCell = ({
+  index,
+  writable,
+  disabled,
+  onPreview,
+}: PreviewAwareCellProps) => {
+  const salesLocked = Boolean(
+    useWatch({ name: lineFieldPath(index, "sales_locked") }),
+  );
+  const materialLocked = Boolean(
+    useWatch({ name: lineFieldPath(index, "material_locked") }),
+  );
+  const unitPriceTarget = useWatch({
+    name: lineFieldPath(index, "unit_price_target"),
+  });
   const { setValue } = useFormContext<EstimateLineEditorFormValues>();
 
   if (!writable) {
-    return <Tag>{lockLabel(lock ?? "none")}</Tag>;
+    return (
+      <Space size={4}>
+        {salesLocked ? <Tag>Sell</Tag> : null}
+        {materialLocked ? <Tag>Mat</Tag> : null}
+        {!salesLocked && !materialLocked ? <Tag>Fluid</Tag> : null}
+      </Space>
+    );
   }
 
   return (
-    <Button
-      size="small"
-      type={lock === "none" ? "default" : "primary"}
-      ghost={lock !== "none"}
-      disabled={disabled}
-      onClick={() => {
-        const current = lock ?? "none";
-        const nextIndex = (LOCK_CYCLE.indexOf(current) + 1) % LOCK_CYCLE.length;
-        setValue(lineFieldPath(index, "lock"), LOCK_CYCLE[nextIndex] ?? "none", {
-          shouldDirty: true,
-        });
-      }}
-    >
-      {lockLabel(lock ?? "none")}
-    </Button>
+    <Space size={4}>
+      <Button
+        size="small"
+        type={salesLocked ? "primary" : "default"}
+        ghost={salesLocked}
+        disabled={disabled}
+        title={salesLocked ? "Unlock sell (sync to target)" : "Lock sell"}
+        onClick={() => {
+          if (salesLocked) {
+            setValue(lineFieldPath(index, "sales_locked"), false, {
+              shouldDirty: true,
+            });
+            setValue(lineFieldPath(index, "unit_price"), Number(unitPriceTarget ?? 0), {
+              shouldDirty: true,
+            });
+          } else {
+            setValue(lineFieldPath(index, "sales_locked"), true, {
+              shouldDirty: true,
+            });
+          }
+        }}
+      >
+        S
+      </Button>
+      <Button
+        size="small"
+        type={materialLocked ? "primary" : "default"}
+        ghost={materialLocked}
+        disabled={disabled}
+        title={
+          materialLocked
+            ? "Unlock material (re-resolve PN)"
+            : "Lock material (item + part)"
+        }
+        onClick={() => {
+          if (materialLocked) {
+            setValue(lineFieldPath(index, "material_locked"), false, {
+              shouldDirty: true,
+            });
+            onPreview?.(index);
+          } else {
+            setValue(lineFieldPath(index, "material_locked"), true, {
+              shouldDirty: true,
+            });
+          }
+        }}
+      >
+        M
+      </Button>
+    </Space>
   );
 };
 
@@ -328,7 +375,7 @@ export const SellCell = ({ index, writable, disabled }: CellProps) => {
       writable={writable}
       disabled={disabled}
       onValueChange={() => {
-        setValue(lineFieldPath(index, "lock"), "sell", { shouldDirty: true });
+        setValue(lineFieldPath(index, "sales_locked"), true, { shouldDirty: true });
       }}
     />
   );

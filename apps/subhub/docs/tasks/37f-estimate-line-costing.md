@@ -558,7 +558,7 @@ Environment: local dev (`localhost:3003`). No `item` rows under scope roots in d
 **UX / design (pinned — not fixed in 37f):**
 
 - **Kind vs Item** — default `line_kind = product` gates the Item column; selecting Product is the only path to catalog material lines, but feels wrong as the “pick an item” affordance. Revisit line model + column layout.
-- **Part column** — 0/1/many states (text vs “No match” vs Select); recalc on Save only; no material alert banner for 0 matches (task mentioned alert; v1 shows “No match” in Part column only).
+- **Part column** — 0/1/many states (text vs “No match” vs Select); **v1 was recalc on Save only** — superseded by [37aa live preview](./37aa-estimate-line-live-preview.md); no material alert banner for 0 matches (task mentioned alert; v1 shows “No match” in Part column only).
 - **Dev catalog gap** — `027_part_dev_seed.sql` has parts but dev lacked `item` / `item_category` / `part_category` links needed for product-line smoke (#5–#7).
 
 **Follow-up before full line smoke:**

@@ -6,6 +6,200 @@
 
 ---
 
+### Decision: item labor axis override — single-spec axis, no compound (2026-07-11)
+
+**Status:** **Superseded (2026-07-11)** by [item placement + mount axis override — reverted, leaf duplication instead](#decision-item-placement--mount-axis-override--reverted-leaf-duplication-instead-2026-07-11). Never shipped past Step 3 (Step 4 stayed blocked on `estimate_line_spec` write). **Do not implement** `commercial_axis`, `variant_spec_option_id`, or `item_cost_override` — text below is historical. **Was locked** (2026-07-11). **Task:** [37ab](../tasks/37ab-item-placement-mount-axis.md), reverted by [37ac](../tasks/37ac-item-placement-mount-axis-revert.md). **Amended:** [D4 unified `resolveRate`](#decision-unified-item-tree--merge-category--item-node-anchored-estimate-lines-2026-07-05) — the two narrow exceptions below (`item_labor_phase` **M1–M6**, margin FKs **M7**) are retired; D4's single self→ancestry→neutral walk is unamended once more.
+
+**Problem:** some device families genuinely need different install labor depending on **mount** (ceiling / wall / outdoor), while everything else about the device — name, freight/incidental/markup policy, and most of the eligible part pool — stays the same. Two alternatives were weighed and rejected:
+
+| Rejected alternative | Why |
+|---|---|
+| **Split a leaf per mount value** (`Strobe — Ceiling`, `Strobe — Wall`, `Strobe — Outdoor`, ×5 device families = 15 leaves) | `part_item` is leaf-only (locked — [U1–U3](#decision-part-item-links-leaf-only--specs-value-ux-2026-07-08)), so every mount-universal part needs re-linking on every leaf it fits, 3× the authoring for no material difference in most cases |
+| **Mount as a category branch, leaf reused across branches** | Requires reviving many-to-many `item_category` placement, which was deliberately retired when `category` + `item` were unified into one self-referential tree specifically to keep cost resolution a single deterministic path (self → ancestry → neutral). Re-introducing dual-parent leaves reopens that ambiguity. |
+| **`complexity_factor` absorbs the difference** | Wrong layer — complexity is a **job-circumstance** multiplier (lift work, occupied-building access, difficult retrofit), orthogonal to which device was selected. A ceiling-mount box takes different install steps *every time*, regardless of site; that's device-inherent, not circumstantial, so it doesn't belong on the condition. The two layers **compose**: `unit_labor = item's own (axis-resolved) base hours × complexity_factor from the line's condition`. |
+
+**Choice:**
+
+| # | Topic | Choice |
+|---|--------|--------|
+| **M1** | Axis def | Any `spec_def` flagged `commercial_axis = true` (new boolean column, default `false`) that the item participates in via `item_spec_participation` |
+| **M2** | Storage | `item_labor_phase.variant_spec_option_id` — nullable FK → `spec_option`. `NULL` = base row. Set = override row, used only when the line's resolved value for that def equals this option. |
+| **M3** | Resolution | Per phase: use the row where `variant_spec_option_id` matches the line's axis value; else use the row where it is `NULL` (base). No merge across rows — one row wins, same "atomic group" spirit as today's self/ancestor labor set. |
+| **M4** | Scope | **Single axis only.** No compound/multi-axis combination logic (no tailwind-variants-style `compoundVariants` tier). Revisit only if a *second*, independently-varying axis is confirmed on real catalog data — do not build this speculatively. |
+| **M5** | Estimate input | **No new estimate UI.** The axis value is whatever the estimator already sets in the line's spec bucket for that def — the same click that narrows the part pool also selects the labor row. |
+| **M6** | Guardrail | Only defs flagged `commercial_axis` may be referenced by `variant_spec_option_id` — every other spec (color, protocol, candela) stays inert to costing, preserving D4's "specs never touch costing" boundary except for this one narrow, opt-in exception. |
+| **M7** | Extend to margin FKs | Confirmed **real** need, not hypothetical — some device families need freight/incidental/markup to vary by the same axis, not just labor. New `item_cost_override(item_id, variant_spec_option_id NULL, freight_rate_type_id, incidental_rate_type_id, markup_type_id)` table; same axis-match-else-base resolution as **M3**, applied to the three margin FKs instead of labor phases. `resolveRate`'s freight/incidental/markup steps gain the same self-row variant lookup labor gets — `item.parent_id` and the ancestry walk itself are untouched. |
+
+**Worked example — Fire Alarm mount:**
+
+```
+Notification Appliances
+  ├── Strobe
+  ├── Horn/Strobe
+  ├── Horn
+  ├── Speaker
+  └── Speaker/Strobe
+```
+
+Five leaves, unchanged. `mount` (enum: ceiling / wall / outdoor) is flagged `commercial_axis = true`; each leaf participates. `Strobe`'s `item_labor_phase`:
+
+| Phase | Rate | Hrs/unit | `variant_spec_option_id` |
+|---|---|---|---|
+| Install | Standard | 0.50 | *(base)* |
+| Install | Standard | 0.75 | Ceiling |
+| Install | Standard | 0.65 | Outdoor |
+
+Estimator adds a **Strobe** line, sets `mount = Ceiling` on the spec panel (narrowing the part pool to ceiling-rated MPNs, as today) — the same value resolves `unit_labor` to 0.75 hr/unit instead of the 0.50 base. If that line's condition also carries a complexity factor (e.g. 125% for a 30-ft warehouse ceiling), both apply: `0.75 × 1.25`.
+
+**Rationale:** matches the cost/authoring shape of the actual problem (one axis, ≤3 values) instead of building general N-axis machinery for a case that doesn't need it. Reuses the existing `item_labor_phase` table and its `FieldArrayTable` UI with one new optional column, rather than a new variant entity. Keeps the leaf count at "one per real commercial identity" and keeps part authoring at "once per real MPN."
+
+**Planning:** task filed — [37ab](../tasks/37ab-item-placement-mount-axis.md). Would need: `commercial_axis` column on `spec_def` + admin UI toggle; `variant_spec_option_id` column on `item_labor_phase` + "When" column in the labor `FieldArrayTable`; **M7** — new `item_cost_override` table + a "When" affordance on `ItemCommercialFields`; DAL guard rejecting `variant_spec_option_id`/override rows whose def isn't `commercial_axis` or isn't in the item's participation; resolver change in the labor-phase lookup step **and** the freight/incidental/markup lookup step.
+
+---
+
+### Decision: item placement — multi-location browse tree, decoupled from cost resolution (2026-07-11)
+
+**Status:** **Superseded (2026-07-11)** by [item placement + mount axis override — reverted, leaf duplication instead](#decision-item-placement--mount-axis-override--reverted-leaf-duplication-instead-2026-07-11). **Do not implement** `item_placement` or `implies_spec_option_id` — text below is historical. **Was locked** (2026-07-11). **Task:** [37ab](../tasks/37ab-item-placement-mount-axis.md), reverted by [37ac](../tasks/37ac-item-placement-mount-axis-revert.md).
+
+**Problem:** even with M1–M7, `mount` still has to be set as a spec value on the line/condition for labor/margin variance to take effect — but there's no catalog-tree way to *browse* by Wall/Ceiling/Outdoor groupings without either duplicating each leaf per mount value, or giving a leaf multiple structural parents (which reopens the ancestry ambiguity [D1](#decision-unified-item-tree--merge-category--item-node-anchored-estimate-lines-2026-07-05) deliberately closed).
+
+**Rejected alternative:**
+
+| Rejected alternative | Why |
+|---|---|
+| Give the leaf multiple `item.parent_id` values directly (revive `item_category` as **load-bearing** ancestry) | `resolveRate` needs exactly one ancestry path per leaf; multi-parent reopens "which ancestor wins" for labor/freight/incidental/markup — the same ambiguity [D1](#decision-unified-item-tree--merge-category--item-node-anchored-estimate-lines-2026-07-05) retired `item_category` to avoid. `estimate_line.item_id` alone also can't record which parent a pick came through, so cost resolution stays ambiguous even after the fact unless the line schema changes shape too. |
+
+**Choice:**
+
+| # | Topic | Choice |
+|---|--------|--------|
+| **L1** | Storage | New `item_placement(item_id, parent_id)` — composite PK, many-to-many. `item.parent_id` (single-valued) is untouched and remains the **only** input to `resolveRate`'s self→ancestry walk. |
+| **L2** | Placement targets | Constrained to `node_type = 'category'` nodes within the **same scope root** as the item's canonical parent — reuses the guardrail already enforced for drag/drop (`resolveScopeRootId` equality, [`item-tree-dnd.ts`](../../lib/catalog/item-tree-dnd.ts)). No cross-scope-root placement; no placing under another leaf. |
+| **L3** | Catalog UI | New **"Parent Items"** field (multi-select TreeSelect) on `ItemDetailForm` — present on both the detail form and the `/items/new` create form. Separate from the existing drag/drop mechanism, which continues to own only the single canonical `parent_id`, unchanged. |
+| **L4** | Estimate picker | `useEstimateItemPicker` unions `item.parent_id` edges with `item_placement` edges. Each placement renders as its own tree node keyed by a synthetic id (`place:<item_id>:<parent_id>`) so the same leaf can appear at multiple tree positions (e.g. under both Wall and Ceiling) as distinct, independently selectable nodes — `onChange` decodes the key back to `item_id` (unchanged field) plus the clicked branch. |
+| **L5** | Auto-seed bridge | New nullable `implies_spec_option_id` FK (→ `spec_option`) on category nodes. Selecting a leaf through a branch that has this set auto-writes an `estimate_line_spec` row for the corresponding def (e.g. picking through "Wall" seeds `mount = Wall` on the new line) — a UX shortcut for a spec value the estimator would otherwise set by hand for M1–M7 to take effect. **Depends on** `estimate_line_spec` write/UI ([D3](#decision-specs-narrow-parts-separate-from-rates-2026-07-04), still deferred v1) shipping first — no line to write to until then. |
+| **L6** | Guardrail | `item_placement` is **never** read by `resolveRate`, `manufacturer_part_spec` matching, or any cost/part resolution path — display and authoring convenience only. The resolved spec value (via M1–M7) stays the **single** input to cost/part resolution; the placement tree is just a faster way to set that value, never a second source of truth for it. |
+
+**Worked example:**
+
+```
+Notification Appliances                (item.parent_id — unchanged, canonical home)
+
+Initiating Devices                     (a scope-level browse grouping)
+  ├─ Wall        (category, implies_spec_option_id = mount:Wall)
+  │   ├─ Horn/Strobe   ← item_placement row; same row as below
+  │   └─ Strobe
+  └─ Ceiling      (category, implies_spec_option_id = mount:Ceiling)
+      ├─ Horn/Strobe   ← same item_id, no duplication
+      └─ Strobe
+```
+
+Horn/Strobe is authored once — one name, one part pool, one `item_labor_phase` set (with M1–M6 variant rows). Picking it through "Wall" adds a line with `item_id` unchanged and `mount = Wall` pre-seeded; picking it through "Ceiling" does the same with `mount = Ceiling`. Cost/parts resolution never knows or cares which branch was clicked — only the resolved `mount` value, exactly as M1–M7 already specifies.
+
+**Rationale:** keeps `item.parent_id` single-valued and `resolveRate` unambiguous (no ambiguity reopened), avoids catalog-side leaf duplication (no 3× part re-linking for mount-agnostic MPNs), and reuses the spec-value mechanism M1–M7 already requires — the placement tree is additive UX, not a new resolution path.
+
+**Planning:** task filed — [37ab](../tasks/37ab-item-placement-mount-axis.md). Depends on M1–M7 for cost variance and on the deferred `estimate_line_spec` UI for L5's auto-seed; L1–L4 (placement table + catalog UI + picker rendering) can ship independently of both as a pure browsing improvement.
+
+---
+
+### Decision: item placement + mount axis override — reverted, leaf duplication instead (2026-07-11)
+
+**Status:** **Locked** (2026-07-11). **Task:** [37ac](../tasks/37ac-item-placement-mount-axis-revert.md). **Supersedes in full:** [item labor axis override, M1–M7](#decision-item-labor-axis-override--single-spec-axis-no-compound-2026-07-11) and [item placement, L1–L6](#decision-item-placement--multi-location-browse-tree-decoupled-from-cost-resolution-2026-07-11) — both retired same-day, before either shipped past catalog UI (Step 4 line-spec seed was still blocked on `estimate_line_spec` write). **Restores:** [D1/D4 unified tree](#decision-unified-item-tree--merge-category--item-node-anchored-estimate-lines-2026-07-05) to its original, unamended single-parent shape.
+
+**Problem:** M1–M7/L1–L6 solved mount-dependent labor/margin variance by keeping the leaf singular and layering two indirections on top — a `commercial_axis` spec value matched via `variant_spec_option_id`/`item_cost_override`, and a separate `item_placement` browse table to let that one leaf appear under Wall and Ceiling in the tree. On review, this reopened exactly the ambiguity `resolveRate` needs to avoid, just one level removed: **which item was actually installed still isn't answerable from the item alone** — the mount value has to travel with the *pick*, not the catalog row, and the only mechanism designed to carry it (L5's auto-seed into `estimate_line_spec`) had a hard, unshipped dependency (D3). Until that landed, `item_placement` changed nothing about resulting cost regardless of which branch was clicked — pure UI decoration with no functional payoff, at the cost of two new tables, a resolver branch, and a picker synthetic-key scheme.
+
+**Rejected alternative (this is what M1–M7 chose over — now the chosen path):**
+
+| Rejected alternative | Why it was rejected at the time | Why it's chosen now |
+|---|---|---|
+| **Split a leaf per mount value** (`Horn/Strobe` under Wall = one row, under Ceiling = a second row) | `part_item` is leaf-only, so every mount-universal part needs re-linking on every leaf it fits — 3× the authoring for no material difference in most cases | Confirmed the real device-family count is small enough that 2–3× authoring per family is cheap in absolute terms, and it buys back a single deterministic cost path with zero new machinery — the trade favors simplicity once the axis-matching indirection's real cost (two tables, a resolver branch, a blocked seed mechanism) is counted honestly |
+
+**Choice:**
+
+| # | Topic | Choice |
+|---|--------|--------|
+| **R1** | Storage | Drop `item_placement`, `item_cost_override`, `spec_def.commercial_axis`, `item_labor_phase.variant_spec_option_id`, `item.implies_spec_option_id` entirely. `item.parent_id` remains the **only** structural relationship a leaf has, unamended since D1. |
+| **R2** | Modeling mount variance | Author one item row **per install location** that needs different labor/margin (e.g. `Horn/Strobe` under `Wall`, a second `Horn/Strobe` under `Ceiling`) — same name allowed (name is not a uniqueness key), each with its own `parent_id`, `item_labor_phase`, `item_cost_override`-equivalent inline FKs, `part_item` links, and `item_spec_participation`. |
+| **R3** | `resolveRate` | Reverts to exactly [D4](#decision-unified-item-tree--merge-category--item-node-anchored-estimate-lines-2026-07-05) — self → ancestry walk-up → neutral, no axis-match step, no variant lookup. The M3/M7 resolver branches are removed, not just unused. |
+| **R4** | Cost/part duplication accepted | Re-linking the same MPNs and re-authoring the same labor phase rows across mount-variant leaves is accepted cost, not a bug to solve later — matches the "split a leaf per mount value" alternative's known trade-off, now judged acceptable at real catalog scale. |
+| **R5** | Catalog UI | Drop "Parent Items" multi-select from `ItemDetailForm`; drop the labor/cost-override "When" column; drop category "Implies spec value" field; drop `spec_def` "Commercial axis" toggle. Drag/drop remains the **only** way to set `parent_id`, unchanged from before 37ab. |
+| **R6** | Estimate picker | `useEstimateItemPicker` goes back to rendering `item.parent_id` edges only — no synthetic `place:<item_id>:<parent_id>` keys, no placement-union step. Each leaf appears exactly once, at exactly one tree position. |
+
+**Rationale:** the axis-match/placement design was betting that keeping one leaf and carrying its install-location as a derived spec value would be cheaper than duplicating leaves — but that bet required `estimate_line_spec` write to exist to pay off, and until it does, the indirection has strictly negative value (all cost, no benefit). Leaf duplication pays off immediately with the tooling that already exists (`part_item`, `item_labor_phase`, drag/drop `parent_id`) and keeps `resolveRate` exactly as simple as D1/D4 intended — one deterministic path, no exceptions, no blocked dependency standing between "pick an item" and "get the right cost."
+
+**Planning:** task filed — [37ac](../tasks/37ac-item-placement-mount-axis-revert.md). Reverts migration `057`; deletes `item_placement`/`item_cost_override` DAL, tests, and UI added in 37ab Steps 1–3; restores the pre-37ab picker and `ItemDetailForm`.
+
+---
+
+### Proposal: numeric spec bucket range — interval overlap replaces point-in-band (2026-07-11)
+
+**Status:** **Proposal** (2026-07-11) — not yet locked, no task filed. **Amends (if implemented):** [N4/N5](#decision-numeric-specs--drop-range-type-band-is-part-authored-2026-07-08) — generalizes the bucket side from a single point to a range; the def/part-authoring shape (N1–N3, N6–N10) is unchanged.
+
+**Problem:** today's match rule is `point ∈ [part.min, part.max]` — the bucket sets one exact target, the part declares a band, and matching checks containment. That's right for a genuine target value (duct width, nominal voltage) but cannot express a **capability threshold** ("rated for at least 135 cd," "must not exceed 50 psi"): a part whose band is `[150, 185]` should satisfy "≥135," but point-in-band containment against a bucket point of `135` rejects it (`150 ≤ 135` is false), because containment asks "does the part's range cover this exact spot," not "does the part's range clear this bar."
+
+**Choice:**
+
+| # | Topic | Choice |
+|---|--------|--------|
+| **R1** | Bucket storage | Activate `value_number_max` on bucket rows (`estimate_condition_spec`, `estimate_line_spec`, job spec rows) — currently unused/deferred on buckets; now holds the range's upper end |
+| **R2** | Null semantics | `value_number = NULL` → lower bound is −∞ (no floor); `value_number_max = NULL` → upper bound is +∞ (no ceiling) |
+| **R3** | Match rule | `bucket_min ≤ part_max AND part_min ≤ bucket_max` (interval overlap) — replaces point-in-band containment as the general rule. Today's exact-point case is the degenerate case where `bucket_min = bucket_max`; behavior for existing exact-target specs is unchanged. |
+| **R4** | Named presets | Optional `spec_threshold_preset (spec_def_id, label, value_number, value_number_max, sort_order)` — e.g. "High" → `[135, NULL]`, "Low" → `[NULL, 135]`. Admin-curated convenience; estimate UI may render a def with presets as a toggle instead of two raw number inputs. |
+| **R5** | Applies to | `number`-type defs only. `enum`-type defs use the separate curated-option-set preset mechanism (below) — the two are not interchangeable per def. |
+
+**Rationale:** one formula covers exact-target matching (today's only use), one-sided threshold matching ("at least X" / "at most X"), and genuine two-sided range narrowing, without a separate operator/mode column. Only reach for this when a spec's real-world values are genuinely wide/continuous (temperature rating, pressure, flow rate) — see the enum proposal below for closed discrete-value specs, where this would silently imply coverage of values the part doesn't actually support.
+
+---
+
+### Proposal: enum spec threshold presets — curated option-set, no comparison operator (2026-07-11)
+
+**Status:** **Proposal** (2026-07-11) — not yet locked, no task filed. **Complements** the numeric-range proposal above; applies when a `spec_def.value_type = 'enum'` represents a small closed list of real, discrete values with meaningful gaps (e.g. candela field-selectable switch positions — 135/150/177 are real settings, but 160 is not, so a continuous band would misrepresent the part).
+
+**Choice:**
+
+| # | Topic | Choice |
+|---|--------|--------|
+| **E1** | Preset storage | `spec_threshold_preset (spec_def_id, label, sort_order)` + junction `spec_threshold_preset_option (preset_id, spec_option_id)` — a named preset is a curated **set** of `spec_option_id`s, decided once by an admin |
+| **E2** | Match rule | Set membership — part qualifies iff it has any `manufacturer_part_spec` row whose `spec_option_id` is in the selected preset's set. Reuses today's enum matcher unchanged; no new comparison logic. |
+| **E3** | Estimator control | Bucket UI renders presets as a single-select toggle (not multi-select) — picking both "Low" and "High" is redundant with leaving the field blank once the two sets are curated to cover the realistic range |
+
+**Worked example — candela:** `spec_option` rows for the real settings (`15, 30, 75, 95, 110, 115, 135, 150, 177, 185`). A part supporting `135, 150, 177` gets three `manufacturer_part_spec` rows (today's existing J7 mechanism — no change). Presets: `"High" → {135, 150, 177, 185}`, `"Low" → {15, 30, 75, 95, 110, 115}`. Estimator picks "High" → the part above matches (135 is in the set).
+
+**Decision point for future specs:** whether a numeric-shaped attribute uses this (enum + curated set) or the range proposal above (number + interval overlap) depends on whether its real-world values are a small closed list with gaps (enum) or genuinely continuous/wide (number). Both mechanisms are retained; the choice is made per `spec_def`, not globally.
+
+---
+
+### Proposal: `slc_protocol` naming — rename + explicit `none`/`conventional` option (2026-07-11)
+
+**Status:** **Proposal** (2026-07-11) — naming correction, no schema change; safe to apply whenever the def is next touched, no migration urgency.
+
+**Problem:** `slc_protocol` borrows a category name ("SLC protocol") for a value — conventional signaling — that isn't an SLC protocol at all. Separately, using `NULL` to mean "explicitly conventional, no addressable protocol" was considered and rejected: `NULL` already carries a **global** meaning across every def in the system — "this dimension doesn't apply, ignore it for filtering" (blank-bucket-ignore, retained through every value-type revision). Overloading `NULL` for one specific def would make it mean two contradictory things depending on which def you're looking at, and any generic bucket-merge or matcher code that treats blank-as-ignore would silently mishandle it.
+
+**Choice:**
+
+| # | Topic | Choice |
+|---|--------|--------|
+| **P1** | Rename | `slc_protocol` → protocol-agnostic display name (e.g. "Device protocol" or "Signaling type") |
+| **P2** | Add option | Explicit `conventional` (or `none`) `spec_option` row — not `NULL` |
+| **P3** | Cross-def dependency | Not modeled — see deferred proposal below. A hypothetical `protocol_dialect` (meaningful only when addressable) stays collapsed into this one enum rather than split into a dependent second def. |
+
+---
+
+### Deferred: cross-spec dependency and derived specs (2026-07-11)
+
+**Status:** **Deferred** — not v1, not scheduled for v2. Captured so it isn't relitigated from scratch if it resurfaces.
+
+**Finding:** the flat participation model ([37o](#decision-spec-definitions-scoped-to-root-flat-item-participation--no-ownershipinheritance-2026-07-07)) has no mechanism for "def B's valid values depend on def A's value," or a derived/computed def whose value is calculated from another def. Two shapes were considered and both rejected in favor of a cheaper default:
+
+| Rejected mechanism | Why deferred |
+|---|---|
+| **Ad hoc write-guard** (DAL rejects one def's value when another def is set a certain way) | Reintroduces exactly the cross-def coupling 37o's flat model was built to avoid — S9's "bounded blast radius" guarantee quietly breaks the moment two defs' write paths know about each other |
+| **General dependency framework** (`spec_def.depends_on_spec_def_id` / `depends_on_option_id`, honored by the scope panel, contextual union, and line narrowing) | Touches three separate consumers for a problem usually avoidable by collapsing mutually-exclusive states into one enum def (see the `slc_protocol` proposal above) |
+
+**Default going forward:** when a dependency shows up, prefer collapsing the two defs into one enum with mutually-exclusive options. Only reconsider building real dependency machinery if 3+ independent real cases can't be collapsed this way.
+
+---
+
 ### Decision: item commercial margin inherit checkbox (2026-07-09)
 
 **Status:** **Locked** (2026-07-09). **Task:** [37z](../tasks/37z-item-commercial-inherit-ui.md). **Aligns with:** estimate condition inherit UX [Y4](./estimate.md#decision-condition-only-commercial-tree-2026-07-09); unified `resolveRate` [D4](#decision-unified-item-tree--merge-category--item-node-anchored-estimate-lines-2026-07-05).
@@ -179,9 +373,9 @@ Fire Alarm (scope root)              ← spec_def.scope_root_item_id = Fire Alar
 | **D4** | Unified `resolveRate` | **Locked** · [amended 37l](#decision-unified-item-tree--merge-category--item-node-anchored-estimate-lines-2026-07-05) | One algorithm for labor, markup, freight, incidental: **`self → ancestry walk-up → neutral`** (descendant-max dropped — leaf-only selection). Complexity + specs excluded. ROM uses explicit quotable allowance leaves with `fallback_unit_cost`. |
 | **D5** | Complexity on estimate **condition** | **Locked** · **amended 2026-07-09** | **`complexity_factor_id` on `estimate_condition` only** (every node, incl. roots) — not on site geography; `estimate_scope` retired ([Y1](./estimate.md#decision-condition-only-commercial-tree-2026-07-09)). Null factor → walk ancestors → **100%**. Applies to `unit_labor` only. |
 | **D6a** | Estimate `status` — lifecycle freeze | **Locked** | **`sent`** = customer issued → **full structural freeze** (lines, scopes, scope/zone specs, complexity); **no recalc** (snapshots are the record). **`draft`** = fluid recalc per line-lock rules (D6b). **`won`** = immutable (existing); extends freeze to job handoff. Amends [estimate lifecycle](./estimate.md). |
-| **D6b** | Line `lock` enum (draft only) | **Locked** | `estimate_line.lock`: **`none` \| `sell` \| `line`** (hierarchy: `line` supersedes `sell`). `none` = full fluid recalc incl. sell; `sell` = freeze `unit_price` only; `line` = skip recalc entirely. Manual sell edit → `sell`; lock line → `line`; sync to target → `none`. Drops `part_locked` / `sell_locked`. |
+| **D6b** | Line locks (draft only) | **Locked** · **superseded 2026-07-11** | Was `estimate_line.lock`: **`none` \| `sell` \| `line`**. **Now:** [`sales_locked` + `material_locked`](./estimate.md#decision-estimate-dual-line-locks-and-live-preview-2026-07-11) — independent; costing always updates in draft; sell sticky vs item/part sticky. Live server preview before Save ([37aa](../tasks/37aa-estimate-line-live-preview.md)). |
 | **D6c** | Qty on `lock = line` | **Locked** | **Allow** `quantity` edits — operational, not policy. Unit snapshots stay frozen; ext sell = `qty × unit_price`. Changing item/scope/specs on locked line → block or force unlock (Q4). |
-| **D6d** | PN pick + structural edits | **Locked** | **Q4a:** PN pick alone does **not** lock — `part_id` may change on recalc while `lock = none` (fluid). User sets `lock = line` to freeze PN. **Q4b:** **`lock = line`** → **block** item / scope / zone changes in UI + DAL (no force-unlock prompt v1). |
+| **D6d** | PN pick + structural edits | **Locked** · **amended 2026-07-11** | Was: PN pick does not set `lock`; `lock = line` blocks item/condition change. **Now:** manual PN → **`material_locked`**; blocks item change; costing still runs. See [dual locks](./estimate.md#decision-estimate-dual-line-locks-and-live-preview-2026-07-11). |
 | **D6e** | `material_status` | **Locked — drop** | Remove column. UI derives part-resolution hint from `part_id` presence + filtered match count + `lock` — not persisted. |
 | **D6f** | Line commercial FK | **Locked** · **amended 2026-07-09** | **`estimate_line.estimate_condition_id` NOT NULL** — every line under a condition; item picker root from condition tree’s `root_item_id`. **Drop `estimate_line.estimate_scope_id`** ([Y2](./estimate.md#decision-condition-only-commercial-tree-2026-07-09)). Block condition change when `lock = line` (D6d). |
 | **D6g** | `site_zone_id` | **Locked — keep** · **amended 2026-07-09** | **Nullable** place FK (and/or future allocation rows). **No longer** merges commercial specs/complexity — those live on **condition** ([G1–G3](./estimate.md#decision-estimate-scope-condition-zone-and-line-qty-2026-07-09)). Block change when `lock = line` (D6d). |
@@ -321,11 +515,13 @@ This makes complexity the **second** estimator-controlled input (alongside spec 
 
 Estimate-level freeze **supersedes** per-line lock — `lock` matters only while `status = draft`.
 
-##### Estimate line locking (D6b — locked 2026-07-05)
+##### Estimate line locking (D6b — locked 2026-07-05 · **superseded 2026-07-11**)
+
+> **Superseded (2026-07-11):** [dual line locks + live preview](./estimate.md#decision-estimate-dual-line-locks-and-live-preview-2026-07-11) — `sales_locked` + `material_locked` booleans; no `lock = line` “skip all costing”; task [37aa](../tasks/37aa-estimate-line-live-preview.md). Text below is historical.
 
 **Replaces** `part_locked`, `sell_locked`, and 37f O4 implicit sell stickiness.
 
-**One column:** `estimate_line.lock` — `none` | `sell` | `line` (CHECK constraint). Hierarchy: **`none` < `sell` < `line`** (`line` is the superset).
+**One column (retired):** `estimate_line.lock` — `none` | `sell` | `line` (CHECK constraint). Hierarchy: **`none` < `sell` < `line`** (`line` is the superset).
 
 | `lock` | Recalc while `draft` | What stays frozen |
 |--------|----------------------|-------------------|

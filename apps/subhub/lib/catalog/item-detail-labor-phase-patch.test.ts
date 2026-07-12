@@ -60,7 +60,7 @@ const emptyRelated: ItemDetailStoreRelated = {
   spec_participation: { participates: [] },
 };
 
-describe("item_detail patch — item_labor_phase", () => {
+describe("item_detail patch — related collections", () => {
   it("routes item_labor_phase to replaceRelated", async () => {
     const replaceRelated = vi.fn(async () => undefined);
     const store: StoreAdapter<ItemDetailRow, ItemDetailStoreRelated> = {

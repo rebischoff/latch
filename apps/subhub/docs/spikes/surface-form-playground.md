@@ -126,11 +126,11 @@ const formItemLayout = {
 - **Per control:** RHF `Controller` inside presentational `Form.Item` (`label`, `validateStatus`, `help` only) via `FormFieldItem`.
 - **Spacing:** antd `itemMarginBottom` (default 24px) — no custom CSS overrides.
 
-### Decision: form width (2026-06-22)
+### Decision: form width (2026-06-22, amended 2026-07-11)
 
-**Choice:** **`maxWidth: 960`** on the layout `Form` (`SURFACE_FORM_MAX_WIDTH`); **`width: "100%"`** + **`marginInline: "auto"`** to center in the pane. **Single-column** scalar layout — no `Row`/`Col` around labeled `*Input`s.
+**Choice:** **`SurfaceFormLayout`** fills the detail pane (`width: "100%"`, no default max). Readable scalar sections use **`FormSection`** with default **`maxWidth: 960`** (`SURFACE_SECTION_MAX_WIDTH`). Collection sections use **`FormSection width="full"`** so the section chrome does not constrain tables — **table / list caps live on the structure** (`FieldArrayTable maxWidth`, `CatalogTableSurface`, estimate Structure / Line items panels) via `TABLE_WIDTH_MD` (1150) / `LG` (1300) / `XL` (1500) / `XXL` (2200). Scalar controls stay capped at **`SURFACE_CONTROL_MAX_WIDTH` (480)** via `formItemLayout`. **Single-column** scalar layout — no `Row`/`Col` around labeled `*Input`s.
 
-**Rationale:** Prevents fields stretching across the full master-detail pane; one shared label column for all scalars per [`site.md`](../surface-specs/site.md).
+**Rationale:** Prevents scalar fields stretching across the full master-detail pane while allowing each table to stop at a content-appropriate width on large viewports.
 
 ### Decision: collection fields use FieldArrayTable (2026-06-22)
 
@@ -330,10 +330,10 @@ Zod: local `PlaygroundPatchSchema` under `components/dev/playground-fixtures.ts`
 | `components/surface/useFieldMode.ts` | `hidden` \| `read` \| `write` |
 | `components/form/FormFieldItem.tsx` | Presentational `Form.Item` shell for scalar `*Input` controllers |
 | `components/form/FieldArrayTable.tsx` | Collection editor: antd `Table` + `useFieldArray` |
-| `components/form/formLayout.ts` | Shared `formItemLayout` + `SURFACE_FORM_MAX_WIDTH` |
+| `components/form/formLayout.ts` | Shared `formItemLayout` + section/control/table width constants |
 | `components/surface/SurfaceFormLayout.tsx` | antd layout `Form` wrapper (`component="div"`, saving `disabled`) |
 | `components/form/TextInput.tsx` | Field gate + Controller + skeleton / write / read-only |
-| `components/form/FormSection.tsx` | Section heading |
+| `components/form/FormSection.tsx` | Section heading + optional width (`default` \| `full`) |
 
 ### `TextInput` API
 

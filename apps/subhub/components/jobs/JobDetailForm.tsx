@@ -15,7 +15,6 @@ import { useForm, type Resolver } from "react-hook-form";
 import { z } from "zod";
 
 import { FormSection } from "@/components/form/FormSection";
-import { SURFACE_FORM_MAX_WIDTH } from "@/components/form/formLayout";
 import { SelectInput } from "@/components/form/SelectInput";
 import { TextInput } from "@/components/form/TextInput";
 import { useSurfaceFormChrome } from "@/components/surface/SurfaceFormChromeContext";
@@ -517,7 +516,7 @@ export const JobDetailForm = ({
       resetKey={isCreate ? "create" : `${jobId}:${detail?.data?.id ?? ""}`}
     >
       <form onSubmit={onSave}>
-        <SurfaceFormLayout maxWidth={SURFACE_FORM_MAX_WIDTH}>
+        <SurfaceFormLayout>
           <DetailHeader
             title={isCreate ? "New job" : (profile?.title ?? "Job")}
             items={[

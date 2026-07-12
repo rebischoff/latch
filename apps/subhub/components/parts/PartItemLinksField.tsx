@@ -14,6 +14,7 @@ import {
 } from "react-hook-form";
 
 import { FormSection } from "@/components/form/FormSection";
+import { TABLE_WIDTH_LG } from "@/components/form/formLayout";
 import { findTreeTitle } from "@/components/form/optionHelpers";
 import { useItemTreePicker } from "@/lib/hooks/use-item-tree-picker";
 import type { PartItemTreePickerNode } from "@/lib/surface-api";
@@ -148,7 +149,7 @@ export const PartItemLinksField = ({ manifest }: PartItemLinksFieldProps) => {
 
   return (
     <FieldControl manifest={manifest} field="item_links">
-      <FormSection title="Item links">
+      <FormSection title="Item links" width="full">
         {emptyState}
         {isLoading ? (
           <Skeleton.Input active size="small" block />
@@ -173,7 +174,7 @@ export const PartItemLinksField = ({ manifest }: PartItemLinksFieldProps) => {
                   treeCheckable
                   showCheckedStrategy={TreeSelect.SHOW_CHILD}
                   size="small"
-                  style={{ width: "100%" }}
+                  style={{ width: "100%", maxWidth: TABLE_WIDTH_LG }}
                   treeData={treeData}
                   value={selectedIds}
                   placeholder="Select leaf items"

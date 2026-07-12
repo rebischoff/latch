@@ -15,7 +15,6 @@ import { useForm, type Resolver } from "react-hook-form";
 import { z } from "zod";
 
 import { FormSection } from "@/components/form/FormSection";
-import { SURFACE_FORM_MAX_WIDTH } from "@/components/form/formLayout";
 import { InputNumberInput } from "@/components/form/InputNumberInput";
 import { LinkedSelectInput } from "@/components/form/LinkedSelectInput";
 import { TextAreaInput } from "@/components/form/TextAreaInput";
@@ -704,7 +703,7 @@ export const PartDetailForm = ({
       resetKey={isCreate ? "create" : `${partId}:${detail?.data?.id ?? ""}`}
     >
       <form onSubmit={onSave}>
-        <SurfaceFormLayout maxWidth={SURFACE_FORM_MAX_WIDTH}>
+        <SurfaceFormLayout>
           {showPurchaseTab && showSpecsTab ? (
             <DetailHeader
               title={isCreate ? "New part" : (profile?.mpn ?? "Part")}

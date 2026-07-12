@@ -13,7 +13,7 @@ import {
   type FieldArrayTableColumn,
 } from "@/components/form/FieldArrayTable";
 import { FormSection } from "@/components/form/FormSection";
-import { SURFACE_FORM_MAX_WIDTH } from "@/components/form/formLayout";
+import { TABLE_WIDTH_LG } from "@/components/form/formLayout";
 import { InputNumberInput } from "@/components/form/InputNumberInput";
 import { MentionsInput } from "@/components/form/MentionsInput";
 import { RadioInput } from "@/components/form/RadioInput";
@@ -165,11 +165,12 @@ const PlaygroundPhonesBlock = () => {
   }
 
   return (
-    <FormSection title="Phones">
+    <FormSection title="Phones" width="full">
       <FieldArrayTable<PlaygroundFormValues, "phones">
         field="phones"
         name="phones"
         columns={PHONE_COLUMNS}
+        maxWidth={TABLE_WIDTH_LG}
         createRow={() => ({ label: "", number: "", is_primary: false })}
         addLabel="Add phone"
       />
@@ -309,7 +310,7 @@ export const PlaygroundDetailForm = () => {
       resetKey={`${recordId}:${recordParam ?? ""}`}
     >
       <form onSubmit={submit}>
-        <SurfaceFormLayout maxWidth={SURFACE_FORM_MAX_WIDTH}>
+        <SurfaceFormLayout>
           <FormSection title="Profile">
             <TextInput<PlaygroundFormValues>
               field="display_name"

@@ -19,6 +19,7 @@ import {
 } from "@/components/form/FieldArrayTable";
 import { FormFieldItem } from "@/components/form/FormFieldItem";
 import { FormSection } from "@/components/form/FormSection";
+import { TABLE_WIDTH_LG } from "@/components/form/formLayout";
 import { LinkedSelectControl } from "@/components/form/LinkedSelectInput";
 import { findSelectLabel } from "@/components/form/optionHelpers";
 import type { ItemTreeNode } from "@/lib/catalog/descriptors/item-list";
@@ -137,29 +138,31 @@ const ItemLaborPhaseSection = ({
             Inherited from &ldquo;{laborPhaseSourceName}&rdquo;
           </Typography.Paragraph>
         ) : null}
-        <Table
-          size="small"
-          pagination={false}
-          rowKey={(row) => row.labor_phase_id}
-          dataSource={inheritedLaborPhaseRows}
-          columns={[
-            {
-              title: "Phase",
-              dataIndex: "labor_phase_name",
-              key: "labor_phase_name",
-            },
-            {
-              title: "Labor rate",
-              dataIndex: "labor_rate_type_name",
-              key: "labor_rate_type_name",
-            },
-            {
-              title: "Hrs/unit",
-              key: "hours_per_unit",
-              render: (_, row) => Number(row.hours_per_unit ?? 0).toFixed(2),
-            },
-          ]}
-        />
+        <div style={{ width: "100%", maxWidth: TABLE_WIDTH_LG }}>
+          <Table
+            size="small"
+            pagination={false}
+            rowKey={(row) => row.labor_phase_id}
+            dataSource={inheritedLaborPhaseRows}
+            columns={[
+              {
+                title: "Phase",
+                dataIndex: "labor_phase_name",
+                key: "labor_phase_name",
+              },
+              {
+                title: "Labor rate",
+                dataIndex: "labor_rate_type_name",
+                key: "labor_rate_type_name",
+              },
+              {
+                title: "Hrs/unit",
+                key: "hours_per_unit",
+                render: (_, row) => Number(row.hours_per_unit ?? 0).toFixed(2),
+              },
+            ]}
+          />
+        </div>
         {writable && !disabled ? (
           <LaborPhaseAddButton disabled={disabled} onClick={beginLaborPhaseOverride} />
         ) : null}
@@ -187,6 +190,7 @@ const ItemLaborPhaseSection = ({
         name="item_labor_phase"
         fieldArray={fieldArray}
         columns={columns}
+        maxWidth={TABLE_WIDTH_LG}
         createRow={() => createEmptyLaborPhaseRow(fields.length + 1)}
         addLabel="Add labor phase"
         allowAdd={writable && !disabled}
@@ -213,14 +217,15 @@ export const validateItemLaborPhaseDuplicates = (
       return;
     }
 
-    const priorIndex = seen.get(row.labor_phase_id);
+    const key = row.labor_phase_id;
+    const priorIndex = seen.get(key);
     if (priorIndex !== undefined) {
       const message = "Each labor phase can appear only once";
       setError(`item_labor_phase.${index}.labor_phase_id`, { message });
       setError(`item_labor_phase.${priorIndex}.labor_phase_id`, { message });
       valid = false;
     } else {
-      seen.set(row.labor_phase_id, index);
+      seen.set(key, index);
     }
   });
 
@@ -454,7 +459,6 @@ const ItemCommercialRateField = ({
   const { control, setValue } = useFormContext<ItemDetailFormValues>();
   const fieldName = commercialRateFieldName[family];
   const ownValue = useWatch({ control, name: fieldName }) as string | null | undefined;
-  const hasStoredOverride = ownValue != null && ownValue !== "";
   const [forceOverride, setForceOverride] = useState(false);
 
   useEffect(() => {
@@ -536,7 +540,7 @@ export const ItemCommercialFields = ({
   manifest,
   nodeType,
 }: ItemCommercialFieldsProps) => {
-  const { watch, setValue } = useFormContext<ItemDetailFormValues>();
+  const { watch } = useFormContext<ItemDetailFormValues>();
   const { disabled } = useFormUi();
   const parentId = watch("profile.parent_id");
   const isQuotableLeaf = nodeType === "item";
@@ -631,7 +635,7 @@ export const ItemCommercialFields = ({
       {
         key: "labor_phase_id",
         title: "Phase",
-        width: "34%",
+        width: "40%",
         render: ({ index, writable: rowWritable, disabled: rowDisabled, loading }) => (
           <PhaseCell
             index={index}
@@ -645,7 +649,7 @@ export const ItemCommercialFields = ({
       {
         key: "labor_rate_type_id",
         title: "Labor rate",
-        width: "34%",
+        width: "40%",
         render: ({ index, writable: rowWritable, disabled: rowDisabled, loading }) => (
           <RateCell
             index={index}
@@ -659,7 +663,7 @@ export const ItemCommercialFields = ({
       {
         key: "hours_per_unit",
         title: "Hrs/unit",
-        width: 120,
+        width: 100,
         render: ({ index, writable: rowWritable, disabled: rowDisabled, loading }) => (
           <HoursCell
             index={index}
@@ -681,7 +685,7 @@ export const ItemCommercialFields = ({
   }
 
   return (
-    <FormSection title="Commercial">
+    <FormSection title="Commercial" width="full">
       {commercialReadable ? (
         <>
           <ItemCommercialRateField

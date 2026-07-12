@@ -15,7 +15,6 @@ import {
   type EstimateLineFormRow,
 } from "@/components/estimates/estimate-line-tree";
 import {
-  DescriptionCell,
   ExtSellCell,
   ItemCell,
   LINE_TABLE_COLUMN_WIDTHS,
@@ -44,11 +43,15 @@ type FlatLineRow = {
 type EstimateLineFlatTableProps = {
   manifest: Manifest;
   selection: EstimateBucketSelection | null;
+  onPreviewLine?: (index: number) => void;
+  isPreviewing?: (lineId: string) => boolean;
 };
 
 export const EstimateLineFlatTable = ({
   manifest,
   selection,
+  onPreviewLine,
+  isPreviewing,
 }: EstimateLineFlatTableProps) => {
   const { control, getValues } = useFormContext<EstimateLineEditorFormValues>();
   const { append: appendLine, remove: removeLines } = useFieldArray({
@@ -115,6 +118,7 @@ export const EstimateLineFlatTable = ({
             writable={writableLines}
             disabled={disabled}
             conditions={conditions}
+            onPreview={onPreviewLine}
           />
         ),
       },
@@ -127,15 +131,8 @@ export const EstimateLineFlatTable = ({
             index={record.index}
             writable={writableLines}
             disabled={disabled}
+            onPreview={onPreviewLine}
           />
-        ),
-      },
-      {
-        key: "description",
-        title: "Description",
-        width: LINE_TABLE_COLUMN_WIDTHS.description,
-        render: (_value, record) => (
-          <DescriptionCell index={record.index} writable={writableLines} disabled={disabled} />
         ),
       },
       {
@@ -165,6 +162,7 @@ export const EstimateLineFlatTable = ({
             writable={writableLines}
             disabled={disabled}
             readOnly
+            previewing={isPreviewing?.(record.line.id)}
           />
         ),
       },
@@ -179,6 +177,7 @@ export const EstimateLineFlatTable = ({
             writable={writableLines}
             disabled={disabled}
             readOnly
+            previewing={isPreviewing?.(record.line.id)}
           />
         ),
       },
@@ -193,6 +192,7 @@ export const EstimateLineFlatTable = ({
             writable={writableLines}
             disabled={disabled}
             readOnly
+            previewing={isPreviewing?.(record.line.id)}
           />
         ),
       },
@@ -207,6 +207,7 @@ export const EstimateLineFlatTable = ({
             writable={writableLines}
             disabled={disabled}
             readOnly
+            previewing={isPreviewing?.(record.line.id)}
           />
         ),
       },
@@ -221,6 +222,7 @@ export const EstimateLineFlatTable = ({
             writable={writableLines}
             disabled={disabled}
             readOnly
+            previewing={isPreviewing?.(record.line.id)}
           />
         ),
       },
@@ -235,15 +237,21 @@ export const EstimateLineFlatTable = ({
             writable={writableLines}
             disabled={disabled}
             readOnly
+            previewing={isPreviewing?.(record.line.id)}
           />
         ),
       },
       {
-        key: "lock",
-        title: "Lock",
-        width: LINE_TABLE_COLUMN_WIDTHS.lock,
+        key: "locks",
+        title: "Locks",
+        width: LINE_TABLE_COLUMN_WIDTHS.locks,
         render: (_value, record) => (
-          <LockCell index={record.index} writable={writableLines} disabled={disabled} />
+          <LockCell
+            index={record.index}
+            writable={writableLines}
+            disabled={disabled}
+            onPreview={onPreviewLine}
+          />
         ),
       },
       {
@@ -297,6 +305,8 @@ export const EstimateLineFlatTable = ({
     allowRemoveLine,
     conditions,
     disabled,
+    isPreviewing,
+    onPreviewLine,
     removeLineAt,
     showActionsColumn,
     siteTree,

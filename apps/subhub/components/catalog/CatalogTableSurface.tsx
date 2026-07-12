@@ -22,6 +22,7 @@ import {
   FieldArrayTable,
   type FieldArrayTableColumn,
 } from "@/components/form/FieldArrayTable";
+import { TABLE_WIDTH_LG } from "@/components/form/formLayout";
 import { useRegisterSurfaceActions } from "@/components/shell/SurfaceActionsProvider";
 import { SurfaceFormRoot } from "@/components/surface/SurfaceFormRoot";
 import { SurfaceApiError } from "@/lib/surface-api";
@@ -38,6 +39,8 @@ type CatalogTableSurfaceProps<
   createRow: () => TRow;
   addLabel?: string;
   orderable?: boolean;
+  /** Cap the catalog table; default TABLE_WIDTH_LG. */
+  maxWidth?: number;
   defaultRows: TRow[];
   resetKey: unknown;
   loading: boolean;
@@ -58,6 +61,7 @@ export const CatalogTableSurface = <
   createRow,
   addLabel,
   orderable = false,
+  maxWidth = TABLE_WIDTH_LG,
   defaultRows,
   resetKey,
   loading,
@@ -174,6 +178,7 @@ export const CatalogTableSurface = <
           createRow={createRow}
           addLabel={addLabel}
           size="small"
+          maxWidth={maxWidth}
           orderable={orderable && canSurfaceWrite}
           allowAdd={allowAdd}
           allowRemove={allowRemove}

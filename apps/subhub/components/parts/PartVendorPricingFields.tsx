@@ -17,6 +17,7 @@ import {
   type FieldArrayTableColumn,
 } from "@/components/form/FieldArrayTable";
 import { FormSection } from "@/components/form/FormSection";
+import { TABLE_WIDTH_XL } from "@/components/form/formLayout";
 import { LinkedSelectControl } from "@/components/form/LinkedSelectInput";
 import { findSelectLabel } from "@/components/form/optionHelpers";
 import { useVendorPicker } from "@/lib/hooks/use-vendor-picker";
@@ -403,12 +404,13 @@ export const PartVendorPricingFields = ({
 
   return (
     <FieldControl manifest={manifest} field="vendor_pricing">
-      <FormSection title="Vendor pricing">
+      <FormSection title="Vendor pricing" width="full">
         {emptyState}
         <FieldArrayTable<PartVendorPricingFormValues, "vendor_pricing">
           field="vendor_pricing"
           name="vendor_pricing"
           columns={columns}
+          maxWidth={TABLE_WIDTH_XL}
           createRow={() => ({
             vendor_party_id: "",
             vendor_display_name: "",

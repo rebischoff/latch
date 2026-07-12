@@ -700,7 +700,7 @@ Table item_labor_phase {
     (item_id, labor_phase_id) [pk]
   }
 
-  Note: 'Labor hours × rate per item node — one row per phase per item (040b).'
+  Note: 'Labor hours × rate per item node (040b).'
 }
 
 Table item {
@@ -1008,7 +1008,8 @@ Table estimate_line {
   unit_freight numeric [not null, default: 0]
   unit_incidental numeric [not null, default: 0]
   site_asset_id text [note: 'nullable FK → site_asset — device-level scope']
-  lock text [not null, default: 'none', note: 'CHECK: none | sell | line — recalc gate (040b D6b)']
+  sales_locked boolean [not null, default: false, note: 'Sticky sell — keep unit_price; costs/target still update (37aa P6)']
+  material_locked boolean [not null, default: false, note: 'Sticky item+part — costing still runs (37aa P6)']
   item_id text [not null, note: 'FK → item — required on product lines']
   part_id text [note: 'nullable FK → manufacturer_part — when PN determined or user-picked']
   vendor_part_id text [note: 'nullable FK → vendor_part — cost source when pinned']
@@ -1020,7 +1021,8 @@ Table estimate_line {
 
   Note: '''
     Quote line — **item_id** at any tree depth; commercial snapshots M/L/freight/incidental/target.
-    Places via `estimate_line_allocation` (not a single site_zone_id). **lock** — none/sell/line (040b).
+    Places via `estimate_line_allocation` (not a single site_zone_id).
+    **sales_locked** / **material_locked** — independent dual locks (37aa; was lock enum).
   '''
 }
 

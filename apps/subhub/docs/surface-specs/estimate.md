@@ -1,6 +1,6 @@
 # Estimates — `estimate_list` · `estimate_detail`
 
-> **Wave:** 4e · **Status:** backbone + **37y condition-only commercial tree** (2026-07-09) · **Implementation:** [task 32](../tasks/32-estimate-wave-4e.md) wave 4e; [task 37w](../tasks/37w-estimate-line-items-panels.md) three-panel shell; [task 37x](../tasks/37x-estimate-conditions-allocations.md) (superseded for roots); [task 37y](../tasks/37y-condition-only-commercial-tree.md) condition forest · **Planning:** [`02-estimates.md`](../planning/02-estimates.md) · **Catalog:** [`surfaces.md`](../surfaces.md#estimate_list--estimate_detail) · **DBML:** `estimate`, `estimate_party`, `estimate_condition`, `estimate_line`, `estimate_line_allocation` · **Decisions:** [condition-only tree Y1–Y5](../decisions/estimate.md#decision-condition-only-commercial-tree-2026-07-09), [scope / condition / zone / qty](../decisions/estimate.md#decision-estimate-scope-condition-zone-and-line-qty-2026-07-09), [three-panel layout](../decisions/estimate.md#decision-estimate-line-items-tab--three-panel-layout-2026-07-08), [site anchor](../decisions/estimate.md#decision-estimate-site-anchor--gate-lines-immutable-after-create-2026-06-30)
+> **Wave:** 4e · **Status:** backbone + **37y condition-only commercial tree** (2026-07-09); **37aa** live preview + dual locks (**complete** 2026-07-11) · **Implementation:** [task 32](../tasks/32-estimate-wave-4e.md) wave 4e; [task 37w](../tasks/37w-estimate-line-items-panels.md) three-panel shell; [task 37x](../tasks/37x-estimate-conditions-allocations.md) (superseded for roots); [task 37y](../tasks/37y-condition-only-commercial-tree.md) condition forest; [task 37aa](../tasks/37aa-estimate-line-live-preview.md) live preview · **Planning:** [`02-estimates.md`](../planning/02-estimates.md) · **Catalog:** [`surfaces.md`](../surfaces.md#estimate_list--estimate_detail) · **DBML:** `estimate`, `estimate_party`, `estimate_condition`, `estimate_line`, `estimate_line_allocation` · **Decisions:** [dual locks + live preview](../decisions/estimate.md#decision-estimate-dual-line-locks-and-live-preview-2026-07-11), [condition-only tree Y1–Y5](../decisions/estimate.md#decision-condition-only-commercial-tree-2026-07-09), [scope / condition / zone / qty](../decisions/estimate.md#decision-estimate-scope-condition-zone-and-line-qty-2026-07-09), [three-panel layout](../decisions/estimate.md#decision-estimate-line-items-tab--three-panel-layout-2026-07-08), [site anchor](../decisions/estimate.md#decision-estimate-site-anchor--gate-lines-immutable-after-create-2026-06-30)
 
 **Related:** Site anchor via `profile.site_id` → [`site_detail`](./site.md). Stakeholder catalog: [`job-party-relation.md`](./job-party-relation.md). Win → job copy in wave **4b** → [`job.md`](./job.md).
 
@@ -392,21 +392,23 @@ Empty forest → prompt to **Add root** (catalog root picker).
 
 **Not in 37y:** kit UI; summary chips; win→job condition/allocation copy (X4); LI drag→**S** retarget (deferred).
 
-### Line columns (37f / LI)
+### Line columns (37f / LI · **37aa dual locks + preview**)
 
 | Column | Notes |
 |--------|-------|
-| Item | `TreeSelect` — root category subtree for condition tree’s `root_item_id` |
-| Part | `Select` or text — resolver output |
+| Item | `TreeSelect` — root category subtree for condition tree’s `root_item_id`; change → **server line-preview** (that line); blocked when `material_locked` |
+| Part | `Select` or text — resolver / preview; manual PN → `material_locked` |
 | Description | `Input` |
-| Qty | `InputNumber` |
+| Qty | `InputNumber` — updates **ext sell** only (no unit costing preview) |
 | Unit | `Input` |
-| Material / Freight / Incidental / Labor | read-only — recalc snapshots |
+| Material / Freight / Incidental / Labor | read-only — preview + save snapshots |
 | Target / Cost | read-only |
-| Lock | cycle button — `none` → `sell` → `line` |
-| Sell | `InputNumber` — manual edit → `sell` lock |
+| Sales lock / Material lock | independent booleans (replace `lock` enum) — see [P1–P7](../decisions/estimate.md#decision-estimate-dual-line-locks-and-live-preview-2026-07-11) |
+| Sell | `InputNumber` — editable even when sales-locked; manual edit → `sales_locked` |
 | Ext sell | read-only — qty × sell |
 | Actions | delete |
+
+**Live preview (37aa):** `POST` batch line-preview (1..n) on item/part/config — no persist. Config change on selected condition previews **all** lines under that condition.
 
 **Kit UI removed (37v).** PATCH emits `line_role: standalone` only.
 

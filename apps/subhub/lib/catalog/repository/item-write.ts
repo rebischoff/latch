@@ -4,7 +4,6 @@ import type { Pool, PoolClient } from "pg";
 
 import { InUseError, type DeleteBlocker } from "../../errors";
 import { tableExists } from "../../sites/repository/sql-utils";
-import type { ItemDetailRow } from "./item-detail";
 import { loadAllItems, resolveRootItemId, type ItemFlatRow } from "./item-tree";
 
 const DELETE_BLOCKER_SAMPLE_LIMIT = 5;
@@ -174,16 +173,16 @@ export const replaceItemLaborPhases = async (
   rows: ItemLaborPhaseWriteRow[],
 ): Promise<void> => {
   await assertItemLaborPhaseWritable(client, itemId);
-  const seenPhases = new Set<string>();
+  const seenPhaseIds = new Set<string>();
   for (const row of rows) {
-    if (seenPhases.has(row.labor_phase_id)) {
+    if (seenPhaseIds.has(row.labor_phase_id)) {
       throw new ValidationError("Duplicate labor_phase_id on item", {
         field: "item_labor_phase",
         code: "duplicate_phase",
         labor_phase_id: row.labor_phase_id,
       });
     }
-    seenPhases.add(row.labor_phase_id);
+    seenPhaseIds.add(row.labor_phase_id);
   }
 
   await client.query(`DELETE FROM item_labor_phase WHERE item_id = $1`, [itemId]);
@@ -284,19 +283,6 @@ export const loadItemDeleteBlockers = async (
     }
   }
 
-  if (await tableExists(pool, "item_placement_removed")) {
-    const countResult = await pool.query<{ count: number }>(
-      `SELECT COUNT(*)::int AS count
-       FROM item_placement_removed
-       WHERE item_id = $1`,
-      [categoryId],
-    );
-    const count = countResult.rows[0]?.count ?? 0;
-    if (count > 0) {
-      blockers.push({ type: "item_child_removed", count });
-    }
-  }
-
   if (await tableExists(pool, "part_item")) {
     const countResult = await pool.query<{ count: number }>(
       `SELECT COUNT(*)::int AS count
@@ -319,7 +305,7 @@ export const loadItemDeleteBlockers = async (
      SELECT COUNT(*)::int AS count
      FROM manufacturer_part_spec mps
      INNER JOIN spec_def sd ON sd.id = mps.spec_def_id
-     WHERE sd.item_id IN (SELECT id FROM subtree)`,
+     WHERE sd.scope_root_item_id IN (SELECT id FROM subtree)`,
     [categoryId],
   );
   const partSpecCount = partSpecCountResult.rows[0]?.count ?? 0;

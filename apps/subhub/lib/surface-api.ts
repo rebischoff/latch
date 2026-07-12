@@ -301,6 +301,70 @@ export const fetchEstimatePartPicker = async (params: {
   return parseResponse<EstimatePartPickerData>(response);
 };
 
+export type EstimateLinePreviewLineInput = {
+  id: string;
+  item_id: string | null;
+  part_id?: string | null;
+  sales_locked?: boolean;
+  material_locked?: boolean;
+  quantity?: number;
+  unit_price?: number;
+  unit_material?: number;
+  unit_labor?: number;
+  unit_freight?: number;
+  unit_incidental?: number;
+  unit_cost?: number;
+  unit_price_target?: number;
+  unit?: string;
+  description?: string;
+  vendor_part_id?: string | null;
+};
+
+export type EstimateLinePreviewConditionDraft = {
+  complexity_factor_id?: string | null;
+  labor_phases_explicit?: boolean;
+  included_labor_phases?: string[];
+  specs?: Array<{
+    spec_def_id: string;
+    spec_option_id?: string | null;
+    value_boolean?: boolean | null;
+    value_number?: number | null;
+  }>;
+};
+
+export type EstimateLinePreviewResultLine = {
+  id: string;
+  part_id: string | null;
+  vendor_part_id: string | null;
+  unit_material: number;
+  unit_freight: number;
+  unit_incidental: number;
+  unit_labor: number;
+  unit_cost: number;
+  unit_price_target: number;
+  unit_price: number;
+};
+
+export type EstimateLinePreviewData = {
+  lines: EstimateLinePreviewResultLine[];
+};
+
+export const fetchEstimateLinePreview = async (
+  estimateId: string,
+  body: {
+    condition_id: string;
+    condition_draft?: EstimateLinePreviewConditionDraft;
+    lines: EstimateLinePreviewLineInput[];
+  },
+): Promise<ApiSuccessBody<EstimateLinePreviewData>> => {
+  const response = await fetch(`/api/estimates/${encodeURIComponent(estimateId)}/line-preview`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  return parseResponse<EstimateLinePreviewData>(response);
+};
+
 export const fetchEstimateSiteTree = async (
   siteId: string,
 ): Promise<ApiSuccessBody<EstimateSiteTreePickerData>> => {

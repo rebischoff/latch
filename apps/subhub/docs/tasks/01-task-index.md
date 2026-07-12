@@ -257,6 +257,9 @@ flowchart LR
 | **37x** | [37x-estimate-conditions-allocations.md](./37x-estimate-conditions-allocations.md) | Estimate **conditions** + line **allocations**; S = commercial tree; complexity on condition only — **complete** (2026-07-09); **superseded for roots by 37y** |
 | **37y** | [37y-condition-only-commercial-tree.md](./37y-condition-only-commercial-tree.md) | Drop `estimate_scope`; condition-only forest; lines require condition; C inherit checkbox (Y1–Y5) — **complete** (2026-07-09) |
 | **37z** | [37z-item-commercial-inherit-ui.md](./37z-item-commercial-inherit-ui.md) | Item F/I/M inherit checkbox on all nodes; no schema change (Z1–Z5) — **complete** (2026-07-09) |
+| **37aa** | [37aa-estimate-line-live-preview.md](./37aa-estimate-line-live-preview.md) | Live line preview (item/part/config); `sales_locked` + `material_locked`; drop `lock` enum — **complete** (2026-07-11) |
+| **37ab** | [37ab-item-placement-mount-axis.md](./37ab-item-placement-mount-axis.md) | `item_placement` browse tree + mount labor/margin axis override (M1–M7, L1–L6) — **superseded/reverted** (2026-07-11), see 37ac |
+| **37ac** | [37ac-item-placement-mount-axis-revert.md](./37ac-item-placement-mount-axis-revert.md) | Revert 37ab — drop `item_placement`/`item_cost_override`/`commercial_axis`; mount variance = leaf-per-location (R1–R6) — **complete** (2026-07-11) |
 | **37h** | *(see 37a chain)* | Job `site_zone_id` FK renames |
 
 ### Backbone pass (estimate finish) — tasks 29–32

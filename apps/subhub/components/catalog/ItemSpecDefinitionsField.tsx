@@ -8,6 +8,7 @@ import { Controller, useFormContext, useWatch } from "react-hook-form";
 import type { FieldArrayTableColumn } from "@/components/form/FieldArrayTable";
 import { FieldArrayTable } from "@/components/form/FieldArrayTable";
 import { FormSection } from "@/components/form/FormSection";
+import { TABLE_WIDTH_LG } from "@/components/form/formLayout";
 import { useSurfaceList } from "@/lib/hooks/use-surface-list";
 
 import type { ItemDetailFormValues } from "./ItemDetailForm";
@@ -342,11 +343,12 @@ export const ItemSpecDefinitionsField = ({
   }
 
   return (
-    <FormSection title="Spec definitions">
+    <FormSection title="Spec definitions" width="full">
       <FieldArrayTable<ItemDetailFormValues, "spec_definitions">
         field="spec_definitions"
         name="spec_definitions"
         columns={columns}
+        maxWidth={TABLE_WIDTH_LG}
         orderable={canWrite}
         addLabel="Add spec"
         allowRemove={canWrite}

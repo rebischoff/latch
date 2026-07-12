@@ -1,11 +1,14 @@
-/** Default max width for detail forms (playground + production). */
-export const SURFACE_FORM_MAX_WIDTH = 960;
+/** Default max width for readable form sections (Profile, Notes, etc.). */
+export const SURFACE_SECTION_MAX_WIDTH = 960;
 
 /** Max width for scalar controls (inputs, selects, pickers) inside the wrapper column. */
 export const SURFACE_CONTROL_MAX_WIDTH = 480;
 
-/** @deprecated Use SURFACE_FORM_MAX_WIDTH */
-export const PLAYGROUND_FORM_MAX_WIDTH = SURFACE_FORM_MAX_WIDTH;
+/** Table / list structure caps (applied on the table, not the form shell). */
+export const TABLE_WIDTH_MD = 1150;
+export const TABLE_WIDTH_LG = 1300;
+export const TABLE_WIDTH_XL = 1500;
+export const TABLE_WIDTH_XXL = 2200;
 
 /** Shared antd Form layout props — label alignment only; RHF owns values. */
 export const formItemLayout = {

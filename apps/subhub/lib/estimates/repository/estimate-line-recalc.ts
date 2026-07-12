@@ -10,16 +10,21 @@ import {
   resolveComplexityPercent,
   resolveFilteredLaborCost,
   resolveRate,
+  type ComplexityContext,
   type CostAddOnProfile,
   type MarkupProfile,
 } from "./estimate-commercial";
-import { loadMergedBucketForLine } from "./estimate-bucket-specs";
+import {
+  loadMergedBucketForLine,
+  type MergedBucketSpecs,
+} from "./estimate-bucket-specs";
 import { resolveLineMaterial } from "./estimate-part-resolver";
 
 export type RecalcLineInput = EstimateLineItemPatchRow & {
   id: string;
   is_new?: boolean;
-  lock?: "line" | "none" | "sell";
+  sales_locked?: boolean;
+  material_locked?: boolean;
 };
 
 export type RecalcLineOutput = RecalcLineInput & {
@@ -29,6 +34,13 @@ export type RecalcLineOutput = RecalcLineInput & {
   unit_labor: number;
   unit_cost: number;
   unit_price_target: number;
+};
+
+/** Optional overrides so preview can reuse save-path math without persisting draft config. */
+export type RecalcContextOverrides = {
+  bucket?: MergedBucketSpecs;
+  complexity?: ComplexityContext;
+  laborPhases?: string[] | null;
 };
 
 const loadEstimateStatus = async (
@@ -45,68 +57,62 @@ const loadEstimateStatus = async (
   return result.rows[0]?.status ?? null;
 };
 
+const frozenSnapshots = (line: RecalcLineInput): RecalcLineOutput => ({
+  ...line,
+  unit_material: Number(line.unit_material ?? 0),
+  unit_labor: Number(line.unit_labor ?? 0),
+  unit_freight: Number(line.unit_freight ?? 0),
+  unit_incidental: Number(line.unit_incidental ?? 0),
+  unit_cost: Number(line.unit_cost ?? 0),
+  unit_price_target: Number(line.unit_price_target ?? 0),
+});
+
 export const recalcProductLine = async (
   client: Pool | PoolClient,
   line: RecalcLineInput,
   catalog?: Awaited<ReturnType<typeof loadCommercialCatalog>>,
+  overrides?: RecalcContextOverrides,
 ): Promise<RecalcLineOutput> => {
   const commercialCatalog = catalog ?? (await loadCommercialCatalog(client));
-  const lock = line.lock ?? "none";
+  const salesLocked = line.sales_locked ?? false;
+  const materialLocked = line.material_locked ?? false;
   const status = await loadEstimateStatus(client, line.estimate_condition_id);
 
   if (status && status !== "draft") {
-    return {
-      ...line,
-      unit_material: Number(line.unit_material ?? 0),
-      unit_labor: Number(line.unit_labor ?? 0),
-      unit_freight: Number(line.unit_freight ?? 0),
-      unit_incidental: Number(line.unit_incidental ?? 0),
-      unit_cost: Number(line.unit_cost ?? 0),
-      unit_price_target: Number(line.unit_price_target ?? 0),
-    };
-  }
-
-  if (lock === "line") {
-    return {
-      ...line,
-      unit_material: Number(line.unit_material ?? 0),
-      unit_labor: Number(line.unit_labor ?? 0),
-      unit_freight: Number(line.unit_freight ?? 0),
-      unit_incidental: Number(line.unit_incidental ?? 0),
-      unit_cost: Number(line.unit_cost ?? 0),
-      unit_price_target: Number(line.unit_price_target ?? 0),
-    };
+    return frozenSnapshots(line);
   }
 
   if (!line.item_id) {
     const unitCost = Number(line.unit_cost ?? 0);
     const unitPriceTarget = unitCost;
-    const isNew = line.is_new ?? false;
     return {
       ...line,
+      sales_locked: salesLocked,
+      material_locked: materialLocked,
       unit_material: Number(line.unit_material ?? 0),
       unit_labor: 0,
       unit_freight: 0,
       unit_incidental: 0,
       unit_cost: unitCost,
       unit_price_target: unitPriceTarget,
-      unit_price:
-        lock === "sell" ? line.unit_price : isNew ? unitPriceTarget : line.unit_price,
+      unit_price: salesLocked ? line.unit_price : unitPriceTarget,
     };
   }
 
-  const bucket = await loadMergedBucketForLine(
-    client,
-    line.estimate_condition_id,
-    line.is_new ? null : line.id,
-  );
+  const bucket =
+    overrides?.bucket ??
+    (await loadMergedBucketForLine(
+      client,
+      line.estimate_condition_id,
+      line.is_new ? null : line.id,
+    ));
 
   const material = await resolveLineMaterial(
     client,
     {
       item_id: line.item_id,
       part_id: line.part_id ?? null,
-      lock: line.lock ?? "none",
+      material_locked: materialLocked,
     },
     bucket,
     line.is_new ?? false,
@@ -127,8 +133,12 @@ export const recalcProductLine = async (
   const unitIncidental = computeAddOnUnit(incidentalProfile, unitMaterial);
 
   const [conditionLaborPhases, complexity] = await Promise.all([
-    loadConditionLaborPhases(client, line.estimate_condition_id),
-    loadComplexityContext(client, line.estimate_condition_id),
+    overrides?.laborPhases !== undefined
+      ? Promise.resolve(overrides.laborPhases)
+      : loadConditionLaborPhases(client, line.estimate_condition_id),
+    overrides?.complexity
+      ? Promise.resolve(overrides.complexity)
+      : loadComplexityContext(client, line.estimate_condition_id),
   ]);
   const baseLabor = resolveFilteredLaborCost(
     commercialCatalog,
@@ -139,7 +149,11 @@ export const recalcProductLine = async (
   const unitLabor = baseLabor * (complexityPercent / 100);
 
   const unitCost = unitMaterial + unitLabor + unitFreight + unitIncidental;
-  const markup = resolveRate(commercialCatalog, line.item_id, "markup") as MarkupProfile | null;
+  const markup = resolveRate(
+    commercialCatalog,
+    line.item_id,
+    "markup",
+  ) as MarkupProfile | null;
   const unitPriceTarget = computeUnitPriceTarget(
     unitMaterial,
     unitLabor,
@@ -148,18 +162,15 @@ export const recalcProductLine = async (
     markup,
   );
 
-  const isNew = line.is_new ?? false;
-  const unitPrice =
-    lock === "sell"
-      ? line.unit_price
-      : isNew || lock === "none"
-        ? unitPriceTarget
-        : line.unit_price;
+  const unitPrice = salesLocked ? line.unit_price : unitPriceTarget;
 
   return {
     ...line,
-    part_id: material.part_id,
-    lock: material.lock,
+    sales_locked: salesLocked,
+    material_locked: materialLocked,
+    // Material lock keeps form pin; otherwise adopt resolver suggestion.
+    part_id: materialLocked ? (line.part_id ?? null) : material.part_id,
+    item_id: line.item_id,
     vendor_part_id: material.vendor_part_id,
     unit_material: unitMaterial,
     unit_labor: unitLabor,

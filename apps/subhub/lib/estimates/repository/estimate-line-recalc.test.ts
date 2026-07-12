@@ -64,7 +64,6 @@ vi.mock("./estimate-bucket-specs", () => ({
 vi.mock("./estimate-part-resolver", () => ({
   resolveLineMaterial: vi.fn(async () => ({
     filtered_part_count: 0,
-    lock: "none" as const,
     part_id: null,
     part_match_alert: null,
     unit_material: 100,
@@ -104,7 +103,8 @@ const baseLine = (): RecalcLineInput => ({
   estimate_condition_id: "cond-1",
   item_id: "item-leaf",
   part_id: null,
-  lock: "none",
+  sales_locked: false,
+  material_locked: false,
 });
 
 describe("recalcProductLine", () => {
@@ -112,7 +112,7 @@ describe("recalcProductLine", () => {
     vi.clearAllMocks();
   });
 
-  it("populates full commercial snapshots when lock is none", async () => {
+  it("populates full commercial snapshots when unlocked", async () => {
     const result = await recalcProductLine(
       makeClient("draft"),
       { ...baseLine(), is_new: true },
@@ -128,10 +128,15 @@ describe("recalcProductLine", () => {
     expect(result.unit_price).toBeCloseTo(272.5);
   });
 
-  it("freezes unit_price when lock is sell but updates cost snapshots", async () => {
+  it("keeps unit_price when sales_locked but updates cost snapshots", async () => {
     const result = await recalcProductLine(
       makeClient("draft"),
-      { ...baseLine(), lock: "sell", unit_price: 999, is_new: false },
+      {
+        ...baseLine(),
+        sales_locked: true,
+        unit_price: 999,
+        is_new: false,
+      },
       buildCatalog(),
     );
 
@@ -141,28 +146,68 @@ describe("recalcProductLine", () => {
     expect(result.unit_freight).toBe(10);
   });
 
-  it("skips recalc entirely when lock is line", async () => {
-    const frozen = {
-      ...baseLine(),
-      lock: "line" as const,
-      unit_material: 50,
-      unit_labor: 25,
-      unit_freight: 5,
-      unit_incidental: 1,
-      unit_cost: 81,
-      unit_price_target: 90,
-      unit_price: 95,
-    };
+  it("keeps part when material_locked but still updates costs", async () => {
+    vi.mocked(resolveLineMaterial).mockResolvedValue({
+      filtered_part_count: 3,
+      part_id: "suggested-part",
+      part_match_alert: null,
+      unit_material: 100,
+      vendor_part_id: "vp-1",
+    });
 
-    const result = await recalcProductLine(makeClient("draft"), frozen, buildCatalog());
+    const result = await recalcProductLine(
+      makeClient("draft"),
+      {
+        ...baseLine(),
+        material_locked: true,
+        part_id: "pinned-part",
+        unit_price: 50,
+        is_new: false,
+      },
+      buildCatalog(),
+    );
 
-    expect(result.unit_material).toBe(50);
-    expect(result.unit_labor).toBe(25);
-    expect(result.unit_freight).toBe(5);
-    expect(result.unit_incidental).toBe(1);
-    expect(result.unit_cost).toBe(81);
-    expect(result.unit_price_target).toBe(90);
-    expect(result.unit_price).toBe(95);
+    expect(result.part_id).toBe("pinned-part");
+    expect(result.unit_material).toBe(100);
+    expect(result.unit_price_target).toBeCloseTo(272.5);
+    expect(result.unit_price).toBeCloseTo(272.5);
+    expect(resolveLineMaterial).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        material_locked: true,
+        part_id: "pinned-part",
+      }),
+      expect.anything(),
+      false,
+    );
+  });
+
+  it("honors both locks independently", async () => {
+    vi.mocked(resolveLineMaterial).mockResolvedValue({
+      filtered_part_count: 1,
+      part_id: "other-part",
+      part_match_alert: null,
+      unit_material: 100,
+      vendor_part_id: null,
+    });
+
+    const result = await recalcProductLine(
+      makeClient("draft"),
+      {
+        ...baseLine(),
+        sales_locked: true,
+        material_locked: true,
+        part_id: "pinned-part",
+        unit_price: 777,
+        is_new: false,
+      },
+      buildCatalog(),
+    );
+
+    expect(result.part_id).toBe("pinned-part");
+    expect(result.unit_price).toBe(777);
+    expect(result.unit_price_target).toBeCloseTo(272.5);
+    expect(result.unit_labor).toBe(125);
   });
 
   it("skips recalc when estimate status is not draft", async () => {
@@ -183,6 +228,21 @@ describe("recalcProductLine", () => {
     expect(result.unit_labor).toBe(10);
     expect(result.unit_price).toBe(65);
   });
+
+  it("syncs unlocked existing lines to unit_price_target", async () => {
+    const result = await recalcProductLine(
+      makeClient("draft"),
+      {
+        ...baseLine(),
+        sales_locked: false,
+        unit_price: 10,
+        is_new: false,
+      },
+      buildCatalog(),
+    );
+
+    expect(result.unit_price).toBeCloseTo(result.unit_price_target);
+  });
 });
 
 describe("recalcLineItems", () => {
@@ -190,7 +250,6 @@ describe("recalcLineItems", () => {
     vi.clearAllMocks();
     vi.mocked(resolveLineMaterial).mockResolvedValue({
       filtered_part_count: 0,
-      lock: "none",
       part_id: null,
       part_match_alert: null,
       unit_material: 100,
@@ -198,12 +257,17 @@ describe("recalcLineItems", () => {
     });
   });
 
-  it("sets unit_price to target for new lines and preserves existing sell lock", async () => {
+  it("sets unit_price to target for unlocked lines and preserves sales lock", async () => {
     const client = makeClient("draft");
 
     const lines: RecalcLineInput[] = [
-      { ...baseLine(), id: "new-line", lock: "none" },
-      { ...baseLine(), id: "existing-line", lock: "sell", unit_price: 888 },
+      { ...baseLine(), id: "new-line", sales_locked: false },
+      {
+        ...baseLine(),
+        id: "existing-line",
+        sales_locked: true,
+        unit_price: 888,
+      },
     ];
 
     const results = await recalcLineItems(client, lines, new Set(["existing-line"]));

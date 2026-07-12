@@ -114,17 +114,18 @@ New rows omit `id` (server generates). Unknown top-level keys → **400**.
 
 ## UI: React Hook Form
 
-Scalar fields use `SurfaceFormLayout` + `*Input` controllers (`FormFieldItem`). Collection Fields use **`FieldArrayTable`** — antd `Table` with column headers, RHF `useFieldArray`, and add/remove in the table footer.
+Scalar fields use `SurfaceFormLayout` + `*Input` controllers (`FormFieldItem`) inside `FormSection` (default max 960px). Collection Fields use **`FieldArrayTable`** inside **`FormSection width="full"`** — the section does not cap width; pass **`maxWidth`** on the table (e.g. `TABLE_WIDTH_LG`) so the list/table structure is capped independently.
 
 ```tsx
-// Scalar — inside SurfaceFormLayout
+// Scalar — inside SurfaceFormLayout + FormSection (default width)
 <TextInput field="display_name" name="display_name" label="Display name" />
 
-// Collection — section title + table (not FormFieldItem per cell)
-<FormSection title="Phones">
+// Collection — full-width section; table carries its own max
+<FormSection title="Phones" width="full">
   <FieldArrayTable
     field="phones"
     name="phones"
+    maxWidth={TABLE_WIDTH_LG}
     createRow={() => ({ label: "", number: "", is_primary: false })}
     addLabel="Add phone"
     columns={[

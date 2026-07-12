@@ -450,8 +450,10 @@ export const loadItemDetailRelated = async (
     };
   }
 
-  const item_labor_phase = await loadItemLaborPhases(pool, categoryId);
-  const inherited = await resolveInheritedLaborPhases(pool, categoryId);
+  const [item_labor_phase, inherited] = await Promise.all([
+    loadItemLaborPhases(pool, categoryId),
+    resolveInheritedLaborPhases(pool, categoryId),
+  ]);
   const inherited_labor_phase = inherited.rows;
   const labor_phase_mode = deriveLaborPhaseMode(item_labor_phase, inherited_labor_phase);
 

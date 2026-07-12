@@ -184,22 +184,38 @@ export const replaceEstimateLineItemsTx = async (
     validConditionIds,
   );
 
+  const priorRows = await client.query<{ id: string; item_id: string | null }>(
+    `SELECT id, item_id FROM estimate_line WHERE estimate_id = $1`,
+    [estimateId],
+  );
+  const priorItemById = new Map(
+    priorRows.rows.map((row) => [row.id, row.item_id] as const),
+  );
   const priorIds =
-    existingLineIds ??
-    new Set(
-      (
-        await client.query<{ id: string }>(
-          `SELECT id FROM estimate_line WHERE estimate_id = $1`,
-          [estimateId],
-        )
-      ).rows.map((row) => row.id),
-    );
+    existingLineIds ?? new Set(priorRows.rows.map((row) => row.id));
+
+  for (const row of normalized) {
+    if (row.material_locked && priorIds.has(row.id)) {
+      const priorItemId = priorItemById.get(row.id) ?? null;
+      if (priorItemId !== null && priorItemId !== (row.item_id ?? null)) {
+        throw new ValidationError(
+          "Cannot change item_id while material_locked is true",
+          {
+            field: "line_items",
+            code: "material_locked_item",
+            id: row.id,
+          },
+        );
+      }
+    }
+  }
 
   const recalculated = await recalcLineItems(
     client,
     normalized.map((row) => ({
       ...row,
-      lock: row.lock ?? "none",
+      sales_locked: row.sales_locked ?? false,
+      material_locked: row.material_locked ?? false,
     })),
     priorIds,
   );
@@ -231,13 +247,14 @@ export const replaceEstimateLineItemsTx = async (
          unit_freight,
          unit_incidental,
          unit_price_target,
-         lock,
+         sales_locked,
+         material_locked,
          item_id,
          part_id,
          vendor_part_id,
          sort_order
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)`,
       [
         row.id,
         estimateId,
@@ -256,7 +273,8 @@ export const replaceEstimateLineItemsTx = async (
         row.unit_freight,
         row.unit_incidental,
         row.unit_price_target,
-        row.lock ?? "none",
+        row.sales_locked ?? false,
+        row.material_locked ?? false,
         row.item_id ?? null,
         row.part_id ?? null,
         row.vendor_part_id ?? null,

@@ -47,6 +47,13 @@ _Operations backbone forks **resolved** (2026-06-27). Optional: [J3 phase weight
 
 | Decision | File | Date | Status |
 |----------|------|------|--------|
+| Deferred — cross-spec dependency and derived specs | [catalog.md](./catalog.md) | 2026-07-11 | **deferred** |
+| `slc_protocol` naming — rename + explicit `none`/`conventional` option | [catalog.md](./catalog.md) | 2026-07-11 | planning (no task) |
+| Enum spec threshold presets — curated option-set | [catalog.md](./catalog.md) | 2026-07-11 | planning (no task) |
+| Numeric spec bucket range — interval overlap replaces point-in-band | [catalog.md](./catalog.md) | 2026-07-11 | planning (no task) |
+| Item placement + mount axis override — reverted, leaf duplication instead (R1–R6) | [catalog.md](./catalog.md) | 2026-07-11 | **locked** ([37ac](../tasks/37ac-item-placement-mount-axis-revert.md)) |
+| Item placement — multi-location browse tree, decoupled from cost resolution (L1–L6) | [catalog.md](./catalog.md) | 2026-07-11 | **superseded** ([37ac](../tasks/37ac-item-placement-mount-axis-revert.md)) |
+| Item labor axis override — single-spec axis, no compound (M1–M7, M7 = margin FK extension) | [catalog.md](./catalog.md) | 2026-07-11 | **superseded** ([37ac](../tasks/37ac-item-placement-mount-axis-revert.md)) |
 | Condition-only commercial tree (Y1–Y5) | [estimate.md](./estimate.md) | 2026-07-09 | **locked** ([37y](../tasks/37y-condition-only-commercial-tree.md)) |
 | Estimate scope / condition / zone / line qty (G1–G5e) | [estimate.md](./estimate.md) | 2026-07-09 | **locked** · **amended by Y1–Y5** ([37x](../tasks/37x-estimate-conditions-allocations.md)) |
 | Part item links leaf-only + Specs value UX | [catalog.md](./catalog.md) | 2026-07-08 | **locked** ([37u](../tasks/37u-part-leaf-links-specs-ui.md)) |

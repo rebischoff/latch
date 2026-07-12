@@ -19,6 +19,7 @@ import {
   type FieldArrayTableColumn,
 } from "@/components/form/FieldArrayTable";
 import { FormSection } from "@/components/form/FormSection";
+import { TABLE_WIDTH_LG } from "@/components/form/formLayout";
 import { findSelectLabel } from "@/components/form/optionHelpers";
 import { useSitePartyPicker } from "@/lib/hooks/use-site-party-picker";
 import { useSurfaceList } from "@/lib/hooks/use-surface-list";
@@ -269,12 +270,13 @@ export const EstimateStakeholderFields = ({
 
   return (
     <FieldControl manifest={manifest} field="stakeholders">
-      <FormSection title="Stakeholders">
+      <FormSection title="Stakeholders" width="full">
         {emptyState}
         <FieldArrayTable<EstimateStakeholdersFormValues, "stakeholders">
           field="stakeholders"
           name="stakeholders"
           columns={columns}
+          maxWidth={TABLE_WIDTH_LG}
           createRow={() => ({
             party_id: "",
             relation_id: "",

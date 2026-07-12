@@ -23,7 +23,8 @@ export type EstimateLineFormRow = {
   unit_price_target: number;
   parent_line_id: string | null;
   estimate_condition_id: string;
-  lock: "line" | "none" | "sell";
+  sales_locked: boolean;
+  material_locked: boolean;
   phase_id: string | null;
   item_id: string | null;
   part_id: string | null;
@@ -132,7 +133,8 @@ export const makeLine = (
     parent_line_id: null,
     estimate_condition_id: "",
     allocations: [],
-    lock: "none",
+    sales_locked: false,
+    material_locked: false,
     phase_id: null,
     item_id: null,
     part_id: null,

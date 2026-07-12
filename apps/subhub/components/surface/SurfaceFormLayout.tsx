@@ -36,7 +36,7 @@ export const SurfaceFormLayout = ({
         style: { maxWidth: controlMaxWidth },
       }}
       disabled={disabled}
-      style={{ width: "100%", maxWidth, marginInline: "auto", ...style }}
+      style={{ width: "100%", ...(maxWidth !== undefined ? { maxWidth } : {}), ...style }}
     >
       {children}
     </Form>

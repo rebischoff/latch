@@ -138,6 +138,8 @@ type FieldArrayTableProps<
   createRow: () => FieldArray<T, TName>;
   addLabel?: string;
   size?: TableProps["size"];
+  /** Cap table width; omit for unconstrained. */
+  maxWidth?: number;
   /** Enable drag-sort; requires stable row ids from useFieldArray. */
   orderable?: boolean;
   /** Form key updated on reorder (default `sort_order`, 1-based). */
@@ -160,6 +162,7 @@ const FieldArrayTableCore = <
   createRow,
   addLabel = "Add row",
   size = "middle",
+  maxWidth,
   orderable = false,
   sortOrderKey = "sort_order",
   allowAdd,
@@ -319,11 +322,9 @@ const FieldArrayTableCore = <
     />
   );
 
-  if (!canReorder) {
-    return table;
-  }
-
-  return (
+  const body = !canReorder ? (
+    table
+  ) : (
     <DndContext
       sensors={sensors}
       modifiers={[restrictToVerticalAxis]}
@@ -334,6 +335,12 @@ const FieldArrayTableCore = <
       </SortableContext>
     </DndContext>
   );
+
+  if (maxWidth === undefined) {
+    return body;
+  }
+
+  return <div style={{ width: "100%", maxWidth }}>{body}</div>;
 };
 
 const FieldArrayTableConnected = <

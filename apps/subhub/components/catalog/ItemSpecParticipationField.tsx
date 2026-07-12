@@ -76,7 +76,7 @@ export const ItemSpecParticipationField = ({
   };
 
   return (
-    <FormSection title="Specs">
+    <FormSection title="Specs" width="full">
       {participates.length === 0 ? (
         <Typography.Text type="secondary">
           No specs defined for this scope yet.

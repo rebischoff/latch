@@ -40,7 +40,6 @@ import {
 } from "@/components/estimates/EstimateStakeholderFields";
 import { FormSection } from "@/components/form/FormSection";
 import { FormFieldItem } from "@/components/form/FormFieldItem";
-import { SURFACE_FORM_MAX_WIDTH } from "@/components/form/formLayout";
 import {
   LinkedSelectControl,
   LinkedSelectInput,
@@ -338,10 +337,8 @@ const mapLineItems = (rows: unknown): EstimateLineFormRow[] => {
             };
           })
         : [],
-      lock:
-        item.lock === "line" || item.lock === "sell" || item.lock === "none"
-          ? item.lock
-          : "none",
+      sales_locked: item.sales_locked === true,
+      material_locked: item.material_locked === true,
       phase_id: asString(item.phase_id),
       item_id: asString(item.item_id),
       part_id: asString(item.part_id),
@@ -646,7 +643,8 @@ export const EstimateDetailForm = ({
             site_zone_id: alloc.site_zone_id,
             quantity: alloc.quantity,
           })),
-          lock: row.lock,
+          sales_locked: row.sales_locked,
+          material_locked: row.material_locked,
           phase_id: row.phase_id,
           item_id: row.item_id,
           part_id: row.part_id,
@@ -862,6 +860,7 @@ export const EstimateDetailForm = ({
   const lineItemsTab = showLineItemsTab ? (
     <EstimateLineItemsPanels
       key={siteId}
+      estimateId={isCreate ? undefined : estimateId}
       manifest={activeManifest}
       siteId={siteId}
       siteSelected={Boolean(siteId)}
@@ -889,7 +888,7 @@ export const EstimateDetailForm = ({
       resetKey={isCreate ? "create" : `${estimateId}:${detail?.data?.id ?? ""}`}
     >
       <form onSubmit={onSave}>
-        <SurfaceFormLayout maxWidth={SURFACE_FORM_MAX_WIDTH}>
+        <SurfaceFormLayout>
           <DetailHeader
             title={isCreate ? "New estimate" : (profile?.title ?? "Estimate")}
             items={tabItems.length > 0 ? tabItems : undefined}

@@ -22,7 +22,6 @@ import {
   type ContactDetailFormValues,
 } from "@/components/contacts/PhoneEmailFields";
 import { FormSection } from "@/components/form/FormSection";
-import { SURFACE_FORM_MAX_WIDTH } from "@/components/form/formLayout";
 import { SelectInput } from "@/components/form/SelectInput";
 import { TextInput } from "@/components/form/TextInput";
 import { PartyRoleFields } from "@/components/parties/PartyRoleFields";
@@ -495,7 +494,7 @@ export const PartyDetailForm = ({
       resetKey={isCreate ? "create" : `${entityId}:${detail?.data?.id ?? ""}`}
     >
       <form onSubmit={onSave}>
-        <SurfaceFormLayout maxWidth={SURFACE_FORM_MAX_WIDTH}>
+        <SurfaceFormLayout>
           <Typography.Title level={4} style={{ marginTop: 0 }}>
             {title}
           </Typography.Title>

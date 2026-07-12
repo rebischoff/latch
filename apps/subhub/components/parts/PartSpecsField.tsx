@@ -15,6 +15,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Controller, useFormContext, useWatch } from "react-hook-form";
 
 import { FormSection } from "@/components/form/FormSection";
+import { TABLE_WIDTH_LG } from "@/components/form/formLayout";
 import { usePartSpecDefsPicker } from "@/lib/hooks/use-part-spec-defs-picker";
 import {
   collapsePartSpecRows,
@@ -383,7 +384,7 @@ export const PartSpecsField = ({ manifest, syncKey }: PartSpecsFieldProps) => {
 
   return (
     <FieldControl manifest={manifest} field="part_specs">
-      <FormSection title="Compatibility specs">
+      <FormSection title="Compatibility specs" width="full">
         {linksDirty ? (
           <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
             Item links changed — compatibility specs will update when you save.
@@ -398,6 +399,7 @@ export const PartSpecsField = ({ manifest, syncKey }: PartSpecsFieldProps) => {
         ) : null}
         {emptyState}
         {linkedItemIds.length > 0 && (defsLoading || (defs?.length ?? 0) > 0) ? (
+          <div style={{ width: "100%", maxWidth: TABLE_WIDTH_LG }}>
           <Table
             size="small"
             pagination={false}
@@ -449,6 +451,7 @@ export const PartSpecsField = ({ manifest, syncKey }: PartSpecsFieldProps) => {
               },
             ]}
           />
+          </div>
         ) : null}
       </FormSection>
     </FieldControl>

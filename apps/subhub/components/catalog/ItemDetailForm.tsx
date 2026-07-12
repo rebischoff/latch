@@ -14,17 +14,21 @@ import { useCallback, useMemo, useRef } from "react";
 import { useForm, type Resolver } from "react-hook-form";
 import { z } from "zod";
 
-import { ItemCommercialFields, validateItemLaborPhaseDuplicates, validateItemLaborPhaseRowsComplete } from "@/components/catalog/ItemCommercialFields";
+import {
+  ItemCommercialFields,
+  validateItemLaborPhaseDuplicates,
+  validateItemLaborPhaseRowsComplete,
+} from "@/components/catalog/ItemCommercialFields";
 import { ItemSpecDefinitionsField } from "@/components/catalog/ItemSpecDefinitionsField";
 import { ItemSpecParticipationField } from "@/components/catalog/ItemSpecParticipationField";
 import { FormSection } from "@/components/form/FormSection";
-import { SURFACE_FORM_MAX_WIDTH } from "@/components/form/formLayout";
 import { FormFieldItem } from "@/components/form/FormFieldItem";
 import { TextInput } from "@/components/form/TextInput";
 import { useSurfaceFormChrome } from "@/components/surface/SurfaceFormChromeContext";
 import { useMasterDetailSelectionOptional } from "@/components/shell/MasterDetailSelectionContext";
 import { SurfaceFormLayout } from "@/components/surface/SurfaceFormLayout";
 import { SurfaceFormRoot } from "@/components/surface/SurfaceFormRoot";
+import { toSpecDefinitionPatchRow } from "@/lib/catalog/item-spec-definitions-form";
 import { useSurfaceListCreate } from "@/lib/hooks/use-surface-list-create";
 import { useSurfaceDetail } from "@/lib/hooks/use-surface-detail";
 import { useSurfaceDelete, useSurfacePatch } from "@/lib/hooks/use-surface-patch";
@@ -34,7 +38,6 @@ import {
   navigateOnCancel,
   sanitizeReturnTo,
 } from "@/lib/surface-navigation";
-import { toSpecDefinitionPatchRow } from "@/lib/catalog/item-spec-definitions-form";
 import { SurfaceApiError } from "@/lib/surface-api";
 
 type ItemDetailFormProps = {
@@ -125,7 +128,9 @@ const buildDefaultValues = (
         name: "",
         sort_order: 0,
         csi_code: null,
-        ...(parentId ? { parent_id: parentId } : {}),
+        ...(parentId
+          ? { parent_id: parentId, node_type: "category" as const }
+          : { node_type: "scope" as const, is_root: true }),
       },
       spec_definitions: emptySpecDefinitions(),
       spec_participation: emptySpecParticipation(),
@@ -199,8 +204,6 @@ const buildDefaultValues = (
 const toPatchBody = (
   values: ItemDetailFormValues,
   manifest: Manifest,
-  isRoot: boolean,
-  categoryId: string,
 ): Record<string, unknown> => {
   const patchable = patchableFieldIds(manifest);
   const body: Record<string, unknown> = {};
@@ -232,13 +235,9 @@ const toPatchBody = (
 
   if (patchable.includes("commercial")) {
     body.commercial = {
-      ...(values.profile.node_type === "scope" || values.profile.node_type === "category"
-        ? {
-            freight_rate_type_id: values.commercial.freight_rate_type_id,
-            incidental_rate_type_id: values.commercial.incidental_rate_type_id,
-            markup_type_id: values.commercial.markup_type_id,
-          }
-        : {}),
+      freight_rate_type_id: values.commercial.freight_rate_type_id,
+      incidental_rate_type_id: values.commercial.incidental_rate_type_id,
+      markup_type_id: values.commercial.markup_type_id,
       ...(values.profile.node_type === "item"
         ? { fallback_unit_cost: values.commercial.fallback_unit_cost ?? 0 }
         : {}),
@@ -357,8 +356,7 @@ export const ItemDetailForm = ({
 
       try {
         if (isCreate) {
-          const createIsRoot = !parentId && !values.profile.parent_id;
-          const body = toPatchBody(values, activeManifest, createIsRoot, "new");
+          const body = toPatchBody(values, activeManifest);
           if (patchableFieldIds(activeManifest).includes("profile")) {
             body.profile = {
               ...(body.profile as Record<string, unknown> | undefined),
@@ -391,7 +389,7 @@ export const ItemDetailForm = ({
           return;
         }
 
-        const body = toPatchBody(values, activeManifest, isRoot, categoryId);
+        const body = toPatchBody(values, activeManifest);
         await patchMutation.mutateAsync(body);
         message.success("Category saved");
         form.reset(values);
@@ -431,7 +429,6 @@ export const ItemDetailForm = ({
       createMutation,
       form,
       isCreate,
-      isRoot,
       message,
       parentId,
       patchMutation,
@@ -605,7 +602,7 @@ export const ItemDetailForm = ({
       }
     >
       <form onSubmit={onSave}>
-        <SurfaceFormLayout maxWidth={SURFACE_FORM_MAX_WIDTH}>
+        <SurfaceFormLayout>
           {showSpecsTab ? (
             <Tabs
               activeKey={activeTab}

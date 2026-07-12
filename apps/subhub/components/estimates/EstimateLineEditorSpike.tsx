@@ -40,7 +40,6 @@ import {
   type LineKind,
 } from "@/components/estimates/estimate-spike-fixtures";
 import { FormSection } from "@/components/form/FormSection";
-import { SURFACE_FORM_MAX_WIDTH } from "@/components/form/formLayout";
 import { useRegisterSurfaceActions } from "@/components/shell/SurfaceActionsProvider";
 import { SurfaceFormLayout } from "@/components/surface/SurfaceFormLayout";
 import { SurfaceFormRoot } from "@/components/surface/SurfaceFormRoot";
@@ -653,7 +652,6 @@ export const EstimateLineEditorSpike = ({
       defaultValues={defaultValues}
     >
       <form onSubmit={submit}>
-        <div style={{ maxWidth: SURFACE_FORM_MAX_WIDTH }}>
           <Alert
             type="warning"
             showIcon
@@ -689,7 +687,7 @@ export const EstimateLineEditorSpike = ({
             </Typography.Paragraph>
           </FormSection>
 
-          <FormSection title="Line items">
+          <FormSection title="Line items" width="full">
             {editorMode === "flat" ? (
               <>
                 <LineTable
@@ -775,7 +773,6 @@ export const EstimateLineEditorSpike = ({
               …
             </Typography.Paragraph>
           </FormSection>
-        </div>
       </form>
     </SurfaceFormRoot>
   );

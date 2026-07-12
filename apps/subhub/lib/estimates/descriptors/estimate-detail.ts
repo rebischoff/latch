@@ -81,7 +81,8 @@ const EstimateLineItemPatchElementSchema = z
     unit_price_target: z.number().optional(),
     estimate_condition_id: z.string(),
     allocations: z.array(EstimateLineAllocationPatchElementSchema).optional(),
-    lock: z.enum(["none", "sell", "line"]).optional(),
+    sales_locked: z.boolean().optional(),
+    material_locked: z.boolean().optional(),
     phase_id: z.string().nullable().optional(),
     item_id: z.string().nullable().optional(),
     part_id: z.string().nullable().optional(),
@@ -222,12 +223,13 @@ export type EstimateLineItemRow = {
   item_id: string | null;
   line_number: number;
   line_role: string;
-  lock: "line" | "none" | "sell";
+  material_locked: boolean;
   parent_line_id: string | null;
   part_id: string | null;
   phase_id: string | null;
   qty_manual: boolean;
   quantity: number;
+  sales_locked: boolean;
   sort_order: number;
   unit: string;
   unit_cost: number;
