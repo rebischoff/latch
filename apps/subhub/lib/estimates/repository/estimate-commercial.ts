@@ -1,5 +1,6 @@
 import type { Pool, PoolClient } from "pg";
 
+import { mergeLaborPhaseRowsByPhaseId } from "../../catalog/labor-phase-resolve";
 import { tableExists } from "../../sites/repository/sql-utils";
 
 export type ItemCommercialRow = {
@@ -120,21 +121,10 @@ export const resolveLaborGroup = (
   catalog: CommercialCatalog,
   itemId: string,
 ): ItemLaborPhaseRow[] => {
-  const selfRows = catalog.laborByItem.get(itemId) ?? [];
-  if (selfRows.length > 0) {
-    return selfRows;
-  }
-
   const path = walkAncestry(catalog, itemId);
-  for (let index = 1; index < path.length; index += 1) {
-    const ancestorId = path[index]!;
-    const rows = catalog.laborByItem.get(ancestorId) ?? [];
-    if (rows.length > 0) {
-      return rows;
-    }
-  }
-
-  return [];
+  return mergeLaborPhaseRowsByPhaseId(
+    path.map((nodeId) => catalog.laborByItem.get(nodeId) ?? []),
+  );
 };
 
 /**

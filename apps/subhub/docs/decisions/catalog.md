@@ -6,6 +6,73 @@
 
 ---
 
+### Decision: spec participation removed — narrow by scope-root namespace, part-row presence is the filter (2026-07-12)
+
+**Status:** **Locked** (2026-07-12). **Task:** [37ai](../tasks/37ai-spec-participation-removal.md). **Amends/supersedes:** [spec definitions scoped to root, flat item participation (S1–S10, 2026-07-07)](#decision-spec-definitions-scoped-to-root-flat-item-participation--no-ownershipinheritance-2026-07-07) — **S3, S6, S8, S9, S10 retired outright** (participation as a concept is gone, not just re-shaped); **S1, S2, S4, S5, S7 unchanged** (definitions still a flat namespace per scope root, edited on the scope's Specs tab; categories still carry no spec Fields; `item_spec_exclude` stays dropped; estimate scope panel stays the whole root namespace).
+
+**Problem:** even the flattened, no-inheritance participation model (S1–S10) still required every leaf item to be individually opted into every spec dimension it should be filtered on — a real authoring cost once a category has many leaves that all genuinely need the same specs (worked example: **Notification Appliances** → 3 sub-categories × 5 leaves = 15 leaves needing `Notification Color`, `Notification Series`, and `Candela` — 45 individual checkbox clicks, repeated again for every new spec or every new leaf). Two paths were weighed to fix that:
+
+| Rejected alternative | Why |
+|---|---|
+| **Category-level participation with ancestry-merge inheritance** (leaf → root, presence-wins, mirroring [37ad](#decision-labor-phase-per-row-override--merge-across-full-ancestry-2026-07-12)'s labor-phase merge) | Solves the authoring cost, but reopens exactly the blast-radius problem S9 was written to close: a category-level participation edit can silently change the effective spec set for every descendant leaf and every part linked to any of them at once, with `manufacturer_part_spec` pruning (K1) only wired to fire on a part's own `item_links` save — not on an ancestor's participation edit. Fixable (widen the prune trigger to fire on any participation write, scoped to the edited node's descendant leaves), but it's new write-path machinery, a new policy/Field-grant surface on category nodes, and a fourth attempt at inheritance semantics in this exact area in two weeks — see chat discussion for the full pros/cons/orphan-risk breakdown. |
+| **Bulk-apply / "copy from item" UI convenience only** (S10, never built) | Cheapest, zero schema risk, but doesn't remove the underlying per-leaf row bookkeeping — adding a 16th leaf or a 4th spec later still requires remembering to re-run the bulk action; no structural guarantee the set stays in sync. |
+
+**Choice — drop participation entirely, narrow by the part's own recorded values:**
+
+| # | Topic | Choice |
+|---|---|---|
+| **V1** | Storage | **Drop `item_spec_participation` table.** No replacement junction, no category-level table, no ownership/inheritance concept anywhere in the tree. A leaf item has **zero** spec Fields on `item_detail` — nothing to select, nothing to display. |
+| **V2** | "Effective defs" for an item | **The item's scope root's entire namespace** — `SELECT * FROM spec_def WHERE scope_root_item_id = <item's root>` (`scopePanelDefs`, unchanged function, now also the per-item answer — S7's "broader than any subtree union" framing turns out to be the *only* answer once participation is gone, not just the scope-panel answer). |
+| **V3** | Part contextual union | **Union of `scopePanelDefs(root)` across the distinct scope root(s) of a part's linked leaves** — replaces S6's `⋃ item_spec_participation`. A part linked only to Fire Alarm leaves sees the whole Fire Alarm namespace as writable `part_specs` rows, not a hand-curated subset. |
+| **V4** | Guardrail removed (explicit trade-off) | `assertValidPartSpecs`'s "not allowed for this part's item links" check now validates against the wider root namespace, not participation — an admin may record a value for **any** def in scope, including ones that don't semantically apply to that part family. Accepted cost: nothing catalog-side stops a Horn/Strobe part from getting an `slc_protocol` value; the part's own spec-value rows are the only signal of relevance now (V5). |
+| **V5** | Matching semantic flip — the load-bearing change | A part with **zero** `manufacturer_part_spec` rows for a def is no longer "fails to match" — it's **"no opinion, skip this dimension for this part."** `spec-match.ts`'s `enumOptionSetMatches`, the numeric bucket check, and the boolean check all flip their zero-rows case from `false` to `true` (pass-through) when the bucket has a non-blank value for that def. This is what makes V2/V3's wider namespace safe to filter on: Horn/Strobe parts simply never get an `slc_protocol` row, so an SLC bucket value set anywhere in the Fire Alarm scope has no effect on them — they're skipped on that dimension, not excluded. |
+| **V6** | Line-level narrowing | Bucket (line → zone → scope merge, unchanged) is now checked against **every def in the item's scope-root namespace** (V2) instead of `bucket ∩ participation(item)` (old S8). The intersection step is gone — there's nothing to intersect with. |
+| **V7** | Orphan / staleness risk | **Lower than before, not higher.** Moving from a narrow, per-item, admin-curated set (participation) to the full root namespace only ever *widens* what's allowed — no existing `manufacturer_part_spec` row becomes newly invalid. `prunePartSpecsToContextTx` (K1) is unchanged in mechanism and still runs on `item_links` replace, but fires far less often since almost every existing spec value is now in-namespace by construction. |
+| **V8** | `in_use_participation_count` | Dropped from `spec_definitions[]` DTO and delete-guard payloads (`spec-detail-write.ts`, `item-spec-definitions-write.ts`) — nothing left to count. `in_use_part_count` (against `manufacturer_part_spec`) is the only remaining delete-guard signal for a def. |
+
+**Worked example — Fire Alarm, Notification Appliances (15 leaves):**
+
+```text
+Fire Alarm (scope root) — spec_def namespace: { slc_protocol, notification_color, notification_series, candela }
+├── Initiating Devices (category)
+│   └── Pull Station (item) — no spec Fields on this item's detail page at all
+└── Notification Appliances (category)
+    ├── Strobes (category) × 5 leaves
+    ├── Horns (category) × 5 leaves
+    └── Horn/Strobes (category) × 5 leaves
+```
+
+No item anywhere has a participation checklist to fill in. Every one of the 15 Notification leaves' linked parts can carry values for `notification_color`, `notification_series`, and `candela` — and, if someone mistakenly links a Notification part to `slc_protocol`, that's allowed (V4) but harmless: no Notification part will ever have an `slc_protocol` row, so an SLC bucket value on the Fire Alarm scope silently skips every Notification line (V5) exactly as it should. Pull Station parts never get `candela`/`color`/`series` rows for the same reason. The correctness now lives entirely in "does this part have a row for this def," authored once per part on `part_detail`, not "does this item participate," authored once per leaf on `item_detail` — one fewer place to keep in sync, at the cost of the guardrail in V4.
+
+**Rationale:** the real cost driver in the 15-leaf example wasn't *which* defs matter to each leaf — every leaf in the same physical product family already gets its "relevance" signal for free from what its actual parts are rated for. Participation was catalog metadata restating a fact that `manufacturer_part_spec` already encodes at the part level. Removing it removes an entire authoring surface (leaf Specs Field, `item_spec_participation` table, `item-spec-participation-write.ts`) without needing category-level inheritance, ancestry walks, or a widened prune trigger — at the accepted cost of one guardrail (V4) that was catching data-entry mistakes, not correctness bugs (a part's own blank/filled rows are still the source of truth either way).
+
+**Planning:** chat discussion (2026-07-12, this session) walked Option C (category-ancestry-merge participation) and Option E (this decision) side by side before locking Option E. **Task:** [37ai](../tasks/37ai-spec-participation-removal.md).
+
+---
+
+### Decision: labor phase per-row override — merge across full ancestry (2026-07-12)
+
+**Status:** **Locked** (2026-07-12). **Task:** [37ad](../tasks/37ad-labor-phase-per-row-override.md). **Amends:** [unified item tree "Labor" clause](#decision-unified-item-tree--merge-category--item-node-anchored-estimate-lines-2026-07-05) (37l); [labor phase inclusion N2](#decision-labor-phase-inclusion--catalog--estimate--job-2026-07-07) (37n). **Aligns with:** [item commercial margin inherit checkbox Z1–Z5](#decision-item-commercial-margin-inherit-checkbox-2026-07-09) — same inherit/override vocabulary, now applied per-row instead of per-scalar-field.
+
+**Problem:** 37l/37n locked labor resolution as an **atomic group**: a node with *any* own `item_labor_phase` rows fully replaces the ancestor's whole set, even for phases the node never touched. Authoring one override (e.g. bump `Program` hours on a specific leaf) silently drops every other inherited phase (`Test`, `Install`, …) from that leaf's cost — surprising, and the opposite of what "override" should mean. Locked at the time as the simpler v1 shape, revisited now that the real fix is small.
+
+**Choice:**
+
+| Topic | Choice |
+|---|---|
+| **Resolution** | Merge, not swap. Walk **leaf → parent → … → root**; build one map keyed by `labor_phase_id`. The **first row seen per phase id wins** (nearest node to the leaf); keep walking to the root regardless, to fill any phase id not yet claimed by a nearer node. Replaces "self's whole set, else first non-empty ancestor's whole set" in both `resolveLaborGroup` (costing) and the catalog display resolver. |
+| **Single resolver** | One shared merge helper, used by **both** the estimate/job costing engine (`estimate-commercial.ts`) and the catalog display DAL (`item-detail.ts`). The catalog UI and the cost math must never disagree about what a node's effective labor set is. |
+| **Exclusion — no new state** | To suppress an inherited phase at a lower node, author an **own override row for that `labor_phase_id` with `hours_per_unit = 0`**. Row presence (any value, including zero) wins per the resolution rule above; row *absence* always means "no opinion, inherit." No tombstone column, no schema change — zero-hours is the existing shape doing double duty as "explicitly none," same spirit as [Z5's catalog **None** rate type](#decision-item-commercial-margin-inherit-checkbox-2026-07-09) for margin FKs. |
+| **Catalog UI / DTO** | Whole-table `labor_phase_mode` (`empty`/`inherited`/`override`) and single `source_item_id`/`source_item_name` are replaced by **per-row origin**: each resolved row carries `origin: "own" \| "inherited"` plus its own `source_item_id`/`source_item_name` when inherited. Overriding one inherited row seeds an editable own row from its current value (checkbox/affordance mirrors [Z2](#decision-item-commercial-margin-inherit-checkbox-2026-07-09)'s per-field inherit checkbox, applied per array row); deleting that one own row reverts just that phase back to its inherited placeholder — not the whole table. |
+| **Unaffected** | Category + item authoring surface (N2) is unchanged — this changes how a node's *effective* set is computed from itself plus ancestry, not who may author rows. `estimate_scope_labor_phase` / `estimate_zone_labor_phase` inclusion (N4) and job `scope_phase` seed (N6) are structurally unchanged — they still filter whatever `labor_phase_id`s the resolver returns, just a more accurate (usually larger) set now. |
+| **Data note** | No DDL migration. Any node that previously relied on "my partial own set blanks the rest" will pick up previously-hidden ancestor phases on next load — call out in manual smoke, not a schema migration. |
+
+**Rationale:** presence-based per-phase override is the smaller, more literal reading of "override" — a node states only what's different, everything else still flows from ancestry. The zero-hours idiom reuses the existing row shape instead of inventing an exclusion marker. Consolidating catalog display and costing onto one merge helper removes a standing risk that the UI shows a labor set the engine wouldn't actually cost.
+
+**Supersedes:** the "Labor: … atomic group … no per-phase merge/override across levels" clause of the [unified item tree 37l amendment](#decision-unified-item-tree--merge-category--item-node-anchored-estimate-lines-2026-07-05); the "atomic, no per-phase merge across levels" clause of [N2](#decision-labor-phase-inclusion--catalog--estimate--job-2026-07-07).
+
+---
+
 ### Decision: item labor axis override — single-spec axis, no compound (2026-07-11)
 
 **Status:** **Superseded (2026-07-11)** by [item placement + mount axis override — reverted, leaf duplication instead](#decision-item-placement--mount-axis-override--reverted-leaf-duplication-instead-2026-07-11). Never shipped past Step 3 (Step 4 stayed blocked on `estimate_line_spec` write). **Do not implement** `commercial_axis`, `variant_spec_option_id`, or `item_cost_override` — text below is historical. **Was locked** (2026-07-11). **Task:** [37ab](../tasks/37ab-item-placement-mount-axis.md), reverted by [37ac](../tasks/37ac-item-placement-mount-axis-revert.md). **Amended:** [D4 unified `resolveRate`](#decision-unified-item-tree--merge-category--item-node-anchored-estimate-lines-2026-07-05) — the two narrow exceptions below (`item_labor_phase` **M1–M6**, margin FKs **M7**) are retired; D4's single self→ancestry→neutral walk is unamended once more.
@@ -131,41 +198,47 @@ Horn/Strobe is authored once — one name, one part pool, one `item_labor_phase`
 
 ---
 
-### Proposal: numeric spec bucket range — interval overlap replaces point-in-band (2026-07-11)
+### Decision: spec threshold presets + numeric bucket ranges (2026-07-12)
 
-**Status:** **Proposal** (2026-07-11) — not yet locked, no task filed. **Amends (if implemented):** [N4/N5](#decision-numeric-specs--drop-range-type-band-is-part-authored-2026-07-08) — generalizes the bucket side from a single point to a range; the def/part-authoring shape (N1–N3, N6–N10) is unchanged.
+**Status:** **Locked** (2026-07-12). **Tasks:** [37ae](../tasks/37ae-spec-threshold-presets-ddl.md) → [37af](../tasks/37af-spec-threshold-presets-catalog-ui.md) → [37ag](../tasks/37ag-spec-threshold-presets-matcher.md) → [37ah](../tasks/37ah-spec-threshold-presets-estimate-ui.md). **Amends:** [N4/N5](#decision-numeric-specs--drop-range-type-band-is-part-authored-2026-07-08) (bucket side only — part authoring unchanged). **Supersedes:** the 2026-07-11 *proposals* for numeric bucket range and enum threshold presets (same content, now locked).
 
-**Problem:** today's match rule is `point ∈ [part.min, part.max]` — the bucket sets one exact target, the part declares a band, and matching checks containment. That's right for a genuine target value (duct width, nominal voltage) but cannot express a **capability threshold** ("rated for at least 135 cd," "must not exceed 50 psi"): a part whose band is `[150, 185]` should satisfy "≥135," but point-in-band containment against a bucket point of `135` rejects it (`150 ≤ 135` is false), because containment asks "does the part's range cover this exact spot," not "does the part's range clear this bar."
-
-**Choice:**
-
-| # | Topic | Choice |
-|---|--------|--------|
-| **R1** | Bucket storage | Activate `value_number_max` on bucket rows (`estimate_condition_spec`, `estimate_line_spec`, job spec rows) — currently unused/deferred on buckets; now holds the range's upper end |
-| **R2** | Null semantics | `value_number = NULL` → lower bound is −∞ (no floor); `value_number_max = NULL` → upper bound is +∞ (no ceiling) |
-| **R3** | Match rule | `bucket_min ≤ part_max AND part_min ≤ bucket_max` (interval overlap) — replaces point-in-band containment as the general rule. Today's exact-point case is the degenerate case where `bucket_min = bucket_max`; behavior for existing exact-target specs is unchanged. |
-| **R4** | Named presets | Optional `spec_threshold_preset (spec_def_id, label, value_number, value_number_max, sort_order)` — e.g. "High" → `[135, NULL]`, "Low" → `[NULL, 135]`. Admin-curated convenience; estimate UI may render a def with presets as a toggle instead of two raw number inputs. |
-| **R5** | Applies to | `number`-type defs only. `enum`-type defs use the separate curated-option-set preset mechanism (below) — the two are not interchangeable per def. |
-
-**Rationale:** one formula covers exact-target matching (today's only use), one-sided threshold matching ("at least X" / "at most X"), and genuine two-sided range narrowing, without a separate operator/mode column. Only reach for this when a spec's real-world values are genuinely wide/continuous (temperature rating, pressure, flow rate) — see the enum proposal below for closed discrete-value specs, where this would silently imply coverage of values the part doesn't actually support.
-
----
-
-### Proposal: enum spec threshold presets — curated option-set, no comparison operator (2026-07-11)
-
-**Status:** **Proposal** (2026-07-11) — not yet locked, no task filed. **Complements** the numeric-range proposal above; applies when a `spec_def.value_type = 'enum'` represents a small closed list of real, discrete values with meaningful gaps (e.g. candela field-selectable switch positions — 135/150/177 are real settings, but 160 is not, so a continuous band would misrepresent the part).
+**Problem:** (1) Number buckets only store a point today, so capability thresholds ("≥135 cd") reject parts whose band clears the bar but does not contain the exact point. (2) Closed discrete dims (candela switch positions) need estimator shortcuts ("High" / "Low") without inventing fake continuous coverage. Both need admin-curated presets and an activated bucket range column.
 
 **Choice:**
 
 | # | Topic | Choice |
 |---|--------|--------|
-| **E1** | Preset storage | `spec_threshold_preset (spec_def_id, label, sort_order)` + junction `spec_threshold_preset_option (preset_id, spec_option_id)` — a named preset is a curated **set** of `spec_option_id`s, decided once by an admin |
-| **E2** | Match rule | Set membership — part qualifies iff it has any `manufacturer_part_spec` row whose `spec_option_id` is in the selected preset's set. Reuses today's enum matcher unchanged; no new comparison logic. |
-| **E3** | Estimator control | Bucket UI renders presets as a single-select toggle (not multi-select) — picking both "Low" and "High" is redundant with leaving the field blank once the two sets are curated to cover the realistic range |
+| **A1** | **Where presets are edited** | Catalog admin only — **scope root → Specs tab → `spec_definitions` Details popover** (`ItemSpecDefinitionsField`), nested under the same def that owns the options / unit. **Not** a separate Surface, **not** on leaf items, **not** on the part form, **not** in the estimate C panel. |
+| **A2** | Where presets are *used* | Estimate **C panel** (`EstimateScopeSpecFields`) — single-select toggle when the def has ≥1 preset; Custom still allows raw option / min–max. Parts keep authoring raw enum rows / number bands only. |
+| **T1** | Shared preset table | `spec_threshold_preset (id, spec_def_id, label, sort_order, value_number, value_number_max)` — one table for both types. Number presets fill the numeric columns; enum presets leave them null. |
+| **T2** | Enum preset membership | Junction `spec_threshold_preset_option (preset_id, spec_option_id)` — curated **set** of options. Empty set rejected on write. |
+| **T3** | Number match (bucket) | Activate `value_number_max` on `estimate_condition_spec` / `estimate_line_spec`. Null semantics: `value_number` null → −∞ floor; `value_number_max` null → +∞ ceiling. Match = interval overlap: `bucket_min ≤ part_max AND part_min ≤ bucket_max`. Exact-target = degenerate `min = max`. **Legacy point-only rows** (pre-range UI: `value_number` set, `value_number_max` null, no preset) are **backfilled** to `value_number_max = value_number` in migration **061** ([37ag](../tasks/37ag-spec-threshold-presets-matcher.md)) so they become `[v, v]` before overlap semantics ship; thereafter min-only without max is intentionally one-sided (e.g. `≥ 135`). |
+| **T4** | Enum match (preset) | Part qualifies iff any of its `manufacturer_part_spec` option ids is in the selected preset's set. Single-option buckets keep today's exact membership. |
+| **T5** | Bucket row storage | Nullable `spec_threshold_preset_id` on condition/line spec rows. Persist the preset FK when chosen (reload + audit). Matcher expands at match time. |
+| **T6** | Mutual exclusion | Per bucket row, at most one of: `spec_threshold_preset_id` \| `spec_option_id` \| numeric pair (`value_number` and/or `value_number_max`). DAL rejects combinations. |
+| **T7** | Blank / "is set" | Blank = all value fields null (including preset id). Number is **set** if **either** bound is non-null (so `[, 135]` is a real filter). |
+| **T8** | Type split | Enum vs number presets are **not interchangeable** on one def — shape follows `spec_def.value_type`. Choose enum+sets for closed lists with gaps (candela); number+overlap for continuous dims (amps, pressure). |
+| **T8b** | Bucket numeric storage | **`value_number` / `value_number_max` stored canonical** in `estimate_condition_spec` / `estimate_line_spec` (same as `manufacturer_part_spec` and number presets). Estimate forms convert display ↔ canonical via `to_canonical_factor` on the hydrated spec row; matcher operates canonical-only. |
+| **T8c** | Estimate preset hydration | Each condition/line **spec template row** on estimate GET includes read-only **`presets[]`** (catalog metadata, same shape as `item_detail.spec_definitions[].presets[]`) alongside existing `options[]`. Only **`spec_threshold_preset_id`** is persisted on bucket rows; matcher expands FK at match time. |
+| **T8d** | Line-spec DAL parity | **`estimate_line_spec`** gets the same load/write columns and T6 validation as **`estimate_condition_spec`** in 37ag (`value_number_max`, `spec_threshold_preset_id`) — even if line-level spec UI is deferred. |
+| **T9** | Delete guards | Block delete of preset / option when referenced by bucket rows or `spec_threshold_preset_option`. |
+| **T10** | Job win / legacy | Job snapshot tables stay out of this epic (still legacy `system_spec_*`). |
 
-**Worked example — candela:** `spec_option` rows for the real settings (`15, 30, 75, 95, 110, 115, 135, 150, 177, 185`). A part supporting `135, 150, 177` gets three `manufacturer_part_spec` rows (today's existing J7 mechanism — no change). Presets: `"High" → {135, 150, 177, 185}`, `"Low" → {15, 30, 75, 95, 110, 115}`. Estimator picks "High" → the part above matches (135 is in the set).
+**Authoring UX (A1 detail):**
 
-**Decision point for future specs:** whether a numeric-shaped attribute uses this (enum + curated set) or the range proposal above (number + interval overlap) depends on whether its real-world values are a small closed list with gaps (enum) or genuinely continuous/wide (number). Both mechanisms are retained; the choice is made per `spec_def`, not globally.
+| `value_type` | Details popover |
+|--------------|-----------------|
+| `enum` | Options list (existing) + **Presets** section (label + multi-select of this def's options) |
+| `number` | Unit + decimals (existing) + **Presets** section (label + min / max inputs in def unit) |
+| `boolean` | unchanged — no presets |
+
+**Estimator UX (A2 detail):** when `presets.length ≥ 1`, render preset chips/toggle + Custom path; when none, keep today's Select / single InputNumber (plus min/max once T3 ships).
+
+**Worked example — candela (enum):** options `15…185`; presets `"High" → {135,150,177,185}`, `"Low" → {15…115}`. Admin authors on Fire Alarm Specs tab; estimator picks High on C panel.
+
+**Rationale:** Presets are catalog policy for a dimension — they belong next to the def's options/unit, not on every leaf or every estimate. Interval overlap + curated enum sets cover the two real shapes without operators or a second Surface. Part authoring stays exact (what the SKU supports); buckets express intent (what the job needs).
+
+**Out of this decision:** cross-spec dependencies (still deferred); commercial axis / costing; wildcard enum option (T11); candela as `number` (use enum + presets).
 
 ---
 
@@ -245,7 +318,9 @@ Horn/Strobe is authored once — one name, one part pool, one `item_labor_phase`
 
 ### Decision: spec definitions scoped to root, flat item participation — no ownership/inheritance (2026-07-07)
 
-**Status:** **Locked** (2026-07-07). **Task:** [37o](../tasks/37o-spec-participation-flatten.md). **Supersedes:** [spec ownership — `spec_def.category_id`/`item_id` (2026-07-04)](#decision-spec-ownership--spec_defcategory_id-drop-category_spec_def-2026-07-04) storage + algorithm; [category spec participation — assign-once, branch exclude (2026-07-03)](#decision-category-spec-participation--assign-once-branch-exclude-2026-07-03) storage + algorithm + UI; [category spec visibility — owner-branch knowledge (2026-07-03)](#decision-category-spec-visibility--owner-branch-knowledge-2026-07-03) in full. **Amends:** [D3 in unified item tree (2026-07-05)](#decision-unified-item-tree--merge-category--item-node-anchored-estimate-lines-2026-07-05) — the "spec defs inherit down" clause is retired; specs no longer inherit at all. **Retains unchanged:** `spec_def` / `spec_option` row shape, `manufacturer_part_spec`, `estimate_scope_spec` / `_zone_spec` / `_line_spec`, the tiered bucket merge (line → zone → scope), and the part-matching algorithm from [value types (2026-07-02)](#decision-spec_def-value-types-and-part-matching-rules-2026-07-02).
+**Status:** **S3, S6, S8, S9, S10 superseded (2026-07-12)** by [spec participation removed](#decision-spec-participation-removed--narrow-by-scope-root-namespace-part-row-presence-is-the-filter-2026-07-12) — `item_spec_participation` is dropped outright, not re-shaped. **S1, S2, S4, S5, S7 remain locked** — flat `spec_def` namespace per scope root, edited on the scope's Specs tab; categories carry no spec Fields; `item_spec_exclude` stays dropped; estimate scope panel stays the whole root namespace. Read this block for the retained S1/S2/S4/S5/S7 clauses; read [37ai](../tasks/37ai-spec-participation-removal.md) for what replaced S3/S6/S8/S9/S10.
+
+**Status (original, 2026-07-07):** **Locked.** **Task:** [37o](../tasks/37o-spec-participation-flatten.md). **Supersedes:** [spec ownership — `spec_def.category_id`/`item_id` (2026-07-04)](#decision-spec-ownership--spec_defcategory_id-drop-category_spec_def-2026-07-04) storage + algorithm; [category spec participation — assign-once, branch exclude (2026-07-03)](#decision-category-spec-participation--assign-once-branch-exclude-2026-07-03) storage + algorithm + UI; [category spec visibility — owner-branch knowledge (2026-07-03)](#decision-category-spec-visibility--owner-branch-knowledge-2026-07-03) in full. **Amends:** [D3 in unified item tree (2026-07-05)](#decision-unified-item-tree--merge-category--item-node-anchored-estimate-lines-2026-07-05) — the "spec defs inherit down" clause is retired; specs no longer inherit at all. **Retains unchanged:** `spec_def` / `spec_option` row shape, `manufacturer_part_spec`, `estimate_scope_spec` / `_zone_spec` / `_line_spec`, the tiered bucket merge (line → zone → scope), and the part-matching algorithm from [value types (2026-07-02)](#decision-spec_def-value-types-and-part-matching-rules-2026-07-02).
 
 **Problem:** the ownership + branch-exclude model (a spec owned by one tree node, inherited down, cut by an exclude row with no re-include) required an ancestor walk to compute "effective" specs anywhere, tied editing rights to wherever a def happened to be owned, and made every category-level participation edit a potential fan-out across every descendant leaf and every part linked to any of them. That is exactly the "nightmare to maintain" failure mode this area is trying to avoid. A discussion pass converged on a simpler shape that decouples *who can edit a dimension* from *who uses it*.
 
@@ -351,7 +426,7 @@ Fire Alarm (scope root)              ← spec_def.scope_root_item_id = Fire Alar
 - **D4 (amend):** `resolveRate` drops the **descendant-max** step → `self → ancestry walk-up → neutral`. Because selection is leaf-only, cost (material/labor on the leaf) resolves via `self`, and margin policy (markup/freight/incidental authored high) resolves via ancestry. The mixed-UOM branch-material guard (Q2.2) is retired — no branch material fan-out remains.
 - **D8c (reverse):** Item picker offers **quotable leaves only**; scopes + categories render expandable but **non-selectable**.
 - **ROM:** rough quoting uses explicit quotable **allowance items** authored under a category (own `fallback_unit_cost` / labor group), not `descendantMax`. Keeps ROM deterministic, auditable, and node+PN reportable (D10).
-- **Labor:** resolves as an **atomic group** — the leaf's `item_labor_phase` set, else the first ancestor's whole set. No per-phase merge/override across levels. **Estimate scope/zone** filters which phases count for `unit_labor` and job `scope_phase` seed — see [37n labor phase inclusion](../tasks/37n-labor-phase-inclusion.md).
+- **Labor:** resolves as an **atomic group** — the leaf's `item_labor_phase` set, else the first ancestor's whole set. No per-phase merge/override across levels. **Estimate scope/zone** filters which phases count for `unit_labor` and job `scope_phase` seed — see [37n labor phase inclusion](../tasks/37n-labor-phase-inclusion.md). **Superseded (2026-07-12):** labor now merges **per-phase** across the full ancestry walk instead of swapping the whole group — see [per-row labor override](#decision-labor-phase-per-row-override--merge-across-full-ancestry-2026-07-12) (37ad).
 
 **On lock, supersedes / amends:**
 
@@ -784,8 +859,8 @@ Fire Alarm          ← spec_def.category_id = Fire Alarm  (SLC protocol)
 | **N1** | Type set | **`enum` \| `boolean` \| `number`** — **drop `range`** from `value_type` |
 | **N2** | Def numeric metadata | **`unit_id`** (required) + **`decimal_places`** (optional, display-only) — **no def min/max** (T6 stays deferred) |
 | **N3** | Part numeric shape | Part may store **`value_number` only** (exact) **or** **`value_number` + `value_number_max`** (band) — parallel to enum multi-option rows for *labeled* discrete sets |
-| **N4** | Estimate bucket | Unchanged — single nullable **point** `value_number`; blank = no filter |
-| **N5** | Match | Blank → pass; point + part exact → equality; point + part band → `min ≤ point ≤ max`; no part row → fail |
+| **N4** | Estimate bucket | **Amended 2026-07-12** by [threshold presets + numeric bucket ranges](#decision-spec-threshold-presets--numeric-bucket-ranges-2026-07-12) — bucket may store point **or** range (`value_number` / `value_number_max`); blank = no filter |
+| **N5** | Match | **Amended 2026-07-12** — interval overlap on buckets; exact-target = `min = max`. Part side unchanged (exact or band). |
 | **N6** | Specs table UI | Columns: **Name · Type · Details** (rename from “Options”). Drop Unit / Decimals columns. Type-aware **popover** on Details |
 | **N7** | Details popover | **`enum`:** option list (as today). **`boolean`:** cell blank; no popover. **`number`:** unit picker + decimal places |
 | **N8** | Migrate | `UPDATE spec_def SET value_type = 'number' WHERE value_type = 'range'`; tighten CHECK; no part/bucket column drops |
@@ -1273,14 +1348,14 @@ Knowledge and use can diverge only at an **exclude** node: the node that wrote `
 
 ### Decision: labor phase inclusion — catalog → estimate → job (2026-07-07)
 
-**Status:** **Locked** (2026-07-07). **Task:** [37n](../tasks/37n-labor-phase-inclusion.md). **Amends:** [37l labor atomic group](#decision-unified-item-tree--merge-category--item-node-anchored-estimate-lines-2026-07-05); [commercial costing](#decision-commercial-costing--org-tables-category-defaults-estimate-overrides-2026-07-04); [J5 phase templates](#decision-phase-templates--per-root-category-default--item-override-j5-locked-2026-06-27) (**superseded**); legacy [labor phases catalog](#decision-labor-phases--catalog-only-in-v1-2026-06-17) org **`phase`** table.
+**Status:** **Locked** (2026-07-07). **Task:** [37n](../tasks/37n-labor-phase-inclusion.md). **Amends:** [37l labor atomic group](#decision-unified-item-tree--merge-category--item-node-anchored-estimate-lines-2026-07-05); [commercial costing](#decision-commercial-costing--org-tables-category-defaults-estimate-overrides-2026-07-04); [J5 phase templates](#decision-phase-templates--per-root-category-default--item-override-j5-locked-2026-06-27) (**superseded**); legacy [labor phases catalog](#decision-labor-phases--catalog-only-in-v1-2026-06-17) org **`phase`** table. **N2 amended (2026-07-12):** leaf resolution is no longer atomic — see [per-row labor override](#decision-labor-phase-per-row-override--merge-across-full-ancestry-2026-07-12) (37ad).
 
 **Choice:**
 
 | # | Topic | Choice |
 |---|--------|--------|
 | **N1** | **Single phase catalog** | Org **`labor_phase`** + **`labor_rate_type`** stay as shipped (040b). One id bridges **costing** (`item_labor_phase`) and **progress** (`scope_phase`). Retire org **`phase`**, **`phase_template`**, **`phase_template_step`**, `estimate_line.phase_id`, `scope_phase.phase_template_step_id`. |
-| **N2** | **Item matrix** | **`item_labor_phase`**: `labor_phase_id` + `labor_rate_type_id` + `hours_per_unit` per node. **Author on `category` and `item`** (not scope roots). Leaf resolution unchanged (37l): leaf's whole set, else **first ancestor's whole set** — atomic, no per-phase merge across levels. |
+| **N2** | **Item matrix** | **`item_labor_phase`**: `labor_phase_id` + `labor_rate_type_id` + `hours_per_unit` per node. **Author on `category` and `item`** (not scope roots). Leaf resolution unchanged (37l): leaf's whole set, else **first ancestor's whole set** — atomic, no per-phase merge across levels. **Superseded (2026-07-12):** resolution now merges per `labor_phase_id` across the full ancestry walk — see [37ad](#decision-labor-phase-per-row-override--merge-across-full-ancestry-2026-07-12). |
 | **N3** | **Item UI — inherit + override** | Leaf with **no own rows** and ancestor has rows → **read-only** inherited table (phase, rate, hrs) + source label. **Add labor phase** → **override mode** (writable replace-array on leaf). Delete all own rows → revert to inherited display (no leaf rows in DB). |
 | **N4** | **Estimate inclusion** | Per **`estimate_scope`** and optional **`estimate_zone`**: pick which **`labor_phase`** ids apply to lines in that bucket (e.g. Parts & Smarts → Program + Test only; omit Install / Prewire). Junction: `estimate_scope_labor_phase`, `estimate_zone_labor_phase`. **Default:** all phases in the resolved item labor group (unset = include all). **Zone overrides scope** when zone has rows (same tier rule as `complexity_factor`). |
 | **N5** | **`unit_labor` recalc** | `resolved = resolveLaborGroup(item)` → filter rows where `labor_phase_id ∈ includedPhases(scope, zone)` → `Σ hours × rate` × complexity. Frozen when `lock = line` or `sent` (D6a). |

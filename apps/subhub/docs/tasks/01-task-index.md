@@ -260,6 +260,12 @@ flowchart LR
 | **37aa** | [37aa-estimate-line-live-preview.md](./37aa-estimate-line-live-preview.md) | Live line preview (item/part/config); `sales_locked` + `material_locked`; drop `lock` enum — **complete** (2026-07-11) |
 | **37ab** | [37ab-item-placement-mount-axis.md](./37ab-item-placement-mount-axis.md) | `item_placement` browse tree + mount labor/margin axis override (M1–M7, L1–L6) — **superseded/reverted** (2026-07-11), see 37ac |
 | **37ac** | [37ac-item-placement-mount-axis-revert.md](./37ac-item-placement-mount-axis-revert.md) | Revert 37ab — drop `item_placement`/`item_cost_override`/`commercial_axis`; mount variance = leaf-per-location (R1–R6) — **complete** (2026-07-11) |
+| **37ad** | [37ad-labor-phase-per-row-override.md](./37ad-labor-phase-per-row-override.md) | Labor phase resolution merges per `labor_phase_id` across full ancestry (was atomic group); catalog UI per-row inherit/override; no schema change — **complete** (2026-07-12) |
+| **37ae** | [37ae-spec-threshold-presets-ddl.md](./37ae-spec-threshold-presets-ddl.md) | Threshold presets + bucket `value_number_max` / `spec_threshold_preset_id` DDL (A1–T10) — **pending** |
+| **37af** | [37af-spec-threshold-presets-catalog-ui.md](./37af-spec-threshold-presets-catalog-ui.md) | Author presets on scope Specs Details popover — **complete** (2026-07-12) |
+| **37ag** | [37ag-spec-threshold-presets-matcher.md](./37ag-spec-threshold-presets-matcher.md) | Interval-overlap + enum preset set match; bucket DAL — **complete** (2026-07-12) |
+| **37ah** | [37ah-spec-threshold-presets-estimate-ui.md](./37ah-spec-threshold-presets-estimate-ui.md) | Estimate C panel preset / range controls — **complete** (2026-07-12) |
+| **37ai** | [37ai-spec-participation-removal.md](./37ai-spec-participation-removal.md) | Drop `item_spec_participation`; item narrows via scope-root namespace; part-row absence = wildcard match (V1–V8) — **complete** (2026-07-12) |
 | **37h** | *(see 37a chain)* | Job `site_zone_id` FK renames |
 
 ### Backbone pass (estimate finish) — tasks 29–32

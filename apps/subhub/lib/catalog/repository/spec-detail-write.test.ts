@@ -44,11 +44,8 @@ describe("patchSpecDetailTx", () => {
         if (sql.includes("scope_root_item_id, value_type")) {
           return { rows: [{ scope_root_item_id: "fa-root", value_type: "enum" }] };
         }
-        if (sql.includes("item_spec_participation")) {
-          return { rows: [{ count: 2 }] };
-        }
         if (sql.includes("manufacturer_part_spec")) {
-          return { rows: [{ count: 0 }] };
+          return { rows: [{ count: 2 }] };
         }
         return { rows: [] };
       }),

@@ -36,18 +36,30 @@ export type EstimateConditionSpecOptionFormRow = {
   id: string;
 };
 
+export type EstimateConditionSpecPresetFormRow = {
+  id: string;
+  label: string;
+  option_ids: string[];
+  sort_order: number;
+  value_number: number | null;
+  value_number_max: number | null;
+};
+
 export type EstimateConditionSpecFormRow = {
   decimal_places?: number | null;
   def_display_name?: string;
   spec_def_id: string;
   spec_option_id: string | null;
+  spec_threshold_preset_id?: string | null;
   option_display_name?: string | null;
   to_canonical_factor?: number;
   unit_symbol?: string | null;
   value_number: number | null;
+  value_number_max?: number | null;
   value_boolean: boolean | null;
   value_type?: "enum" | "boolean" | "number";
   options?: EstimateConditionSpecOptionFormRow[];
+  presets?: EstimateConditionSpecPresetFormRow[];
 };
 
 export type EstimateConditionLaborPhaseFormRow = {

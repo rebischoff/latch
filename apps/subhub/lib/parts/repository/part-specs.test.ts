@@ -20,7 +20,7 @@ vi.mock("./part-item-links", () => ({
 }));
 
 vi.mock("../../catalog/repository/item-effective-specs", () => ({
-  unionEffectiveForItems: vi.fn(async (_pool: unknown, itemIds: string[]) => {
+  rootNamespaceForItems: vi.fn(async (_pool: unknown, itemIds: string[]) => {
     const defsByItem: Record<string, Array<{ spec_def_id: string; display_name: string; value_type: string }>> = {
       "smoke-detector": [
         {

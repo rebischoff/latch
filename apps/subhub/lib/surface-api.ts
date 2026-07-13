@@ -206,13 +206,26 @@ export type EstimateSiteTreePickerData = {
     spec_templates: Record<
       string,
       Array<{
+        decimal_places?: number | null;
         def_display_name: string;
+        option_display_name: string | null;
         options?: Array<{ display_name: string; id: string }>;
+        presets?: Array<{
+          id: string;
+          label: string;
+          option_ids: string[];
+          sort_order: number;
+          value_number: number | null;
+          value_number_max: number | null;
+        }>;
         spec_def_id: string;
         spec_option_id: string | null;
-        option_display_name: string | null;
+        spec_threshold_preset_id?: string | null;
+        to_canonical_factor?: number;
+        unit_symbol?: string | null;
         value_boolean: boolean | null;
         value_number: number | null;
+        value_number_max?: number | null;
         value_type: "enum" | "boolean" | "number";
       }>
     >;
@@ -249,12 +262,22 @@ export type EstimateScopeSpecTemplateRow = {
   def_display_name: string;
   option_display_name: string | null;
   options?: Array<{ display_name: string; id: string }>;
+  presets?: Array<{
+    id: string;
+    label: string;
+    option_ids: string[];
+    sort_order: number;
+    value_number: number | null;
+    value_number_max: number | null;
+  }>;
   spec_def_id: string;
   spec_option_id: string | null;
+  spec_threshold_preset_id?: string | null;
   to_canonical_factor?: number;
   unit_symbol?: string | null;
   value_boolean: boolean | null;
   value_number: number | null;
+  value_number_max?: number | null;
   value_type: "enum" | "boolean" | "number";
 };
 

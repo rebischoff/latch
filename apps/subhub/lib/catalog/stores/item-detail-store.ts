@@ -12,7 +12,6 @@ import {
   loadItemDetail,
   loadItemDetailRelated,
 } from "../repository/item-detail";
-import { applyCategorySpecParticipationTx } from "../repository/item-spec-participation-write";
 import { applyScopeSpecDefinitionsTx } from "../repository/item-spec-definitions-write";
 import {
   deleteItem,
@@ -69,20 +68,6 @@ export const createItemDetailStore = (
     await withPermissionDb(pool, actorId, async (client) => {
       if (patch.spec_definitions !== undefined) {
         await applyScopeSpecDefinitionsTx(client, category, patch.spec_definitions);
-      }
-
-      if (patch.spec_participation !== undefined) {
-        const rootItemId = category.is_root
-          ? categoryId
-          : category.root_item_id;
-        if (rootItemId) {
-          await applyCategorySpecParticipationTx(
-            client,
-            categoryId,
-            rootItemId,
-            patch.spec_participation.participates,
-          );
-        }
       }
 
       if (patch.item_labor_phase !== undefined && category.node_type !== "scope") {

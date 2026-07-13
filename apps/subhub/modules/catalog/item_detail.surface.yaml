@@ -16,7 +16,6 @@ tables:
   - item
   - spec_def
   - spec_option
-  - item_spec_participation
 
 fields:
   - id: profile
@@ -49,17 +48,11 @@ fields:
       - column: item.fallback_unit_cost
         type: number
   - id: item_labor_phase
-    # logical — DAL maps item_labor_phase junction rows
+    # logical — DAL maps item_labor_phase junction rows (own / writable)
     columns: []
-  - id: inherited_labor_phase
-    # logical — read-only ancestor labor group when leaf has no own rows (37n)
-    columns: []
-  - id: labor_phase_mode
-    # logical — derived: empty | inherited | override (37n)
+  - id: resolved_labor_phase
+    # logical — read-only per-phase merge across ancestry (37ad); gated by item_labor_phase read
     columns: []
   - id: spec_definitions
     # logical — DAL maps spec_def + spec_option for scope roots only (37o UI pivot)
-    columns: []
-  - id: spec_participation
-    # logical — DAL maps item_spec_participation flat opt-in (37o)
     columns: []

@@ -1,16 +1,9 @@
 import type { ItemLaborPhaseRow } from "./item-detail";
+import type { LaborPhaseOrigin } from "../labor-phase-resolve";
 
-export type LaborPhaseMode = "empty" | "inherited" | "override";
-
-export const deriveLaborPhaseMode = (
+/** Per-row origin from whether an own row exists for this `labor_phase_id`. */
+export const laborPhaseRowOrigin = (
+  laborPhaseId: string,
   ownRows: Array<Pick<ItemLaborPhaseRow, "labor_phase_id">>,
-  inheritedRows: Array<Pick<ItemLaborPhaseRow, "labor_phase_id">>,
-): LaborPhaseMode => {
-  if (ownRows.length > 0) {
-    return "override";
-  }
-  if (inheritedRows.length > 0) {
-    return "inherited";
-  }
-  return "empty";
-};
+): LaborPhaseOrigin =>
+  ownRows.some((row) => row.labor_phase_id === laborPhaseId) ? "own" : "inherited";

@@ -1,6 +1,8 @@
 # Catalog — `spec_list` · `spec_detail`
 
 > **Status:** **Superseded** (2026-07-08). Content folded into [`item.md`](./item.md) — definitions edited on `item_detail` **Specs** tab (`spec_definitions` Field, scope roots only); interim `/specs` Surface retired. Retained for historical reference during 37o execution.
+>
+> **Further amendment (2026-07-12):** every reference below to `item_spec_participation` / leaf `spec_participation` (§5, § F) is **stale** — [37ai](../tasks/37ai-spec-participation-removal.md) drops that table and Field outright. See [decision V1–V8](../decisions/catalog.md#decision-spec-participation-removed--narrow-by-scope-root-namespace-part-row-presence-is-the-filter-2026-07-12). This file is historical only; do not use it to implement anything.
 
 > **Wave:** 3b (37o) · **Status:** **pending** (2026-07-07) · **Catalog:** [`surfaces.md`](../surfaces.md) · **DBML:** `spec_def`, `spec_option` · **Decision:** [spec participation flatten](../decisions/catalog.md#decision-spec-definitions-scoped-to-root-flat-item-participation--no-ownershipinheritance-2026-07-07) · **Task:** [37o](../tasks/37o-spec-participation-flatten.md)
 

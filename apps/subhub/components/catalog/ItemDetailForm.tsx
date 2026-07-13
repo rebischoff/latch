@@ -20,7 +20,6 @@ import {
   validateItemLaborPhaseRowsComplete,
 } from "@/components/catalog/ItemCommercialFields";
 import { ItemSpecDefinitionsField } from "@/components/catalog/ItemSpecDefinitionsField";
-import { ItemSpecParticipationField } from "@/components/catalog/ItemSpecParticipationField";
 import { FormSection } from "@/components/form/FormSection";
 import { FormFieldItem } from "@/components/form/FormFieldItem";
 import { TextInput } from "@/components/form/TextInput";
@@ -68,23 +67,23 @@ export type ItemDetailFormValues = {
     unit_id?: string | null;
     decimal_places?: number | null;
     unit_symbol?: string | null;
+    to_canonical_factor?: number | null;
     sort_order?: number;
     options: Array<{
       id?: string;
       display_name: string;
       sort_order?: number;
     }>;
-    in_use_participation_count?: number;
+    presets?: Array<{
+      id?: string;
+      label: string;
+      sort_order?: number;
+      value_number?: number | null;
+      value_number_max?: number | null;
+      option_ids?: string[];
+    }>;
     in_use_part_count?: number;
   }>;
-  spec_participation: {
-    participates: Array<{
-      spec_def_id: string;
-      display_name: string;
-      value_type: "boolean" | "enum" | "number";
-      active: boolean;
-    }>;
-  };
   commercial: {
     freight_rate_type_id: string | null;
     incidental_rate_type_id: string | null;
@@ -99,23 +98,41 @@ export type ItemDetailFormValues = {
     hours_per_unit: number;
     sort_order?: number;
   }>;
-  inherited_labor_phase: Array<{
+  resolved_labor_phase: Array<{
     labor_phase_id: string;
     labor_phase_name?: string;
     labor_rate_type_id: string;
     labor_rate_type_name?: string;
     hours_per_unit: number;
     sort_order?: number;
+    origin: "own" | "inherited";
+    source_item_id: string | null;
+    source_item_name: string | null;
   }>;
-  labor_phase_mode?: "empty" | "inherited" | "override";
-  labor_phase_source_item_name?: string | null;
 };
 
 const emptySpecDefinitions = (): ItemDetailFormValues["spec_definitions"] => [];
 
-const emptySpecParticipation = (): ItemDetailFormValues["spec_participation"] => ({
-  participates: [],
-});
+const buildCreateInheritedLaborRows = (
+  data: Record<string, unknown> | undefined,
+  parentId?: string | null,
+): ItemDetailFormValues["resolved_labor_phase"] => {
+  if (!Array.isArray(data?.resolved_labor_phase) || !parentId) {
+    return [];
+  }
+
+  const parentProfile = data.profile as { name?: string } | undefined;
+  const parentName = parentProfile?.name ?? null;
+
+  return (data.resolved_labor_phase as ItemDetailFormValues["resolved_labor_phase"]).map(
+    (row) => ({
+      ...row,
+      origin: "inherited",
+      source_item_id: row.origin === "own" ? parentId : row.source_item_id,
+      source_item_name: row.origin === "own" ? parentName : row.source_item_name,
+    }),
+  );
+};
 
 const buildDefaultValues = (
   data: Record<string, unknown> | undefined,
@@ -133,7 +150,6 @@ const buildDefaultValues = (
           : { node_type: "scope" as const, is_root: true }),
       },
       spec_definitions: emptySpecDefinitions(),
-      spec_participation: emptySpecParticipation(),
       commercial: {
         freight_rate_type_id: null,
         incidental_rate_type_id: null,
@@ -141,9 +157,7 @@ const buildDefaultValues = (
         fallback_unit_cost: 0,
       },
       item_labor_phase: [],
-      inherited_labor_phase: [],
-      labor_phase_mode: "empty",
-      labor_phase_source_item_name: null,
+      resolved_labor_phase: buildCreateInheritedLaborRows(data, parentId),
     };
   }
 
@@ -151,23 +165,14 @@ const buildDefaultValues = (
   const specDefinitions = Array.isArray(data?.spec_definitions)
     ? (data.spec_definitions as ItemDetailFormValues["spec_definitions"])
     : [];
-  const specParticipation = data?.spec_participation as
-    | ItemDetailFormValues["spec_participation"]
-    | undefined;
   const commercial = data?.commercial as ItemDetailFormValues["commercial"] | undefined;
 
   const ownRows = Array.isArray(data?.item_labor_phase)
     ? (data.item_labor_phase as ItemDetailFormValues["item_labor_phase"])
     : [];
-  const inheritedRows = Array.isArray(data?.inherited_labor_phase)
-    ? (data.inherited_labor_phase as ItemDetailFormValues["inherited_labor_phase"])
+  const resolvedRows = Array.isArray(data?.resolved_labor_phase)
+    ? (data.resolved_labor_phase as ItemDetailFormValues["resolved_labor_phase"])
     : [];
-  const laborPhaseMode =
-    data?.labor_phase_mode === "inherited" ||
-    data?.labor_phase_mode === "override" ||
-    data?.labor_phase_mode === "empty"
-      ? data.labor_phase_mode
-      : "empty";
 
   return {
     profile: {
@@ -184,7 +189,6 @@ const buildDefaultValues = (
       in_use: profile?.in_use ?? false,
     },
     spec_definitions: specDefinitions,
-    spec_participation: specParticipation ?? emptySpecParticipation(),
     commercial: {
       freight_rate_type_id: commercial?.freight_rate_type_id ?? null,
       incidental_rate_type_id: commercial?.incidental_rate_type_id ?? null,
@@ -192,12 +196,7 @@ const buildDefaultValues = (
       fallback_unit_cost: commercial?.fallback_unit_cost ?? 0,
     },
     item_labor_phase: ownRows,
-    inherited_labor_phase: inheritedRows,
-    labor_phase_mode: laborPhaseMode,
-    labor_phase_source_item_name:
-      typeof data?.labor_phase_source_item_name === "string"
-        ? data.labor_phase_source_item_name
-        : null,
+    resolved_labor_phase: resolvedRows,
   };
 };
 
@@ -222,15 +221,6 @@ const toPatchBody = (
     body.spec_definitions = values.spec_definitions.map((row, index) =>
       toSpecDefinitionPatchRow(row, index),
     );
-  }
-
-  if (patchable.includes("spec_participation") && values.profile.node_type === "item") {
-    body.spec_participation = {
-      participates: values.spec_participation.participates.map((row) => ({
-        spec_def_id: row.spec_def_id,
-        active: row.active,
-      })),
-    };
   }
 
   if (patchable.includes("commercial")) {
@@ -275,6 +265,10 @@ export const ItemDetailForm = ({
     "item_detail",
     isCreate ? undefined : categoryId,
   );
+  const parentDetailQuery = useSurfaceDetail(
+    "item_detail",
+    isCreate ? (parentId ?? undefined) : undefined,
+  );
   const patchMutation = useSurfacePatch("item_detail", categoryId);
   const deleteMutation = useSurfaceDelete("item_detail", categoryId);
   const createMutation = useSurfaceListCreate("item_list", "item_detail");
@@ -284,8 +278,13 @@ export const ItemDetailForm = ({
   const activeManifest = detailQuery.data?.manifest ?? manifest;
 
   const defaultValues = useMemo(
-    () => buildDefaultValues(detailQuery.data?.data, isCreate, parentId),
-    [detailQuery.data?.data, isCreate, parentId],
+    () =>
+      buildDefaultValues(
+        isCreate ? parentDetailQuery.data?.data : detailQuery.data?.data,
+        isCreate,
+        parentId,
+      ),
+    [detailQuery.data?.data, isCreate, parentDetailQuery.data?.data, parentId],
   );
 
   const resolver = useMemo(() => {
@@ -295,11 +294,8 @@ export const ItemDetailForm = ({
         profile: z.object({}).passthrough().optional(),
         commercial: z.object({}).passthrough().optional(),
         item_labor_phase: z.array(z.object({}).passthrough()).optional(),
-        spec_participation: z.object({}).passthrough().optional(),
         spec_definitions: z.array(z.object({}).passthrough()).optional(),
-        inherited_labor_phase: z.array(z.object({}).passthrough()).optional(),
-        labor_phase_mode: z.enum(["empty", "inherited", "override"]).optional(),
-        labor_phase_source_item_name: z.string().nullable().optional(),
+        resolved_labor_phase: z.array(z.object({}).passthrough()).optional(),
       })
       .passthrough();
 
@@ -514,7 +510,9 @@ export const ItemDetailForm = ({
     notFound();
   }
 
-  const initialLoading = !isCreate && detailQuery.isLoading && !detailQuery.data;
+  const initialLoading = isCreate
+    ? Boolean(parentId) && parentDetailQuery.isLoading && !parentDetailQuery.data
+    : detailQuery.isLoading && !detailQuery.data;
   const blocking = !isCreate && detailQuery.isFetching && Boolean(detailQuery.data);
   const activeTab = searchParams.get("tab") === "specs" ? "specs" : "general";
   const showSpecsTab =
@@ -522,7 +520,6 @@ export const ItemDetailForm = ({
   const serverNodeType = (
     detailQuery.data?.data?.profile as { node_type?: "scope" | "category" | "item" } | undefined
   )?.node_type;
-  const detailReady = Boolean(detailQuery.data);
 
   const generalContent = (
     <>
@@ -570,13 +567,6 @@ export const ItemDetailForm = ({
           </>
         ) : null}
       </FormSection>
-
-      <ItemSpecParticipationField
-        isCreate={isCreate}
-        manifest={activeManifest}
-        detailReady={detailReady}
-        serverNodeType={serverNodeType}
-      />
 
       <ItemCommercialFields
         categoryId={categoryId}

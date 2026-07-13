@@ -10,6 +10,11 @@ import type {
   EstimateConditionSpecPatchRow,
   EstimateLineItemPatchRow,
 } from "../descriptors/estimate-detail";
+import {
+  assertBucketSpecWritable,
+  insertConditionBucketSpecTx,
+  isBucketSpecBlank,
+} from "./estimate-bucket-spec-write";
 
 type FlatCondition = {
   complexity_factor_id: string | null;
@@ -433,6 +438,7 @@ export const replaceEstimateConditionsTx = async (
 
     for (const spec of condition.specs) {
       await assertSpecDefInScopePanel(client, treeRootItemId, spec.spec_def_id);
+      await assertBucketSpecWritable(client, spec, "conditions", condition.id);
       if (spec.spec_option_id !== null && spec.spec_option_id !== undefined) {
         await assertSpecOptionBelongsToDef(client, spec.spec_def_id, spec.spec_option_id);
       }
@@ -518,23 +524,11 @@ export const replaceEstimateConditionsTx = async (
     );
 
     for (const spec of condition.specs) {
-      await client.query(
-        `INSERT INTO estimate_condition_spec (
-           estimate_condition_id,
-           spec_def_id,
-           spec_option_id,
-           value_boolean,
-           value_number
-         )
-         VALUES ($1, $2, $3, $4, $5)`,
-        [
-          condition.id,
-          spec.spec_def_id,
-          spec.spec_option_id ?? null,
-          spec.value_boolean ?? null,
-          spec.value_number ?? null,
-        ],
-      );
+      if (isBucketSpecBlank(spec)) {
+        continue;
+      }
+
+      await insertConditionBucketSpecTx(client, condition.id, spec);
     }
 
     await replaceConditionLaborPhasesTx(

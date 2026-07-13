@@ -46,6 +46,22 @@ describe("estimateScopeSpecToPatchBody", () => {
     expect(patch.spec_option_id).toBeNull();
   });
 
+  it("stores canonical max bound and preset id", () => {
+    const patch = estimateScopeSpecToPatchBody({
+      spec_def_id: "def-cd",
+      value_type: "number",
+      value_number: null,
+      value_number_max: 135,
+      spec_threshold_preset_id: "preset-high",
+      to_canonical_factor: 1,
+      spec_option_id: null,
+      value_boolean: null,
+    });
+
+    expect(patch.value_number_max).toBe(135);
+    expect(patch.spec_threshold_preset_id).toBe("preset-high");
+  });
+
   it("leaves blank bucket filters as null", () => {
     const patch = estimateScopeSpecToPatchBody({
       spec_def_id: "def-ton",

@@ -99,7 +99,9 @@ export const addConditionUnder = (
           specs: row.specs.map((spec) => ({
             ...spec,
             spec_option_id: null,
+            spec_threshold_preset_id: null,
             value_number: null,
+            value_number_max: null,
             value_boolean: null,
             option_display_name: null,
           })),

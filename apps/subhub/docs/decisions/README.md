@@ -47,10 +47,12 @@ _Operations backbone forks **resolved** (2026-06-27). Optional: [J3 phase weight
 
 | Decision | File | Date | Status |
 |----------|------|------|--------|
+| Spec participation removed — namespace narrowing + part-row presence (V1–V8) | [catalog.md](./catalog.md) | 2026-07-12 | **locked** ([37ai](../tasks/37ai-spec-participation-removal.md)) |
+| Spec threshold presets + numeric bucket ranges (A1–T10) | [catalog.md](./catalog.md) | 2026-07-12 | **locked** ([37ae](../tasks/37ae-spec-threshold-presets-ddl.md) → [37ah](../tasks/37ah-spec-threshold-presets-estimate-ui.md)) |
+| Labor phase per-row override — merge across full ancestry | [catalog.md](./catalog.md) | 2026-07-12 | **locked** ([37ad](../tasks/37ad-labor-phase-per-row-override.md)) |
 | Deferred — cross-spec dependency and derived specs | [catalog.md](./catalog.md) | 2026-07-11 | **deferred** |
 | `slc_protocol` naming — rename + explicit `none`/`conventional` option | [catalog.md](./catalog.md) | 2026-07-11 | planning (no task) |
-| Enum spec threshold presets — curated option-set | [catalog.md](./catalog.md) | 2026-07-11 | planning (no task) |
-| Numeric spec bucket range — interval overlap replaces point-in-band | [catalog.md](./catalog.md) | 2026-07-11 | planning (no task) |
+| Enum / numeric threshold presets (2026-07-11 proposals) | [catalog.md](./catalog.md) | 2026-07-11 | **superseded** by 2026-07-12 locked decision |
 | Item placement + mount axis override — reverted, leaf duplication instead (R1–R6) | [catalog.md](./catalog.md) | 2026-07-11 | **locked** ([37ac](../tasks/37ac-item-placement-mount-axis-revert.md)) |
 | Item placement — multi-location browse tree, decoupled from cost resolution (L1–L6) | [catalog.md](./catalog.md) | 2026-07-11 | **superseded** ([37ac](../tasks/37ac-item-placement-mount-axis-revert.md)) |
 | Item labor axis override — single-spec axis, no compound (M1–M7, M7 = margin FK extension) | [catalog.md](./catalog.md) | 2026-07-11 | **superseded** ([37ac](../tasks/37ac-item-placement-mount-axis-revert.md)) |
@@ -59,7 +61,7 @@ _Operations backbone forks **resolved** (2026-06-27). Optional: [J3 phase weight
 | Part item links leaf-only + Specs value UX | [catalog.md](./catalog.md) | 2026-07-08 | **locked** ([37u](../tasks/37u-part-leaf-links-specs-ui.md)) |
 | Numeric specs — drop `range` type; band is part-authored | [catalog.md](./catalog.md) | 2026-07-08 | **locked** ([37s](../tasks/37s-spec-defs-ui-drop-range.md)) |
 | Spec value types, units table, and locks | [catalog.md](./catalog.md) | 2026-07-08 | **amended** ([37s](../tasks/37s-spec-defs-ui-drop-range.md); was 37p → 37q → 37r) |
-| Spec definitions scoped to root, flat item participation | [catalog.md](./catalog.md) | 2026-07-07 | **locked** ([37o](../tasks/37o-spec-participation-flatten.md)) |
+| Spec definitions scoped to root, flat item participation | [catalog.md](./catalog.md) | 2026-07-07 | **partially superseded** (participation dropped 2026-07-12, [37ai](../tasks/37ai-spec-participation-removal.md); namespace/scope-root clauses still locked, [37o](../tasks/37o-spec-participation-flatten.md)) |
 | Labor phase inclusion — catalog → estimate → job | [catalog.md](./catalog.md) | 2026-07-07 | **locked** ([37n](../tasks/37n-labor-phase-inclusion.md)) |
 | Catalog part authoring UI — `item_links` + `part_specs` on `part_detail` | [catalog.md](./catalog.md) | 2026-07-06 | **locked** ([37j](../tasks/37j-catalog-part-authoring.md)) |
 | Line item part pin — `item_id`, `part_id`, `part_locked` | [37f](../tasks/37f-estimate-line-costing.md) | 2026-07-04 | **locked** |

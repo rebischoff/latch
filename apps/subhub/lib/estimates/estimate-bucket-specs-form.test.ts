@@ -160,6 +160,18 @@ describe("isBucketSpecValueSet", () => {
       isBucketSpecValueSet(conditionSpec("slc", { spec_option_id: "opt-a" })),
     ).toBe(true);
   });
+
+  it("treats max-only number bucket as set", () => {
+    expect(
+      isBucketSpecValueSet(
+        conditionSpec("amps", {
+          value_type: "number",
+          value_number: null,
+          value_number_max: 135,
+        }),
+      ),
+    ).toBe(true);
+  });
 });
 
 describe("mergeBucketSpecLayers", () => {

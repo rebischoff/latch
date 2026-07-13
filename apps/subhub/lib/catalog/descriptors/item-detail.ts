@@ -10,6 +10,17 @@ const SpecOptionPatchElementSchema = z
   })
   .strict();
 
+const SpecThresholdPresetPatchElementSchema = z
+  .object({
+    id: z.string().optional(),
+    label: z.string(),
+    sort_order: z.number().optional(),
+    value_number: z.number().nullable().optional(),
+    value_number_max: z.number().nullable().optional(),
+    option_ids: z.array(z.string()).optional(),
+  })
+  .strict();
+
 const SpecDefinitionPatchElementSchema = z
   .object({
     id: z.string().optional(),
@@ -19,19 +30,7 @@ const SpecDefinitionPatchElementSchema = z
     decimal_places: z.number().int().nullable().optional(),
     sort_order: z.number().optional(),
     options: z.array(SpecOptionPatchElementSchema),
-  })
-  .strict();
-
-const SpecParticipationPatchElementSchema = z
-  .object({
-    spec_def_id: z.string(),
-    active: z.boolean(),
-  })
-  .strict();
-
-const SpecParticipationPatchSchema = z
-  .object({
-    participates: z.array(SpecParticipationPatchElementSchema),
+    presets: z.array(SpecThresholdPresetPatchElementSchema),
   })
   .strict();
 
@@ -69,7 +68,6 @@ export const ItemDetailPatchSchema = z
       .optional(),
     item_labor_phase: z.array(ItemLaborPhasePatchElementSchema).optional(),
     spec_definitions: z.array(SpecDefinitionPatchElementSchema).optional(),
-    spec_participation: SpecParticipationPatchSchema.optional(),
   })
   .strict();
 
@@ -96,7 +94,6 @@ export const ItemDetailCreateSchema = z
       .optional(),
     item_labor_phase: z.array(ItemLaborPhasePatchElementSchema).optional(),
     spec_definitions: z.array(SpecDefinitionPatchElementSchema).optional(),
-    spec_participation: SpecParticipationPatchSchema.optional(),
   })
   .strict();
 
@@ -125,43 +122,41 @@ export type SpecOptionRow = {
   sort_order: number;
 };
 
+export type SpecThresholdPresetRow = {
+  id: string;
+  label: string;
+  option_ids: string[];
+  sort_order: number;
+  value_number: number | null;
+  value_number_max: number | null;
+};
+
 export type SpecDefinitionRow = {
   decimal_places: number | null;
   display_name: string;
   id: string;
   in_use_part_count: number;
-  in_use_participation_count: number;
   options: SpecOptionRow[];
+  presets: SpecThresholdPresetRow[];
   sort_order: number;
   unit_id: string | null;
   unit_symbol: string | null;
   value_type: "boolean" | "enum" | "number";
 };
 
-export type SpecParticipationRow = {
-  participates: Array<{
-    active: boolean;
-    display_name: string;
-    spec_def_id: string;
-    value_type: "boolean" | "enum" | "number";
-  }>;
-};
-
-export type InheritedLaborPhaseRow = {
+export type ResolvedLaborPhaseRow = {
   hours_per_unit: number;
   labor_phase_id: string;
   labor_phase_name: string;
   labor_rate_type_id: string;
   labor_rate_type_name: string;
+  origin: "own" | "inherited";
   sort_order: number;
-  source_item_id: string;
-  source_item_name: string;
+  source_item_id: string | null;
+  source_item_name: string | null;
 };
 
-export type LaborPhaseMode = "empty" | "inherited" | "override";
-
 export type ItemDetailRelated = {
-  inherited_labor_phase: InheritedLaborPhaseRow[];
   item_labor_phase: Array<{
     hours_per_unit: number;
     labor_phase_id: string;
@@ -170,16 +165,12 @@ export type ItemDetailRelated = {
     labor_rate_type_name: string;
     sort_order: number;
   }>;
-  labor_phase_mode: LaborPhaseMode;
-  labor_phase_source_item_id: string | null;
-  labor_phase_source_item_name: string | null;
+  resolved_labor_phase: ResolvedLaborPhaseRow[];
   spec_definitions: SpecDefinitionRow[];
-  spec_participation: SpecParticipationRow;
 };
 
 export type SpecDefinitionPatchRow = z.infer<typeof SpecDefinitionPatchElementSchema>;
-export type SpecParticipationPatchRow = z.infer<typeof SpecParticipationPatchElementSchema>;
-export type SpecParticipationPatchBody = z.infer<typeof SpecParticipationPatchSchema>;
+export type SpecThresholdPresetPatchRow = z.infer<typeof SpecThresholdPresetPatchElementSchema>;
 
 export type ItemDetailRelatedPatch = {
   item_labor_phase?: Array<{
@@ -189,7 +180,6 @@ export type ItemDetailRelatedPatch = {
     sort_order?: number;
   }>;
   spec_definitions?: SpecDefinitionPatchRow[];
-  spec_participation?: SpecParticipationPatchBody;
 };
 
 export type ItemDetailStoreRelated =
@@ -229,25 +219,14 @@ const formatItemDetailRow = (row: ItemDetailRow): Record<string, unknown> => ({
   sort_order: row.sort_order,
 });
 
-const emptySpecParticipation = (): SpecParticipationRow => ({
-  participates: [],
-});
-
 const emptySpecDefinitions = (): SpecDefinitionRow[] => [];
 
 const normalizeItemDetailRelated = (
   related: ItemDetailStoreRelated,
 ): ItemDetailRelated => ({
   item_labor_phase: (related.item_labor_phase ?? []) as ItemDetailRelated["item_labor_phase"],
-  inherited_labor_phase: (related as ItemDetailRelated).inherited_labor_phase ?? [],
-  labor_phase_mode: (related as ItemDetailRelated).labor_phase_mode ?? "empty",
-  labor_phase_source_item_id:
-    (related as ItemDetailRelated).labor_phase_source_item_id ?? null,
-  labor_phase_source_item_name:
-    (related as ItemDetailRelated).labor_phase_source_item_name ?? null,
+  resolved_labor_phase: (related as ItemDetailRelated).resolved_labor_phase ?? [],
   spec_definitions: (related.spec_definitions ?? emptySpecDefinitions()) as SpecDefinitionRow[],
-  spec_participation: (related.spec_participation ??
-    emptySpecParticipation()) as SpecParticipationRow,
 });
 
 export const projectItemDetailRow = (
@@ -289,17 +268,11 @@ export const projectItemDetailRow = (
 
   if (manifest.fields.item_labor_phase?.includes("read")) {
     dto.item_labor_phase = normalized.item_labor_phase;
-    dto.inherited_labor_phase = normalized.inherited_labor_phase;
-    dto.labor_phase_mode = normalized.labor_phase_mode;
-    dto.labor_phase_source_item_name = normalized.labor_phase_source_item_name;
+    dto.resolved_labor_phase = normalized.resolved_labor_phase;
   }
 
   if (manifest.fields.spec_definitions?.includes("read")) {
     dto.spec_definitions = normalized.spec_definitions;
-  }
-
-  if (manifest.fields.spec_participation?.includes("read")) {
-    dto.spec_participation = normalized.spec_participation;
   }
 
   return dto;
@@ -365,10 +338,6 @@ export const itemDetailDescriptor: SurfaceDescriptor<
       related.spec_definitions = typed.spec_definitions;
     }
 
-    if (typed.spec_participation !== undefined) {
-      related.spec_participation = typed.spec_participation;
-    }
-
     if (typed.item_labor_phase !== undefined) {
       related.item_labor_phase = typed.item_labor_phase;
     }
@@ -379,7 +348,6 @@ export const itemDetailDescriptor: SurfaceDescriptor<
   deleteAuditSnapshot: (row, related) => ({
     ...formatItemDetailRow(row),
     spec_definitions: normalizeItemDetailRelated(related).spec_definitions,
-    spec_participation: normalizeItemDetailRelated(related).spec_participation,
   }),
   canDelete: (ctx) => ctx.manifest.actions.includes("delete"),
 };

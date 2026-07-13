@@ -2,17 +2,10 @@ import type { EstimateConditionSpecFormRow } from "@/components/estimates/estima
 import type { EstimateConditionFormRow } from "@/components/estimates/estimate-line-tree";
 import { getConditionAncestry } from "@/components/estimates/estimate-line-selection";
 
-export const isBucketSpecValueSet = (spec: EstimateConditionSpecFormRow): boolean => {
-  if (spec.value_type === "boolean") {
-    return spec.value_boolean !== null;
-  }
+import { isBucketSpecValueSet as isBucketSpecValueSetShared } from "./repository/estimate-bucket-spec-write";
 
-  if (spec.value_type === "number") {
-    return spec.value_number !== null;
-  }
-
-  return spec.spec_option_id !== null;
-};
+export const isBucketSpecValueSet = (spec: EstimateConditionSpecFormRow): boolean =>
+  isBucketSpecValueSetShared(spec);
 
 export const mergeBucketSpecLayers = (
   layers: EstimateConditionSpecFormRow[][],

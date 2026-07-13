@@ -9,12 +9,22 @@ export type EstimateScopeSpecUnitRow = {
   def_display_name?: string;
   option_display_name?: string | null;
   options?: Array<{ display_name: string; id: string }>;
+  presets?: Array<{
+    id: string;
+    label: string;
+    option_ids: string[];
+    sort_order: number;
+    value_number: number | null;
+    value_number_max: number | null;
+  }>;
   spec_def_id: string;
   spec_option_id: string | null;
+  spec_threshold_preset_id?: string | null;
   to_canonical_factor?: number;
   unit_symbol?: string | null;
   value_boolean: boolean | null;
   value_number: number | null;
+  value_number_max?: number | null;
   value_type?: "enum" | "boolean" | "number";
 };
 
@@ -37,6 +47,7 @@ export const estimateScopeSpecsToDisplay = <T extends EstimateScopeSpecUnitRow>(
     return {
       ...row,
       value_number: specValueToDisplay(row.value_number, unitMeta),
+      value_number_max: specValueToDisplay(row.value_number_max ?? null, unitMeta),
     };
   });
 
@@ -46,14 +57,25 @@ export const estimateScopeSpecToPatchBody = (
 ): {
   spec_def_id: string;
   spec_option_id: string | null;
+  spec_threshold_preset_id: string | null;
   value_boolean: boolean | null;
   value_number: number | null;
-} => ({
-  spec_def_id: row.spec_def_id,
-  spec_option_id: row.spec_option_id,
-  value_boolean: row.value_boolean,
-  value_number:
-    row.value_type === "number"
-      ? specValueToCanonical(row.value_number, unitMetaFromRow(row))
-      : row.value_number,
-});
+  value_number_max: number | null;
+} => {
+  const unitMeta = unitMetaFromRow(row);
+
+  return {
+    spec_def_id: row.spec_def_id,
+    spec_option_id: row.spec_option_id,
+    spec_threshold_preset_id: row.spec_threshold_preset_id ?? null,
+    value_boolean: row.value_boolean,
+    value_number:
+      row.value_type === "number"
+        ? specValueToCanonical(row.value_number, unitMeta)
+        : row.value_number,
+    value_number_max:
+      row.value_type === "number"
+        ? specValueToCanonical(row.value_number_max ?? null, unitMeta)
+        : (row.value_number_max ?? null),
+  };
+};

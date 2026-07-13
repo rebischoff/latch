@@ -18,8 +18,6 @@ import {
   type ItemDetailWriteRow,
 } from "../descriptors/item-detail";
 import { loadItemDetail } from "../repository/item-detail";
-import { applyCategorySpecParticipationTx } from "../repository/item-spec-participation-write";
-import { loadAllItems, resolveRootItemId } from "../repository/item-tree";
 import { insertItem, replaceItemLaborPhases } from "../repository/item-write";
 
 export const parseCategoryCreateBody = (
@@ -56,31 +54,6 @@ export const createCategoryRowFromBody = (
   fallback_unit_cost: body.commercial?.fallback_unit_cost ?? 0,
 });
 
-const applySpecParticipationCreate = async (
-  pool: Pool,
-  actorId: string,
-  categoryId: string,
-  isRoot: boolean,
-  specParticipation: NonNullable<
-    z.infer<typeof ItemDetailCreateSchema>["spec_participation"]
-  >,
-): Promise<void> => {
-  const allRows = await loadAllItems(pool);
-  const rootItemId = isRoot ? categoryId : resolveRootItemId(allRows, categoryId);
-  if (!rootItemId) {
-    return;
-  }
-
-  await withPermissionDb(pool, actorId, async (client) => {
-    await applyCategorySpecParticipationTx(
-      client,
-      categoryId,
-      rootItemId,
-      specParticipation.participates,
-    );
-  });
-};
-
 export const extendItemDetailDal = (
   pool: Pool,
   getActorId: () => Promise<string>,
@@ -113,16 +86,6 @@ export const extendItemDetailDal = (
     const actorId = await getActorId();
     await insertItem(pool, actorId, row);
 
-    if (input.spec_participation !== undefined) {
-      await applySpecParticipationCreate(
-        pool,
-        actorId,
-        id,
-        row.parent_id === null,
-        input.spec_participation,
-      );
-    }
-
     if (input.item_labor_phase !== undefined) {
       await withPermissionDb(pool, actorId, async (client) => {
         await replaceItemLaborPhases(
@@ -142,9 +105,6 @@ export const extendItemDetailDal = (
     }
     if (input.item_labor_phase !== undefined) {
       fieldIds.push("item_labor_phase");
-    }
-    if (input.spec_participation !== undefined) {
-      fieldIds.push("spec_participation");
     }
 
     await writeAudit({

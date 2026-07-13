@@ -1,8 +1,9 @@
 "use client";
 
+import { DeleteOutlined } from "@ant-design/icons";
 import { fieldAllows, type Manifest } from "@latch/contracts";
 import { FieldControl } from "@latch/react";
-import { Checkbox, InputNumber, Skeleton, Table, Typography } from "antd";
+import { Button, Checkbox, InputNumber, Skeleton, Table, Typography } from "antd";
 import { useEffect, useMemo, useState } from "react";
 import {
   Controller,
@@ -12,11 +13,7 @@ import {
   type FieldPath,
   type UseFormSetError,
 } from "react-hook-form";
-import {
-  FieldArrayTable,
-  LaborPhaseAddButton,
-  type FieldArrayTableColumn,
-} from "@/components/form/FieldArrayTable";
+import { LaborPhaseAddButton } from "@/components/form/FieldArrayTable";
 import { FormFieldItem } from "@/components/form/FormFieldItem";
 import { FormSection } from "@/components/form/FormSection";
 import { TABLE_WIDTH_LG } from "@/components/form/formLayout";
@@ -33,8 +30,10 @@ import {
   summarizeMarkupCatalogRow,
   type CommercialFamily,
 } from "@/lib/catalog/item-commercial-display";
-import { resolveItemLaborPhaseUiView } from "@/lib/catalog/item-labor-phase-ui-state";
-import { deriveLaborPhaseMode } from "@/lib/catalog/repository/item-labor-phase-display";
+import {
+  buildItemLaborPhaseDisplayRows,
+  type ItemLaborPhaseDisplayRow,
+} from "@/lib/catalog/item-labor-phase-ui-state";
 import { useSurfaceList } from "@/lib/hooks/use-surface-list";
 import { useFormUi } from "@/components/surface/useFormUi";
 
@@ -89,119 +88,191 @@ const createEmptyLaborPhaseRow = (
   sort_order: sortOrder,
 });
 
+const createOwnRowFromInherited = (
+  row: Extract<ItemLaborPhaseDisplayRow, { kind: "inherited" }>,
+  sortOrder: number,
+): ItemDetailFormValues["item_labor_phase"][number] => ({
+  labor_phase_id: row.labor_phase_id,
+  labor_phase_name: row.labor_phase_name,
+  labor_rate_type_id: row.labor_rate_type_id,
+  labor_rate_type_name: row.labor_rate_type_name,
+  hours_per_unit: row.hours_per_unit,
+  sort_order: sortOrder,
+});
+
 type ItemLaborPhaseSectionProps = {
-  columns: FieldArrayTableColumn<ItemDetailFormValues, "item_labor_phase">[];
-  isQuotableLeaf: boolean;
+  laborPhaseOptions: SelectOption[];
+  laborRateOptions: SelectOption[];
+  pickerLoading: boolean;
   writable: boolean;
 };
 
 const ItemLaborPhaseSection = ({
-  columns,
-  isQuotableLeaf,
+  laborPhaseOptions,
+  laborRateOptions,
+  pickerLoading,
   writable,
 }: ItemLaborPhaseSectionProps) => {
-  const { control, setValue, watch } = useFormContext<ItemDetailFormValues>();
-  const { disabled } = useFormUi();
+  const { control } = useFormContext<ItemDetailFormValues>();
+  const { disabled, loading: formLoading } = useFormUi();
   const fieldArray = useFieldArray({ control, name: "item_labor_phase" });
-  const { fields, append } = fieldArray;
-  const inheritedLaborPhaseRows = watch("inherited_labor_phase") ?? [];
-  const laborPhaseSourceName = watch("labor_phase_source_item_name");
+  const { fields, append, remove } = fieldArray;
+  const ownRows = useWatch({ control, name: "item_labor_phase" }) ?? [];
+  const resolvedRows = useWatch({ control, name: "resolved_labor_phase" }) ?? [];
 
-  const view = resolveItemLaborPhaseUiView({
-    isQuotableLeaf,
-    ownRowCount: fields.length,
-    inheritedRowCount: inheritedLaborPhaseRows.length,
-  });
+  const displayRows = useMemo(
+    () =>
+      buildItemLaborPhaseDisplayRows({
+        ownRows,
+        resolvedRows,
+      }),
+    [ownRows, resolvedRows],
+  );
 
-  useEffect(() => {
-    if (fields.length > 0) {
-      return;
-    }
+  const loading = formLoading || pickerLoading;
+  const canWrite = writable && !disabled;
 
-    setValue(
-      "labor_phase_mode",
-      deriveLaborPhaseMode([], inheritedLaborPhaseRows),
-      { shouldDirty: false },
-    );
-  }, [fields.length, inheritedLaborPhaseRows, setValue]);
-
-  const beginLaborPhaseOverride = () => {
-    append(createEmptyLaborPhaseRow(1));
-    setValue("labor_phase_mode", "override", { shouldDirty: false });
+  const beginOverride = (row: Extract<ItemLaborPhaseDisplayRow, { kind: "inherited" }>) => {
+    append(createOwnRowFromInherited(row, fields.length + 1));
   };
 
-  if (view === "inherited") {
-    return (
-      <>
-        {laborPhaseSourceName ? (
-          <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
-            Inherited from &ldquo;{laborPhaseSourceName}&rdquo;
-          </Typography.Paragraph>
-        ) : null}
-        <div style={{ width: "100%", maxWidth: TABLE_WIDTH_LG }}>
-          <Table
-            size="small"
-            pagination={false}
-            rowKey={(row) => row.labor_phase_id}
-            dataSource={inheritedLaborPhaseRows}
-            columns={[
-              {
-                title: "Phase",
-                dataIndex: "labor_phase_name",
-                key: "labor_phase_name",
-              },
-              {
-                title: "Labor rate",
-                dataIndex: "labor_rate_type_name",
-                key: "labor_rate_type_name",
-              },
-              {
-                title: "Hrs/unit",
-                key: "hours_per_unit",
-                render: (_, row) => Number(row.hours_per_unit ?? 0).toFixed(2),
-              },
-            ]}
-          />
-        </div>
-        {writable && !disabled ? (
-          <LaborPhaseAddButton disabled={disabled} onClick={beginLaborPhaseOverride} />
-        ) : null}
-      </>
-    );
-  }
+  const addLaborPhase = () => {
+    append(createEmptyLaborPhaseRow(fields.length + 1));
+  };
 
-  if (view === "empty") {
+  if (displayRows.length === 0) {
     return (
       <>
         <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
           No labor phases configured on this node.
         </Typography.Paragraph>
-        {writable && !disabled ? (
-          <LaborPhaseAddButton disabled={disabled} onClick={beginLaborPhaseOverride} />
+        {canWrite ? (
+          <LaborPhaseAddButton disabled={disabled} onClick={addLaborPhase} />
         ) : null}
       </>
     );
   }
 
   return (
-    <>
-      <FieldArrayTable<ItemDetailFormValues, "item_labor_phase">
-        field="item_labor_phase"
-        name="item_labor_phase"
-        fieldArray={fieldArray}
-        columns={columns}
-        maxWidth={TABLE_WIDTH_LG}
-        createRow={() => createEmptyLaborPhaseRow(fields.length + 1)}
-        addLabel="Add labor phase"
-        allowAdd={writable && !disabled}
+    <div style={{ width: "100%", maxWidth: TABLE_WIDTH_LG }}>
+      <Table<ItemLaborPhaseDisplayRow>
         size="small"
+        pagination={false}
+        rowKey={(row) =>
+          row.kind === "own"
+            ? `own-${row.ownIndex}-${row.labor_phase_id || "new"}`
+            : `inherited-${row.labor_phase_id}`
+        }
+        dataSource={displayRows}
+        columns={[
+          {
+            title: "Phase",
+            key: "phase",
+            width: "32%",
+            render: (_value, row) => {
+              if (row.kind === "inherited") {
+                return (
+                  <div>
+                    <Typography.Text>{row.labor_phase_name || "—"}</Typography.Text>
+                    {row.source_item_name ? (
+                      <Typography.Paragraph
+                        type="secondary"
+                        style={{ marginBottom: 0, marginTop: 2, fontSize: 12 }}
+                      >
+                        Inherited from &ldquo;{row.source_item_name}&rdquo;
+                      </Typography.Paragraph>
+                    ) : null}
+                  </div>
+                );
+              }
+              return (
+                <PhaseCell
+                  index={row.ownIndex}
+                  writable={canWrite}
+                  disabled={disabled}
+                  options={laborPhaseOptions}
+                  loading={loading}
+                />
+              );
+            },
+          },
+          {
+            title: "Labor rate",
+            key: "rate",
+            width: "32%",
+            render: (_value, row) => {
+              if (row.kind === "inherited") {
+                return <Typography.Text>{row.labor_rate_type_name || "—"}</Typography.Text>;
+              }
+              return (
+                <RateCell
+                  index={row.ownIndex}
+                  writable={canWrite}
+                  disabled={disabled}
+                  options={laborRateOptions}
+                  loading={loading}
+                />
+              );
+            },
+          },
+          {
+            title: "Hrs/unit",
+            key: "hours",
+            width: 100,
+            render: (_value, row) => {
+              if (row.kind === "inherited") {
+                return (
+                  <Typography.Text>
+                    {Number(row.hours_per_unit ?? 0).toFixed(2)}
+                  </Typography.Text>
+                );
+              }
+              return (
+                <HoursCell
+                  index={row.ownIndex}
+                  writable={canWrite}
+                  disabled={disabled}
+                  loading={loading}
+                />
+              );
+            },
+          },
+          {
+            title: "",
+            key: "actions",
+            width: 96,
+            align: "center",
+            render: (_value, row) => {
+              if (!canWrite) {
+                return null;
+              }
+              if (row.kind === "inherited") {
+                return (
+                  <Button type="link" size="small" onClick={() => beginOverride(row)}>
+                    Override
+                  </Button>
+                );
+              }
+              return (
+                <Button
+                  type="text"
+                  danger
+                  icon={<DeleteOutlined />}
+                  aria-label="Remove row"
+                  disabled={disabled}
+                  onClick={() => remove(row.ownIndex)}
+                />
+              );
+            },
+          },
+        ]}
+        footer={
+          canWrite
+            ? () => <LaborPhaseAddButton disabled={disabled} onClick={addLaborPhase} />
+            : undefined
+        }
       />
-      {view === "category_editable" && fields.length === 0 ? (
-        <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
-          No labor phases configured on this node.
-        </Typography.Paragraph>
-      ) : null}
-    </>
+    </div>
   );
 };
 
@@ -610,7 +681,7 @@ export const ItemCommercialFields = ({
     () =>
       buildAncestorChain(
         commercialIndex,
-        isCreate ? undefined : categoryId,
+        categoryId,
         parentId,
       ),
     [categoryId, commercialIndex, isCreate, parentId],
@@ -627,55 +698,6 @@ export const ItemCommercialFields = ({
     freightRatesLoading ||
     incidentalRatesLoading ||
     markupTypesLoading;
-
-  const laborColumns = useMemo<
-    FieldArrayTableColumn<ItemDetailFormValues, "item_labor_phase">[]
-  >(
-    () => [
-      {
-        key: "labor_phase_id",
-        title: "Phase",
-        width: "40%",
-        render: ({ index, writable: rowWritable, disabled: rowDisabled, loading }) => (
-          <PhaseCell
-            index={index}
-            writable={rowWritable}
-            disabled={rowDisabled}
-            options={laborPhaseOptions}
-            loading={loading || pickerLoading}
-          />
-        ),
-      },
-      {
-        key: "labor_rate_type_id",
-        title: "Labor rate",
-        width: "40%",
-        render: ({ index, writable: rowWritable, disabled: rowDisabled, loading }) => (
-          <RateCell
-            index={index}
-            writable={rowWritable}
-            disabled={rowDisabled}
-            options={laborRateOptions}
-            loading={loading || pickerLoading}
-          />
-        ),
-      },
-      {
-        key: "hours_per_unit",
-        title: "Hrs/unit",
-        width: 100,
-        render: ({ index, writable: rowWritable, disabled: rowDisabled, loading }) => (
-          <HoursCell
-            index={index}
-            writable={rowWritable}
-            disabled={rowDisabled}
-            loading={loading || pickerLoading}
-          />
-        ),
-      },
-    ],
-    [laborPhaseOptions, laborRateOptions, pickerLoading],
-  );
 
   const showCommercial =
     commercialReadable || fieldAllows(manifest, "item_labor_phase", "read");
@@ -758,8 +780,9 @@ export const ItemCommercialFields = ({
       fieldAllows(manifest, "item_labor_phase", "read") ? (
         <FieldControl manifest={manifest} field="item_labor_phase">
           <ItemLaborPhaseSection
-            columns={laborColumns}
-            isQuotableLeaf={isQuotableLeaf}
+            laborPhaseOptions={laborPhaseOptions}
+            laborRateOptions={laborRateOptions}
+            pickerLoading={pickerLoading}
             writable={laborPhaseWritable}
           />
         </FieldControl>

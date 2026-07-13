@@ -7,6 +7,15 @@ export type SpecDetailOptionPatchRow = {
   sort_order?: number;
 };
 
+export type SpecThresholdPresetPatchRow = {
+  id?: string;
+  label: string;
+  option_ids?: string[];
+  sort_order?: number;
+  value_number?: number | null;
+  value_number_max?: number | null;
+};
+
 export type SpecValueType = "boolean" | "enum" | "number";
 
 export type SpecDetailProfilePatchRow = {
@@ -68,6 +77,100 @@ export const assertSpecDefinitionShape = (
       field: "profile",
       code: "unit_not_allowed",
     });
+  }
+};
+
+export const assertSpecPresetsShape = (
+  valueType: string,
+  presets: SpecThresholdPresetPatchRow[],
+  allowedOptionIds: Set<string>,
+): void => {
+  if (valueType === "boolean") {
+    if (presets.length > 0) {
+      throw new ValidationError("Boolean spec definitions may not include presets", {
+        field: "presets",
+        code: "presets_not_allowed",
+      });
+    }
+    return;
+  }
+
+  for (const [presetIndex, preset] of presets.entries()) {
+    if (!preset.label.trim()) {
+      throw new ValidationError("Threshold presets require a label", {
+        field: "presets",
+        code: "preset_label_required",
+        preset_index: presetIndex,
+      });
+    }
+
+    if (valueType === "enum") {
+      const optionIds = preset.option_ids ?? [];
+      if (optionIds.length === 0) {
+        throw new ValidationError("Enum threshold presets require at least one option", {
+          field: "presets",
+          code: "preset_option_set_empty",
+          preset_index: presetIndex,
+        });
+      }
+      if (
+        preset.value_number !== undefined &&
+        preset.value_number !== null
+      ) {
+        throw new ValidationError("Enum threshold presets may not include numeric bounds", {
+          field: "presets",
+          code: "preset_shape_mismatch",
+          preset_index: presetIndex,
+        });
+      }
+      if (
+        preset.value_number_max !== undefined &&
+        preset.value_number_max !== null
+      ) {
+        throw new ValidationError("Enum threshold presets may not include numeric bounds", {
+          field: "presets",
+          code: "preset_shape_mismatch",
+          preset_index: presetIndex,
+        });
+      }
+      for (const optionId of optionIds) {
+        if (!allowedOptionIds.has(optionId)) {
+          throw new ValidationError("Threshold preset references an unknown option", {
+            field: "presets",
+            code: "preset_option_orphan",
+            preset_index: presetIndex,
+            spec_option_id: optionId,
+          });
+        }
+      }
+      continue;
+    }
+
+    if (valueType === "number") {
+      const min = preset.value_number ?? null;
+      const max = preset.value_number_max ?? null;
+      if (min === null && max === null) {
+        throw new ValidationError("Number threshold presets require min and/or max", {
+          field: "presets",
+          code: "preset_bounds_required",
+          preset_index: presetIndex,
+        });
+      }
+      if (min !== null && max !== null && min > max) {
+        throw new ValidationError("Threshold preset min must be less than or equal to max", {
+          field: "presets",
+          code: "preset_bounds_invalid",
+          preset_index: presetIndex,
+        });
+      }
+      if ((preset.option_ids ?? []).length > 0) {
+        throw new ValidationError("Number threshold presets may not include option sets", {
+          field: "presets",
+          code: "preset_shape_mismatch",
+          preset_index: presetIndex,
+        });
+      }
+    }
   }
 };
 
@@ -137,6 +240,25 @@ export const assertSpecOptionDeletable = async (
       },
     );
   }
+
+  const presetMembershipResult = await client.query<{ count: number }>(
+    `SELECT COUNT(*)::int AS count
+     FROM spec_threshold_preset_option
+     WHERE spec_option_id = $1`,
+    [specOptionId],
+  );
+  const presetMembershipCount = presetMembershipResult.rows[0]?.count ?? 0;
+  if (presetMembershipCount > 0) {
+    throw new ValidationError(
+      `${presetMembershipCount} threshold preset(s) include this option — update those presets first`,
+      {
+        field: "options",
+        code: "spec_option_in_use",
+        spec_option_id: specOptionId,
+        preset_count: presetMembershipCount,
+      },
+    );
+  }
 };
 
 export const loadSpecDefValueRowCount = async (
@@ -184,24 +306,15 @@ export const assertSpecDefTypeUnitMutable = async (
 const loadSpecDefInUseCounts = async (
   client: PoolClient,
   specDefId: string,
-): Promise<{ participation: number; parts: number }> => {
-  const [participationResult, partResult] = await Promise.all([
-    client.query<{ count: number }>(
-      `SELECT COUNT(*)::int AS count
-       FROM item_spec_participation
-       WHERE spec_def_id = $1`,
-      [specDefId],
-    ),
-    client.query<{ count: number }>(
-      `SELECT COUNT(*)::int AS count
-       FROM manufacturer_part_spec
-       WHERE spec_def_id = $1`,
-      [specDefId],
-    ),
-  ]);
+): Promise<{ parts: number }> => {
+  const partResult = await client.query<{ count: number }>(
+    `SELECT COUNT(*)::int AS count
+     FROM manufacturer_part_spec
+     WHERE spec_def_id = $1`,
+    [specDefId],
+  );
 
   return {
-    participation: participationResult.rows[0]?.count ?? 0,
     parts: partResult.rows[0]?.count ?? 0,
   };
 };
@@ -211,11 +324,10 @@ export const assertScopeRootReassignable = async (
   specDefId: string,
 ): Promise<void> => {
   const counts = await loadSpecDefInUseCounts(client, specDefId);
-  if (counts.participation > 0 || counts.parts > 0) {
+  if (counts.parts > 0) {
     throw new ValidationError("Cannot reassign scope while spec is in use", {
       field: "profile",
       code: "scope_reassign_blocked",
-      in_use_participation_count: counts.participation,
       in_use_part_count: counts.parts,
     });
   }
@@ -226,10 +338,9 @@ const assertSpecDefDeletable = async (
   specDefId: string,
 ): Promise<void> => {
   const counts = await loadSpecDefInUseCounts(client, specDefId);
-  if (counts.participation > 0 || counts.parts > 0) {
+  if (counts.parts > 0) {
     throw new ConflictError("Cannot delete spec definition in use", {
       code: "in_use",
-      in_use_participation_count: counts.participation,
       in_use_part_count: counts.parts,
     });
   }

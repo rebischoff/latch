@@ -1,5 +1,6 @@
 import type { Pool } from "pg";
 
+import { loadSpecPresetsByDefIds } from "@/lib/catalog/repository/spec-threshold-presets-read";
 import { scopePanelDefs } from "@/lib/catalog/repository/item-effective-specs";
 import { tableExists } from "@/lib/sites/repository/sql-utils";
 
@@ -62,8 +63,10 @@ const loadSavedConditionSpecs = async (
     option_display_name: string | null;
     spec_def_id: string;
     spec_option_id: string | null;
+    spec_threshold_preset_id: string | null;
     value_boolean: boolean | null;
     value_number: number | null;
+    value_number_max: number | null;
   }>
 > => {
   if (conditionIds.length === 0) {
@@ -75,14 +78,18 @@ const loadSavedConditionSpecs = async (
     option_display_name: string | null;
     spec_def_id: string;
     spec_option_id: string | null;
+    spec_threshold_preset_id: string | null;
     value_boolean: boolean | null;
     value_number: number | null;
+    value_number_max: number | null;
   }>(
     `SELECT
        ecs.estimate_condition_id,
        ecs.spec_def_id,
        ecs.spec_option_id,
+       ecs.spec_threshold_preset_id,
        ecs.value_number,
+       ecs.value_number_max,
        ecs.value_boolean,
        so.display_name AS option_display_name
      FROM estimate_condition_spec ecs
@@ -155,7 +162,24 @@ const mergeConditionSpecs = async (
       ),
     ),
   ];
-  const optionsByDefId = await loadSpecOptions(pool, defIds);
+  const [optionsByDefId, presetsByDefId] = await Promise.all([
+    loadSpecOptions(pool, defIds),
+    loadSpecPresetsByDefIds(
+      pool,
+      defIds.map((defId) => {
+        const def = [...panelDefsByRoot.values()]
+          .flat()
+          .find((row) => row.spec_def_id === defId);
+        return {
+          id: defId,
+          decimal_places: def?.decimal_places ?? null,
+          to_canonical_factor: def?.to_canonical_factor ?? 1,
+          unit_symbol: def?.unit_symbol ?? null,
+          value_type: def?.value_type ?? "boolean",
+        };
+      }),
+    ),
+  ]);
 
   const specsByConditionId = new Map<string, EstimateConditionSpecRow[]>();
   for (const condition of conditionRows) {
@@ -174,13 +198,16 @@ const mergeConditionSpecs = async (
           def_display_name: def.display_name,
           value_type: def.value_type,
           spec_option_id: saved?.spec_option_id ?? null,
+          spec_threshold_preset_id: saved?.spec_threshold_preset_id ?? null,
           option_display_name: saved?.option_display_name ?? null,
           value_number: saved?.value_number ?? null,
+          value_number_max: saved?.value_number_max ?? null,
           value_boolean: saved?.value_boolean ?? null,
           unit_symbol: def.unit_symbol,
           to_canonical_factor: def.to_canonical_factor,
           decimal_places: def.decimal_places,
           options: optionsByDefId.get(def.spec_def_id) ?? [],
+          presets: presetsByDefId.get(def.spec_def_id) ?? [],
         };
       }),
     );

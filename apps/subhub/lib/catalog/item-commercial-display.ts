@@ -101,13 +101,13 @@ export const buildAncestorChain = (
   itemId: string | undefined,
   parentId: string | null | undefined,
 ): string[] => {
-  const start =
-    itemId && index.has(itemId) ? itemId : parentId && index.has(parentId) ? parentId : null;
+  const persistedItem = itemId && index.has(itemId);
+  const start = persistedItem ? itemId : parentId && index.has(parentId) ? parentId : null;
   if (!start) {
     return [];
   }
 
-  const chain: string[] = [];
+  const chain: string[] = itemId && !persistedItem ? [itemId] : [];
   let current: string | null = start;
   while (current) {
     chain.push(current);

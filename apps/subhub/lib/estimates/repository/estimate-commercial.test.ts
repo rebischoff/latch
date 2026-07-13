@@ -165,21 +165,55 @@ describe("resolveLaborGroup", () => {
     rate_cents: 5000,
   });
 
-  it("returns leaf rows when present", () => {
+  it("merges phases across a 3-level chain (nearest wins per phase)", () => {
     const catalog = buildCatalog({
-      items: [item("branch", "root"), item("leaf", "branch")],
+      items: [item("mid", "root"), item("leaf", "mid")],
       labor: [
-        laborRow("branch", "program", 1),
-        laborRow("leaf", "install", 2),
+        laborRow("mid", "phase_a", 1),
+        laborRow("root", "phase_b", 2),
       ],
     });
 
-    expect(resolveLaborGroup(catalog, "leaf").map((row) => row.labor_phase_id)).toEqual([
-      "install",
+    const resolved = resolveLaborGroup(catalog, "leaf");
+    expect(resolved.map((row) => row.labor_phase_id).sort()).toEqual([
+      "phase_a",
+      "phase_b",
     ]);
   });
 
-  it("inherits ancestor group atomically", () => {
+  it("uses own hours for overridden phase while keeping inherited peers", () => {
+    const catalog = buildCatalog({
+      items: [item("mid", "root"), item("leaf", "mid")],
+      labor: [
+        laborRow("mid", "phase_a", 1),
+        laborRow("mid", "phase_b", 2),
+        laborRow("leaf", "phase_a", 9),
+      ],
+    });
+
+    const byPhase = new Map(
+      resolveLaborGroup(catalog, "leaf").map((row) => [row.labor_phase_id, row]),
+    );
+    expect(byPhase.get("phase_a")?.hours_per_unit).toBe(9);
+    expect(byPhase.get("phase_b")?.hours_per_unit).toBe(2);
+  });
+
+  it("keeps explicit zero-hours override (does not re-inherit)", () => {
+    const catalog = buildCatalog({
+      items: [item("mid", "root"), item("leaf", "mid")],
+      labor: [
+        laborRow("mid", "phase_a", 2),
+        laborRow("leaf", "phase_a", 0),
+      ],
+    });
+
+    const resolved = resolveLaborGroup(catalog, "leaf");
+    expect(resolved).toHaveLength(1);
+    expect(resolved[0]?.labor_phase_id).toBe("phase_a");
+    expect(resolved[0]?.hours_per_unit).toBe(0);
+  });
+
+  it("inherits ancestor group when leaf has no own rows", () => {
     const catalog = buildCatalog({
       items: [item("branch", "root"), item("leaf", "branch")],
       labor: [laborRow("branch", "program", 2), laborRow("branch", "test", 1)],

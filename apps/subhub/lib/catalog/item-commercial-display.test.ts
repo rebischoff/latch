@@ -101,6 +101,7 @@ describe("resolveAncestryRateTypeId", () => {
       children: [
         treeNode("child", "root", {
           freight_rate_type_id: "freight-child",
+          incidental_rate_type_id: "incidental-child",
           children: [treeNode("leaf", "child")],
         }),
       ],
@@ -118,6 +119,15 @@ describe("resolveAncestryRateTypeId", () => {
 
   it("returns null when no ancestor has a value", () => {
     expect(resolveAncestryRateTypeId(index, ["leaf"], "markup")).toBeNull();
+  });
+
+  it("includes the immediate parent for an unsaved child", () => {
+    const createChain = buildAncestorChain(index, "new", "child");
+
+    expect(createChain).toEqual(["new", "child", "root"]);
+    expect(resolveAncestryRateTypeId(index, createChain, "incidental")).toBe(
+      "incidental-child",
+    );
   });
 });
 

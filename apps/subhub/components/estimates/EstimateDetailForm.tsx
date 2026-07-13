@@ -143,11 +143,17 @@ const mapConditions = (rows: unknown): EstimateConditionFormRow[] => {
             value_type: valueType,
             spec_option_id:
               typeof spec.spec_option_id === "string" ? spec.spec_option_id : null,
+            spec_threshold_preset_id:
+              typeof spec.spec_threshold_preset_id === "string"
+                ? spec.spec_threshold_preset_id
+                : null,
             option_display_name:
               typeof spec.option_display_name === "string"
                 ? spec.option_display_name
                 : undefined,
             value_number: typeof spec.value_number === "number" ? spec.value_number : null,
+            value_number_max:
+              typeof spec.value_number_max === "number" ? spec.value_number_max : null,
             value_boolean:
               typeof spec.value_boolean === "boolean" ? spec.value_boolean : null,
             unit_symbol: typeof spec.unit_symbol === "string" ? spec.unit_symbol : null,
@@ -175,6 +181,43 @@ const mapConditions = (rows: unknown): EstimateConditionFormRow[] => {
                   })
                   .filter((option): option is { id: string; display_name: string } =>
                     Boolean(option),
+                  )
+              : undefined,
+            presets: Array.isArray(spec.presets)
+              ? spec.presets
+                  .map((presetRow) => {
+                    const preset = presetRow as Record<string, unknown>;
+                    if (typeof preset.id !== "string" || typeof preset.label !== "string") {
+                      return null;
+                    }
+
+                    return {
+                      id: preset.id,
+                      label: preset.label,
+                      sort_order:
+                        typeof preset.sort_order === "number" ? preset.sort_order : 0,
+                      value_number:
+                        typeof preset.value_number === "number" ? preset.value_number : null,
+                      value_number_max:
+                        typeof preset.value_number_max === "number"
+                          ? preset.value_number_max
+                          : null,
+                      option_ids: Array.isArray(preset.option_ids)
+                        ? preset.option_ids.filter((id): id is string => typeof id === "string")
+                        : [],
+                    };
+                  })
+                  .filter(
+                    (
+                      preset,
+                    ): preset is {
+                      id: string;
+                      label: string;
+                      option_ids: string[];
+                      sort_order: number;
+                      value_number: number | null;
+                      value_number_max: number | null;
+                    } => Boolean(preset),
                   )
               : undefined,
           };

@@ -1,7 +1,7 @@
 import type { Pool } from "pg";
 import { describe, expect, it } from "vitest";
 
-import { scopePanelDefs, unionEffectiveForItems } from "./item-effective-specs";
+import { rootNamespaceForItems, scopePanelDefs } from "./item-effective-specs";
 
 describe("scopePanelDefs", () => {
   it("returns the full namespace for a scope root", async () => {
@@ -27,11 +27,12 @@ describe("scopePanelDefs", () => {
   });
 });
 
-describe("unionEffectiveForItems", () => {
-  it("joins item_spec_participation for linked items", async () => {
+describe("rootNamespaceForItems", () => {
+  it("walks ancestry to scope roots and returns distinct namespace defs", async () => {
     const pool = {
       query: async (sql: string, params?: unknown[]) => {
-        expect(sql).toContain("item_spec_participation");
+        expect(sql).toContain("WITH RECURSIVE ancestry");
+        expect(sql).not.toContain("item_spec_participation");
         expect(params?.[0]).toEqual(["leaf-a", "leaf-b"]);
         return {
           rows: [
@@ -45,7 +46,17 @@ describe("unionEffectiveForItems", () => {
       },
     } as unknown as Pool;
 
-    const defs = await unionEffectiveForItems(pool, ["leaf-a", "leaf-b"]);
+    const defs = await rootNamespaceForItems(pool, ["leaf-a", "leaf-b"]);
     expect(defs).toHaveLength(1);
+  });
+
+  it("returns empty array for no item ids", async () => {
+    const pool = {
+      query: async () => {
+        throw new Error("should not query");
+      },
+    } as unknown as Pool;
+
+    await expect(rootNamespaceForItems(pool, [])).resolves.toEqual([]);
   });
 });

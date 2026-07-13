@@ -27,8 +27,10 @@ const PreviewSpecSchema = z
   .object({
     spec_def_id: z.string(),
     spec_option_id: z.string().nullable().optional(),
+    spec_threshold_preset_id: z.string().nullable().optional(),
     value_boolean: z.boolean().nullable().optional(),
     value_number: z.number().nullable().optional(),
+    value_number_max: z.number().nullable().optional(),
   })
   .strict();
 
@@ -221,8 +223,10 @@ export const previewEstimateLines = async (
   const draftSpecs: BucketSpecValue[] | undefined = draft?.specs?.map((spec) => ({
     spec_def_id: spec.spec_def_id,
     spec_option_id: spec.spec_option_id ?? null,
+    spec_threshold_preset_id: spec.spec_threshold_preset_id ?? null,
     value_boolean: spec.value_boolean ?? null,
     value_number: spec.value_number ?? null,
+    value_number_max: spec.value_number_max ?? null,
   }));
 
   const [catalog, complexity, laborPhases] = await Promise.all([

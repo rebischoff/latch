@@ -1,18 +1,21 @@
 import type { Pool, PoolClient } from "pg";
 
-import { unionEffectiveForItems } from "@/lib/catalog/repository/item-effective-specs";
+import {
+  bucketSpecMatchesPartRows,
+  type PartSpecMatchRow,
+  type ThresholdPresetMatchMeta,
+} from "@/lib/catalog/spec-match";
+import { loadThresholdPresetsByIds } from "@/lib/catalog/repository/spec-threshold-presets-read";
+import { rootNamespaceForItems } from "@/lib/catalog/repository/item-effective-specs";
 
 import {
   isBucketValueBlank,
+  type BucketSpecValue,
   type MergedBucketSpecs,
 } from "./estimate-bucket-specs";
 
-export type PartSpecRow = {
+export type PartSpecRow = PartSpecMatchRow & {
   spec_def_id: string;
-  spec_option_id: string | null;
-  value_boolean: boolean | null;
-  value_number: number | null;
-  value_number_max: number | null;
 };
 
 export type FilteredPartRow = {
@@ -116,51 +119,35 @@ const loadSpecDefMeta = async (
   return new Map(result.rows.map((row) => [row.spec_def_id, row]));
 };
 
-const enumMatches = (
-  bucketOptionId: string,
-  partRows: PartSpecRow[],
-  wildcardOptionId: string | null,
-): boolean => {
-  if (partRows.length === 0) {
-    return false;
-  }
+const loadPresetsForBucket = async (
+  client: Pool | PoolClient,
+  bucket: MergedBucketSpecs,
+): Promise<Map<string, ThresholdPresetMatchMeta>> => {
+  const presetIds = [
+    ...new Set(
+      [...bucket.values()]
+        .map((value) => value.spec_threshold_preset_id)
+        .filter((id): id is string => id !== null),
+    ),
+  ];
 
-  const optionIds = new Set(
-    partRows
-      .map((row) => row.spec_option_id)
-      .filter((id): id is string => id !== null),
-  );
-
-  if (optionIds.has(bucketOptionId)) {
-    return true;
-  }
-
-  if (wildcardOptionId && optionIds.has(wildcardOptionId)) {
-    return true;
-  }
-
-  return false;
+  return loadThresholdPresetsByIds(client, presetIds);
 };
 
-const booleanMatches = (bucketValue: boolean, partRows: PartSpecRow[]): boolean =>
-  partRows.some((row) => row.value_boolean === bucketValue);
-
-const numericMatches = (bucketValue: number, partRows: PartSpecRow[]): boolean =>
-  partRows.some((row) => {
-    if (row.value_number === null) {
-      return false;
-    }
-    if (row.value_number_max !== null) {
-      return row.value_number <= bucketValue && bucketValue <= row.value_number_max;
-    }
-    return row.value_number === bucketValue;
-  });
+const bucketToMatchInput = (bucket: BucketSpecValue) => ({
+  spec_option_id: bucket.spec_option_id,
+  spec_threshold_preset_id: bucket.spec_threshold_preset_id,
+  value_boolean: bucket.value_boolean,
+  value_number: bucket.value_number,
+  value_number_max: bucket.value_number_max,
+});
 
 export const partMatchesBucket = (
   partSpecs: PartSpecRow[],
   bucket: MergedBucketSpecs,
   effectiveDefIds: Set<string>,
   defMeta: Map<string, SpecDefMeta>,
+  presetsById: Map<string, ThresholdPresetMatchMeta>,
 ): boolean => {
   for (const defId of effectiveDefIds) {
     const bucketValue = bucket.get(defId);
@@ -174,28 +161,20 @@ export const partMatchesBucket = (
     }
 
     const rowsForDef = partSpecs.filter((row) => row.spec_def_id === defId);
+    const preset = bucketValue.spec_threshold_preset_id
+      ? presetsById.get(bucketValue.spec_threshold_preset_id)
+      : undefined;
 
-    if (meta.value_type === "enum") {
-      if (!bucketValue.spec_option_id) {
-        continue;
-      }
-      if (!enumMatches(bucketValue.spec_option_id, rowsForDef, meta.wildcard_option_id)) {
-        return false;
-      }
-    } else if (meta.value_type === "boolean") {
-      if (bucketValue.value_boolean === null) {
-        continue;
-      }
-      if (!booleanMatches(bucketValue.value_boolean, rowsForDef)) {
-        return false;
-      }
-    } else if (meta.value_type === "number") {
-      if (bucketValue.value_number === null) {
-        continue;
-      }
-      if (!numericMatches(bucketValue.value_number, rowsForDef)) {
-        return false;
-      }
+    if (
+      !bucketSpecMatchesPartRows(
+        bucketToMatchInput(bucketValue),
+        rowsForDef,
+        meta.value_type,
+        preset,
+        meta.wildcard_option_id,
+      )
+    ) {
+      return false;
     }
   }
 
@@ -207,7 +186,7 @@ export const filterPartsForItem = async (
   itemId: string,
   bucket: MergedBucketSpecs,
 ): Promise<FilteredPartRow[]> => {
-  const effectiveDefs = await unionEffectiveForItems(client as Pool, [itemId]);
+  const effectiveDefs = await rootNamespaceForItems(client as Pool, [itemId]);
   const effectiveDefIds = new Set(effectiveDefs.map((def) => def.spec_def_id));
 
   const candidateIds = await loadCandidatePartIds(client, [itemId]);
@@ -215,13 +194,18 @@ export const filterPartsForItem = async (
     return [];
   }
 
-  const specsByPart = await loadPartSpecs(client, candidateIds);
-  const defMeta = await loadSpecDefMeta(client, [...effectiveDefIds]);
+  const [specsByPart, defMeta, presetsById] = await Promise.all([
+    loadPartSpecs(client, candidateIds),
+    loadSpecDefMeta(client, [...effectiveDefIds]),
+    loadPresetsForBucket(client, bucket),
+  ]);
 
   const matched: string[] = [];
   for (const partId of candidateIds) {
     const partSpecs = specsByPart.get(partId) ?? [];
-    if (partMatchesBucket(partSpecs, bucket, effectiveDefIds, defMeta)) {
+    if (
+      partMatchesBucket(partSpecs, bucket, effectiveDefIds, defMeta, presetsById)
+    ) {
       matched.push(partId);
     }
   }

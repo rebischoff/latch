@@ -592,7 +592,8 @@ TableGroup catalog [color: #e67e22] {
   spec_unit
   spec_def
   spec_option
-  item_spec_participation
+  spec_threshold_preset
+  spec_threshold_preset_option
   manufacturer_part_spec
   labor_phase
   item_labor_phase
@@ -650,6 +651,8 @@ Table spec_def {
     `code` column dropped (048) — matching uses FK ids only.
     **37p (2026-07-08):** `text` dropped; `number` + `unit_id`/`decimal_places` added.
     **37s (2026-07-08):** `range` def type dropped — band via optional part `value_number_max`.
+    **37ai (2026-07-12):** `item_spec_participation` dropped — an item's effective def set is
+    simply every row here where `scope_root_item_id` equals its scope root, no per-item opt-in.
   '''
 }
 
@@ -660,6 +663,32 @@ Table spec_option {
   sort_order int [not null, default: 0]
 
   Note: 'Enum values for a `spec_def`. Renamed from `system_spec_option`. `code` dropped (048).'
+}
+
+Table spec_threshold_preset {
+  id uuid [pk, default: `gen_random_uuid()`]
+  spec_def_id uuid [not null]
+  label text [not null]
+  sort_order int [not null, default: 0]
+  value_number numeric [note: 'nullable — number defs only (canonical unit, 37ae)']
+  value_number_max numeric [note: 'nullable — number defs only (canonical unit, 37ae)']
+
+  Note: '''
+    Admin-curated estimator shortcuts for a `spec_def` (37ae, 2026-07-12). Authored on scope
+    Specs tab Details popover only. Number presets fill `value_number` / `value_number_max`; enum
+    presets leave them null and use `spec_threshold_preset_option` for membership.
+  '''
+}
+
+Table spec_threshold_preset_option {
+  preset_id uuid [not null]
+  spec_option_id uuid [not null]
+
+  indexes {
+    (preset_id, spec_option_id) [pk]
+  }
+
+  Note: 'Enum preset membership — curated set of `spec_option` rows (37ae T2).'
 }
 
 Table manufacturer_part_spec {
@@ -725,23 +754,6 @@ Table item {
     `parent_id IS NULL` and `node_type = scope`. Estimate lines anchor to **quotable leaves**
     only (`node_type = item`, 044). Commercial FKs + `item_labor_phase` resolved via
     `resolveRate(N, R)` (040b).
-  '''
-}
-
-Table item_spec_participation {
-  item_id text [not null, note: 'FK → item where node_type = item — leaf only (37o)']
-  spec_def_id uuid [not null]
-  sort_order int [not null, default: 0]
-
-  indexes {
-    (item_id, spec_def_id) [pk]
-  }
-
-  Note: '''
-    **37o (2026-07-07):** flat per-leaf opt-in — replaces `item_spec_exclude` +
-    ownership-based inheritance. No ancestry, no exclude semantics: a row's presence means
-    this item's part filter uses this dimension; absence means it doesn't. Editing one item's
-    rows never affects any other item.
   '''
 }
 
@@ -959,10 +971,13 @@ Table estimate_condition_spec {
   spec_def_id uuid [not null]
   spec_option_id uuid [note: 'nullable — enum defs']
   value_boolean boolean [note: 'nullable — boolean defs']
-  value_number numeric [note: 'nullable — number/range bucket point (canonical, 37p)']
-  value_number_max numeric [note: 'nullable — unused on buckets']
+  value_number numeric [note: 'nullable — number bucket lower bound (canonical, 37p/37ae)']
+  value_number_max numeric [note: 'nullable — number bucket upper bound; null = +∞ (37ae T3)']
+  spec_threshold_preset_id uuid [note: 'nullable — enum/number preset shortcut (37ae T5)']
 
-  Note: 'Per-condition spec. Resolution: line → condition leaf→root → catalog (37y Y3).'
+  Note: '''
+    Per-condition spec. Resolution: line → condition leaf→root → catalog (37y Y3).
+  '''
 }
 
 Table estimate_condition_labor_phase {
@@ -983,10 +998,13 @@ Table estimate_line_spec {
   spec_def_id uuid [not null]
   spec_option_id uuid [note: 'nullable — enum defs']
   value_boolean boolean [note: 'nullable — boolean defs']
-  value_number numeric [note: 'nullable — number/range bucket point (canonical, 37p)']
-  value_number_max numeric [note: 'nullable — unused on buckets']
+  value_number numeric [note: 'nullable — number bucket lower bound (canonical, 37p/37ae)']
+  value_number_max numeric [note: 'nullable — number bucket upper bound; null = +∞ (37ae T3)']
+  spec_threshold_preset_id uuid [note: 'nullable — enum/number preset shortcut (37ae T5)']
 
-  Note: 'Per-line spec override. Resolution: line → condition leaf→root → catalog (37y Y3).'
+  Note: '''
+    Per-line spec override. Resolution: line → condition leaf→root → catalog (37y Y3).
+  '''
 }
 
 Table estimate_line {
@@ -1708,12 +1726,14 @@ Ref: item.markup_type_id > markup_type.id [delete: set null]
 Ref: item_labor_phase.item_id > item.id [delete: cascade]
 Ref: item_labor_phase.labor_phase_id > labor_phase.id [delete: restrict]
 Ref: item_labor_phase.labor_rate_type_id > labor_rate_type.id [delete: restrict]
-Ref: item_spec_participation.item_id > item.id [delete: cascade]
-Ref: item_spec_participation.spec_def_id > spec_def.id [delete: cascade]
+// item_spec_participation dropped (37ai, 2026-07-12) — see catalog.md decision V1
 Ref: spec_def.scope_root_item_id > item.id [delete: restrict]
 Ref: spec_def.unit_id > spec_unit.id [delete: restrict]
 Ref: spec_unit.canonical_unit_id > spec_unit.id [delete: restrict]
 Ref: spec_option.spec_def_id > spec_def.id [delete: cascade]
+Ref: spec_threshold_preset.spec_def_id > spec_def.id [delete: cascade]
+Ref: spec_threshold_preset_option.preset_id > spec_threshold_preset.id [delete: cascade]
+Ref: spec_threshold_preset_option.spec_option_id > spec_option.id [delete: restrict]
 Ref: manufacturer_part_spec.manufacturer_part_id > manufacturer_part.id [delete: cascade]
 Ref: manufacturer_part_spec.spec_def_id > spec_def.id [delete: cascade]
 Ref: manufacturer_part_spec.spec_option_id > spec_option.id [delete: cascade]
@@ -1739,11 +1759,13 @@ Ref: estimate_condition.complexity_factor_id > complexity_factor.id [delete: set
 Ref: estimate_condition_spec.estimate_condition_id > estimate_condition.id [delete: cascade]
 Ref: estimate_condition_spec.spec_def_id > spec_def.id [delete: restrict]
 Ref: estimate_condition_spec.spec_option_id > spec_option.id [delete: set null]
+Ref: estimate_condition_spec.spec_threshold_preset_id > spec_threshold_preset.id [delete: restrict]
 Ref: estimate_condition_labor_phase.estimate_condition_id > estimate_condition.id [delete: cascade]
 Ref: estimate_condition_labor_phase.labor_phase_id > labor_phase.id [delete: restrict]
 Ref: estimate_line_spec.estimate_line_id > estimate_line.id [delete: cascade]
 Ref: estimate_line_spec.spec_def_id > spec_def.id [delete: restrict]
 Ref: estimate_line_spec.spec_option_id > spec_option.id [delete: set null]
+Ref: estimate_line_spec.spec_threshold_preset_id > spec_threshold_preset.id [delete: restrict]
 Ref: estimate_line.estimate_id > estimate.id [delete: cascade]
 Ref: estimate_line.estimate_condition_id > estimate_condition.id [delete: restrict]
 Ref: estimate_line.parent_line_id > estimate_line.id [delete: set null]

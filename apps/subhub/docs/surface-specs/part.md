@@ -2,7 +2,7 @@
 
 > **Wave:** 3 · **Status:** shipped (37j part authoring, 2026-07-06) · **Implementation:** [`24-part-wave-3a.md`](../tasks/24-part-wave-3a.md) wave 3a — **complete** (2026-06-24); [`37j`](../tasks/37j-catalog-part-authoring.md) — `item_links` + `part_specs` · **Catalog:** [`surfaces.md`](../surfaces.md#part_list--part_detail) · **DBML:** `manufacturer_part`, `vendor_part`, `part_item`, `manufacturer_part_spec` · **Decisions:** [catalog parts](../decisions/catalog.md#decision-part_detail--mpn-catalog-and-vendor-pricing-2026-06-19), [part authoring UI](../decisions/catalog.md#decision-catalog-part-authoring-ui-2026-07-06), [catalog simplified](../decisions/catalog.md#decision-catalog--simplified-parts-items-categories-2026-06-16), [list+detail create](../decisions/general.md#decision-listdetail-surface-create--toolbar-and-picker-add-new-2026-06-19), [delete blockers](../decisions/cross-cutting.md#decision-delete-blocked-by-referential-use--structured-errors-2026-06-18), [cross-Surface nav](../decisions/general.md#decision-cross-surface-related-records--navigation-only-v1-2026-06-18)
 
-**Related:** [`manufacturer.md`](./manufacturer.md) — manufacturer is a picker anchor only; no parts hub. [`vendor.md`](./vendor.md) — primary `vendor_part` edit on this Surface. [`item.md`](./item.md) — part pool assignment on **`part_detail` only** v1 (no writable `part_pool` on `item_detail`). [`spec.md`](./spec.md) *(37o, new)* — `part_specs` writable-def union now reads `item_spec_participation` directly (no more ancestor walk). Estimate/job item pickers and part `item_links` are **leaf-only** (`node_type = item`) — [37u](../tasks/37u-part-leaf-links-specs-ui.md). Resolver matches exact `part_item.item_id` (no subtree walk). **Deferred:** `manufacturer_part.specs` free-text, part requirements, `cut_sheet_url` / submittals — estimate/job slice (#20–21).
+**Related:** [`manufacturer.md`](./manufacturer.md) — manufacturer is a picker anchor only; no parts hub. [`vendor.md`](./vendor.md) — primary `vendor_part` edit on this Surface. [`item.md`](./item.md) — part pool assignment on **`part_detail` only** v1 (no writable `part_pool` on `item_detail`). **`item.md`** *(37ai, 2026-07-12)* — `part_specs` writable-def union is now each linked leaf's **scope-root namespace** (`spec_definitions`), not a participation union — `item_spec_participation` is dropped entirely; see [decision V1–V8](../decisions/catalog.md#decision-spec-participation-removed--narrow-by-scope-root-namespace-part-row-presence-is-the-filter-2026-07-12). Estimate/job item pickers and part `item_links` are **leaf-only** (`node_type = item`) — [37u](../tasks/37u-part-leaf-links-specs-ui.md). Resolver matches exact `part_item.item_id` (no subtree walk). **Deferred:** `manufacturer_part.specs` free-text, part requirements, `cut_sheet_url` / submittals — estimate/job slice (#20–21).
 
 ---
 
@@ -20,7 +20,7 @@
 | 8 | Delete | `ConflictError` with counts + sample labels + deep links; allow when only `vendor_part` children; **PATCH** identity unless `RESTRICT` blockers |
 | 9 | Policy | **`profile`** and **`vendor_pricing`** separate manifest Fields — no sensitive-field tier |
 | 10 | Item assignment | **`item_links`** on `part_detail` — `part_item` replace-array; **`node_type = item` leaves only**; one multi leaf-only `TreeSelect`; resolver exact leaf match (no parent→subtree pool) — [37u](../tasks/37u-part-leaf-links-specs-ui.md) |
-| 11 | Part compatibility specs | **`part_specs`** on `part_detail` — Spec · Value table; boolean checkbox; number min + optional max; enum multi-select; rows = contextual union of linked leaves’ `item_spec_participation` |
+| 11 | Part compatibility specs | **`part_specs`** on `part_detail` — Spec · Value table; boolean checkbox; number min + optional max; enum multi-select; rows = union of linked leaves' **scope-root namespace** (37ai — not a participation subset; a blank row on a part means that dimension is skipped when matching, not "fails") |
 
 ---
 
@@ -127,7 +127,7 @@ Only **quotable leaves** (`item.node_type = 'item'`) are linkable. The estimate 
 }
 ```
 
-Enum defs may appear as **multiple rows** (one per compatible `spec_option_id`). Boolean / number: one row per def. UI is a **Spec · Value** table: checkbox (boolean), min + optional max popover (number), multi-select (enum). Writable defs = contextual union of `item_spec_participation` for the part's linked **leaves** (J6 / 37o — direct join; no ancestor walk).
+Enum defs may appear as **multiple rows** (one per compatible `spec_option_id`). Boolean / number: one row per def. UI is a **Spec · Value** table: checkbox (boolean), min + optional max popover (number), multi-select (enum). Writable defs = union of `spec_def WHERE scope_root_item_id IN (roots of the part's linked leaves)` (37ai — direct join on scope root, no participation table, no ancestor walk). **Blank/absent row for a def in this set is a valid, meaningful state** — it means the def doesn't apply to this part, and the estimate resolver skips (does not fail) that dimension for this part ([V5](../decisions/catalog.md#decision-spec-participation-removed--narrow-by-scope-root-namespace-part-row-presence-is-the-filter-2026-07-12)).
 
 ---
 
@@ -181,9 +181,9 @@ Enum defs may appear as **multiple rows** (one per compatible `spec_option_id`).
 
 **`is_preferred`:** when a row is patched/upserted with `is_preferred: true`, set `is_preferred = false` on all other `vendor_part` rows for the same `manufacturer_part_id` in the same transaction.
 
-**`item_links`:** replace-array — upsert by `item_id`; delete omitted rows; `sort_order` from array index; reject unknown `item_id`, duplicate `item_id`, and non-leaf `item_id` (`node_type <> 'item'`). **Prune** `manufacturer_part_spec` in the same transaction — delete rows whose `spec_def_id` is outside the contextual union for the new links (even when PATCH omits `part_specs`).
+**`item_links`:** replace-array — upsert by `item_id`; delete omitted rows; `sort_order` from array index; reject unknown `item_id`, duplicate `item_id`, and non-leaf `item_id` (`node_type <> 'item'`). **Prune** `manufacturer_part_spec` in the same transaction — delete rows whose `spec_def_id` is outside the recomputed namespace union for the new links (even when PATCH omits `part_specs`). **37ai:** this only ever narrows on scope-root change (rare) — moving from participation to full-namespace widened what's allowed, so most existing rows stay in-namespace.
 
-**`part_specs`:** replace-array — delete all rows for part then insert; reject `spec_def_id` outside contextual union (**37o:** `⋃ item_spec_participation` for `item_links`, direct join); enum = one row per `spec_option_id`; boolean / number = one row per def; strict value-type validation.
+**`part_specs`:** replace-array — delete all rows for part then insert; reject `spec_def_id` outside the namespace union (**37ai:** `⋃ spec_def WHERE scope_root_item_id IN (roots of item_links)`, direct join — **not** `item_spec_participation`, which is dropped); enum = one row per `spec_option_id`; boolean / number = one row per def; strict value-type validation. **No participation guardrail** — any def in scope may be valued for any linked part (accepted trade-off, [V4](../decisions/catalog.md#decision-spec-participation-removed--narrow-by-scope-root-namespace-part-row-presence-is-the-filter-2026-07-12)).
 
 **PATCH `manufacturer_party_id` / `mpn`:** allowed when no `RESTRICT` dependents (see § F); re-check uniqueness on change.
 
@@ -265,7 +265,7 @@ Master-detail per [routing-and-libraries.md](../routing-and-libraries.md): list 
 |-------|-----|---------|-------------|
 | `vendor_pricing` | **Add vendor price** | **Vendor** — vendor-tagged `party` only; [`LinkedSelectInput`](../../components/form/LinkedSelectInput.tsx) inline layout (`[ Select ] [ open icon ]`) when `vendor_detail` `read`; read-only row: label + icon (not inline link text); **Add new vendor** deferred | "No vendor pricing" |
 | `item_links` | multi `TreeSelect` | **Item** — org item tree; **leaves selectable only** (`node_type = item`); selection order → `sort_order` | "Not assigned to any items — add an item to include this part in estimate resolution." |
-| `part_specs` | (auto rows) | Spec · Value — checkbox / number min–max popover / enum multi-select; defs from linked leaves’ participation union | "Link items first — compatibility specs appear for each effective definition on the linked items." |
+| `part_specs` | (auto rows) | Spec · Value — checkbox / number min–max popover / enum multi-select; defs from linked leaves' scope-root namespace union (37ai) | "Link items first — compatibility specs appear for each definition in the linked items' scope." |
 
 ### `profile` pickers
 
@@ -302,8 +302,8 @@ Master-detail per [routing-and-libraries.md](../routing-and-libraries.md): list 
 | **Codegen L1/L2** | Hand-written descriptor + repository for `vendor_pricing` until collection codegen |
 | **`vendor_pricing` on `vendor_detail`** | Deferred optional read-only rollup — primary edit here ([`vendor.md`](./vendor.md)) |
 | **Picker return context** | [`25-manufacturer-detail.md`](../tasks/25-manufacturer-detail.md) + [return-context decision](../decisions/general.md#decision-picker-return-context--url-protocol-2026-06-24) — part → manufacturer first; other foreign pickers reuse protocol |
-| **Link shrink / orphan specs** | DAL **prunes** `manufacturer_part_spec` on `item_links` save when union shrinks (37k K1/K4); UI shows helper when links dirty and warning banner when GET rows fall outside current union until save. **37o:** stale rows are also inert at match time (matcher reads only current `item_spec_participation`), so eager prune stays a hygiene nicety, not a correctness requirement — see [S9](../decisions/catalog.md#decision-spec-definitions-scoped-to-root-flat-item-participation--no-ownershipinheritance-2026-07-07) |
-| **Option delete** | `spec_detail` save (37o; moved off `item_detail`) **blocks** removal of options referenced by part compatibility rows (`spec_option_in_use`) — diff upsert, not delete-all |
+| **Link shrink / orphan specs** | DAL **prunes** `manufacturer_part_spec` on `item_links` save when the namespace union shrinks (37k K1/K4, query updated 37ai); UI shows helper when links dirty and warning banner when GET rows fall outside current union until save. **37ai:** absence of a row for an in-namespace def is a normal, matched-as-wildcard state (not "stale") — pruning is now a rare correctness action (scope-root change) rather than routine hygiene, since widening from participation to full namespace means almost nothing falls outside the union anymore |
+| **Option delete** | `item_detail` Specs tab save (scope roots, 37o) **blocks** removal of options referenced by part compatibility rows (`spec_option_in_use`) — diff upsert, not delete-all |
 
 ---
 

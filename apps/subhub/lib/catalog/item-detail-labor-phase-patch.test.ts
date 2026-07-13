@@ -22,7 +22,6 @@ const manifest: Manifest = {
     profile: ["read", "write"],
     commercial: ["read", "write"],
     item_labor_phase: ["read", "write"],
-    spec_participation: ["read", "write"],
   },
 };
 
@@ -53,11 +52,8 @@ const baseRow: ItemDetailRow = {
 
 const emptyRelated: ItemDetailStoreRelated = {
   item_labor_phase: [],
-  inherited_labor_phase: [],
-  labor_phase_mode: "empty",
-  labor_phase_source_item_id: null,
-  labor_phase_source_item_name: null,
-  spec_participation: { participates: [] },
+  resolved_labor_phase: [],
+  spec_definitions: [],
 };
 
 describe("item_detail patch — related collections", () => {
@@ -85,12 +81,10 @@ describe("item_detail patch — related collections", () => {
 
     await dal.patch(ctx, "item-1", {
       item_labor_phase: laborPatch,
-      spec_participation: { participates: [] },
     });
 
     expect(replaceRelated).toHaveBeenCalledWith("item-1", {
       item_labor_phase: laborPatch,
-      spec_participation: { participates: [] },
     });
   });
 });

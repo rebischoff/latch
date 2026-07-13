@@ -45,6 +45,7 @@ describe("toSpecDefinitionPatchRow", () => {
         { id: "opt-1", display_name: "Matte", sort_order: 1 },
         { id: "opt-2", display_name: "Gloss", sort_order: 2 },
       ],
+      presets: [],
     });
   });
 
@@ -60,6 +61,7 @@ describe("toSpecDefinitionPatchRow", () => {
       decimal_places: 2,
       sort_order: 2,
       options: [],
+      presets: [],
     });
   });
 
@@ -79,6 +81,7 @@ describe("toSpecDefinitionPatchRow", () => {
       decimal_places: null,
       sort_order: 1,
       options: [],
+      presets: [],
     });
   });
 
@@ -114,5 +117,45 @@ describe("toSpecDefinitionPatchRow", () => {
       decimal_places: 2,
       options: [],
     });
+  });
+
+  it("converts number preset bounds to canonical storage units", () => {
+    const row = numberRow();
+    row.to_canonical_factor = 1609.34;
+    row.presets = [
+      {
+        id: "preset-1",
+        label: "Long haul",
+        sort_order: 1,
+        value_number: null,
+        value_number_max: 10,
+      },
+    ];
+
+    const patch = toSpecDefinitionPatchRow(row, 0);
+    expect(patch.presets).toHaveLength(1);
+    expect(patch.presets[0]?.value_number).toBeNull();
+    expect(patch.presets[0]?.value_number_max).toBeCloseTo(16093.4);
+  });
+
+  it("emits enum preset option sets", () => {
+    const row = enumRow();
+    row.presets = [
+      {
+        id: "preset-high",
+        label: "High",
+        sort_order: 1,
+        option_ids: ["opt-1"],
+      },
+    ];
+
+    expect(toSpecDefinitionPatchRow(row, 0).presets).toEqual([
+      {
+        id: "preset-high",
+        label: "High",
+        sort_order: 1,
+        option_ids: ["opt-1"],
+      },
+    ]);
   });
 });

@@ -1,11 +1,12 @@
 import type { Pool } from "pg";
 
+import { specValueToDisplay } from "../spec-units";
+import { mergeLaborPhasesAcrossAncestry } from "../labor-phase-resolve";
 import { tableExists } from "../../sites/repository/sql-utils";
 import {
   loadAllItems,
   resolveRootItemId,
 } from "./item-tree";
-import { deriveLaborPhaseMode } from "./item-labor-phase-display";
 
 export type ItemDetailRow = {
   csi_code: string | null;
@@ -41,43 +42,38 @@ export type SpecOptionRow = {
   sort_order: number;
 };
 
+export type SpecThresholdPresetRow = {
+  id: string;
+  label: string;
+  option_ids: string[];
+  sort_order: number;
+  value_number: number | null;
+  value_number_max: number | null;
+};
+
 export type SpecDefinitionRow = {
   decimal_places: number | null;
   display_name: string;
   id: string;
   in_use_part_count: number;
-  in_use_participation_count: number;
   options: SpecOptionRow[];
+  presets: SpecThresholdPresetRow[];
   sort_order: number;
   unit_id: string | null;
   unit_symbol: string | null;
   value_type: "boolean" | "enum" | "number";
 };
 
-export type SpecParticipationRow = {
-  participates: Array<{
-    active: boolean;
-    display_name: string;
-    spec_def_id: string;
-    value_type: "boolean" | "enum" | "number";
-  }>;
+export type ResolvedLaborPhaseRow = ItemLaborPhaseRow & {
+  origin: "own" | "inherited";
+  source_item_id: string | null;
+  source_item_name: string | null;
 };
-
-export type InheritedLaborPhaseRow = ItemLaborPhaseRow & {
-  source_item_id: string;
-  source_item_name: string;
-};
-
-export type LaborPhaseMode = "empty" | "inherited" | "override";
 
 export type ItemDetailRelated = {
-  inherited_labor_phase: InheritedLaborPhaseRow[];
   item_labor_phase: ItemLaborPhaseRow[];
-  labor_phase_mode: LaborPhaseMode;
-  labor_phase_source_item_id: string | null;
-  labor_phase_source_item_name: string | null;
+  resolved_labor_phase: ResolvedLaborPhaseRow[];
   spec_definitions: SpecDefinitionRow[];
-  spec_participation: SpecParticipationRow;
 };
 
 const loadItemHasChildren = async (pool: Pool, id: string): Promise<boolean> => {
@@ -182,10 +178,6 @@ export const loadItemDetail = async (
   };
 };
 
-const emptySpecParticipation = (): SpecParticipationRow => ({
-  participates: [],
-});
-
 const emptySpecDefinitions = (): SpecDefinitionRow[] => [];
 
 const loadSpecOptionsByDefIds = async (
@@ -218,27 +210,113 @@ const loadSpecOptionsByDefIds = async (
   return byDefId;
 };
 
+type SpecThresholdPresetDbRow = {
+  id: string;
+  label: string;
+  sort_order: number;
+  spec_def_id: string;
+  value_number: string | null;
+  value_number_max: string | null;
+};
+
+const loadSpecPresetOptionsByPresetIds = async (
+  pool: Pool,
+  presetIds: string[],
+): Promise<Map<string, string[]>> => {
+  if (presetIds.length === 0) {
+    return new Map();
+  }
+
+  const result = await pool.query<{ preset_id: string; spec_option_id: string }>(
+    `SELECT preset_id, spec_option_id
+     FROM spec_threshold_preset_option
+     WHERE preset_id = ANY($1::uuid[])
+     ORDER BY spec_option_id ASC`,
+    [presetIds],
+  );
+
+  const byPresetId = new Map<string, string[]>();
+  for (const row of result.rows) {
+    const optionIds = byPresetId.get(row.preset_id) ?? [];
+    optionIds.push(row.spec_option_id);
+    byPresetId.set(row.preset_id, optionIds);
+  }
+
+  return byPresetId;
+};
+
+const loadSpecPresetsByDefIds = async (
+  pool: Pool,
+  defs: Array<{
+    decimal_places: number | null;
+    id: string;
+    to_canonical_factor: number | null;
+    unit_symbol: string | null;
+    value_type: "boolean" | "enum" | "number";
+  }>,
+): Promise<Map<string, SpecThresholdPresetRow[]>> => {
+  const defIds = defs.map((def) => def.id);
+  if (defIds.length === 0) {
+    return new Map();
+  }
+
+  const result = await pool.query<SpecThresholdPresetDbRow>(
+    `SELECT id, spec_def_id, label, sort_order, value_number::text, value_number_max::text
+     FROM spec_threshold_preset
+     WHERE spec_def_id = ANY($1::uuid[])
+     ORDER BY sort_order ASC, label ASC, id ASC`,
+    [defIds],
+  );
+
+  if (result.rows.length === 0) {
+    return new Map();
+  }
+
+  const presetIds = result.rows.map((row) => row.id);
+  const optionsByPresetId = await loadSpecPresetOptionsByPresetIds(pool, presetIds);
+  const defMetaById = new Map(defs.map((def) => [def.id, def]));
+
+  const byDefId = new Map<string, SpecThresholdPresetRow[]>();
+  for (const row of result.rows) {
+    const defMeta = defMetaById.get(row.spec_def_id);
+    const unitMeta = {
+      decimal_places: defMeta?.decimal_places,
+      to_canonical_factor: defMeta?.to_canonical_factor ?? 1,
+      unit_symbol: defMeta?.unit_symbol,
+    };
+    const presets = byDefId.get(row.spec_def_id) ?? [];
+    presets.push({
+      id: row.id,
+      label: row.label,
+      sort_order: row.sort_order,
+      value_number:
+        row.value_number !== null
+          ? specValueToDisplay(Number(row.value_number), unitMeta)
+          : null,
+      value_number_max:
+        row.value_number_max !== null
+          ? specValueToDisplay(Number(row.value_number_max), unitMeta)
+          : null,
+      option_ids: optionsByPresetId.get(row.id) ?? [],
+    });
+    byDefId.set(row.spec_def_id, presets);
+  }
+
+  return byDefId;
+};
+
 const loadSpecDefInUseCounts = async (
   pool: Pool,
   specDefId: string,
-): Promise<{ participation: number; parts: number }> => {
-  const [participationResult, partResult] = await Promise.all([
-    pool.query<{ count: number }>(
-      `SELECT COUNT(*)::int AS count
-       FROM item_spec_participation
-       WHERE spec_def_id = $1`,
-      [specDefId],
-    ),
-    pool.query<{ count: number }>(
-      `SELECT COUNT(*)::int AS count
-       FROM manufacturer_part_spec
-       WHERE spec_def_id = $1`,
-      [specDefId],
-    ),
-  ]);
+): Promise<{ parts: number }> => {
+  const partResult = await pool.query<{ count: number }>(
+    `SELECT COUNT(*)::int AS count
+     FROM manufacturer_part_spec
+     WHERE spec_def_id = $1`,
+    [specDefId],
+  );
 
   return {
-    participation: participationResult.rows[0]?.count ?? 0,
     parts: partResult.rows[0]?.count ?? 0,
   };
 };
@@ -252,6 +330,7 @@ export const loadScopeSpecDefinitions = async (
     display_name: string;
     id: string;
     sort_order: number;
+    to_canonical_factor: number | null;
     unit_id: string | null;
     unit_symbol: string | null;
     value_type: "boolean" | "enum" | "number";
@@ -263,7 +342,8 @@ export const loadScopeSpecDefinitions = async (
        sd.unit_id,
        sd.decimal_places,
        sd.sort_order,
-       su.symbol AS unit_symbol
+       su.symbol AS unit_symbol,
+       su.to_canonical_factor
      FROM spec_def sd
      LEFT JOIN spec_unit su ON su.id = sd.unit_id
      WHERE sd.scope_root_item_id = $1
@@ -276,7 +356,10 @@ export const loadScopeSpecDefinitions = async (
   }
 
   const defIds = defsResult.rows.map((row) => row.id);
-  const optionsByDefId = await loadSpecOptionsByDefIds(pool, defIds);
+  const [optionsByDefId, presetsByDefId] = await Promise.all([
+    loadSpecOptionsByDefIds(pool, defIds),
+    loadSpecPresetsByDefIds(pool, defsResult.rows),
+  ]);
 
   const rows: SpecDefinitionRow[] = [];
   for (const def of defsResult.rows) {
@@ -290,7 +373,7 @@ export const loadScopeSpecDefinitions = async (
       decimal_places: def.decimal_places,
       sort_order: def.sort_order,
       options: optionsByDefId.get(def.id) ?? [],
-      in_use_participation_count: counts.participation,
+      presets: presetsByDefId.get(def.id) ?? [],
       in_use_part_count: counts.parts,
     });
   }
@@ -298,114 +381,32 @@ export const loadScopeSpecDefinitions = async (
   return rows;
 };
 
-const loadNamespaceSpecDefs = async (
-  pool: Pool,
-  scopeRootId: string,
-): Promise<
-  Array<{
-    display_name: string;
-    id: string;
-    value_type: "boolean" | "enum" | "number";
-  }>
-> => {
-  const result = await pool.query<{
-    display_name: string;
-    id: string;
-    value_type: "boolean" | "enum" | "number";
-  }>(
-    `SELECT id, display_name, value_type
-     FROM spec_def
-     WHERE scope_root_item_id = $1
-     ORDER BY sort_order ASC, display_name ASC, id ASC`,
-    [scopeRootId],
-  );
-
-  return result.rows;
-};
-
-const loadParticipationIds = async (
+export const resolveResolvedLaborPhases = async (
   pool: Pool,
   itemId: string,
-): Promise<Set<string>> => {
-  const result = await pool.query<{ spec_def_id: string }>(
-    `SELECT spec_def_id FROM item_spec_participation WHERE item_id = $1`,
-    [itemId],
-  );
-
-  return new Set(result.rows.map((row) => row.spec_def_id));
-};
-
-export const buildSpecParticipation = (
-  defs: Array<{
-    display_name: string;
-    id: string;
-    value_type: "boolean" | "enum" | "number";
-  }>,
-  activeIds: Set<string>,
-): SpecParticipationRow => ({
-  participates: defs.map((def) => ({
-    spec_def_id: def.id,
-    display_name: def.display_name,
-    value_type: def.value_type,
-    active: activeIds.has(def.id),
-  })),
-});
-
-export const loadItemSpecParticipation = async (
-  pool: Pool,
-  category: ItemDetailRow,
-): Promise<SpecParticipationRow> => {
-  if (category.node_type !== "item") {
-    return emptySpecParticipation();
-  }
-
-  const rootItemId = category.root_item_id;
-  if (!rootItemId) {
-    return emptySpecParticipation();
-  }
-
-  const [defs, activeIds] = await Promise.all([
-    loadNamespaceSpecDefs(pool, rootItemId),
-    loadParticipationIds(pool, category.id),
-  ]);
-
-  if (defs.length === 0) {
-    return emptySpecParticipation();
-  }
-
-  return buildSpecParticipation(defs, activeIds);
-};
-
-export const resolveInheritedLaborPhases = async (
-  pool: Pool,
-  itemId: string,
-): Promise<{
-  rows: InheritedLaborPhaseRow[];
-  source_item_id: string | null;
-  source_item_name: string | null;
-}> => {
+): Promise<ResolvedLaborPhaseRow[]> => {
   const allItems = await loadAllItems(pool);
   const itemsById = new Map(allItems.map((row) => [row.id, row]));
 
-  let current = itemsById.get(itemId)?.parent_id ?? null;
+  const ancestryIds: string[] = [];
+  let current: string | null = itemId;
   while (current) {
-    const rows = await loadItemLaborPhases(pool, current);
-    if (rows.length > 0) {
-      const source = itemsById.get(current);
-      return {
-        rows: rows.map((row) => ({
-          ...row,
-          source_item_id: current!,
-          source_item_name: source?.name ?? "",
-        })),
-        source_item_id: current,
-        source_item_name: source?.name ?? null,
-      };
-    }
+    ancestryIds.push(current);
     current = itemsById.get(current)?.parent_id ?? null;
   }
 
-  return { rows: [], source_item_id: null, source_item_name: null };
+  const ancestry = await Promise.all(
+    ancestryIds.map(async (id) => {
+      const node = itemsById.get(id);
+      return {
+        itemId: id,
+        itemName: node?.name ?? "",
+        rows: await loadItemLaborPhases(pool, id),
+      };
+    }),
+  );
+
+  return mergeLaborPhasesAcrossAncestry(ancestry);
 };
 
 export const loadItemLaborPhases = async (
@@ -441,39 +442,24 @@ export const loadItemDetailRelated = async (
   if (!category) {
     return {
       item_labor_phase: [],
-      inherited_labor_phase: [],
-      labor_phase_mode: "empty",
-      labor_phase_source_item_id: null,
-      labor_phase_source_item_name: null,
+      resolved_labor_phase: [],
       spec_definitions: emptySpecDefinitions(),
-      spec_participation: emptySpecParticipation(),
     };
   }
 
-  const [item_labor_phase, inherited] = await Promise.all([
+  const [item_labor_phase, resolved_labor_phase] = await Promise.all([
     loadItemLaborPhases(pool, categoryId),
-    resolveInheritedLaborPhases(pool, categoryId),
+    resolveResolvedLaborPhases(pool, categoryId),
   ]);
-  const inherited_labor_phase = inherited.rows;
-  const labor_phase_mode = deriveLaborPhaseMode(item_labor_phase, inherited_labor_phase);
 
   const spec_definitions =
     category.node_type === "scope"
       ? await loadScopeSpecDefinitions(pool, categoryId)
       : emptySpecDefinitions();
 
-  const spec_participation =
-    category.node_type === "item"
-      ? await loadItemSpecParticipation(pool, category)
-      : emptySpecParticipation();
-
   return {
     item_labor_phase,
-    inherited_labor_phase,
-    labor_phase_mode,
-    labor_phase_source_item_id: inherited.source_item_id,
-    labor_phase_source_item_name: inherited.source_item_name,
+    resolved_labor_phase,
     spec_definitions,
-    spec_participation,
   };
 };

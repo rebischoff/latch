@@ -2,7 +2,7 @@ import { ValidationError } from "@latch/contracts";
 import { withPermissionDb } from "@latch/pg-session";
 import type { Pool, PoolClient } from "pg";
 
-import { unionEffectiveForItems } from "../../catalog/repository/item-effective-specs";
+import { rootNamespaceForItems } from "../../catalog/repository/item-effective-specs";
 import { tableExists } from "../../sites/repository/sql-utils";
 import { loadItemLinks } from "./part-item-links";
 
@@ -48,7 +48,7 @@ const loadContextDefsForItemIds = async (
     return [];
   }
 
-  const effectiveDefs = await unionEffectiveForItems(pool as Pool, itemIds);
+  const effectiveDefs = await rootNamespaceForItems(pool as Pool, itemIds);
   const specDefIds = effectiveDefs.map((def) => def.spec_def_id);
   if (specDefIds.length === 0) {
     return [];
@@ -337,7 +337,7 @@ export const prunePartSpecsToContextTx = async (
     return result.rowCount ?? 0;
   }
 
-  const effectiveDefs = await unionEffectiveForItems(client as unknown as Pool, itemIds);
+  const effectiveDefs = await rootNamespaceForItems(client as unknown as Pool, itemIds);
   const allowedDefIds = effectiveDefs.map((def) => def.spec_def_id);
 
   if (allowedDefIds.length === 0) {

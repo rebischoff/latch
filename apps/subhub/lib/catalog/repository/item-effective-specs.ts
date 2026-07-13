@@ -35,7 +35,7 @@ export const scopePanelDefs = async (
   return result.rows;
 };
 
-export const unionEffectiveForItems = async (
+export const rootNamespaceForItems = async (
   pool: Pool,
   itemIds: string[],
 ): Promise<EffectiveSpecDef[]> => {
@@ -44,10 +44,17 @@ export const unionEffectiveForItems = async (
   }
 
   const result = await pool.query<EffectiveSpecDef>(
-    `${effectiveSpecDefSelect}
+    `WITH RECURSIVE ancestry AS (
+       SELECT id, id AS origin_id, parent_id FROM item WHERE id = ANY($1::text[])
+       UNION ALL
+       SELECT i.id, a.origin_id, i.parent_id
+       FROM item i
+       JOIN ancestry a ON i.id = a.parent_id
+     )
+     ${effectiveSpecDefSelect}
      ${effectiveSpecDefFrom}
-     INNER JOIN item_spec_participation p ON p.spec_def_id = sd.id
-     WHERE p.item_id = ANY($1::text[])
+     JOIN ancestry a ON sd.scope_root_item_id = a.id
+     WHERE a.parent_id IS NULL
      ORDER BY sd.sort_order ASC, sd.display_name ASC, sd.id ASC`,
     [itemIds],
   );

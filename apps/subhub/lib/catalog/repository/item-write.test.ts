@@ -4,7 +4,6 @@ import { describe, expect, it, vi } from "vitest";
 
 import { assertParentItemExists, assertParentNotQuotable, assertReparentAllowed } from "./item-write";
 import { nestItemTree, resolveRootItemId } from "./item-tree";
-import { assertSpecDefsBelongToRoot } from "./item-spec-participation-write";
 
 const flatItem = (
   id: string,
@@ -61,23 +60,6 @@ describe("assertParentItemExists", () => {
     await expect(assertParentItemExists(client, "missing")).rejects.toBeInstanceOf(
       ValidationError,
     );
-  });
-});
-
-describe("assertSpecDefsBelongToRoot", () => {
-  it("rejects spec_def_id from another root namespace", async () => {
-    const client = {
-      query: vi.fn().mockResolvedValue({ rows: [{ id: "def-1" }] }),
-    } as unknown as PoolClient;
-
-    await expect(
-      assertSpecDefsBelongToRoot(client, "root-a", ["def-1", "def-2"]),
-    ).rejects.toMatchObject({
-      details: {
-        field: "spec_participation",
-        code: "wrong_root_namespace",
-      },
-    });
   });
 });
 

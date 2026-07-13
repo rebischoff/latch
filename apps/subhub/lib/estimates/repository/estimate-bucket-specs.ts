@@ -3,8 +3,10 @@ import type { Pool, PoolClient } from "pg";
 export type BucketSpecValue = {
   spec_def_id: string;
   spec_option_id: string | null;
+  spec_threshold_preset_id: string | null;
   value_boolean: boolean | null;
   value_number: number | null;
+  value_number_max: number | null;
 };
 
 export type MergedBucketSpecs = Map<string, BucketSpecValue>;
@@ -28,8 +30,10 @@ export const loadConditionBucketSpecs = async (
   const result = await client.query<BucketSpecValue>(
     `SELECT spec_def_id::text,
             spec_option_id,
+            spec_threshold_preset_id,
             value_boolean,
-            value_number
+            value_number,
+            value_number_max
      FROM estimate_condition_spec
      WHERE estimate_condition_id = $1`,
     [estimateConditionId],
@@ -72,8 +76,10 @@ export const loadLineBucketSpecs = async (
   const result = await client.query<BucketSpecValue>(
     `SELECT spec_def_id::text,
             spec_option_id,
+            spec_threshold_preset_id,
             value_boolean,
-            value_number
+            value_number,
+            value_number_max
      FROM estimate_line_spec
      WHERE estimate_line_id = $1`,
     [estimateLineId],
@@ -115,9 +121,11 @@ export const loadMergedBucketForLine = async (
 };
 
 export const isBucketValueBlank = (spec: BucketSpecValue): boolean =>
+  spec.spec_threshold_preset_id === null &&
   spec.spec_option_id === null &&
   spec.value_boolean === null &&
-  spec.value_number === null;
+  spec.value_number === null &&
+  spec.value_number_max === null;
 
 /** @deprecated Scope tier removed in 37y — returns []. */
 export const loadScopeBucketSpecs = async (

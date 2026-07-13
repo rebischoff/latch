@@ -1,6 +1,7 @@
 import type { Pool } from "pg";
 
 import { scopePanelDefs } from "@/lib/catalog/repository/item-effective-specs";
+import { loadSpecPresetsByDefIds } from "@/lib/catalog/repository/spec-threshold-presets-read";
 
 import type {
   EstimateSiteScopeTreeRow,
@@ -103,9 +104,8 @@ export const loadSpecTemplatesForRoots = async (
     })),
   );
 
-  const defIds = [
-    ...new Set(panelDefsByRoot.flatMap((entry) => entry.defs.map((def) => def.spec_def_id))),
-  ];
+  const allPanelDefs = panelDefsByRoot.flatMap((entry) => entry.defs);
+  const defIds = [...new Set(allPanelDefs.map((def) => def.spec_def_id))];
   const optionsByDefId = new Map<string, EstimateScopeSpecRow["options"]>();
 
   if (defIds.length > 0) {
@@ -128,6 +128,17 @@ export const loadSpecTemplatesForRoots = async (
     }
   }
 
+  const presetsByDefId = await loadSpecPresetsByDefIds(
+    pool,
+    allPanelDefs.map((def) => ({
+      id: def.spec_def_id,
+      decimal_places: def.decimal_places,
+      to_canonical_factor: def.to_canonical_factor,
+      unit_symbol: def.unit_symbol,
+      value_type: def.value_type,
+    })),
+  );
+
   const templates: Record<string, EstimateScopeSpecRow[]> = {};
   for (const entry of panelDefsByRoot) {
     templates[entry.rootItemId] = entry.defs.map((def) => ({
@@ -135,13 +146,16 @@ export const loadSpecTemplatesForRoots = async (
       def_display_name: def.display_name,
       value_type: def.value_type,
       spec_option_id: null,
+      spec_threshold_preset_id: null,
       option_display_name: null,
       value_number: null,
+      value_number_max: null,
       value_boolean: null,
       unit_symbol: def.unit_symbol,
       to_canonical_factor: def.to_canonical_factor,
       decimal_places: def.decimal_places,
       options: optionsByDefId.get(def.spec_def_id) ?? [],
+      presets: presetsByDefId.get(def.spec_def_id) ?? [],
     }));
   }
 

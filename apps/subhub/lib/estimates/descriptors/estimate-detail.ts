@@ -2,6 +2,8 @@ import type { Manifest } from "@latch/contracts";
 import type { SurfaceDescriptor } from "@latch/dal";
 import { z } from "zod";
 
+import type { SpecThresholdPresetRow } from "@/lib/catalog/descriptors/item-detail";
+
 const EstimateStakeholderPatchElementSchema = z
   .object({
     party_id: z.string(),
@@ -19,7 +21,9 @@ const EstimateConditionSpecPatchElementSchema = z
   .object({
     spec_def_id: z.string(),
     spec_option_id: z.string().nullable().optional(),
+    spec_threshold_preset_id: z.string().nullable().optional(),
     value_number: z.number().nullable().optional(),
+    value_number_max: z.number().nullable().optional(),
     value_boolean: z.boolean().nullable().optional(),
   })
   .strict();
@@ -37,8 +41,10 @@ const EstimateConditionPatchElementSchema: z.ZodType<{
   specs: Array<{
     spec_def_id: string;
     spec_option_id?: string | null;
+    spec_threshold_preset_id?: string | null;
     value_boolean?: boolean | null;
     value_number?: number | null;
+    value_number_max?: number | null;
   }>;
 }> = z.lazy(() =>
   z
@@ -181,12 +187,15 @@ export type EstimateConditionSpecRow = {
   def_display_name: string;
   option_display_name: string | null;
   options?: Array<{ display_name: string; id: string }>;
+  presets?: SpecThresholdPresetRow[];
   spec_def_id: string;
   spec_option_id: string | null;
+  spec_threshold_preset_id: string | null;
   to_canonical_factor: number;
   unit_symbol: string | null;
   value_boolean: boolean | null;
   value_number: number | null;
+  value_number_max: number | null;
   value_type: "enum" | "boolean" | "number";
 };
 

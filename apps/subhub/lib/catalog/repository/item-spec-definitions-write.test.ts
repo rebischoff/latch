@@ -10,6 +10,7 @@ import {
   assertSpecDefTypeUnitMutable,
   assertSpecDefinitionShape,
   assertSpecOptionDeletable,
+  assertSpecPresetsShape,
 } from "./spec-detail-write";
 
 describe("assertScopeSpecDefinitionsPatch", () => {
@@ -43,7 +44,7 @@ describe("assertSpecDefinitionShape", () => {
 });
 
 describe("assertSpecDefTypeUnitMutable", () => {
-  it("allows retype when only participation exists", async () => {
+  it("allows retype when no part value rows exist", async () => {
     const client = {
       query: vi.fn(async () => ({ rows: [{ count: 0 }] })),
     } as unknown as PoolClient;
@@ -70,6 +71,38 @@ describe("assertSpecDefTypeUnitMutable", () => {
   });
 });
 
+describe("assertSpecPresetsShape", () => {
+  it("rejects empty enum preset option sets", () => {
+    expect(() =>
+      assertSpecPresetsShape(
+        "enum",
+        [{ label: "High", option_ids: [] }],
+        new Set(["opt-1"]),
+      ),
+    ).toThrow(ValidationError);
+  });
+
+  it("rejects orphan option_id references", () => {
+    expect(() =>
+      assertSpecPresetsShape(
+        "enum",
+        [{ label: "High", option_ids: ["opt-missing"] }],
+        new Set(["opt-1"]),
+      ),
+    ).toThrow(ValidationError);
+  });
+
+  it("allows number presets with only max bound", () => {
+    expect(() =>
+      assertSpecPresetsShape(
+        "number",
+        [{ label: "High", value_number: null, value_number_max: 10 }],
+        new Set(),
+      ),
+    ).not.toThrow();
+  });
+});
+
 describe("replaceScopeSpecDefinitionsTx", () => {
   it("inserts spec_def and enum options for a scope root", async () => {
     const sqlCalls: string[] = [];
@@ -85,6 +118,7 @@ describe("replaceScopeSpecDefinitionsTx", () => {
         display_name: "SLC protocol",
         value_type: "enum",
         options: [{ display_name: "LiteSpeed" }],
+        presets: [],
       },
     ]);
 
@@ -112,10 +146,40 @@ describe("replaceScopeSpecDefinitionsTx", () => {
         unit_id: "a1000001-0001-4001-8001-000000000001",
         decimal_places: 2,
         options: [],
+        presets: [],
       },
     ]);
 
     expect(sqlCalls.some((sql) => sql.includes("INSERT INTO spec_def"))).toBe(true);
+  });
+
+  it("upserts enum threshold presets and junction rows", async () => {
+    const sqlCalls: string[] = [];
+    const client = {
+      query: vi.fn(async (sql: string) => {
+        sqlCalls.push(sql);
+        if (sql.includes("FROM spec_option WHERE spec_def_id")) {
+          return { rows: [{ id: "opt-1" }] };
+        }
+        return { rows: [] };
+      }),
+    } as unknown as PoolClient;
+
+    await replaceScopeSpecDefinitionsTx(client, "fa-root", [
+      {
+        display_name: "Candela",
+        value_type: "enum",
+        options: [{ id: "opt-1", display_name: "135" }],
+        presets: [{ label: "High", option_ids: ["opt-1"] }],
+      },
+    ]);
+
+    expect(sqlCalls.some((sql) => sql.includes("INSERT INTO spec_threshold_preset"))).toBe(
+      true,
+    );
+    expect(
+      sqlCalls.some((sql) => sql.includes("INSERT INTO spec_threshold_preset_option")),
+    ).toBe(true);
   });
 });
 
@@ -140,6 +204,25 @@ describe("assertSpecOptionDeletable", () => {
           return { rows: [{ count: 0 }] };
         }
         return { rows: [{ count: 1 }] };
+      }),
+    } as unknown as PoolClient;
+
+    await expect(assertSpecOptionDeletable(client, "opt-1")).rejects.toThrow(ValidationError);
+  });
+
+  it("rejects removal when threshold presets reference the option", async () => {
+    const client = {
+      query: vi.fn(async (sql: string) => {
+        if (sql.includes("manufacturer_part_spec")) {
+          return { rows: [{ count: 0 }] };
+        }
+        if (sql.includes("estimate_condition_spec")) {
+          return { rows: [{ count: 0 }] };
+        }
+        if (sql.includes("spec_threshold_preset_option")) {
+          return { rows: [{ count: 2 }] };
+        }
+        return { rows: [{ count: 0 }] };
       }),
     } as unknown as PoolClient;
 
