@@ -19,6 +19,7 @@ import {
   type MergedBucketSpecs,
 } from "./estimate-bucket-specs";
 import { resolveLineMaterial } from "./estimate-part-resolver";
+import { loadConditionIncludeDiscontinued } from "./estimate-part-picker";
 
 export type RecalcLineInput = EstimateLineItemPatchRow & {
   id: string;
@@ -40,6 +41,7 @@ export type RecalcLineOutput = RecalcLineInput & {
 export type RecalcContextOverrides = {
   bucket?: MergedBucketSpecs;
   complexity?: ComplexityContext;
+  includeDiscontinued?: boolean;
   laborPhases?: string[] | null;
 };
 
@@ -116,6 +118,8 @@ export const recalcProductLine = async (
     },
     bucket,
     line.is_new ?? false,
+    overrides?.includeDiscontinued ??
+      (await loadConditionIncludeDiscontinued(client, line.estimate_condition_id)),
   );
 
   const unitMaterial = material.unit_material;

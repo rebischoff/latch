@@ -1,6 +1,5 @@
 import type { Pool } from "pg";
 
-import { loadSpecPresetsByDefIds } from "@/lib/catalog/repository/spec-threshold-presets-read";
 import { scopePanelDefs } from "@/lib/catalog/repository/item-effective-specs";
 import { tableExists } from "@/lib/sites/repository/sql-utils";
 
@@ -13,6 +12,7 @@ import type {
 type EstimateConditionBaseRow = {
   complexity_factor_id: string | null;
   id: string;
+  include_discontinued: boolean;
   labor_phases_explicit: boolean;
   name: string;
   parent_condition_id: string | null;
@@ -63,7 +63,6 @@ const loadSavedConditionSpecs = async (
     option_display_name: string | null;
     spec_def_id: string;
     spec_option_id: string | null;
-    spec_threshold_preset_id: string | null;
     value_boolean: boolean | null;
     value_number: number | null;
     value_number_max: number | null;
@@ -78,7 +77,6 @@ const loadSavedConditionSpecs = async (
     option_display_name: string | null;
     spec_def_id: string;
     spec_option_id: string | null;
-    spec_threshold_preset_id: string | null;
     value_boolean: boolean | null;
     value_number: number | null;
     value_number_max: number | null;
@@ -87,7 +85,6 @@ const loadSavedConditionSpecs = async (
        ecs.estimate_condition_id,
        ecs.spec_def_id,
        ecs.spec_option_id,
-       ecs.spec_threshold_preset_id,
        ecs.value_number,
        ecs.value_number_max,
        ecs.value_boolean,
@@ -162,24 +159,7 @@ const mergeConditionSpecs = async (
       ),
     ),
   ];
-  const [optionsByDefId, presetsByDefId] = await Promise.all([
-    loadSpecOptions(pool, defIds),
-    loadSpecPresetsByDefIds(
-      pool,
-      defIds.map((defId) => {
-        const def = [...panelDefsByRoot.values()]
-          .flat()
-          .find((row) => row.spec_def_id === defId);
-        return {
-          id: defId,
-          decimal_places: def?.decimal_places ?? null,
-          to_canonical_factor: def?.to_canonical_factor ?? 1,
-          unit_symbol: def?.unit_symbol ?? null,
-          value_type: def?.value_type ?? "boolean",
-        };
-      }),
-    ),
-  ]);
+  const optionsByDefId = await loadSpecOptions(pool, defIds);
 
   const specsByConditionId = new Map<string, EstimateConditionSpecRow[]>();
   for (const condition of conditionRows) {
@@ -198,7 +178,6 @@ const mergeConditionSpecs = async (
           def_display_name: def.display_name,
           value_type: def.value_type,
           spec_option_id: saved?.spec_option_id ?? null,
-          spec_threshold_preset_id: saved?.spec_threshold_preset_id ?? null,
           option_display_name: saved?.option_display_name ?? null,
           value_number: saved?.value_number ?? null,
           value_number_max: saved?.value_number_max ?? null,
@@ -207,7 +186,6 @@ const mergeConditionSpecs = async (
           to_canonical_factor: def.to_canonical_factor,
           decimal_places: def.decimal_places,
           options: optionsByDefId.get(def.spec_def_id) ?? [],
-          presets: presetsByDefId.get(def.spec_def_id) ?? [],
         };
       }),
     );
@@ -272,6 +250,7 @@ const buildConditionTree = (
       root_item_name: row.root_item_name,
       sort_order: row.sort_order,
       complexity_factor_id: row.complexity_factor_id,
+      include_discontinued: row.include_discontinued,
       labor_phases_explicit: row.labor_phases_explicit,
       included_labor_phases: laborByConditionId.get(row.id) ?? [],
       specs: specsByConditionId.get(row.id) ?? [],
@@ -313,6 +292,7 @@ export const loadEstimateConditions = async (
        i.name AS root_item_name,
        ec.sort_order,
        ec.complexity_factor_id,
+       ec.include_discontinued,
        ec.labor_phases_explicit
      FROM estimate_condition ec
      LEFT JOIN item i ON i.id = ec.root_item_id

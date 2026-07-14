@@ -1,6 +1,7 @@
 # Migration 060 — spec threshold presets + bucket ranges
 
-> **Status:** Plan (2026-07-12). **Task:** [37ae](../tasks/37ae-spec-threshold-presets-ddl.md) · **Decision:** [spec threshold presets + numeric bucket ranges](../decisions/catalog.md#decision-spec-threshold-presets--numeric-bucket-ranges-2026-07-12).
+> **Status:** Applied (task **37ae**, 2026-07-12). **Superseded:** preset tables/FKs dropped by [071](./071-drop-threshold-presets-plan.md) / **41ao**. Numeric `value_number_max` retained.
+> **Task:** [37ae](../tasks/37ae-spec-threshold-presets-ddl.md) · **Decision:** [spec threshold presets + numeric bucket ranges](../decisions/catalog.md#decision-spec-threshold-presets--numeric-bucket-ranges-2026-07-12).
 
 ## Goal
 

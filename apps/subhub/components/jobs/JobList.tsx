@@ -2,10 +2,11 @@
 
 import { Table, Typography } from "antd";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 
 import { useSurfaceList } from "@/lib/hooks/use-surface-list";
 import { routes } from "@/lib/nav-routes";
+import { buildDetailHref } from "@/lib/surface-navigation";
 
 type JobListSummary = {
   title?: string | null;
@@ -15,6 +16,7 @@ type JobListSummary = {
 
 export const JobList = () => {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { data, isLoading, error } = useSurfaceList("job_list");
 
   if (error) {
@@ -44,7 +46,12 @@ export const JobList = () => {
           render: (_, row) => {
             const summary = row.summary as JobListSummary | undefined;
             return (
-              <Link href={routes.jobs.detail(row.id)}>
+              <Link
+                href={buildDetailHref({
+                  detailPath: routes.jobs.detail(row.id),
+                  currentSearch: searchParams,
+                })}
+              >
                 {summary?.title ?? row.id}
               </Link>
             );

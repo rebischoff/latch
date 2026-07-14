@@ -279,6 +279,8 @@ One Surface; Ant Design `Tabs` — policy unchanged across tabs ([layout decisio
 └──────────────────────────────────────────────────────────────┘
 ```
 
+URL `?tab=` keys: `overview` (default, omit), `scope`, `field`, `billing`. Same-surface list navigation preserves `tab` via `buildDetailHref`; invalid keys fall back to Overview.
+
 **Shared components:** `JobDetailForm` (production); `JobStakeholderFields` (mirror `EstimateStakeholderFields`).
 
 **Scope tab (4d′+):** shared line editor component (wave **3e**); flat default; grouped-by-place toggle after wave **2b** geography — same rules as [`estimate.md`](./estimate.md) § G.

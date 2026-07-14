@@ -4,17 +4,29 @@ import { fieldAllows, ForbiddenError, ValidationError } from "@latch/contracts";
 import { getPool, resolveContext } from "@/lib/latch";
 import { loadMergedBucketForLine } from "@/lib/estimates/repository/estimate-bucket-specs";
 import { resolveFilteredParts } from "@/lib/estimates/repository/estimate-part-resolver";
-import { loadFilteredPartsForEstimateLine } from "@/lib/estimates/repository/estimate-part-picker";
+import {
+  EstimatePartPickerRequestSchema,
+  loadConditionIncludeDiscontinued,
+  loadFilteredPartsForEstimateLine,
+  loadFilteredPartsWithDraft,
+} from "@/lib/estimates/repository/estimate-part-picker";
 import { assertSurfaceRead } from "@/lib/surfaces/assert-surface-read";
 
+const assertPartsRead = async () => {
+  const ctx = await resolveContext({ surfaceId: "estimate_detail" });
+  assertSurfaceRead(ctx);
+
+  if (!fieldAllows(ctx.manifest, "line_items", "read")) {
+    throw new ForbiddenError();
+  }
+
+  return ctx;
+};
+
+/** Saved-only parts list (no unsaved condition draft). Prefer POST when C is dirty. */
 export const GET = async (request: Request): Promise<Response> =>
   withApiHandler(async () => {
-    const ctx = await resolveContext({ surfaceId: "estimate_detail" });
-    assertSurfaceRead(ctx);
-
-    if (!fieldAllows(ctx.manifest, "line_items", "read")) {
-      throw new ForbiddenError();
-    }
+    const ctx = await assertPartsRead();
 
     const params = new URL(request.url).searchParams;
     const itemId = params.get("item_id")?.trim();
@@ -40,7 +52,16 @@ export const GET = async (request: Request): Promise<Response> =>
         estimateConditionId,
         lineId ?? null,
       );
-      parts = await resolveFilteredParts(pool, itemId, bucket);
+      const includeDiscontinued = await loadConditionIncludeDiscontinued(
+        pool,
+        estimateConditionId,
+      );
+      parts = await resolveFilteredParts(
+        pool,
+        itemId,
+        bucket,
+        includeDiscontinued,
+      );
     } else {
       throw new ValidationError(
         "estimate_id+line_id or estimate_condition_id is required",
@@ -51,5 +72,30 @@ export const GET = async (request: Request): Promise<Response> =>
       );
     }
 
+    return jsonSuccess({ parts }, ctx.manifest);
+  });
+
+/** Parts list using the same draft-bucket merge as line-preview. */
+export const POST = async (request: Request): Promise<Response> =>
+  withApiHandler(async () => {
+    const ctx = await assertPartsRead();
+
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      throw new ValidationError("Invalid JSON body", { code: "invalid_json" });
+    }
+
+    const parsed = EstimatePartPickerRequestSchema.safeParse(body);
+    if (!parsed.success) {
+      throw new ValidationError("Invalid parts picker payload", {
+        code: "invalid_body",
+        issues: parsed.error.issues,
+      });
+    }
+
+    const pool = getPool();
+    const parts = await loadFilteredPartsWithDraft(pool, parsed.data);
     return jsonSuccess({ parts }, ctx.manifest);
   });

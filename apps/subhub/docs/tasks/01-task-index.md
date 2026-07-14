@@ -261,11 +261,17 @@ flowchart LR
 | **37ab** | [37ab-item-placement-mount-axis.md](./37ab-item-placement-mount-axis.md) | `item_placement` browse tree + mount labor/margin axis override (M1–M7, L1–L6) — **superseded/reverted** (2026-07-11), see 37ac |
 | **37ac** | [37ac-item-placement-mount-axis-revert.md](./37ac-item-placement-mount-axis-revert.md) | Revert 37ab — drop `item_placement`/`item_cost_override`/`commercial_axis`; mount variance = leaf-per-location (R1–R6) — **complete** (2026-07-11) |
 | **37ad** | [37ad-labor-phase-per-row-override.md](./37ad-labor-phase-per-row-override.md) | Labor phase resolution merges per `labor_phase_id` across full ancestry (was atomic group); catalog UI per-row inherit/override; no schema change — **complete** (2026-07-12) |
-| **37ae** | [37ae-spec-threshold-presets-ddl.md](./37ae-spec-threshold-presets-ddl.md) | Threshold presets + bucket `value_number_max` / `spec_threshold_preset_id` DDL (A1–T10) — **pending** |
-| **37af** | [37af-spec-threshold-presets-catalog-ui.md](./37af-spec-threshold-presets-catalog-ui.md) | Author presets on scope Specs Details popover — **complete** (2026-07-12) |
-| **37ag** | [37ag-spec-threshold-presets-matcher.md](./37ag-spec-threshold-presets-matcher.md) | Interval-overlap + enum preset set match; bucket DAL — **complete** (2026-07-12) |
-| **37ah** | [37ah-spec-threshold-presets-estimate-ui.md](./37ah-spec-threshold-presets-estimate-ui.md) | Estimate C panel preset / range controls — **complete** (2026-07-12) |
+| **37ae** | [37ae-spec-threshold-presets-ddl.md](./37ae-spec-threshold-presets-ddl.md) | Threshold presets + bucket `value_number_max` / `spec_threshold_preset_id` DDL (A1–T10) — **complete** (2026-07-12); presets dropped by **41ao** |
+| **37af** | [37af-spec-threshold-presets-catalog-ui.md](./37af-spec-threshold-presets-catalog-ui.md) | Author presets on scope Specs Details popover — **complete** (2026-07-12); superseded by **41ao** |
+| **37ag** | [37ag-spec-threshold-presets-matcher.md](./37ag-spec-threshold-presets-matcher.md) | Interval-overlap + enum preset set match; bucket DAL — **complete** (2026-07-12); presets dropped by **41ao** |
+| **37ah** | [37ah-spec-threshold-presets-estimate-ui.md](./37ah-spec-threshold-presets-estimate-ui.md) | Estimate C panel preset / range controls — **complete** (2026-07-12); superseded by **41ao** |
 | **37ai** | [37ai-spec-participation-removal.md](./37ai-spec-participation-removal.md) | Drop `item_spec_participation`; item narrows via scope-root namespace; part-row absence = wildcard match (V1–V8) — **complete** (2026-07-12) |
+| **37aj** | [37aj-estimate-part-select-and-seed.md](./37aj-estimate-part-select-and-seed.md) | Part column always Select; draft-bucket options; notification mount `part_item` parity seed (W2a) — **complete** |
+| **41ak** | [41ak-part-discontinued-filter.md](./41ak-part-discontinued-filter.md) | `discontinued` on parts; C panel include toggle; resolver/picker filter (W2b) — **complete** |
+| **41al** | [41al-estimate-boolean-spec-select.md](./41al-estimate-boolean-spec-select.md) | Boolean C panel Select (True/False, allowClear) — **complete** (2026-07-13) |
+| **41am** | [41am-part-boolean-spec-select.md](./41am-part-boolean-spec-select.md) | Part Specs boolean Select (True/False, allowClear → omit row) — **complete** (2026-07-13) |
+| **41an** | [41an-candela-low-high.md](./41an-candela-low-high.md) | Candela enum Low/High; rewrite seeds + migration 070; strobe parts Low — **complete** (2026-07-13) |
+| **41ao** | [41ao-drop-threshold-presets.md](./41ao-drop-threshold-presets.md) | Drop threshold presets; estimate number popover parity — **complete** (2026-07-13) |
 | **37h** | *(see 37a chain)* | Job `site_zone_id` FK renames |
 
 ### Backbone pass (estimate finish) — tasks 29–32
@@ -449,8 +455,10 @@ When a task completes:
 |---|------|----------|
 | 38 | [38-master-detail-chrome.md](./38-master-detail-chrome.md) | Shared toolbar + `returnTo` create navigation — **complete** |
 | 39 | [39-toolbar-chrome-slots.md](./39-toolbar-chrome-slots.md) | Slot-based list/form → toolbar; category **New child** parent fix |
+| **40** | [40-detail-tab-persistence.md](./40-detail-tab-persistence.md) | URL `?tab=` on all tabbed details; `buildDetailHref` + availability fallback — **complete** |
 
 **Planning:** [12-master-detail-chrome.md](../planning/12-master-detail-chrome.md) · [13-toolbar-chrome.md](../planning/13-toolbar-chrome.md).
+**Decision:** [detail tab persistence](../decisions/general.md#decision-detail-tab-persistence--url-tab--availability-fallback-2026-07-13).
 
 ---
 

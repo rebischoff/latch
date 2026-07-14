@@ -47,8 +47,9 @@ _Operations backbone forks **resolved** (2026-06-27). Optional: [J3 phase weight
 
 | Decision | File | Date | Status |
 |----------|------|------|--------|
+| Detail tab persistence — URL `?tab=` + availability fallback | [general.md](./general.md#decision-detail-tab-persistence--url-tab--availability-fallback-2026-07-13) | 2026-07-13 | **locked** ([40](../tasks/40-detail-tab-persistence.md)) |
 | Spec participation removed — namespace narrowing + part-row presence (V1–V8) | [catalog.md](./catalog.md) | 2026-07-12 | **locked** ([37ai](../tasks/37ai-spec-participation-removal.md)) |
-| Spec threshold presets + numeric bucket ranges (A1–T10) | [catalog.md](./catalog.md) | 2026-07-12 | **locked** ([37ae](../tasks/37ae-spec-threshold-presets-ddl.md) → [37ah](../tasks/37ah-spec-threshold-presets-estimate-ui.md)) |
+| Spec threshold presets + numeric bucket ranges (A1–T10) | [catalog.md](./catalog.md) | 2026-07-12 | **superseded** by [41ao](../tasks/41ao-drop-threshold-presets.md) (numeric ranges retained) |
 | Labor phase per-row override — merge across full ancestry | [catalog.md](./catalog.md) | 2026-07-12 | **locked** ([37ad](../tasks/37ad-labor-phase-per-row-override.md)) |
 | Deferred — cross-spec dependency and derived specs | [catalog.md](./catalog.md) | 2026-07-11 | **deferred** |
 | `slc_protocol` naming — rename + explicit `none`/`conventional` option | [catalog.md](./catalog.md) | 2026-07-11 | planning (no task) |
@@ -56,6 +57,8 @@ _Operations backbone forks **resolved** (2026-06-27). Optional: [J3 phase weight
 | Item placement + mount axis override — reverted, leaf duplication instead (R1–R6) | [catalog.md](./catalog.md) | 2026-07-11 | **locked** ([37ac](../tasks/37ac-item-placement-mount-axis-revert.md)) |
 | Item placement — multi-location browse tree, decoupled from cost resolution (L1–L6) | [catalog.md](./catalog.md) | 2026-07-11 | **superseded** ([37ac](../tasks/37ac-item-placement-mount-axis-revert.md)) |
 | Item labor axis override — single-spec axis, no compound (M1–M7, M7 = margin FK extension) | [catalog.md](./catalog.md) | 2026-07-11 | **superseded** ([37ac](../tasks/37ac-item-placement-mount-axis-revert.md)) |
+| Line item pick + costing walkthrough (W1+) | [estimate.md](./estimate.md#decision-line-item-pick--costing-walkthrough-2026-07-13) | 2026-07-13 | **in progress** (W1, W2a locked; [37aj](../tasks/37aj-estimate-part-select-and-seed.md) ✅; next W2b or 37h) |
+| Dual line locks + live preview (P1–P7) | [estimate.md](./estimate.md#decision-estimate-dual-line-locks-and-live-preview-2026-07-11) | 2026-07-11 | **locked** ([37aa](../tasks/37aa-estimate-line-live-preview.md)) |
 | Condition-only commercial tree (Y1–Y5) | [estimate.md](./estimate.md) | 2026-07-09 | **locked** ([37y](../tasks/37y-condition-only-commercial-tree.md)) |
 | Estimate scope / condition / zone / line qty (G1–G5e) | [estimate.md](./estimate.md) | 2026-07-09 | **locked** · **amended by Y1–Y5** ([37x](../tasks/37x-estimate-conditions-allocations.md)) |
 | Part item links leaf-only + Specs value UX | [catalog.md](./catalog.md) | 2026-07-08 | **locked** ([37u](../tasks/37u-part-leaf-links-specs-ui.md)) |

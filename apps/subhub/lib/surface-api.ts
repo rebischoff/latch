@@ -210,17 +210,8 @@ export type EstimateSiteTreePickerData = {
         def_display_name: string;
         option_display_name: string | null;
         options?: Array<{ display_name: string; id: string }>;
-        presets?: Array<{
-          id: string;
-          label: string;
-          option_ids: string[];
-          sort_order: number;
-          value_number: number | null;
-          value_number_max: number | null;
-        }>;
         spec_def_id: string;
         spec_option_id: string | null;
-        spec_threshold_preset_id?: string | null;
         to_canonical_factor?: number;
         unit_symbol?: string | null;
         value_boolean: boolean | null;
@@ -262,17 +253,8 @@ export type EstimateScopeSpecTemplateRow = {
   def_display_name: string;
   option_display_name: string | null;
   options?: Array<{ display_name: string; id: string }>;
-  presets?: Array<{
-    id: string;
-    label: string;
-    option_ids: string[];
-    sort_order: number;
-    value_number: number | null;
-    value_number_max: number | null;
-  }>;
   spec_def_id: string;
   spec_option_id: string | null;
-  spec_threshold_preset_id?: string | null;
   to_canonical_factor?: number;
   unit_symbol?: string | null;
   value_boolean: boolean | null;
@@ -312,15 +294,23 @@ export const fetchEstimatePartPicker = async (params: {
   estimateConditionId: string;
   estimateId?: string;
   lineId?: string;
+  conditionDraft?: EstimateLinePreviewConditionDraft;
 }): Promise<ApiSuccessBody<EstimatePartPickerData>> => {
-  const search = new URLSearchParams({ item_id: params.itemId });
-  if (params.estimateId && params.lineId) {
-    search.set("estimate_id", params.estimateId);
-    search.set("line_id", params.lineId);
-  } else {
-    search.set("estimate_condition_id", params.estimateConditionId);
-  }
-  const response = await fetch(`/api/estimates/pickers/parts?${search.toString()}`);
+  const response = await fetch("/api/estimates/pickers/parts", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      item_id: params.itemId,
+      estimate_condition_id: params.estimateConditionId,
+      line_id: params.lineId ?? null,
+      condition_draft: params.conditionDraft
+        ? {
+            specs: params.conditionDraft.specs,
+            include_discontinued: params.conditionDraft.include_discontinued,
+          }
+        : undefined,
+    }),
+  });
   return parseResponse<EstimatePartPickerData>(response);
 };
 
@@ -347,11 +337,13 @@ export type EstimateLinePreviewConditionDraft = {
   complexity_factor_id?: string | null;
   labor_phases_explicit?: boolean;
   included_labor_phases?: string[];
+  include_discontinued?: boolean;
   specs?: Array<{
     spec_def_id: string;
     spec_option_id?: string | null;
     value_boolean?: boolean | null;
     value_number?: number | null;
+    value_number_max?: number | null;
   }>;
 };
 

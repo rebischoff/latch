@@ -40,6 +40,7 @@ export const createPartDetailStore = (
       unit: row.unit,
       purchase_unit: row.purchase_unit,
       units_per_purchase: row.units_per_purchase,
+      discontinued: row.discontinued,
     };
     await updatePart(pool, actorId, writeRow, existing);
   },

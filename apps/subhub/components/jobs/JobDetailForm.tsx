@@ -28,6 +28,7 @@ import {
   type JobStakeholderFormRow,
 } from "@/components/jobs/JobStakeholderFields";
 import { useJobSitePicker } from "@/lib/hooks/use-job-site-picker";
+import { useDetailTab } from "@/lib/hooks/use-detail-tab";
 import { useSurfaceListCreate } from "@/lib/hooks/use-surface-list-create";
 import { useSurfaceDetail } from "@/lib/hooks/use-surface-detail";
 import { useSurfacePatch } from "@/lib/hooks/use-surface-patch";
@@ -38,6 +39,8 @@ import {
 import { routes } from "@/lib/nav-routes";
 import { navigateOnCancel } from "@/lib/surface-navigation";
 import { SurfaceApiError } from "@/lib/surface-api";
+
+const JOB_TAB_KEYS = ["overview", "scope", "field", "billing"] as const;
 
 const STATUS_COLORS: Record<string, string> = {
   planned: "default",
@@ -505,6 +508,11 @@ export const JobDetailForm = ({
     <Typography.Paragraph type="secondary">Billing ships in wave 6b.</Typography.Paragraph>
   );
 
+  const { activeKey, setTab } = useDetailTab({
+    availableKeys: JOB_TAB_KEYS,
+    defaultKey: "overview",
+  });
+
   return (
     <SurfaceFormRoot
       manifest={activeManifest}
@@ -519,6 +527,8 @@ export const JobDetailForm = ({
         <SurfaceFormLayout>
           <DetailHeader
             title={isCreate ? "New job" : (profile?.title ?? "Job")}
+            activeKey={activeKey}
+            onChange={setTab}
             items={[
               { key: "overview", label: "Overview", children: overviewTab },
               { key: "scope", label: "Scope", children: scopeTab },

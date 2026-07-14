@@ -4,11 +4,8 @@ import { z } from "zod";
 
 import {
   loadConditionAncestorIds,
-  loadConditionBucketSpecs,
-  loadLineBucketSpecs,
-  mergeBucketSpecs,
+  loadMergedBucketWithDraft,
   type BucketSpecValue,
-  type MergedBucketSpecs,
 } from "./estimate-bucket-specs";
 import {
   loadCommercialCatalog,
@@ -16,6 +13,9 @@ import {
   loadConditionLaborPhases,
   type ComplexityContext,
 } from "./estimate-commercial";
+import {
+  loadConditionIncludeDiscontinued,
+} from "./estimate-part-picker";
 import {
   recalcProductLine,
   type RecalcContextOverrides,
@@ -27,7 +27,6 @@ const PreviewSpecSchema = z
   .object({
     spec_def_id: z.string(),
     spec_option_id: z.string().nullable().optional(),
-    spec_threshold_preset_id: z.string().nullable().optional(),
     value_boolean: z.boolean().nullable().optional(),
     value_number: z.number().nullable().optional(),
     value_number_max: z.number().nullable().optional(),
@@ -39,6 +38,7 @@ export const EstimateLinePreviewConditionDraftSchema = z
     complexity_factor_id: z.string().nullable().optional(),
     labor_phases_explicit: z.boolean().optional(),
     included_labor_phases: z.array(z.string()).optional(),
+    include_discontinued: z.boolean().optional(),
     specs: z.array(PreviewSpecSchema).optional(),
   })
   .strict();
@@ -118,30 +118,6 @@ const assertConditionBelongsToEstimate = async (
   }
 };
 
-const loadMergedBucketWithDraft = async (
-  client: Pool | PoolClient,
-  conditionId: string,
-  lineId: string | null,
-  draftSpecs: BucketSpecValue[] | undefined,
-): Promise<MergedBucketSpecs> => {
-  const conditionSpecsRootToLeaf: BucketSpecValue[] = [];
-  const leafToRoot = await loadConditionAncestorIds(client, conditionId);
-  for (const ancestorId of [...leafToRoot].reverse()) {
-    if (draftSpecs && ancestorId === conditionId) {
-      conditionSpecsRootToLeaf.push(...draftSpecs);
-    } else {
-      conditionSpecsRootToLeaf.push(
-        ...(await loadConditionBucketSpecs(client, ancestorId)),
-      );
-    }
-  }
-
-  const lineSpecs =
-    lineId !== null ? await loadLineBucketSpecs(client, lineId) : [];
-
-  return mergeBucketSpecs(conditionSpecsRootToLeaf, lineSpecs);
-};
-
 const resolveDraftComplexity = async (
   client: Pool | PoolClient,
   conditionId: string,
@@ -187,6 +163,17 @@ const resolveDraftLaborPhases = async (
   return draft.included_labor_phases ?? [];
 };
 
+const resolveDraftIncludeDiscontinued = async (
+  client: Pool | PoolClient,
+  conditionId: string,
+  draft: EstimateLinePreviewRequest["condition_draft"],
+): Promise<boolean> => {
+  if (draft?.include_discontinued !== undefined) {
+    return draft.include_discontinued;
+  }
+  return loadConditionIncludeDiscontinued(client, conditionId);
+};
+
 const toPreviewResult = (row: RecalcLineOutput): EstimateLinePreviewResultLine => ({
   id: row.id,
   part_id: row.part_id ?? null,
@@ -223,16 +210,16 @@ export const previewEstimateLines = async (
   const draftSpecs: BucketSpecValue[] | undefined = draft?.specs?.map((spec) => ({
     spec_def_id: spec.spec_def_id,
     spec_option_id: spec.spec_option_id ?? null,
-    spec_threshold_preset_id: spec.spec_threshold_preset_id ?? null,
     value_boolean: spec.value_boolean ?? null,
     value_number: spec.value_number ?? null,
     value_number_max: spec.value_number_max ?? null,
   }));
 
-  const [catalog, complexity, laborPhases] = await Promise.all([
+  const [catalog, complexity, laborPhases, includeDiscontinued] = await Promise.all([
     loadCommercialCatalog(client),
     resolveDraftComplexity(client, request.condition_id, draft),
     resolveDraftLaborPhases(client, request.condition_id, draft),
+    resolveDraftIncludeDiscontinued(client, request.condition_id, draft),
   ]);
 
   const results: EstimateLinePreviewResultLine[] = [];
@@ -249,6 +236,7 @@ export const previewEstimateLines = async (
       bucket,
       complexity,
       laborPhases,
+      includeDiscontinued,
     };
 
     const input: RecalcLineInput = {

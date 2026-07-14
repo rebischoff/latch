@@ -51,6 +51,7 @@ import { SurfaceFormLayout } from "@/components/surface/SurfaceFormLayout";
 import { SurfaceFormRoot } from "@/components/surface/SurfaceFormRoot";
 import { useFieldMode } from "@/components/surface/useFieldMode";
 import { useApplyPickerReturn } from "@/lib/hooks/use-apply-picker-return";
+import { useDetailTab } from "@/lib/hooks/use-detail-tab";
 import { useEstimateSitePicker } from "@/lib/hooks/use-estimate-site-picker";
 import { useEstimateSiteTree } from "@/lib/hooks/use-estimate-site-tree";
 import { estimateSitePickerKey } from "@/lib/hooks/surface-query-keys";
@@ -143,10 +144,6 @@ const mapConditions = (rows: unknown): EstimateConditionFormRow[] => {
             value_type: valueType,
             spec_option_id:
               typeof spec.spec_option_id === "string" ? spec.spec_option_id : null,
-            spec_threshold_preset_id:
-              typeof spec.spec_threshold_preset_id === "string"
-                ? spec.spec_threshold_preset_id
-                : null,
             option_display_name:
               typeof spec.option_display_name === "string"
                 ? spec.option_display_name
@@ -181,43 +178,6 @@ const mapConditions = (rows: unknown): EstimateConditionFormRow[] => {
                   })
                   .filter((option): option is { id: string; display_name: string } =>
                     Boolean(option),
-                  )
-              : undefined,
-            presets: Array.isArray(spec.presets)
-              ? spec.presets
-                  .map((presetRow) => {
-                    const preset = presetRow as Record<string, unknown>;
-                    if (typeof preset.id !== "string" || typeof preset.label !== "string") {
-                      return null;
-                    }
-
-                    return {
-                      id: preset.id,
-                      label: preset.label,
-                      sort_order:
-                        typeof preset.sort_order === "number" ? preset.sort_order : 0,
-                      value_number:
-                        typeof preset.value_number === "number" ? preset.value_number : null,
-                      value_number_max:
-                        typeof preset.value_number_max === "number"
-                          ? preset.value_number_max
-                          : null,
-                      option_ids: Array.isArray(preset.option_ids)
-                        ? preset.option_ids.filter((id): id is string => typeof id === "string")
-                        : [],
-                    };
-                  })
-                  .filter(
-                    (
-                      preset,
-                    ): preset is {
-                      id: string;
-                      label: string;
-                      option_ids: string[];
-                      sort_order: number;
-                      value_number: number | null;
-                      value_number_max: number | null;
-                    } => Boolean(preset),
                   )
               : undefined,
           };
@@ -284,6 +244,7 @@ const mapConditions = (rows: unknown): EstimateConditionFormRow[] => {
             ? condition.complexity_factor_id
             : null,
         labor_phases_explicit: condition.labor_phases_explicit === true,
+        include_discontinued: condition.include_discontinued === true,
         included_labor_phases: mapLaborPhases(condition.included_labor_phases),
         specs: mapSpecs(condition.specs),
         conditions: mapTree(condition.conditions, id),
@@ -654,6 +615,7 @@ export const EstimateDetailForm = ({
             root_item_id: condition.root_item_id,
             sort_order: conditionIndex + 1,
             complexity_factor_id: condition.complexity_factor_id,
+            include_discontinued: condition.include_discontinued,
             labor_phases_explicit: condition.labor_phases_explicit,
             included_labor_phases: condition.included_labor_phases.map((phase) => ({
               labor_phase_id: phase.labor_phase_id,
@@ -920,6 +882,12 @@ export const EstimateDetailForm = ({
       : []),
   ];
 
+  const { activeKey, setTab } = useDetailTab({
+    availableKeys: tabItems.map((item) => item.key),
+    defaultKey: "general",
+    ready: isCreate || Boolean(detail) || Boolean(error),
+  });
+
   return (
     <SurfaceFormRoot
       manifest={activeManifest}
@@ -934,6 +902,8 @@ export const EstimateDetailForm = ({
         <SurfaceFormLayout>
           <DetailHeader
             title={isCreate ? "New estimate" : (profile?.title ?? "Estimate")}
+            activeKey={activeKey}
+            onChange={setTab}
             items={tabItems.length > 0 ? tabItems : undefined}
           />
         </SurfaceFormLayout>

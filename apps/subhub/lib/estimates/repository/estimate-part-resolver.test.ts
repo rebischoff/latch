@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import type { ThresholdPresetMatchMeta } from "@/lib/catalog/spec-match";
 
 import {
   partMatchesBucket,
@@ -8,7 +7,6 @@ import {
 } from "./estimate-part-resolver";
 import type { MergedBucketSpecs } from "./estimate-bucket-specs";
 
-const emptyPresets = new Map<string, ThresholdPresetMatchMeta>();
 
 const bucket = (
   specDefId: string,
@@ -18,7 +16,6 @@ const bucket = (
   map.set(specDefId, {
     spec_def_id: specDefId,
     spec_option_id: null,
-    spec_threshold_preset_id: null,
     value_boolean: null,
     value_number: null,
     value_number_max: null,
@@ -37,7 +34,7 @@ describe("partMatchesBucket", () => {
     const merged: MergedBucketSpecs = new Map();
 
     expect(
-      partMatchesBucket(specs, merged, effective, defMeta("def-1", "enum"), emptyPresets),
+      partMatchesBucket(specs, merged, effective, defMeta("def-1", "enum")),
     ).toBe(true);
   });
 
@@ -50,9 +47,7 @@ describe("partMatchesBucket", () => {
         specs,
         merged,
         new Set(["def-1"]),
-        defMeta("def-1", "enum"),
-        emptyPresets,
-      ),
+        defMeta("def-1", "enum")),
     ).toBe(true);
   });
 
@@ -72,9 +67,7 @@ describe("partMatchesBucket", () => {
         specs,
         bucket("def-1", { spec_option_id: "opt-a" }),
         new Set(["def-1"]),
-        defMeta("def-1", "enum"),
-        emptyPresets,
-      ),
+        defMeta("def-1", "enum")),
     ).toBe(true);
   });
 
@@ -94,9 +87,7 @@ describe("partMatchesBucket", () => {
         specs,
         bucket("def-1", { spec_option_id: "opt-a" }),
         new Set(["def-1"]),
-        defMeta("def-1", "enum"),
-        emptyPresets,
-      ),
+        defMeta("def-1", "enum")),
     ).toBe(false);
   });
 
@@ -117,9 +108,7 @@ describe("partMatchesBucket", () => {
         specs,
         merged,
         new Set(["def-b"]),
-        defMeta("def-b", "boolean"),
-        emptyPresets,
-      ),
+        defMeta("def-b", "boolean")),
     ).toBe(true);
   });
 
@@ -144,8 +133,7 @@ describe("partMatchesBucket", () => {
           ["def-ton", { spec_def_id: "def-ton", value_type: "number", wildcard_option_id: null }],
           ["def-trip", { spec_def_id: "def-trip", value_type: "number", wildcard_option_id: null }],
         ]),
-        emptyPresets,
-      ),
+              ),
     ).toBe(true);
   });
 
@@ -164,7 +152,6 @@ describe("partMatchesBucket", () => {
         {
           spec_def_id: tonnageDef,
           spec_option_id: null,
-          spec_threshold_preset_id: null,
           value_boolean: null,
           value_number: 3,
           value_number_max: 3,
@@ -175,7 +162,6 @@ describe("partMatchesBucket", () => {
         {
           spec_def_id: tripDef,
           spec_option_id: null,
-          spec_threshold_preset_id: null,
           value_boolean: null,
           value_number: 15,
           value_number_max: 15,
@@ -200,7 +186,7 @@ describe("partMatchesBucket", () => {
       },
     ];
 
-    expect(partMatchesBucket(matchingPart, merged, effective, meta, emptyPresets)).toBe(true);
+    expect(partMatchesBucket(matchingPart, merged, effective, meta)).toBe(true);
 
     const wrongTonnage: PartSpecRow[] = [
       {
@@ -212,7 +198,7 @@ describe("partMatchesBucket", () => {
       },
       matchingPart[1]!,
     ];
-    expect(partMatchesBucket(wrongTonnage, merged, effective, meta, emptyPresets)).toBe(false);
+    expect(partMatchesBucket(wrongTonnage, merged, effective, meta)).toBe(false);
 
     const wrongBand: PartSpecRow[] = [
       matchingPart[0]!,
@@ -224,7 +210,7 @@ describe("partMatchesBucket", () => {
         value_number_max: 12,
       },
     ];
-    expect(partMatchesBucket(wrongBand, merged, effective, meta, emptyPresets)).toBe(false);
+    expect(partMatchesBucket(wrongBand, merged, effective, meta)).toBe(false);
   });
 
   it("matches ≥135 bucket against part band [150,185]", () => {
@@ -245,46 +231,29 @@ describe("partMatchesBucket", () => {
         specs,
         merged,
         new Set([defId]),
-        defMeta(defId, "number"),
-        emptyPresets,
-      ),
+        defMeta(defId, "number")),
     ).toBe(true);
   });
 
-  it("matches enum preset set on bucket", () => {
+  it("matches Candela High enum bucket against part option set", () => {
     const defId = "def-candela";
-    const presetId = "preset-high";
     const specs: PartSpecRow[] = [
       {
         spec_def_id: defId,
-        spec_option_id: "150",
+        spec_option_id: "opt-high",
         value_boolean: null,
         value_number: null,
         value_number_max: null,
       },
     ];
-    const merged = bucket(defId, { spec_threshold_preset_id: presetId });
-    const presets = new Map<string, ThresholdPresetMatchMeta>([
-      [
-        presetId,
-        {
-          id: presetId,
-          spec_def_id: defId,
-          option_ids: ["135", "150", "177", "185"],
-          value_number: null,
-          value_number_max: null,
-        },
-      ],
-    ]);
+    const merged = bucket(defId, { spec_option_id: "opt-high" });
 
     expect(
       partMatchesBucket(
         specs,
         merged,
         new Set([defId]),
-        defMeta(defId, "enum"),
-        presets,
-      ),
+        defMeta(defId, "enum")),
     ).toBe(true);
   });
 });

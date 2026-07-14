@@ -130,6 +130,36 @@
 **Rationale:** Parallel routes add slot wiring, soft-navigation edge cases, and duplicate data-fetch coordination for modest gain. Nested layouts keep the list mounted when switching ids, URLs stay shareable (`/contacts/abc`), and implementation matches prior CRM split-shell learning without `?id=` query strings. Revisit parallel routes only if independent `loading.tsx` / `error.tsx` per pane becomes a measured need.
 
 
+### Decision: detail tab persistence — URL `?tab=` + availability fallback (2026-07-13)
+
+**Choice:** On tabbed `*_detail` Surfaces, the active tab lives in the URL as **`?tab=<key>`**. Same-surface navigation to another record **preserves** `tab` when that tab is still available; otherwise fall back to the surface default and correct the URL.
+
+| Rule | Detail |
+|------|--------|
+| **Storage** | Query param `tab` only — no `sessionStorage` / component-only tab state for record switches |
+| **Default** | Omit `tab` (or delete it) when on the surface default tab |
+| **Same-surface record change** | List row, tree select, next/prev — carry `tab` via shared helper (`buildDetailHref`) |
+| **Availability fallback** | If requested `tab` ∉ available keys for the new record (perms, node type, create mode) → render default tab; `replace` URL to drop/fix invalid `tab` |
+| **Create / leave surface** | `/new` and cross-surface links do **not** inherit origin `tab` |
+| **Deep link** | Bookmark/`?tab=` still works; invalid values fall back the same way |
+
+**Canonical keys (v1):**
+
+| Surface | Default (omit `tab`) | Other keys |
+|---------|----------------------|------------|
+| `part_detail` | `purchase` | `specs` |
+| `item_detail` | `general` | `specs` (scope + Specs Field readable only) |
+| `site_detail` | `general` | `scopes-zones` |
+| `estimate_detail` | `general` | `line-items` |
+| `job_detail` | `overview` | `scope`, `field`, `billing` |
+
+**Not chosen:** path segments (`/items/[id]/specs`); storage-only last-tab; uncontrolled Ant tabs that reset on `[id]` remount.
+
+**Task:** [40-detail-tab-persistence.md](../tasks/40-detail-tab-persistence.md).
+
+**Rationale:** Operators compare records while staying on Specs / Line Items / Geography. URL tabs already exist on parts/items; extending that pattern keeps deep links and makes list/tree navigation the only missing piece. Availability fallback avoids a blank/wrong panel when the next row cannot show that tab.
+
+
 ### Decision: cross-Surface related records — navigation only v1 (2026-06-18)
 
 **Choice:** When one Surface surfaces **related** rows owned by another Surface (customer hub → job, site, invoice; job → customer), v1 uses **manifest-gated navigation** to the target’s **canonical route** (`/jobs/[id]`, `/sites/[id]`, …). **No** drawer or modal hosting a full foreign Surface form in v1.

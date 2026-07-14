@@ -11,6 +11,63 @@
 > **Amended (2026-07-09):** [condition-only commercial tree](#decision-condition-only-commercial-tree-2026-07-09) — drop `estimate_scope`; every commercial node is `estimate_condition`; lines require `estimate_condition_id` ([37y](../tasks/37y-condition-only-commercial-tree.md)).
 >
 > **Amended (2026-07-11):** [dual line locks + live preview](#decision-estimate-dual-line-locks-and-live-preview-2026-07-11) — replace `lock` enum with `sales_locked` + `material_locked`; server line-preview before Save ([37aa](../tasks/37aa-estimate-line-live-preview.md)).
+>
+> **Walkthrough (2026-07-13):** [line item pick + costing walkthrough](#decision-line-item-pick--costing-walkthrough-2026-07-13) — confirm triggers; walk calc steps.
+
+---
+
+### Decision: line item pick + costing walkthrough (2026-07-13)
+
+**Status:** **In progress** — lock one topic per turn with the product owner.
+
+**Context:** `/estimates` Line Items — what happens when the estimator picks an item, and how unit columns are computed. Builds on [dual locks + live preview](#decision-estimate-dual-line-locks-and-live-preview-2026-07-11) and catalog [O1 material](../tasks/37f-estimate-line-costing.md#decision-o1--ambiguous-part-material-cost-2026-07-04) / [D4 resolveRate](./catalog.md#decision-unified-item-tree--merge-category--item-node-anchored-estimate-lines-2026-07-05).
+
+#### W1 — Costing triggers (locked 2026-07-13)
+
+**Choice:** **Keep P2/P3** from [live preview](#decision-estimate-dual-line-locks-and-live-preview-2026-07-11).
+
+| Trigger | Unit costing | Scope |
+|---------|--------------|--------|
+| Item select / change | Yes — server preview | That line only |
+| Part pick / clear | Yes — server preview | That line only |
+| Condition configuration (specs, complexity, labor phases) | Yes — server preview + draft config | All lines under that condition |
+| Quantity | No — client `qty × unit_price` only | Ext sell |
+| Estimate not `draft` | No | Frozen snapshots |
+
+Save re-runs the same `recalcProductLine` path for persistence. Preview is best-effort UI; Save is authoritative.
+
+**Rationale:** Confirmed in product walkthrough; no change to shipped trigger model.
+
+#### W2a — Part column always a Select (locked 2026-07-13)
+
+**Choice:** Part column is **always** a dropdown (`Select`), never plain “No match” / single-MPN text.
+
+| # | Rule |
+|---|------|
+| **(a)** | **Empty options OK** — 0 matches → open Select with no options (clearable / no value) |
+| **(b)** | **Options = all matched parts** — same filtered set as the material resolver (`part_item` ∩ bucket specs). Not a truncated subset |
+| **(c)** | **Manual PN pick → `material_locked = true`** — then re-preview that line (already P / material-lock rule) |
+
+**Amends UI from 37f smoke:** 0/1 matches no longer render as static text; 1 match may still auto-set `part_id` via preview, but the control remains a Select so the estimator can clear or re-pick.
+
+**Follow-up (implementation):** options must track the **current** filter inputs (item + draft condition specs), not only last-saved DB bucket — otherwise (b) fails after unsaved config changes. See W1 config fan-out + preview draft path.
+
+**Rationale:** Consistent affordance; empty list is honest; lock-on-pick matches sticky material identity.
+
+**Task:** [37aj](../tasks/37aj-estimate-part-select-and-seed.md) — seed mount `part_item` parity + always-Select UI + draft-bucket parts picker — **complete** (2026-07-13).
+
+#### W2b — Discontinued part filter (locked 2026-07-13)
+
+**Choice:** `manufacturer_part.discontinued` + condition-level **`include_discontinued`** toggle (C panel general area, default **false**).
+
+| # | Rule |
+|---|------|
+| **(a)** | Discontinued parts **hidden** from Part Select + material resolver unless condition toggle on |
+| **(b)** | Toggle is a **commercial knob** on `estimate_condition` — not a `spec_def` |
+| **(c)** | Already-picked lines **as-is** — unlocked lines re-resolve when toggle changes |
+| **(d)** | Author on **`part_detail` profile** only — no part list badge/filter v1 |
+
+**Task:** [41ak](../tasks/41ak-part-discontinued-filter.md) — **complete** (2026-07-13).
 
 ---
 

@@ -34,6 +34,7 @@ import { useSurfaceFormChrome } from "@/components/surface/SurfaceFormChromeCont
 import { DetailHeader } from "@/components/surface/DetailHeader";
 import { SurfaceFormRoot } from "@/components/surface/SurfaceFormRoot";
 import { useSurfaceListCreate } from "@/lib/hooks/use-surface-list-create";
+import { useDetailTab } from "@/lib/hooks/use-detail-tab";
 import { useSurfaceDetail } from "@/lib/hooks/use-surface-detail";
 import { useSurfaceDelete, useSurfacePatch } from "@/lib/hooks/use-surface-patch";
 import { useSitePartyPicker } from "@/lib/hooks/use-site-party-picker";
@@ -447,6 +448,11 @@ export const SiteDetailForm = ({
       : []),
   ];
 
+  const { activeKey, setTab } = useDetailTab({
+    availableKeys: tabItems.map((item) => item.key),
+    defaultKey: "general",
+  });
+
   return (
     <SurfaceFormRoot
       manifest={activeManifest}
@@ -461,6 +467,8 @@ export const SiteDetailForm = ({
         <SurfaceFormLayout>
           <DetailHeader
             title={isCreate ? "New site" : (profile?.name ?? "Site")}
+            activeKey={activeKey}
+            onChange={setTab}
             items={tabItems.length > 0 ? tabItems : undefined}
           />
         </SurfaceFormLayout>

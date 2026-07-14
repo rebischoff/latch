@@ -37,6 +37,7 @@ const buildPartListWhere = (
 
 const mapPartDetailRow = (row: PartDetailRow): PartDetailRow => ({
   ...row,
+  discontinued: Boolean(row.discontinued),
   units_per_purchase: Number(row.units_per_purchase),
 });
 
@@ -100,7 +101,8 @@ export const loadPartDetail = async (
        mp.description,
        mp.unit,
        mp.purchase_unit,
-       mp.units_per_purchase
+       mp.units_per_purchase,
+       mp.discontinued
      FROM manufacturer_part mp
      INNER JOIN party mfr ON mfr.id = mp.manufacturer_party_id
      WHERE mp.id = $1`,

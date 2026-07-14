@@ -3,9 +3,6 @@
 import { fieldAllows, type Manifest } from "@latch/contracts";
 import { FieldControl } from "@latch/react";
 import {
-  Checkbox,
-  InputNumber,
-  Popover,
   Select,
   Skeleton,
   Table,
@@ -16,6 +13,7 @@ import { Controller, useFormContext, useWatch } from "react-hook-form";
 
 import { FormSection } from "@/components/form/FormSection";
 import { TABLE_WIDTH_LG } from "@/components/form/formLayout";
+import { SpecNumberValuePopover } from "@/components/spec/SpecNumberValuePopover";
 import { usePartSpecDefsPicker } from "@/lib/hooks/use-part-spec-defs-picker";
 import {
   collapsePartSpecRows,
@@ -38,6 +36,11 @@ type PartSpecsFieldProps = {
   syncKey?: string;
 };
 
+const BOOLEAN_SPEC_OPTIONS = [
+  { value: true, label: "True" },
+  { value: false, label: "False" },
+];
+
 const enumOptionLabels = (
   optionIds: string[],
   def: PartSpecDefPickerRow | undefined,
@@ -53,118 +56,47 @@ const enumOptionLabels = (
     .join(", ");
 };
 
-const formatNumberDisplay = (
-  value: number | null | undefined,
-  def: PartSpecDefPickerRow,
-): string => {
-  if (value === null || value === undefined) {
-    return "—";
-  }
-
-  const formatted =
-    def.decimal_places != null ? value.toFixed(def.decimal_places) : String(value);
-
-  return def.unit_symbol ? `${formatted} ${def.unit_symbol}` : formatted;
-};
-
-const formatNumberValueSummary = (
-  row: PartSpecFormRow | undefined,
-  def: PartSpecDefPickerRow,
-): string => {
-  const hasMin = row?.value_number !== null && row?.value_number !== undefined;
-  const hasMax =
-    row?.value_number_max !== null && row?.value_number_max !== undefined;
-
-  if (!hasMin && !hasMax) {
-    return "Set value…";
-  }
-
-  if (hasMax) {
-    const min = formatNumberDisplay(row?.value_number, def);
-    const max = formatNumberDisplay(row?.value_number_max, def);
-    if (min === "—" && max === "—") {
-      return "Set value…";
-    }
-    return `${min} – ${max}`;
-  }
-
-  return formatNumberDisplay(row?.value_number, def);
-};
-
 const NumberValuePopover = ({
   index,
   def,
-  row,
   disabled,
 }: {
   index: number;
   def: PartSpecDefPickerRow;
-  row: PartSpecFormRow | undefined;
   disabled: boolean;
 }) => {
   const { control } = useFormContext<PartSpecsFormValues>();
-  const [open, setOpen] = useState(false);
-  const summary = formatNumberValueSummary(row, def);
-
-  const content = (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12, minWidth: 240 }}>
-      <Controller
-        control={control}
-        name={`part_specs.${index}.value_number`}
-        render={({ field, fieldState }) => (
-          <div>
-            <Typography.Text type="secondary" style={{ display: "block", marginBottom: 4 }}>
-              Value
-            </Typography.Text>
-            <InputNumber
-              addonAfter={def.unit_symbol ?? undefined}
-              disabled={disabled}
-              placeholder="Min / exact"
-              precision={def.decimal_places ?? undefined}
-              status={fieldState.error ? "error" : undefined}
-              style={{ width: "100%" }}
-              value={field.value ?? null}
-              onChange={(value) => field.onChange(value ?? null)}
-            />
-          </div>
-        )}
-      />
-      <Controller
-        control={control}
-        name={`part_specs.${index}.value_number_max`}
-        render={({ field, fieldState }) => (
-          <div>
-            <Typography.Text type="secondary" style={{ display: "block", marginBottom: 4 }}>
-              Max (optional)
-            </Typography.Text>
-            <InputNumber
-              addonAfter={def.unit_symbol ?? undefined}
-              disabled={disabled}
-              placeholder="Empty = exact"
-              precision={def.decimal_places ?? undefined}
-              status={fieldState.error ? "error" : undefined}
-              style={{ width: "100%" }}
-              value={field.value ?? null}
-              onChange={(value) => field.onChange(value ?? null)}
-            />
-          </div>
-        )}
-      />
-    </div>
-  );
+  const unitMeta = {
+    decimal_places: def.decimal_places,
+    unit_symbol: def.unit_symbol,
+  };
 
   return (
-    <Popover
-      content={content}
-      open={open}
-      onOpenChange={setOpen}
-      trigger="click"
-      title="Number value"
-    >
-      <Typography.Link disabled={disabled && summary === "Set value…"}>
-        {summary}
-      </Typography.Link>
-    </Popover>
+    <Controller
+      control={control}
+      name={`part_specs.${index}.value_number`}
+      render={({ field: minField, fieldState: minState }) => (
+        <Controller
+          control={control}
+          name={`part_specs.${index}.value_number_max`}
+          render={({ field: maxField, fieldState: maxState }) => (
+            <SpecNumberValuePopover
+              disabled={disabled}
+              emptyLabel="Set value…"
+              maxStatus={maxState.error ? "error" : undefined}
+              minLabel="Value"
+              minStatus={minState.error ? "error" : undefined}
+              title="Number value"
+              unitMeta={unitMeta}
+              valueMax={maxField.value ?? null}
+              valueMin={minField.value ?? null}
+              onMaxChange={(value) => maxField.onChange(value)}
+              onMinChange={(value) => minField.onChange(value)}
+            />
+          )}
+        />
+      )}
+    />
   );
 };
 
@@ -203,11 +135,21 @@ const SpecValueControl = ({
       );
     }
     if (def.value_type === "number") {
-      const summary = formatNumberValueSummary(row, def);
       return (
-        <Typography.Text>
-          {summary === "Set value…" ? "—" : summary}
-        </Typography.Text>
+        <SpecNumberValuePopover
+          emptyLabel="Set value…"
+          readOnly
+          readOnlyEmptyLabel="—"
+          title="Number value"
+          unitMeta={{
+            decimal_places: def.decimal_places,
+            unit_symbol: def.unit_symbol,
+          }}
+          valueMax={row?.value_number_max ?? null}
+          valueMin={row?.value_number ?? null}
+          onMaxChange={() => {}}
+          onMinChange={() => {}}
+        />
       );
     }
     return <Typography.Text>—</Typography.Text>;
@@ -247,10 +189,15 @@ const SpecValueControl = ({
         control={control}
         name={`part_specs.${index}.value_boolean`}
         render={({ field }) => (
-          <Checkbox
-            checked={field.value === true}
+          <Select
+            allowClear
             disabled={disabled}
-            onChange={(event) => field.onChange(event.target.checked)}
+            options={BOOLEAN_SPEC_OPTIONS}
+            placeholder="Select…"
+            size="small"
+            style={{ width: "100%" }}
+            value={field.value === true || field.value === false ? field.value : undefined}
+            onChange={(next) => field.onChange(next ?? null)}
           />
         )}
       />
@@ -263,7 +210,6 @@ const SpecValueControl = ({
         def={def}
         disabled={disabled}
         index={index}
-        row={row}
       />
     );
   }

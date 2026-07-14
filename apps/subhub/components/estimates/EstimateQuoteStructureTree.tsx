@@ -94,7 +94,6 @@ export const EstimateQuoteStructureTree = ({
           def_display_name: spec.def_display_name,
           value_type: spec.value_type,
           spec_option_id: spec.spec_option_id,
-          spec_threshold_preset_id: spec.spec_threshold_preset_id ?? null,
           option_display_name: spec.option_display_name,
           value_number: spec.value_number,
           value_number_max: spec.value_number_max ?? null,
@@ -103,7 +102,6 @@ export const EstimateQuoteStructureTree = ({
           to_canonical_factor: spec.to_canonical_factor ?? 1,
           decimal_places: spec.decimal_places ?? null,
           options: spec.options,
-          presets: spec.presets,
         }));
       } catch {
         message.error("Could not load specs for that catalog root");

@@ -6,8 +6,6 @@ import {
   assertSpecDefTypeUnitMutable,
   assertSpecDefinitionShape,
   assertSpecOptionDeletable,
-  assertSpecPresetsShape,
-  type SpecThresholdPresetPatchRow,
 } from "./spec-detail-write";
 
 export const assertScopeSpecDefinitionsPatch = (nodeType: string): void => {
@@ -96,147 +94,11 @@ const upsertSpecOptionsTx = async (
   }
 };
 
-const countBucketPresetReferences = async (
-  client: PoolClient,
-  presetId: string,
-): Promise<number> => {
-  const result = await client.query<{ count: number }>(
-    `SELECT (
-       (SELECT COUNT(*)::int FROM estimate_condition_spec WHERE spec_threshold_preset_id = $1)
-       + (SELECT COUNT(*)::int FROM estimate_line_spec WHERE spec_threshold_preset_id = $1)
-     ) AS count`,
-    [presetId],
-  );
-  return result.rows[0]?.count ?? 0;
-};
-
-const assertSpecPresetDeletable = async (
-  client: PoolClient,
-  presetId: string,
-): Promise<void> => {
-  const bucketCount = await countBucketPresetReferences(client, presetId);
-  if (bucketCount > 0) {
-    throw new ValidationError(
-      `${bucketCount} estimate bucket row(s) use this threshold preset — update those estimates first`,
-      {
-        field: "presets",
-        code: "spec_preset_in_use",
-        spec_threshold_preset_id: presetId,
-        bucket_count: bucketCount,
-      },
-    );
-  }
-};
-
-const deleteSpecPresetsForDefTx = async (
-  client: PoolClient,
-  specDefId: string,
-): Promise<void> => {
-  const existingResult = await client.query<{ id: string }>(
-    `SELECT id::text FROM spec_threshold_preset WHERE spec_def_id = $1`,
-    [specDefId],
-  );
-  for (const row of existingResult.rows) {
-    await assertSpecPresetDeletable(client, row.id);
-  }
-  await client.query(`DELETE FROM spec_threshold_preset WHERE spec_def_id = $1`, [specDefId]);
-};
-
-const upsertSpecPresetOptionsTx = async (
-  client: PoolClient,
-  presetId: string,
-  optionIds: string[],
-): Promise<void> => {
-  const existingResult = await client.query<{ spec_option_id: string }>(
-    `SELECT spec_option_id::text FROM spec_threshold_preset_option WHERE preset_id = $1`,
-    [presetId],
-  );
-  const existingIds = new Set(existingResult.rows.map((row) => row.spec_option_id));
-  const payloadIds = new Set(optionIds);
-  const removedIds = [...existingIds].filter((id) => !payloadIds.has(id));
-  const addedIds = [...payloadIds].filter((id) => !existingIds.has(id));
-
-  for (const optionId of removedIds) {
-    await client.query(
-      `DELETE FROM spec_threshold_preset_option
-       WHERE preset_id = $1 AND spec_option_id = $2`,
-      [presetId, optionId],
-    );
-  }
-
-  for (const optionId of addedIds) {
-    await client.query(
-      `INSERT INTO spec_threshold_preset_option (preset_id, spec_option_id)
-       VALUES ($1, $2)
-       ON CONFLICT DO NOTHING`,
-      [presetId, optionId],
-    );
-  }
-};
-
-const upsertSpecPresetsTx = async (
-  client: PoolClient,
-  defId: string,
-  valueType: string,
-  presets: SpecThresholdPresetPatchRow[],
-  allowedOptionIds: Set<string>,
-): Promise<void> => {
-  assertSpecPresetsShape(valueType, presets, allowedOptionIds);
-
-  const existingResult = await client.query<{ id: string }>(
-    `SELECT id::text FROM spec_threshold_preset WHERE spec_def_id = $1`,
-    [defId],
-  );
-  const existingIds = new Set(existingResult.rows.map((row) => row.id));
-  const payloadIds = new Set(presets.filter((preset) => preset.id).map((preset) => preset.id!));
-  const removedIds = [...existingIds].filter((id) => !payloadIds.has(id));
-
-  for (const presetId of removedIds) {
-    await assertSpecPresetDeletable(client, presetId);
-  }
-
-  for (const [presetIndex, preset] of presets.entries()) {
-    const presetId = preset.id ?? crypto.randomUUID();
-    await client.query(
-      `INSERT INTO spec_threshold_preset (
-         id, spec_def_id, label, sort_order, value_number, value_number_max
-       ) VALUES ($1, $2, $3, $4, $5, $6)
-       ON CONFLICT (id) DO UPDATE SET
-         label = EXCLUDED.label,
-         sort_order = EXCLUDED.sort_order,
-         value_number = EXCLUDED.value_number,
-         value_number_max = EXCLUDED.value_number_max`,
-      [
-        presetId,
-        defId,
-        preset.label,
-        preset.sort_order ?? presetIndex + 1,
-        valueType === "number" ? (preset.value_number ?? null) : null,
-        valueType === "number" ? (preset.value_number_max ?? null) : null,
-      ],
-    );
-
-    if (valueType === "enum") {
-      await upsertSpecPresetOptionsTx(client, presetId, preset.option_ids ?? []);
-    } else {
-      await client.query(
-        `DELETE FROM spec_threshold_preset_option WHERE preset_id = $1`,
-        [presetId],
-      );
-    }
-  }
-
-  for (const presetId of removedIds) {
-    await client.query(`DELETE FROM spec_threshold_preset WHERE id = $1`, [presetId]);
-  }
-};
-
 const deleteSpecDefinitionTx = async (
   client: PoolClient,
   specDefId: string,
 ): Promise<void> => {
   await assertSpecDefDeletable(client, specDefId);
-  await deleteSpecPresetsForDefTx(client, specDefId);
   await client.query(`DELETE FROM spec_option WHERE spec_def_id = $1`, [specDefId]);
   await client.query(`DELETE FROM spec_def WHERE id = $1`, [specDefId]);
 };
@@ -291,18 +153,8 @@ const upsertSpecDefinitionTx = async (
 
   if (row.value_type === "enum") {
     await upsertSpecOptionsTx(client, defId, row.options);
-    const persistedOptions = await client.query<{ id: string }>(
-      `SELECT id::text FROM spec_option WHERE spec_def_id = $1`,
-      [defId],
-    );
-    const allowedOptionIds = new Set(persistedOptions.rows.map((option) => option.id));
-    await upsertSpecPresetsTx(client, defId, row.value_type, row.presets, allowedOptionIds);
-  } else if (row.value_type === "number") {
-    await deleteSpecOptionsForDefTx(client, defId);
-    await upsertSpecPresetsTx(client, defId, row.value_type, row.presets, new Set());
   } else {
     await deleteSpecOptionsForDefTx(client, defId);
-    await deleteSpecPresetsForDefTx(client, defId);
   }
 };
 

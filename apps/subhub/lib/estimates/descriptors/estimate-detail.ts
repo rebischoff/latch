@@ -2,8 +2,6 @@ import type { Manifest } from "@latch/contracts";
 import type { SurfaceDescriptor } from "@latch/dal";
 import { z } from "zod";
 
-import type { SpecThresholdPresetRow } from "@/lib/catalog/descriptors/item-detail";
-
 const EstimateStakeholderPatchElementSchema = z
   .object({
     party_id: z.string(),
@@ -21,7 +19,6 @@ const EstimateConditionSpecPatchElementSchema = z
   .object({
     spec_def_id: z.string(),
     spec_option_id: z.string().nullable().optional(),
-    spec_threshold_preset_id: z.string().nullable().optional(),
     value_number: z.number().nullable().optional(),
     value_number_max: z.number().nullable().optional(),
     value_boolean: z.boolean().nullable().optional(),
@@ -32,6 +29,7 @@ const EstimateConditionPatchElementSchema: z.ZodType<{
   complexity_factor_id?: string | null;
   conditions?: unknown[];
   id?: string;
+  include_discontinued?: boolean;
   included_labor_phases?: Array<{ labor_phase_id: string }>;
   labor_phases_explicit?: boolean;
   name: string;
@@ -41,7 +39,6 @@ const EstimateConditionPatchElementSchema: z.ZodType<{
   specs: Array<{
     spec_def_id: string;
     spec_option_id?: string | null;
-    spec_threshold_preset_id?: string | null;
     value_boolean?: boolean | null;
     value_number?: number | null;
     value_number_max?: number | null;
@@ -55,6 +52,7 @@ const EstimateConditionPatchElementSchema: z.ZodType<{
       root_item_id: z.string().nullable().optional(),
       sort_order: z.number(),
       complexity_factor_id: z.string().nullable().optional(),
+      include_discontinued: z.boolean().optional(),
       labor_phases_explicit: z.boolean().optional(),
       included_labor_phases: z.array(EstimateConditionLaborPhasePatchElementSchema).optional(),
       specs: z.array(EstimateConditionSpecPatchElementSchema),
@@ -187,10 +185,8 @@ export type EstimateConditionSpecRow = {
   def_display_name: string;
   option_display_name: string | null;
   options?: Array<{ display_name: string; id: string }>;
-  presets?: SpecThresholdPresetRow[];
   spec_def_id: string;
   spec_option_id: string | null;
-  spec_threshold_preset_id: string | null;
   to_canonical_factor: number;
   unit_symbol: string | null;
   value_boolean: boolean | null;
@@ -208,6 +204,7 @@ export type EstimateConditionRow = {
   complexity_factor_id: string | null;
   conditions: EstimateConditionRow[];
   id: string;
+  include_discontinued: boolean;
   included_labor_phases: EstimateConditionLaborPhaseRow[];
   labor_phases_explicit: boolean;
   name: string;

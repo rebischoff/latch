@@ -329,8 +329,10 @@ Estimate PATCH **must not** INSERT/UPDATE `site_area`, `site_asset`, or `site_sy
 
 | Tab | Content |
 |-----|---------|
-| **General** | `profile`, `stakeholders`; hint when no site selected |
-| **Line Items** | Three-panel **S** / **C** / **LI** layout — gated on non-empty `site_id` |
+| **General** | `profile`, `stakeholders`; hint when no site selected — default (omit `tab`) |
+| **Line Items** | Three-panel **S** / **C** / **LI** layout — gated on non-empty `site_id`; URL `?tab=line-items` |
+
+Same-surface list navigation preserves `tab` via `buildDetailHref`. When Line Items is unavailable, carried `?tab=line-items` falls back to General and the URL is cleaned.
 
 **Scope tab retired (37e/37v).** Bucket config + line editing live on **Line Items** ([37w](../tasks/37w-estimate-line-items-panels.md)).
 
@@ -362,7 +364,7 @@ Master-detail: list in `estimates/layout.tsx`, detail in `[id]/page.tsx` ([`rout
 | Panel | Id | Role |
 |-------|-----|------|
 | **S** | structure | Estimate-owned **condition forest** — Add root ▾ / Add condition / Delete (X1 block if lines); names edit in **C** |
-| **C** | config | Bound to **S** selection — **name**, **complexity**, labor phases, specs on every node; child inherit checkboxes (Y4) |
+| **C** | config | Bound to **S** selection — **name**, **complexity**, labor phases, **include discontinued**, specs on every node; child inherit checkboxes (Y4) |
 | **LI** | lines | Flat **37f** column grid; filtered by **S** selection; **Add line** footer; **Places…** allocations |
 
 ### Selection → LI filter (37y Y5)
@@ -384,7 +386,7 @@ Empty forest → prompt to **Add root** (catalog root picker).
 | Action | Control | Behavior |
 |--------|---------|----------|
 | **Select node** | **S** tree click | Filters **LI**; binds **C** |
-| **Configure** | **C** panel fields | Name; complexity; labor phases; specs — child inherit checkboxes |
+| **Configure** | **C** panel fields | Name; complexity; labor phases; **include discontinued** (default off); specs — child inherit checkboxes |
 | **Add line** | **LI** dashed **Add line** footer | Append standalone row for selected condition |
 | **Places** | **Places…** on line | Allocations (default qty 1); `qty_manual` sync rules (G3/X3) |
 | **Delete node** | **S** Delete | Blocked if lines reference node or descendants (X1) |

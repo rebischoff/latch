@@ -91,3 +91,66 @@ export const navigateAfterCreate = (
   router.replace(resolveAfterCreateNavigation(input));
   router.refresh();
 };
+
+export type BuildDetailHrefInput = {
+  detailPath: string;
+  currentSearch?: string | URLSearchParams | null;
+  /** Query keys to copy when set. Default: `["tab"]`. */
+  preserve?: readonly string[];
+};
+
+const toSearchParams = (
+  currentSearch: string | URLSearchParams | null | undefined,
+): URLSearchParams => {
+  if (currentSearch instanceof URLSearchParams) {
+    return currentSearch;
+  }
+  if (!currentSearch) {
+    return new URLSearchParams();
+  }
+  const trimmed = currentSearch.startsWith("?")
+    ? currentSearch.slice(1)
+    : currentSearch;
+  return new URLSearchParams(trimmed);
+};
+
+/**
+ * Same-surface detail link that preserves listed query keys (default: `tab`).
+ * Does not copy unrelated params (e.g. `returnTo`) unless listed in `preserve`.
+ */
+export const buildDetailHref = ({
+  detailPath,
+  currentSearch,
+  preserve = ["tab"],
+}: BuildDetailHrefInput): string => {
+  const source = toSearchParams(currentSearch);
+  const next = new URLSearchParams();
+
+  for (const key of preserve) {
+    const value = source.get(key);
+    if (value != null && value !== "") {
+      next.set(key, value);
+    }
+  }
+
+  const query = next.toString();
+  return query ? `${detailPath}?${query}` : detailPath;
+};
+
+/**
+ * Returns `requested` when it is in `availableKeys`; otherwise `defaultKey`
+ * (or the first available key when the default is also unavailable).
+ */
+export const resolveActiveTab = (
+  requested: string | null | undefined,
+  availableKeys: readonly string[],
+  defaultKey: string,
+): string => {
+  if (requested && availableKeys.includes(requested)) {
+    return requested;
+  }
+  if (availableKeys.includes(defaultKey)) {
+    return defaultKey;
+  }
+  return availableKeys[0] ?? defaultKey;
+};

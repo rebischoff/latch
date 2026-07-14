@@ -6,7 +6,6 @@ import {
   numberBucketMatchesPartRows,
   numericIntervalsOverlap,
   type PartSpecMatchRow,
-  type ThresholdPresetMatchMeta,
 } from "./spec-match";
 
 const partRow = (overrides: Partial<PartSpecMatchRow> = {}): PartSpecMatchRow => ({
@@ -72,18 +71,9 @@ describe("numberBucketMatchesPartRows", () => {
 });
 
 describe("bucketSpecMatchesPartRows", () => {
-  const candelaPreset: ThresholdPresetMatchMeta = {
-    id: "preset-high",
-    spec_def_id: "def-candela",
-    option_ids: ["135", "150", "177", "185"],
-    value_number: null,
-    value_number_max: null,
-  };
-
-  it("matches Candela High preset against part with {135,150,177}", () => {
+  it("matches Candela High bucket against part with High option", () => {
     const bucket = {
-      spec_option_id: null,
-      spec_threshold_preset_id: "preset-high",
+      spec_option_id: "opt-high",
       value_boolean: null,
       value_number: null,
       value_number_max: null,
@@ -92,37 +82,45 @@ describe("bucketSpecMatchesPartRows", () => {
     expect(
       bucketSpecMatchesPartRows(
         bucket,
-        [
-          partRow({ spec_option_id: "135" }),
-          partRow({ spec_option_id: "150" }),
-          partRow({ spec_option_id: "177" }),
-        ],
-        "enum",
-        candelaPreset,
-        null,
+        [partRow({ spec_option_id: "opt-high" })],
+        "enum", null,
       ),
     ).toBe(true);
   });
 
-  it("passes blank bucket regardless of part rows", () => {
-    const blankBucket = {
-      spec_option_id: null,
-      spec_threshold_preset_id: null,
+  it("does not match Candela High bucket when part only has Low", () => {
+    const bucket = {
+      spec_option_id: "opt-high",
       value_boolean: null,
       value_number: null,
       value_number_max: null,
     };
 
     expect(
-      bucketSpecMatchesPartRows(blankBucket, [], "enum", undefined, null),
+      bucketSpecMatchesPartRows(
+        bucket,
+        [partRow({ spec_option_id: "opt-low" })],
+        "enum", null,
+      ),
+    ).toBe(false);
+  });
+
+  it("passes blank bucket regardless of part rows", () => {
+    const blankBucket = {
+      spec_option_id: null,
+      value_boolean: null,
+      value_number: null,
+      value_number_max: null,
+    };
+
+    expect(
+      bucketSpecMatchesPartRows(blankBucket, [], "enum", null),
     ).toBe(true);
     expect(
       bucketSpecMatchesPartRows(
         blankBucket,
         [partRow({ spec_option_id: "opt-a" })],
-        "enum",
-        undefined,
-        null,
+        "enum", null,
       ),
     ).toBe(true);
   });
@@ -130,42 +128,38 @@ describe("bucketSpecMatchesPartRows", () => {
   it("passes set enum bucket when part has no rows (37ai V5 wildcard)", () => {
     const bucket = {
       spec_option_id: "opt-a",
-      spec_threshold_preset_id: null,
       value_boolean: null,
       value_number: null,
       value_number_max: null,
     };
 
     expect(
-      bucketSpecMatchesPartRows(bucket, [], "enum", undefined, null),
+      bucketSpecMatchesPartRows(bucket, [], "enum", null),
     ).toBe(true);
   });
 
   it("passes set boolean bucket when part has no rows (37ai V5 wildcard)", () => {
     const bucket = {
       spec_option_id: null,
-      spec_threshold_preset_id: null,
       value_boolean: true,
       value_number: null,
       value_number_max: null,
     };
 
     expect(
-      bucketSpecMatchesPartRows(bucket, [], "boolean", undefined, null),
+      bucketSpecMatchesPartRows(bucket, [], "boolean", null),
     ).toBe(true);
   });
 
   it("passes HVAC-style exact tonnage + trip band matrix", () => {
     const tonnageBucket = {
       spec_option_id: null,
-      spec_threshold_preset_id: null,
       value_boolean: null,
       value_number: 3,
       value_number_max: 3,
     };
     const tripBucket = {
       spec_option_id: null,
-      spec_threshold_preset_id: null,
       value_boolean: null,
       value_number: 15,
       value_number_max: 15,
@@ -177,19 +171,17 @@ describe("bucketSpecMatchesPartRows", () => {
     ];
 
     expect(
-      bucketSpecMatchesPartRows(tonnageBucket, matchingPart, "number", undefined, null),
+      bucketSpecMatchesPartRows(tonnageBucket, matchingPart, "number", null),
     ).toBe(true);
     expect(
-      bucketSpecMatchesPartRows(tripBucket, matchingPart, "number", undefined, null),
+      bucketSpecMatchesPartRows(tripBucket, matchingPart, "number", null),
     ).toBe(true);
 
     expect(
       bucketSpecMatchesPartRows(
         tonnageBucket,
         [partRow({ value_number: 4 }), matchingPart[1]!],
-        "number",
-        undefined,
-        null,
+        "number", null,
       ),
     ).toBe(false);
 
@@ -197,9 +189,7 @@ describe("bucketSpecMatchesPartRows", () => {
       bucketSpecMatchesPartRows(
         tripBucket,
         [matchingPart[0]!, partRow({ value_number: 5, value_number_max: 12 })],
-        "number",
-        undefined,
-        null,
+        "number", null,
       ),
     ).toBe(false);
   });

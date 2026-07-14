@@ -270,7 +270,7 @@ Master-detail per [routing-and-libraries.md](../routing-and-libraries.md): list 
 
 **Create (list):** **New** → POST with `name` required; **Scopes & zones tab** on edit after site row exists.
 
-**Tabs:** **General** (wave 1 fields) · **Scopes & zones** (`scopes` + `general_zones` tree). One RHF form; Save sends full PATCH.
+**Tabs:** **General** (wave 1 fields) · **Scopes & zones** (`scopes` + `general_zones` tree). URL `?tab=scopes-zones` selects Scopes & zones; default (omit `tab`) is General. Tab omitted on create / when scopes are not readable — invalid `?tab=` falls back and cleans the URL. Same-surface list navigation preserves `tab` via `buildDetailHref`. One RHF form; Save sends full PATCH.
 
 **Shared components:** `SiteDetailForm`; `SiteScopesZonesTree` ([task 37c](../tasks/37c-site-scopes-zones.md)).
 

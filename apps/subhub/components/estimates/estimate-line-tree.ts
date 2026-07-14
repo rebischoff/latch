@@ -36,21 +36,11 @@ export type EstimateConditionSpecOptionFormRow = {
   id: string;
 };
 
-export type EstimateConditionSpecPresetFormRow = {
-  id: string;
-  label: string;
-  option_ids: string[];
-  sort_order: number;
-  value_number: number | null;
-  value_number_max: number | null;
-};
-
 export type EstimateConditionSpecFormRow = {
   decimal_places?: number | null;
   def_display_name?: string;
   spec_def_id: string;
   spec_option_id: string | null;
-  spec_threshold_preset_id?: string | null;
   option_display_name?: string | null;
   to_canonical_factor?: number;
   unit_symbol?: string | null;
@@ -59,7 +49,6 @@ export type EstimateConditionSpecFormRow = {
   value_boolean: boolean | null;
   value_type?: "enum" | "boolean" | "number";
   options?: EstimateConditionSpecOptionFormRow[];
-  presets?: EstimateConditionSpecPresetFormRow[];
 };
 
 export type EstimateConditionLaborPhaseFormRow = {
@@ -72,6 +61,7 @@ export type EstimateConditionFormRow = {
   complexity_factor_id: string | null;
   conditions: EstimateConditionFormRow[];
   id: string;
+  include_discontinued: boolean;
   included_labor_phases: EstimateConditionLaborPhaseFormRow[];
   labor_phases_explicit: boolean;
   name: string;
@@ -165,6 +155,7 @@ export const makeCondition = (
   root_item_name: null,
   sort_order: 1,
   complexity_factor_id: null,
+  include_discontinued: false,
   labor_phases_explicit: false,
   included_labor_phases: [],
   specs: [],

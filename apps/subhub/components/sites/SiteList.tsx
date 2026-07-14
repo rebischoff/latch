@@ -2,10 +2,11 @@
 
 import { Table, Typography } from "antd";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 
 import { useSurfaceList } from "@/lib/hooks/use-surface-list";
 import { routes } from "@/lib/nav-routes";
+import { buildDetailHref } from "@/lib/surface-navigation";
 
 const siteLabel = (row: {
   summary?: {
@@ -16,6 +17,7 @@ const siteLabel = (row: {
 
 export const SiteList = () => {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { data, isLoading, error } = useSurfaceList("site_list");
 
   if (error) {
@@ -43,7 +45,14 @@ export const SiteList = () => {
         {
           title: "Name",
           render: (_, row) => (
-            <Link href={routes.sites.detail(row.id)}>{siteLabel(row)}</Link>
+            <Link
+              href={buildDetailHref({
+                detailPath: routes.sites.detail(row.id),
+                currentSearch: searchParams,
+              })}
+            >
+              {siteLabel(row)}
+            </Link>
           ),
         },
       ]}

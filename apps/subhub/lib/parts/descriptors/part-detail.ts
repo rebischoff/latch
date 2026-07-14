@@ -42,6 +42,7 @@ export const PartDetailPatchSchema = z
         unit: z.string().optional(),
         purchase_unit: z.string().nullable().optional(),
         units_per_purchase: z.number().optional(),
+        discontinued: z.boolean().optional(),
       })
       .strict()
       .optional(),
@@ -62,6 +63,7 @@ export const PartDetailCreateSchema = z
         unit: z.string().optional(),
         purchase_unit: z.string().nullable().optional(),
         units_per_purchase: z.number().optional(),
+        discontinued: z.boolean().optional(),
       })
       .strict(),
     vendor_pricing: z.array(VendorPricingPatchElementSchema).optional(),
@@ -72,6 +74,7 @@ export const PartDetailCreateSchema = z
 
 export type PartDetailRow = {
   description: string;
+  discontinued: boolean;
   id: string;
   manufacturer_display_name: string;
   manufacturer_party_id: string;
@@ -137,10 +140,12 @@ export type PartDetailWriteRow = Pick<
   | "unit"
   | "purchase_unit"
   | "units_per_purchase"
+  | "discontinued"
 >;
 
 const formatPartDetailRow = (row: PartDetailRow): Record<string, unknown> => ({
   description: row.description,
+  discontinued: row.discontinued,
   id: row.id,
   manufacturer_party_id: row.manufacturer_party_id,
   mpn: row.mpn,
@@ -172,6 +177,7 @@ export const projectPartDetailRow = (
       manufacturer_display_name: row.manufacturer_display_name,
       mpn: row.mpn,
       description: row.description,
+      discontinued: row.discontinued,
       unit: row.unit,
       purchase_unit: row.purchase_unit,
       units_per_purchase: row.units_per_purchase,
@@ -220,6 +226,9 @@ const applyPartDetailPatch = (
   }
   if (typed.profile?.units_per_purchase !== undefined) {
     next.units_per_purchase = typed.profile.units_per_purchase;
+  }
+  if (typed.profile?.discontinued !== undefined) {
+    next.discontinued = typed.profile.discontinued;
   }
 
   return next;

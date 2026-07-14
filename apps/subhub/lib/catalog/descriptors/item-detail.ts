@@ -10,17 +10,6 @@ const SpecOptionPatchElementSchema = z
   })
   .strict();
 
-const SpecThresholdPresetPatchElementSchema = z
-  .object({
-    id: z.string().optional(),
-    label: z.string(),
-    sort_order: z.number().optional(),
-    value_number: z.number().nullable().optional(),
-    value_number_max: z.number().nullable().optional(),
-    option_ids: z.array(z.string()).optional(),
-  })
-  .strict();
-
 const SpecDefinitionPatchElementSchema = z
   .object({
     id: z.string().optional(),
@@ -30,7 +19,6 @@ const SpecDefinitionPatchElementSchema = z
     decimal_places: z.number().int().nullable().optional(),
     sort_order: z.number().optional(),
     options: z.array(SpecOptionPatchElementSchema),
-    presets: z.array(SpecThresholdPresetPatchElementSchema),
   })
   .strict();
 
@@ -122,22 +110,12 @@ export type SpecOptionRow = {
   sort_order: number;
 };
 
-export type SpecThresholdPresetRow = {
-  id: string;
-  label: string;
-  option_ids: string[];
-  sort_order: number;
-  value_number: number | null;
-  value_number_max: number | null;
-};
-
 export type SpecDefinitionRow = {
   decimal_places: number | null;
   display_name: string;
   id: string;
   in_use_part_count: number;
   options: SpecOptionRow[];
-  presets: SpecThresholdPresetRow[];
   sort_order: number;
   unit_id: string | null;
   unit_symbol: string | null;
@@ -170,7 +148,6 @@ export type ItemDetailRelated = {
 };
 
 export type SpecDefinitionPatchRow = z.infer<typeof SpecDefinitionPatchElementSchema>;
-export type SpecThresholdPresetPatchRow = z.infer<typeof SpecThresholdPresetPatchElementSchema>;
 
 export type ItemDetailRelatedPatch = {
   item_labor_phase?: Array<{

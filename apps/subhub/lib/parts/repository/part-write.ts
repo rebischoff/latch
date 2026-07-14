@@ -205,9 +205,10 @@ export const insertPart = async (
            description,
            unit,
            purchase_unit,
-           units_per_purchase
+           units_per_purchase,
+           discontinued
          )
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
         [
           row.id,
           row.manufacturer_party_id,
@@ -216,6 +217,7 @@ export const insertPart = async (
           row.unit,
           row.purchase_unit,
           row.units_per_purchase,
+          row.discontinued,
         ],
       );
 
@@ -252,6 +254,7 @@ export const updatePart = async (
              unit = $5,
              purchase_unit = $6,
              units_per_purchase = $7,
+             discontinued = $8,
              updated_at = now()
          WHERE id = $1`,
         [
@@ -262,6 +265,7 @@ export const updatePart = async (
           row.unit,
           row.purchase_unit,
           row.units_per_purchase,
+          row.discontinued,
         ],
       );
     });

@@ -46,6 +46,7 @@ export const createPartRowFromBody = (
   unit: body.profile.unit ?? "ea",
   purchase_unit: body.profile.purchase_unit ?? null,
   units_per_purchase: body.profile.units_per_purchase ?? 1,
+  discontinued: body.profile.discontinued ?? false,
 });
 
 export const extendPartDetailDal = (

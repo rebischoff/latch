@@ -46,20 +46,19 @@ describe("estimateScopeSpecToPatchBody", () => {
     expect(patch.spec_option_id).toBeNull();
   });
 
-  it("stores canonical max bound and preset id", () => {
+  it("stores canonical max bound", () => {
     const patch = estimateScopeSpecToPatchBody({
       spec_def_id: "def-cd",
       value_type: "number",
       value_number: null,
       value_number_max: 135,
-      spec_threshold_preset_id: "preset-high",
       to_canonical_factor: 1,
       spec_option_id: null,
       value_boolean: null,
     });
 
     expect(patch.value_number_max).toBe(135);
-    expect(patch.spec_threshold_preset_id).toBe("preset-high");
+    expect(patch).not.toHaveProperty("spec_threshold_preset_id");
   });
 
   it("leaves blank bucket filters as null", () => {

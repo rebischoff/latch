@@ -3,9 +3,7 @@ import type { Pool, PoolClient } from "pg";
 import {
   bucketSpecMatchesPartRows,
   type PartSpecMatchRow,
-  type ThresholdPresetMatchMeta,
 } from "@/lib/catalog/spec-match";
-import { loadThresholdPresetsByIds } from "@/lib/catalog/repository/spec-threshold-presets-read";
 import { rootNamespaceForItems } from "@/lib/catalog/repository/item-effective-specs";
 
 import {
@@ -119,24 +117,8 @@ const loadSpecDefMeta = async (
   return new Map(result.rows.map((row) => [row.spec_def_id, row]));
 };
 
-const loadPresetsForBucket = async (
-  client: Pool | PoolClient,
-  bucket: MergedBucketSpecs,
-): Promise<Map<string, ThresholdPresetMatchMeta>> => {
-  const presetIds = [
-    ...new Set(
-      [...bucket.values()]
-        .map((value) => value.spec_threshold_preset_id)
-        .filter((id): id is string => id !== null),
-    ),
-  ];
-
-  return loadThresholdPresetsByIds(client, presetIds);
-};
-
 const bucketToMatchInput = (bucket: BucketSpecValue) => ({
   spec_option_id: bucket.spec_option_id,
-  spec_threshold_preset_id: bucket.spec_threshold_preset_id,
   value_boolean: bucket.value_boolean,
   value_number: bucket.value_number,
   value_number_max: bucket.value_number_max,
@@ -147,7 +129,6 @@ export const partMatchesBucket = (
   bucket: MergedBucketSpecs,
   effectiveDefIds: Set<string>,
   defMeta: Map<string, SpecDefMeta>,
-  presetsById: Map<string, ThresholdPresetMatchMeta>,
 ): boolean => {
   for (const defId of effectiveDefIds) {
     const bucketValue = bucket.get(defId);
@@ -161,16 +142,12 @@ export const partMatchesBucket = (
     }
 
     const rowsForDef = partSpecs.filter((row) => row.spec_def_id === defId);
-    const preset = bucketValue.spec_threshold_preset_id
-      ? presetsById.get(bucketValue.spec_threshold_preset_id)
-      : undefined;
 
     if (
       !bucketSpecMatchesPartRows(
         bucketToMatchInput(bucketValue),
         rowsForDef,
         meta.value_type,
-        preset,
         meta.wildcard_option_id,
       )
     ) {
@@ -185,6 +162,7 @@ export const filterPartsForItem = async (
   client: Pool | PoolClient,
   itemId: string,
   bucket: MergedBucketSpecs,
+  includeDiscontinued = false,
 ): Promise<FilteredPartRow[]> => {
   const effectiveDefs = await rootNamespaceForItems(client as Pool, [itemId]);
   const effectiveDefIds = new Set(effectiveDefs.map((def) => def.spec_def_id));
@@ -194,18 +172,15 @@ export const filterPartsForItem = async (
     return [];
   }
 
-  const [specsByPart, defMeta, presetsById] = await Promise.all([
+  const [specsByPart, defMeta] = await Promise.all([
     loadPartSpecs(client, candidateIds),
     loadSpecDefMeta(client, [...effectiveDefIds]),
-    loadPresetsForBucket(client, bucket),
   ]);
 
   const matched: string[] = [];
   for (const partId of candidateIds) {
     const partSpecs = specsByPart.get(partId) ?? [];
-    if (
-      partMatchesBucket(partSpecs, bucket, effectiveDefIds, defMeta, presetsById)
-    ) {
+    if (partMatchesBucket(partSpecs, bucket, effectiveDefIds, defMeta)) {
       matched.push(partId);
     }
   }
@@ -230,8 +205,9 @@ export const filterPartsForItem = async (
             ) AS max_vendor_price
      FROM manufacturer_part mp
      WHERE mp.id = ANY($1::text[])
+       AND ($2::boolean OR COALESCE(mp.discontinued, false) = false)
      ORDER BY mp.mpn ASC, mp.id ASC`,
-    [matched],
+    [matched, includeDiscontinued],
   );
 
   return priceResult.rows.map((row) => ({
@@ -286,8 +262,14 @@ export const resolveLineMaterial = async (
   input: MaterialResolveInput,
   bucket: MergedBucketSpecs,
   isNewLine: boolean,
+  includeDiscontinued = false,
 ): Promise<MaterialResolveResult> => {
-  const filtered = await filterPartsForItem(client, input.item_id, bucket);
+  const filtered = await filterPartsForItem(
+    client,
+    input.item_id,
+    bucket,
+    includeDiscontinued,
+  );
   const fallback = await loadItemFallbackCost(client, input.item_id);
   const filteredCount = filtered.length;
 
@@ -360,4 +342,6 @@ export const resolveFilteredParts = async (
   client: Pool | PoolClient,
   itemId: string,
   bucket: MergedBucketSpecs,
-): Promise<FilteredPartRow[]> => filterPartsForItem(client, itemId, bucket);
+  includeDiscontinued = false,
+): Promise<FilteredPartRow[]> =>
+  filterPartsForItem(client, itemId, bucket, includeDiscontinued);

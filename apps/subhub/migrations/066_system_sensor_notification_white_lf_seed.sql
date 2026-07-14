@@ -311,7 +311,7 @@ WHERE NOT EXISTS (
     AND existing.spec_def_id = ld.id
 );
 
--- ─── 7. manufacturer_part_spec — candela on wall horn/strobes (field-selectable) ─
+-- ─── 7. manufacturer_part_spec — candela Low on wall horn/strobes ─────────────
 
 WITH fa_root AS (
   SELECT id FROM item WHERE name = 'Fire Alarm' AND parent_id IS NULL LIMIT 1
@@ -323,15 +323,12 @@ candela_def AS (
   WHERE sd.display_name = 'Candela'
   LIMIT 1
 ),
-option_by_name AS (
-  SELECT so.display_name, so.id
+low_option AS (
+  SELECT so.id
   FROM spec_option so
   INNER JOIN candela_def cd ON cd.id = so.spec_def_id
-),
-wall_candela AS (
-  SELECT unnest(
-    ARRAY['15', '30', '75', '95', '110', '135', '185']
-  ) AS display_name
+  WHERE so.display_name = 'Low'
+  LIMIT 1
 ),
 horn_strobe_seed AS (
   SELECT *
@@ -350,11 +347,10 @@ INSERT INTO manufacturer_part_spec (
 SELECT
   mp.id,
   cd.id,
-  obn.id
+  lo.id
 FROM horn_strobe_seed hss
 CROSS JOIN candela_def cd
-CROSS JOIN wall_candela wc
-INNER JOIN option_by_name obn ON obn.display_name = wc.display_name
+CROSS JOIN low_option lo
 INNER JOIN party p ON p.display_name = hss.mfr_name AND p.kind = 'organization'
 INNER JOIN party_role pr ON pr.party_id = p.id AND pr.role = 'manufacturer'
 INNER JOIN manufacturer_part mp
@@ -365,7 +361,7 @@ WHERE NOT EXISTS (
   FROM manufacturer_part_spec existing
   WHERE existing.manufacturer_part_id = mp.id
     AND existing.spec_def_id = cd.id
-    AND existing.spec_option_id = obn.id
+    AND existing.spec_option_id = lo.id
 );
 
 COMMIT;

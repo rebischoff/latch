@@ -13,6 +13,7 @@ CREATE TABLE manufacturer_part (
   purchase_unit           TEXT,
   units_per_purchase      NUMERIC NOT NULL DEFAULT 1,
   cut_sheet_url           TEXT,
+  discontinued            BOOLEAN NOT NULL DEFAULT false,
   created_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
   CONSTRAINT manufacturer_part_mpn_unique UNIQUE (manufacturer_party_id, mpn)

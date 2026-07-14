@@ -1,7 +1,7 @@
 "use client";
 
 import { fieldAllows, type Manifest } from "@latch/contracts";
-import { Button, Divider, Input, InputNumber, Popover, Select, Typography } from "antd";
+import { Button, Input, InputNumber, Popover, Select, Typography } from "antd";
 import { useMemo, useState } from "react";
 import { Controller, useFormContext, useWatch } from "react-hook-form";
 
@@ -62,161 +62,16 @@ const formatNumberUnitSummary = (
 
 const formatEnumDetailsSummary = (
   options: ItemDetailFormValues["spec_definitions"][number]["options"],
-  presets: ItemDetailFormValues["spec_definitions"][number]["presets"],
-): string => {
-  const optionSummary =
-    options.length > 0
-      ? options.map((row) => row.display_name).filter(Boolean).join(", ")
-      : "No options";
-  const presetCount = presets?.length ?? 0;
-  if (presetCount === 0) {
-    return optionSummary;
-  }
-  return `${optionSummary} · ${presetCount} preset${presetCount === 1 ? "" : "s"}`;
-};
+): string =>
+  options.length > 0
+    ? options.map((row) => row.display_name).filter(Boolean).join(", ")
+    : "No options";
 
 const formatNumberDetailsSummary = (
   unitId: string | null | undefined,
   decimalPlaces: number | null | undefined,
   unitOptions: SpecUnitOption[],
-  presets: ItemDetailFormValues["spec_definitions"][number]["presets"],
-): string => {
-  const base = formatNumberUnitSummary(unitId, decimalPlaces, unitOptions);
-  const presetCount = presets?.length ?? 0;
-  if (presetCount === 0) {
-    return base;
-  }
-  return `${base} · ${presetCount} preset${presetCount === 1 ? "" : "s"}`;
-};
-
-type SpecThresholdPresetsEditorProps = {
-  disabled: boolean;
-  index: number;
-  mode: "enum" | "number";
-  optionChoices?: Array<{ label: string; value: string }>;
-  writable: boolean;
-};
-
-const SpecThresholdPresetsEditor = ({
-  index,
-  writable,
-  disabled,
-  mode,
-  optionChoices = [],
-}: SpecThresholdPresetsEditorProps) => {
-  const { control, watch, setValue } = useFormContext<ItemDetailFormValues>();
-  const presets = watch(`spec_definitions.${index}.presets`) ?? [];
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      <Typography.Text type="secondary">Threshold presets</Typography.Text>
-      {presets.map((preset, presetIndex) => (
-        <div
-          key={preset.id ?? `new-preset-${presetIndex}`}
-          style={{ display: "flex", flexDirection: "column", gap: 8 }}
-        >
-          <div style={{ display: "flex", gap: 8 }}>
-            <Controller
-              control={control}
-              name={`spec_definitions.${index}.presets.${presetIndex}.label`}
-              render={({ field }) => (
-                <Input
-                  {...field}
-                  disabled={!writable || disabled}
-                  placeholder="Preset label"
-                  style={{ flex: 1 }}
-                />
-              )}
-            />
-            {writable && !disabled ? (
-              <Button
-                type="text"
-                danger
-                onClick={() => {
-                  const next = presets.filter((_, i) => i !== presetIndex);
-                  setValue(`spec_definitions.${index}.presets`, next, { shouldDirty: true });
-                }}
-              >
-                Remove
-              </Button>
-            ) : null}
-          </div>
-          {mode === "enum" ? (
-            <Controller
-              control={control}
-              name={`spec_definitions.${index}.presets.${presetIndex}.option_ids`}
-              render={({ field }) => (
-                <Select
-                  allowClear
-                  disabled={!writable || disabled}
-                  mode="multiple"
-                  options={optionChoices}
-                  placeholder="Options in preset"
-                  style={{ width: "100%" }}
-                  value={field.value ?? []}
-                  onChange={(value) => field.onChange(value)}
-                />
-              )}
-            />
-          ) : (
-            <div style={{ display: "flex", gap: 8 }}>
-              <Controller
-                control={control}
-                name={`spec_definitions.${index}.presets.${presetIndex}.value_number`}
-                render={({ field }) => (
-                  <InputNumber
-                    disabled={!writable || disabled}
-                    placeholder="Min"
-                    style={{ flex: 1 }}
-                    value={field.value ?? undefined}
-                    onChange={(value) => field.onChange(value ?? null)}
-                  />
-                )}
-              />
-              <Controller
-                control={control}
-                name={`spec_definitions.${index}.presets.${presetIndex}.value_number_max`}
-                render={({ field }) => (
-                  <InputNumber
-                    disabled={!writable || disabled}
-                    placeholder="Max"
-                    style={{ flex: 1 }}
-                    value={field.value ?? undefined}
-                    onChange={(value) => field.onChange(value ?? null)}
-                  />
-                )}
-              />
-            </div>
-          )}
-        </div>
-      ))}
-      {writable && !disabled ? (
-        <Button
-          type="dashed"
-          onClick={() => {
-            setValue(
-              `spec_definitions.${index}.presets`,
-              [
-                ...presets,
-                mode === "enum"
-                  ? { label: "", sort_order: presets.length + 1, option_ids: [] }
-                  : {
-                      label: "",
-                      sort_order: presets.length + 1,
-                      value_number: null,
-                      value_number_max: null,
-                    },
-              ],
-              { shouldDirty: true },
-            );
-          }}
-        >
-          Add preset
-        </Button>
-      ) : null}
-    </div>
-  );
-};
+): string => formatNumberUnitSummary(unitId, decimalPlaces, unitOptions);
 
 type SpecOptionsPopoverProps = {
   disabled: boolean;
@@ -227,17 +82,9 @@ type SpecOptionsPopoverProps = {
 const SpecOptionsPopover = ({ index, writable, disabled }: SpecOptionsPopoverProps) => {
   const { control, watch, setValue } = useFormContext<ItemDetailFormValues>();
   const options = watch(`spec_definitions.${index}.options`) ?? [];
-  const presets = watch(`spec_definitions.${index}.presets`) ?? [];
   const [open, setOpen] = useState(false);
 
-  const optionChoices = options
-    .filter((option) => option.id && option.display_name)
-    .map((option) => ({
-      value: option.id!,
-      label: option.display_name,
-    }));
-
-  const summary = formatEnumDetailsSummary(options, presets);
+  const summary = formatEnumDetailsSummary(options);
 
   const content = (
     <div style={{ display: "flex", flexDirection: "column", gap: 8, minWidth: 280 }}>
@@ -284,14 +131,6 @@ const SpecOptionsPopover = ({ index, writable, disabled }: SpecOptionsPopoverPro
           Add option
         </Button>
       ) : null}
-      <Divider style={{ margin: "4px 0" }} />
-      <SpecThresholdPresetsEditor
-        index={index}
-        writable={writable}
-        disabled={disabled}
-        mode="enum"
-        optionChoices={optionChoices}
-      />
     </div>
   );
 
@@ -303,7 +142,7 @@ const SpecOptionsPopover = ({ index, writable, disabled }: SpecOptionsPopoverPro
       trigger="click"
       title="Enum details"
     >
-      <Typography.Link disabled={!writable && options.length === 0 && presets.length === 0}>
+      <Typography.Link disabled={!writable && options.length === 0}>
         {summary}
       </Typography.Link>
     </Popover>
@@ -328,10 +167,9 @@ const NumberDetailsPopover = ({
   const { control, watch } = useFormContext<ItemDetailFormValues>();
   const unitId = watch(`spec_definitions.${index}.unit_id`);
   const decimalPlaces = watch(`spec_definitions.${index}.decimal_places`);
-  const presets = watch(`spec_definitions.${index}.presets`) ?? [];
   const [open, setOpen] = useState(false);
 
-  const summary = formatNumberDetailsSummary(unitId, decimalPlaces, unitOptions, presets);
+  const summary = formatNumberDetailsSummary(unitId, decimalPlaces, unitOptions);
 
   const content = (
     <div style={{ display: "flex", flexDirection: "column", gap: 12, minWidth: 280 }}>
@@ -378,13 +216,6 @@ const NumberDetailsPopover = ({
           </div>
         )}
       />
-      <Divider style={{ margin: "4px 0" }} />
-      <SpecThresholdPresetsEditor
-        index={index}
-        writable={writable}
-        disabled={disabled}
-        mode="number"
-      />
     </div>
   );
 
@@ -396,7 +227,7 @@ const NumberDetailsPopover = ({
       trigger="click"
       title="Number details"
     >
-      <Typography.Link disabled={!writable && !unitId && presets.length === 0}>
+      <Typography.Link disabled={!writable && !unitId}>
         {summary}
       </Typography.Link>
     </Popover>
@@ -541,7 +372,6 @@ export const ItemSpecDefinitionsField = ({
           value_type: "enum",
           sort_order: definitions.length + 1,
           options: [],
-          presets: [],
           unit_id: null,
           decimal_places: null,
           in_use_part_count: 0,

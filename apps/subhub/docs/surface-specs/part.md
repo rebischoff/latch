@@ -10,7 +10,7 @@
 
 | # | Topic | Choice |
 |---|--------|--------|
-| 1 | `profile` scope | **MPN header only** — `manufacturer_party_id`, `mpn`, `description`, `unit`, `purchase_unit`, `units_per_purchase`. **`part_specs`** on separate Field (37j); defer `manufacturer_part.specs` text, requirements graph, `cut_sheet_url` |
+| 1 | `profile` scope | **MPN header only** — `manufacturer_party_id`, `mpn`, `description`, `unit`, `purchase_unit`, `units_per_purchase`, **`discontinued`** (41ak). **`part_specs`** on separate Field (37j); defer `manufacturer_part.specs` text, requirements graph, `cut_sheet_url` |
 | 2 | `vendor_pricing` row | `vendor_party_id`, `vendor_pn`, `vendor_description`, `unit_price`, `is_preferred`. **No** `currency` on row (org/vendor-level if ever needed). **No** price history / effective date |
 | 3 | `is_preferred` | **At most one** `true` per part — DAL clears siblings on PATCH |
 | 4 | List filter | **None** v1 — org-wide list; no `?manufacturer=` deep link or sidebar filter |
@@ -20,7 +20,7 @@
 | 8 | Delete | `ConflictError` with counts + sample labels + deep links; allow when only `vendor_part` children; **PATCH** identity unless `RESTRICT` blockers |
 | 9 | Policy | **`profile`** and **`vendor_pricing`** separate manifest Fields — no sensitive-field tier |
 | 10 | Item assignment | **`item_links`** on `part_detail` — `part_item` replace-array; **`node_type = item` leaves only**; one multi leaf-only `TreeSelect`; resolver exact leaf match (no parent→subtree pool) — [37u](../tasks/37u-part-leaf-links-specs-ui.md) |
-| 11 | Part compatibility specs | **`part_specs`** on `part_detail` — Spec · Value table; boolean checkbox; number min + optional max; enum multi-select; rows = union of linked leaves' **scope-root namespace** (37ai — not a participation subset; a blank row on a part means that dimension is skipped when matching, not "fails") |
+| 11 | Part compatibility specs | **`part_specs`** on `part_detail` — Spec · Value table; boolean Select (True/False, clear → N/A); number min + optional max; enum multi-select; rows = union of linked leaves' **scope-root namespace** (37ai — not a participation subset; a blank row on a part means that dimension is skipped when matching, not "fails") |
 
 ---
 
@@ -71,7 +71,7 @@
 
 | Field id | Type | Writable | Columns / child table | Notes |
 |----------|------|----------|-------------------------|-------|
-| `profile` | scalar | read + write | `manufacturer_party_id`, `mpn`, `description`, `unit`, `purchase_unit`, `units_per_purchase` | Manufacturer ref + denormalized label in read DTO |
+| `profile` | scalar | read + write | `manufacturer_party_id`, `mpn`, `description`, `unit`, `purchase_unit`, `units_per_purchase`, `discontinued` | Manufacturer ref + denormalized label in read DTO |
 | `vendor_pricing` | collection | read + write | `vendor_part` | replace-array PATCH; see element shape |
 | `item_links` | collection | read + write | `part_item`, `item` | replace-array; leaf items only (`node_type = item`); part → item M:N pool for estimate resolver |
 | `part_specs` | collection | read + write | `manufacturer_part_spec`, `spec_def`, `spec_option` | replace-array; Spec · Value UX; compatibility rows for part filter |
@@ -127,7 +127,7 @@ Only **quotable leaves** (`item.node_type = 'item'`) are linkable. The estimate 
 }
 ```
 
-Enum defs may appear as **multiple rows** (one per compatible `spec_option_id`). Boolean / number: one row per def. UI is a **Spec · Value** table: checkbox (boolean), min + optional max popover (number), multi-select (enum). Writable defs = union of `spec_def WHERE scope_root_item_id IN (roots of the part's linked leaves)` (37ai — direct join on scope root, no participation table, no ancestor walk). **Blank/absent row for a def in this set is a valid, meaningful state** — it means the def doesn't apply to this part, and the estimate resolver skips (does not fail) that dimension for this part ([V5](../decisions/catalog.md#decision-spec-participation-removed--narrow-by-scope-root-namespace-part-row-presence-is-the-filter-2026-07-12)).
+Enum defs may appear as **multiple rows** (one per compatible `spec_option_id`). Boolean / number: one row per def. UI is a **Spec · Value** table: Select True/False with `allowClear` (boolean — clear omits row / N/A), min + optional max popover (number), multi-select (enum). Writable defs = union of `spec_def WHERE scope_root_item_id IN (roots of the part's linked leaves)` (37ai — direct join on scope root, no participation table, no ancestor walk). **Blank/absent row for a def in this set is a valid, meaningful state** — it means the def doesn't apply to this part, and the estimate resolver skips (does not fail) that dimension for this part ([V5](../decisions/catalog.md#decision-spec-participation-removed--narrow-by-scope-root-namespace-part-row-presence-is-the-filter-2026-07-12)).
 
 ---
 
@@ -231,7 +231,7 @@ Master-detail per [routing-and-libraries.md](../routing-and-libraries.md): list 
 
 **Create:** toolbar **New part** on list layout → empty detail pane → POST on first Save ([create decision](../decisions/general.md#decision-listdetail-surface-create--toolbar-and-picker-add-new-2026-06-19)).
 
-**Tabs:** **Purchase** (`profile`, `vendor_pricing`) and **Specs** (`item_links`, `part_specs`). URL `?tab=specs` selects Specs; default is Purchase. When only one tab group is readable, show that content without tab chrome.
+**Tabs:** **Purchase** (`profile`, `vendor_pricing`) and **Specs** (`item_links`, `part_specs`). URL `?tab=specs` selects Specs; default (omit `tab`) is Purchase. Same-surface list navigation preserves `tab` via `buildDetailHref`; unavailable Specs falls back to Purchase and clears the URL. When only one tab group is readable, show that content without tab chrome.
 
 **UOM helper:** when `purchase_unit` differs from `unit`, show conversion hint (`units_per_purchase`) on the Purchase tab above the pricing grid.
 
@@ -265,7 +265,7 @@ Master-detail per [routing-and-libraries.md](../routing-and-libraries.md): list 
 |-------|-----|---------|-------------|
 | `vendor_pricing` | **Add vendor price** | **Vendor** — vendor-tagged `party` only; [`LinkedSelectInput`](../../components/form/LinkedSelectInput.tsx) inline layout (`[ Select ] [ open icon ]`) when `vendor_detail` `read`; read-only row: label + icon (not inline link text); **Add new vendor** deferred | "No vendor pricing" |
 | `item_links` | multi `TreeSelect` | **Item** — org item tree; **leaves selectable only** (`node_type = item`); selection order → `sort_order` | "Not assigned to any items — add an item to include this part in estimate resolution." |
-| `part_specs` | (auto rows) | Spec · Value — checkbox / number min–max popover / enum multi-select; defs from linked leaves' scope-root namespace union (37ai) | "Link items first — compatibility specs appear for each definition in the linked items' scope." |
+| `part_specs` | (auto rows) | Spec · Value — boolean Select (True/False, clear → N/A) / number min–max popover / enum multi-select; defs from linked leaves' scope-root namespace union (37ai) | "Link items first — compatibility specs appear for each definition in the linked items' scope." |
 
 ### `profile` pickers
 

@@ -67,7 +67,6 @@ describe("projectItemDetailRow", () => {
             decimal_places: null,
             sort_order: 1,
             options: [],
-            presets: [],
             in_use_part_count: 2,
           },
         ],

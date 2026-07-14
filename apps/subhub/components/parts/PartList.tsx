@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 
 import {
   SurfaceListError,
@@ -10,6 +10,7 @@ import {
 import { useSurfaceList } from "@/lib/hooks/use-surface-list";
 import { useSurfaceListSearch } from "@/lib/hooks/use-surface-list-search";
 import { routes } from "@/lib/nav-routes";
+import { buildDetailHref } from "@/lib/surface-navigation";
 
 type PartListSummary = {
   mpn?: string | null;
@@ -18,6 +19,7 @@ type PartListSummary = {
 
 export const PartList = () => {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const baseList = useSurfaceList("part_list");
   const { search, setSearch, showSearch, listQuery } = useSurfaceListSearch(
     baseList.data?.manifest,
@@ -48,7 +50,12 @@ export const PartList = () => {
           render: (_, row) => {
             const summary = row.summary as PartListSummary | undefined;
             return (
-              <Link href={routes.parts.detail(row.id)}>
+              <Link
+                href={buildDetailHref({
+                  detailPath: routes.parts.detail(row.id),
+                  currentSearch: searchParams,
+                })}
+              >
                 {summary?.mpn ?? row.id}
               </Link>
             );

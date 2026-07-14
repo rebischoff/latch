@@ -20,7 +20,7 @@ That's the entire migration. No FK cleanup elsewhere — `item_spec_participatio
 |-----------|--------|
 | Existing `item_spec_participation` rows | **Discarded, not backfilled anywhere.** Nothing downstream reads them after this ships — [V1–V8](../decisions/catalog.md#decision-spec-participation-removed--narrow-by-scope-root-namespace-part-row-presence-is-the-filter-2026-07-12) replaces the concept, not the storage. |
 | Existing `manufacturer_part_spec` rows | **Untouched.** Moving from participation (narrow) to full scope-root namespace (broad) only ever *widens* what's in-namespace for a part — no row that was previously valid becomes invalid ([V7](../decisions/catalog.md#decision-spec-participation-removed--narrow-by-scope-root-namespace-part-row-presence-is-the-filter-2026-07-12)). |
-| `spec_def` / `spec_option` / `spec_threshold_preset*` | Untouched — namespace-scoping (37o) is unaffected by this migration. |
+| `spec_def` / `spec_option` | Untouched — namespace-scoping (37o) is unaffected by this migration. (`spec_threshold_preset*` later dropped by [071](./071-drop-threshold-presets-plan.md) / **41ao**.) |
 
 **No backfill script needed** (unlike [046](../tasks/37o-spec-participation-flatten.md#step-2--migration-046_spec_participation_flattensql)'s one-off participation backfill) — this migration only removes storage that nothing will read going forward. Apply **after** the DAL/matcher code (37ai steps 2–4) stops querying `item_spec_participation`, so there's no window where running code 500s on a missing table. Order: ship code first (reads become namespace-only), then run `064`, matching the "widen, then drop" safety pattern.
 

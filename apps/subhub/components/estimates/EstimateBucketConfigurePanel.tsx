@@ -63,6 +63,7 @@ export const EstimateBucketConfigurePanel = ({
     }
     return JSON.stringify({
       complexity_factor_id: node.complexity_factor_id,
+      include_discontinued: node.include_discontinued,
       labor_phases_explicit: node.labor_phases_explicit,
       included_labor_phases: node.included_labor_phases,
       specs: node.specs,
@@ -168,6 +169,28 @@ export const EstimateBucketConfigurePanel = ({
         writable={writable}
         disabled={disabled}
       />
+
+      <Controller
+        control={control}
+        name={conditionPathToRhf(binding.conditionPath, "include_discontinued")}
+        render={({ field: { value, onChange } }) => (
+          <FormFieldItem label="Discontinued">
+            <Checkbox
+              checked={value === true}
+              disabled={disabled || !writable}
+              onChange={(event) => {
+                onChange(event.target.checked);
+                setValue(
+                  conditionPathToRhf(binding.conditionPath, "include_discontinued"),
+                  event.target.checked,
+                  { shouldDirty: true },
+                );
+              }}
+            />
+          </FormFieldItem>
+        )}
+      />
+
       <EstimateScopeSpecFields
         binding={binding}
         isChild={isChild}

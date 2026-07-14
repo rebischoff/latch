@@ -4,7 +4,7 @@ import { fieldAllows } from "@latch/contracts";
 import type { DataNode } from "antd/es/tree";
 import { App, Badge, Input, Tree, Typography } from "antd";
 import type { TreeProps } from "antd";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -24,6 +24,7 @@ import { useSurfaceList } from "@/lib/hooks/use-surface-list";
 import { useSurfaceListSearch } from "@/lib/hooks/use-surface-list-search";
 import { routes } from "@/lib/nav-routes";
 import { patchSurfaceDetail, SurfaceApiError } from "@/lib/surface-api";
+import { buildDetailHref } from "@/lib/surface-navigation";
 
 const toAntdTreeData = (nodes: ItemTreeNode[]): DataNode[] =>
   nodes.map((node) => ({
@@ -42,6 +43,7 @@ const toAntdTreeData = (nodes: ItemTreeNode[]): DataNode[] =>
 export const ItemTreeList = () => {
   const pathname = usePathname();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { message } = App.useApp();
   const { selectedId, setSelectedId, setChildCreateBlocked } = useMasterDetailSelection();
@@ -162,7 +164,12 @@ export const ItemTreeList = () => {
               const node = findNodeById(displayTree, id);
               setChildCreateBlocked(node?.node_type === "item");
               setSelectedId(id);
-              router.push(routes.items.detail(id));
+              router.push(
+                buildDetailHref({
+                  detailPath: routes.items.detail(id),
+                  currentSearch: searchParams,
+                }),
+              );
             }}
           />
         )}

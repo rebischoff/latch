@@ -2,13 +2,15 @@
 
 import { Table, Typography } from "antd";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 
 import { useSurfaceList } from "@/lib/hooks/use-surface-list";
 import { routes } from "@/lib/nav-routes";
+import { buildDetailHref } from "@/lib/surface-navigation";
 
 export const EstimateList = () => {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { data, isLoading, error } = useSurfaceList("estimate_list");
 
   if (error) {
@@ -45,7 +47,12 @@ export const EstimateList = () => {
           render: (_, row) => {
             const summary = row.summary as { title?: string | null } | undefined;
             return (
-              <Link href={routes.estimates.detail(row.id)}>
+              <Link
+                href={buildDetailHref({
+                  detailPath: routes.estimates.detail(row.id),
+                  currentSearch: searchParams,
+                })}
+              >
                 {summary?.title ?? row.id}
               </Link>
             );

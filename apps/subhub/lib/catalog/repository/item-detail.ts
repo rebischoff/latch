@@ -1,6 +1,5 @@
 import type { Pool } from "pg";
 
-import { specValueToDisplay } from "../spec-units";
 import { mergeLaborPhasesAcrossAncestry } from "../labor-phase-resolve";
 import { tableExists } from "../../sites/repository/sql-utils";
 import {
@@ -42,22 +41,12 @@ export type SpecOptionRow = {
   sort_order: number;
 };
 
-export type SpecThresholdPresetRow = {
-  id: string;
-  label: string;
-  option_ids: string[];
-  sort_order: number;
-  value_number: number | null;
-  value_number_max: number | null;
-};
-
 export type SpecDefinitionRow = {
   decimal_places: number | null;
   display_name: string;
   id: string;
   in_use_part_count: number;
   options: SpecOptionRow[];
-  presets: SpecThresholdPresetRow[];
   sort_order: number;
   unit_id: string | null;
   unit_symbol: string | null;
@@ -210,101 +199,6 @@ const loadSpecOptionsByDefIds = async (
   return byDefId;
 };
 
-type SpecThresholdPresetDbRow = {
-  id: string;
-  label: string;
-  sort_order: number;
-  spec_def_id: string;
-  value_number: string | null;
-  value_number_max: string | null;
-};
-
-const loadSpecPresetOptionsByPresetIds = async (
-  pool: Pool,
-  presetIds: string[],
-): Promise<Map<string, string[]>> => {
-  if (presetIds.length === 0) {
-    return new Map();
-  }
-
-  const result = await pool.query<{ preset_id: string; spec_option_id: string }>(
-    `SELECT preset_id, spec_option_id
-     FROM spec_threshold_preset_option
-     WHERE preset_id = ANY($1::uuid[])
-     ORDER BY spec_option_id ASC`,
-    [presetIds],
-  );
-
-  const byPresetId = new Map<string, string[]>();
-  for (const row of result.rows) {
-    const optionIds = byPresetId.get(row.preset_id) ?? [];
-    optionIds.push(row.spec_option_id);
-    byPresetId.set(row.preset_id, optionIds);
-  }
-
-  return byPresetId;
-};
-
-const loadSpecPresetsByDefIds = async (
-  pool: Pool,
-  defs: Array<{
-    decimal_places: number | null;
-    id: string;
-    to_canonical_factor: number | null;
-    unit_symbol: string | null;
-    value_type: "boolean" | "enum" | "number";
-  }>,
-): Promise<Map<string, SpecThresholdPresetRow[]>> => {
-  const defIds = defs.map((def) => def.id);
-  if (defIds.length === 0) {
-    return new Map();
-  }
-
-  const result = await pool.query<SpecThresholdPresetDbRow>(
-    `SELECT id, spec_def_id, label, sort_order, value_number::text, value_number_max::text
-     FROM spec_threshold_preset
-     WHERE spec_def_id = ANY($1::uuid[])
-     ORDER BY sort_order ASC, label ASC, id ASC`,
-    [defIds],
-  );
-
-  if (result.rows.length === 0) {
-    return new Map();
-  }
-
-  const presetIds = result.rows.map((row) => row.id);
-  const optionsByPresetId = await loadSpecPresetOptionsByPresetIds(pool, presetIds);
-  const defMetaById = new Map(defs.map((def) => [def.id, def]));
-
-  const byDefId = new Map<string, SpecThresholdPresetRow[]>();
-  for (const row of result.rows) {
-    const defMeta = defMetaById.get(row.spec_def_id);
-    const unitMeta = {
-      decimal_places: defMeta?.decimal_places,
-      to_canonical_factor: defMeta?.to_canonical_factor ?? 1,
-      unit_symbol: defMeta?.unit_symbol,
-    };
-    const presets = byDefId.get(row.spec_def_id) ?? [];
-    presets.push({
-      id: row.id,
-      label: row.label,
-      sort_order: row.sort_order,
-      value_number:
-        row.value_number !== null
-          ? specValueToDisplay(Number(row.value_number), unitMeta)
-          : null,
-      value_number_max:
-        row.value_number_max !== null
-          ? specValueToDisplay(Number(row.value_number_max), unitMeta)
-          : null,
-      option_ids: optionsByPresetId.get(row.id) ?? [],
-    });
-    byDefId.set(row.spec_def_id, presets);
-  }
-
-  return byDefId;
-};
-
 const loadSpecDefInUseCounts = async (
   pool: Pool,
   specDefId: string,
@@ -356,10 +250,7 @@ export const loadScopeSpecDefinitions = async (
   }
 
   const defIds = defsResult.rows.map((row) => row.id);
-  const [optionsByDefId, presetsByDefId] = await Promise.all([
-    loadSpecOptionsByDefIds(pool, defIds),
-    loadSpecPresetsByDefIds(pool, defsResult.rows),
-  ]);
+  const optionsByDefId = await loadSpecOptionsByDefIds(pool, defIds);
 
   const rows: SpecDefinitionRow[] = [];
   for (const def of defsResult.rows) {
@@ -373,7 +264,6 @@ export const loadScopeSpecDefinitions = async (
       decimal_places: def.decimal_places,
       sort_order: def.sort_order,
       options: optionsByDefId.get(def.id) ?? [],
-      presets: presetsByDefId.get(def.id) ?? [],
       in_use_part_count: counts.parts,
     });
   }

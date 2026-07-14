@@ -40,6 +40,8 @@ fields:
         nullable: true
       - column: manufacturer_part.units_per_purchase
         type: number
+      - column: manufacturer_part.discontinued
+        type: boolean
   - id: vendor_pricing
     # logical — DAL maps to vendor_part; see docs/child-collections.md
     columns: []

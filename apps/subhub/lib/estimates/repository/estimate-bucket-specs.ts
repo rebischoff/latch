@@ -3,7 +3,6 @@ import type { Pool, PoolClient } from "pg";
 export type BucketSpecValue = {
   spec_def_id: string;
   spec_option_id: string | null;
-  spec_threshold_preset_id: string | null;
   value_boolean: boolean | null;
   value_number: number | null;
   value_number_max: number | null;
@@ -30,7 +29,6 @@ export const loadConditionBucketSpecs = async (
   const result = await client.query<BucketSpecValue>(
     `SELECT spec_def_id::text,
             spec_option_id,
-            spec_threshold_preset_id,
             value_boolean,
             value_number,
             value_number_max
@@ -76,7 +74,6 @@ export const loadLineBucketSpecs = async (
   const result = await client.query<BucketSpecValue>(
     `SELECT spec_def_id::text,
             spec_option_id,
-            spec_threshold_preset_id,
             value_boolean,
             value_number,
             value_number_max
@@ -102,26 +99,42 @@ export const mergeBucketSpecs = (
   return merged;
 };
 
-export const loadMergedBucketForLine = async (
+/**
+ * Same merge as `loadMergedBucketForLine`, but when `draftSpecs` is provided the
+ * leaf condition's DB rows are replaced by the draft (preview / unsaved C panel).
+ */
+export const loadMergedBucketWithDraft = async (
   client: Pool | PoolClient,
-  estimateConditionId: string,
-  estimateLineId: string | null,
+  conditionId: string,
+  lineId: string | null,
+  draftSpecs: BucketSpecValue[] | undefined,
 ): Promise<MergedBucketSpecs> => {
   const conditionSpecsRootToLeaf: BucketSpecValue[] = [];
-  const leafToRoot = await loadConditionAncestorIds(client, estimateConditionId);
-  for (const conditionId of [...leafToRoot].reverse()) {
-    const specs = await loadConditionBucketSpecs(client, conditionId);
-    conditionSpecsRootToLeaf.push(...specs);
+  const leafToRoot = await loadConditionAncestorIds(client, conditionId);
+  for (const ancestorId of [...leafToRoot].reverse()) {
+    if (draftSpecs && ancestorId === conditionId) {
+      conditionSpecsRootToLeaf.push(...draftSpecs);
+    } else {
+      conditionSpecsRootToLeaf.push(
+        ...(await loadConditionBucketSpecs(client, ancestorId)),
+      );
+    }
   }
 
   const lineSpecs =
-    estimateLineId !== null ? await loadLineBucketSpecs(client, estimateLineId) : [];
+    lineId !== null ? await loadLineBucketSpecs(client, lineId) : [];
 
   return mergeBucketSpecs(conditionSpecsRootToLeaf, lineSpecs);
 };
 
+export const loadMergedBucketForLine = async (
+  client: Pool | PoolClient,
+  estimateConditionId: string,
+  estimateLineId: string | null,
+): Promise<MergedBucketSpecs> =>
+  loadMergedBucketWithDraft(client, estimateConditionId, estimateLineId, undefined);
+
 export const isBucketValueBlank = (spec: BucketSpecValue): boolean =>
-  spec.spec_threshold_preset_id === null &&
   spec.spec_option_id === null &&
   spec.value_boolean === null &&
   spec.value_number === null &&

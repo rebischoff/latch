@@ -9,7 +9,7 @@ import {
 } from "@latch/contracts";
 import { App } from "antd";
 import { Checkbox, Tabs, Typography } from "antd";
-import { notFound, useRouter, useSearchParams } from "next/navigation";
+import { notFound, useRouter } from "next/navigation";
 import { useCallback, useMemo, useRef } from "react";
 import { useForm, type Resolver } from "react-hook-form";
 import { z } from "zod";
@@ -28,6 +28,7 @@ import { useMasterDetailSelectionOptional } from "@/components/shell/MasterDetai
 import { SurfaceFormLayout } from "@/components/surface/SurfaceFormLayout";
 import { SurfaceFormRoot } from "@/components/surface/SurfaceFormRoot";
 import { toSpecDefinitionPatchRow } from "@/lib/catalog/item-spec-definitions-form";
+import { useDetailTab } from "@/lib/hooks/use-detail-tab";
 import { useSurfaceListCreate } from "@/lib/hooks/use-surface-list-create";
 import { useSurfaceDetail } from "@/lib/hooks/use-surface-detail";
 import { useSurfaceDelete, useSurfacePatch } from "@/lib/hooks/use-surface-patch";
@@ -73,14 +74,6 @@ export type ItemDetailFormValues = {
       id?: string;
       display_name: string;
       sort_order?: number;
-    }>;
-    presets?: Array<{
-      id?: string;
-      label: string;
-      sort_order?: number;
-      value_number?: number | null;
-      value_number_max?: number | null;
-      option_ids?: string[];
     }>;
     in_use_part_count?: number;
   }>;
@@ -258,7 +251,6 @@ export const ItemDetailForm = ({
   returnTo = null,
 }: ItemDetailFormProps) => {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { message, modal } = App.useApp();
   const isCreate = categoryId === "new";
   const detailQuery = useSurfaceDetail(
@@ -514,12 +506,19 @@ export const ItemDetailForm = ({
     ? Boolean(parentId) && parentDetailQuery.isLoading && !parentDetailQuery.data
     : detailQuery.isLoading && !detailQuery.data;
   const blocking = !isCreate && detailQuery.isFetching && Boolean(detailQuery.data);
-  const activeTab = searchParams.get("tab") === "specs" ? "specs" : "general";
   const showSpecsTab =
     nodeType === "scope" && fieldAllows(activeManifest, "spec_definitions", "read");
+  const availableKeys = showSpecsTab
+    ? (["general", "specs"] as const)
+    : (["general"] as const);
   const serverNodeType = (
     detailQuery.data?.data?.profile as { node_type?: "scope" | "category" | "item" } | undefined
   )?.node_type;
+  const { activeKey, setTab } = useDetailTab({
+    availableKeys,
+    defaultKey: "general",
+    ready: isCreate || Boolean(serverNodeType) || Boolean(detailQuery.error),
+  });
 
   const generalContent = (
     <>
@@ -595,22 +594,8 @@ export const ItemDetailForm = ({
         <SurfaceFormLayout>
           {showSpecsTab ? (
             <Tabs
-              activeKey={activeTab}
-              onChange={(key) => {
-                const params = new URLSearchParams(searchParams.toString());
-                if (key === "specs") {
-                  params.set("tab", "specs");
-                } else {
-                  params.delete("tab");
-                }
-                const query = params.toString();
-                router.replace(
-                  query
-                    ? `${routes.items.detail(categoryId)}?${query}`
-                    : routes.items.detail(categoryId),
-                  { scroll: false },
-                );
-              }}
+              activeKey={activeKey}
+              onChange={setTab}
               items={[
                 { key: "general", label: "General", children: generalContent },
                 {

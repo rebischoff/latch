@@ -14,7 +14,6 @@ describe("isBucketSpecBlank", () => {
       isBucketSpecBlank({
         spec_def_id: "def-1",
         spec_option_id: null,
-        spec_threshold_preset_id: null,
         value_boolean: null,
         value_number: null,
         value_number_max: null,
@@ -35,37 +34,24 @@ describe("isBucketSpecValueSet", () => {
     ).toBe(true);
   });
 
-  it("treats preset id as set", () => {
+  it("treats enum option as set", () => {
     expect(
       isBucketSpecValueSet({
         spec_def_id: "def-enum",
         value_type: "enum",
-        spec_threshold_preset_id: "preset-1",
+        spec_option_id: "opt-1",
       }),
     ).toBe(true);
   });
 });
 
 describe("assertBucketSpecMutualExclusion", () => {
-  it("rejects preset plus option", () => {
+  it("rejects option plus numeric bounds", () => {
     expect(() =>
       assertBucketSpecMutualExclusion(
         {
           spec_def_id: "def-1",
-          spec_threshold_preset_id: "preset-1",
           spec_option_id: "opt-1",
-        },
-        "conditions",
-      ),
-    ).toThrow(ValidationError);
-  });
-
-  it("rejects numeric bounds plus preset", () => {
-    expect(() =>
-      assertBucketSpecMutualExclusion(
-        {
-          spec_def_id: "def-1",
-          spec_threshold_preset_id: "preset-1",
           value_number: 10,
         },
         "conditions",
@@ -75,14 +61,11 @@ describe("assertBucketSpecMutualExclusion", () => {
 });
 
 describe("replaceLineBucketSpecsTx", () => {
-  it("writes value_number_max and spec_threshold_preset_id columns", async () => {
+  it("writes value_number_max column", async () => {
     const queries: Array<{ sql: string; params: unknown[] }> = [];
     const client = {
       query: vi.fn(async (sql: string, params: unknown[] = []) => {
         queries.push({ sql, params });
-        if (sql.includes("FROM spec_threshold_preset")) {
-          return { rows: [{ id: "preset-1" }] };
-        }
         return { rows: [] };
       }),
     };
@@ -95,12 +78,13 @@ describe("replaceLineBucketSpecsTx", () => {
       },
       {
         spec_def_id: "def-enum",
-        spec_threshold_preset_id: "preset-1",
+        spec_option_id: "opt-1",
       },
     ]);
 
     const insert = queries.find((entry) => entry.sql.includes("INSERT INTO estimate_line_spec"));
     expect(insert).toBeDefined();
+    expect(insert?.sql.includes("spec_threshold_preset_id")).toBe(false);
     expect(queries.some((entry) => entry.sql.includes("DELETE FROM estimate_line_spec"))).toBe(
       true,
     );

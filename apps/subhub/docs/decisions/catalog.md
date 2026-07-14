@@ -200,7 +200,7 @@ Horn/Strobe is authored once — one name, one part pool, one `item_labor_phase`
 
 ### Decision: spec threshold presets + numeric bucket ranges (2026-07-12)
 
-**Status:** **Locked** (2026-07-12). **Tasks:** [37ae](../tasks/37ae-spec-threshold-presets-ddl.md) → [37af](../tasks/37af-spec-threshold-presets-catalog-ui.md) → [37ag](../tasks/37ag-spec-threshold-presets-matcher.md) → [37ah](../tasks/37ah-spec-threshold-presets-estimate-ui.md). **Amends:** [N4/N5](#decision-numeric-specs--drop-range-type-band-is-part-authored-2026-07-08) (bucket side only — part authoring unchanged). **Supersedes:** the 2026-07-11 *proposals* for numeric bucket range and enum threshold presets (same content, now locked).
+**Status:** **Superseded** (2026-07-13) — preset machinery removed by [41ao](../tasks/41ao-drop-threshold-presets.md); **numeric bucket ranges retained** (T3/T7/T8b, N4/N5). **Historical tasks:** [37ae](../tasks/37ae-spec-threshold-presets-ddl.md) → [37af](../tasks/37af-spec-threshold-presets-catalog-ui.md) → [37ag](../tasks/37ag-spec-threshold-presets-matcher.md) → [37ah](../tasks/37ah-spec-threshold-presets-estimate-ui.md). **Amends:** [N4/N5](#decision-numeric-specs--drop-range-type-band-is-part-authored-2026-07-08) (bucket side only — part authoring unchanged). **Supersedes:** the 2026-07-11 *proposals* for numeric bucket range and enum threshold presets (same content, now locked).
 
 **Problem:** (1) Number buckets only store a point today, so capability thresholds ("≥135 cd") reject parts whose band clears the bar but does not contain the exact point. (2) Closed discrete dims (candela switch positions) need estimator shortcuts ("High" / "Low") without inventing fake continuous coverage. Both need admin-curated presets and an activated bucket range column.
 
@@ -239,6 +239,30 @@ Horn/Strobe is authored once — one name, one part pool, one `item_labor_phase`
 **Rationale:** Presets are catalog policy for a dimension — they belong next to the def's options/unit, not on every leaf or every estimate. Interval overlap + curated enum sets cover the two real shapes without operators or a second Surface. Part authoring stays exact (what the SKU supports); buckets express intent (what the job needs).
 
 **Out of this decision:** cross-spec dependencies (still deferred); commercial axis / costing; wildcard enum option (T11); candela as `number` (use enum + presets).
+
+**Superseded (2026-07-13) for Candela only:** Candela no longer uses cd switch positions or High/Low option-set presets — see [Candela Low/High](#decision-candela-lowhigh-enum-2026-07-13). Threshold-preset system removed by [41ao](../tasks/41ao-drop-threshold-presets.md).
+
+---
+
+### Decision: Candela Low/High enum (2026-07-13)
+
+**Status:** **Locked** (2026-07-13). **Task:** [41an](../tasks/41an-candela-low-high.md). **Supersedes:** Candela worked example in [threshold presets](#decision-spec-threshold-presets--numeric-bucket-ranges-2026-07-12) (cd switch positions + High/Low option-set presets).
+
+**Problem:** Candela was modeled as an enum of field-selectable cd settings (15…185) with High/Low threshold presets. Datasheets classify devices by capability class (low vs high), not by listing every switch position; presets were often wrong.
+
+**Choice:**
+
+| # | Topic | Choice |
+|---|--------|--------|
+| **C1** | Def | `Candela` stays `enum` on Fire Alarm scope root |
+| **C2** | Options | **Low** \| **High** only — no cd switch positions, no `Any` |
+| **C3** | Authoring guidance | **High** ⇔ datasheet coverage includes ≥135 cd; **Low** ⇔ only below that boundary |
+| **C4** | Parts | Multi-select — both options = device spans the low/high boundary |
+| **C5** | Estimate bucket | Single `Select` + `allowClear` (same as other enum specs); clear = no filter |
+| **C6** | Match | Existing enum set membership — bucket option ∈ part option set |
+| **C7** | Migration | Clear all Candela bucket rows; replace options; seed strobe-bearing parts **Low** only |
+
+**Rationale:** Low/High is the estimator mental model; parts that span both boundaries carry both rows. No threshold-preset indirection.
 
 ---
 
@@ -393,6 +417,23 @@ Fire Alarm (scope root)              ← spec_def.scope_root_item_id = Fire Alar
 | **K7** | Empty enum on part save | **Unchanged** — `expandPartSpecsForPatch` omits blank rows (37j J7) |
 
 **Rationale:** 37j shipped replace-array authoring but left orphan `manufacturer_part_spec` rows when links shrank without a `part_specs` PATCH, and item enum saves could CASCADE-delete referenced options. Prune + option diff close hygiene gaps without resolver changes.
+
+---
+
+### Decision: manufacturer part discontinued flag (2026-07-13)
+
+**Status:** **Locked** (2026-07-13). **Task:** [41ak](../tasks/41ak-part-discontinued-filter.md). **Amends:** [`part.md`](../surface-specs/part.md) `profile`; estimate part filter — [W2b](./estimate.md#w2b--discontinued-part-filter-locked-2026-07-13).
+
+**Choice:**
+
+| # | Topic | Choice |
+|---|--------|--------|
+| **D1** | Column | `manufacturer_part.discontinued BOOLEAN NOT NULL DEFAULT false` |
+| **D2** | Authoring | Writable on `part_detail` **`profile`** checkbox |
+| **D3** | Estimate filter | Excluded from `filterPartsForItem` unless `estimate_condition.include_discontinued` |
+| **D4** | Part list | No list column/badge/filter v1 |
+
+**Rationale:** EOL MPNs stay linked for history but drop out of estimate pick/costing by default; condition toggle is a commercial knob separate from compatibility specs.
 
 ---
 

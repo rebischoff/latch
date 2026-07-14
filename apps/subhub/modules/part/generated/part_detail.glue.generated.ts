@@ -10,6 +10,7 @@ import {
 
 export type PartDetailRow = {
   description: string;
+  discontinued: boolean;
   id: string;
   manufacturer_party_id: string;
   mpn: string;
@@ -20,6 +21,7 @@ export type PartDetailRow = {
 
 const formatPartDetailRow = (row: PartDetailRow): Record<string, unknown> => ({
   description: row.description,
+  discontinued: row.discontinued,
   id: row.id,
   manufacturer_party_id: row.manufacturer_party_id,
   mpn: row.mpn,
@@ -37,7 +39,7 @@ export const projectPartDetailRow = (
   const dto: Record<string, unknown> = { id: row.id };
 
   if (manifest.fields.profile?.includes("read")) {
-    dto.profile = { id: row.id, manufacturer_party_id: row.manufacturer_party_id, mpn: row.mpn, description: row.description, unit: row.unit, purchase_unit: row.purchase_unit, units_per_purchase: row.units_per_purchase };
+    dto.profile = { id: row.id, manufacturer_party_id: row.manufacturer_party_id, mpn: row.mpn, description: row.description, unit: row.unit, purchase_unit: row.purchase_unit, units_per_purchase: row.units_per_purchase, discontinued: row.discontinued };
   }
   return dto;
 };
@@ -69,6 +71,9 @@ export const applyPartDetailPatch = (
   }
   if (typed.profile?.units_per_purchase !== undefined) {
     next.units_per_purchase = typed.profile.units_per_purchase;
+  }
+  if (typed.profile?.discontinued !== undefined) {
+    next.discontinued = typed.profile.discontinued;
   }
   return next;
 };

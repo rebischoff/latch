@@ -14,6 +14,7 @@ import { useCallback, useMemo, useRef } from "react";
 import { useForm, type Resolver } from "react-hook-form";
 import { z } from "zod";
 
+import { CheckboxInput } from "@/components/form/CheckboxInput";
 import { FormSection } from "@/components/form/FormSection";
 import { InputNumberInput } from "@/components/form/InputNumberInput";
 import { LinkedSelectInput } from "@/components/form/LinkedSelectInput";
@@ -43,6 +44,7 @@ import {
   type VendorPricingFormRow,
 } from "@/components/parts/PartVendorPricingFields";
 import { useApplyPickerReturn } from "@/lib/hooks/use-apply-picker-return";
+import { useDetailTab } from "@/lib/hooks/use-detail-tab";
 import { useManufacturerPicker } from "@/lib/hooks/use-manufacturer-picker";
 import { useSurfaceListCreate } from "@/lib/hooks/use-surface-list-create";
 import { useSurfaceDetail } from "@/lib/hooks/use-surface-detail";
@@ -76,6 +78,7 @@ type PartDetailFormValues = {
     unit?: string;
     purchase_unit?: string | null;
     units_per_purchase?: number;
+    discontinued?: boolean;
   };
   vendor_pricing: VendorPricingFormRow[];
   item_links: ItemLinkFormRow[];
@@ -169,6 +172,7 @@ const buildDefaultValues = (
         unit: "ea",
         purchase_unit: null,
         units_per_purchase: 1,
+        discontinued: false,
       },
       vendor_pricing: [],
       item_links: [],
@@ -184,6 +188,7 @@ const buildDefaultValues = (
         unit?: string | null;
         purchase_unit?: string | null;
         units_per_purchase?: number | null;
+        discontinued?: boolean | null;
       }
     | undefined;
 
@@ -195,6 +200,7 @@ const buildDefaultValues = (
       unit: profile?.unit ?? "ea",
       purchase_unit: profile?.purchase_unit ?? null,
       units_per_purchase: profile?.units_per_purchase ?? 1,
+      discontinued: profile?.discontinued === true,
     },
     vendor_pricing: mapVendorPricing(data?.vendor_pricing),
     item_links: mapItemLinks(data?.item_links),
@@ -224,6 +230,7 @@ const normalizeProfileBody = (
       ? null
       : profile.purchase_unit,
   units_per_purchase: profile.units_per_purchase,
+  discontinued: profile.discontinued === true,
 });
 
 const normalizeItemLinksBody = (
@@ -613,8 +620,14 @@ export const PartDetailForm = ({
   const showSpecsTab =
     fieldAllows(activeManifest, "item_links", "read") ||
     fieldAllows(activeManifest, "part_specs", "read");
-  const activeTab =
-    searchParams.get("tab") === "specs" && showSpecsTab ? "specs" : "purchase";
+  const availableKeys = [
+    ...(showPurchaseTab ? (["purchase"] as const) : []),
+    ...(showSpecsTab ? (["specs"] as const) : []),
+  ];
+  const { activeKey, setTab } = useDetailTab({
+    availableKeys,
+    defaultKey: "purchase",
+  });
 
   const purchaseContent = (
     <>
@@ -662,6 +675,11 @@ export const PartDetailForm = ({
             label="Units per purchase"
             min={1}
           />
+          <CheckboxInput<PartDetailFormValues>
+            field="profile"
+            name="profile.discontinued"
+            label="Discontinued"
+          />
         </FormSection>
       ) : null}
 
@@ -707,17 +725,8 @@ export const PartDetailForm = ({
           {showPurchaseTab && showSpecsTab ? (
             <DetailHeader
               title={isCreate ? "New part" : (profile?.mpn ?? "Part")}
-              activeKey={activeTab}
-              onChange={(key) => {
-                const params = new URLSearchParams(searchParams.toString());
-                if (key === "specs") {
-                  params.set("tab", "specs");
-                } else {
-                  params.delete("tab");
-                }
-                const query = params.toString();
-                router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
-              }}
+              activeKey={activeKey}
+              onChange={setTab}
               items={[
                 { key: "purchase", label: "Purchase", children: purchaseContent },
                 { key: "specs", label: "Specs", children: specsContent },

@@ -6,14 +6,12 @@ import type { EstimateConditionSpecPatchRow } from "../descriptors/estimate-deta
 export type BucketSpecWritable = {
   spec_def_id: string;
   spec_option_id?: string | null;
-  spec_threshold_preset_id?: string | null;
   value_boolean?: boolean | null;
   value_number?: number | null;
   value_number_max?: number | null;
 };
 
 export const isBucketSpecBlank = (spec: BucketSpecWritable): boolean =>
-  (spec.spec_threshold_preset_id ?? null) === null &&
   (spec.spec_option_id ?? null) === null &&
   (spec.value_boolean ?? null) === null &&
   (spec.value_number ?? null) === null &&
@@ -22,10 +20,6 @@ export const isBucketSpecBlank = (spec: BucketSpecWritable): boolean =>
 export const isBucketSpecValueSet = (
   spec: BucketSpecWritable & { value_type?: "boolean" | "enum" | "number" },
 ): boolean => {
-  if ((spec.spec_threshold_preset_id ?? null) !== null) {
-    return true;
-  }
-
   if (spec.value_type === "boolean") {
     return (spec.value_boolean ?? null) !== null;
   }
@@ -44,15 +38,13 @@ export const assertBucketSpecMutualExclusion = (
   field: string,
   context?: string,
 ): void => {
-  const hasPreset = (spec.spec_threshold_preset_id ?? null) !== null;
   const hasOption = (spec.spec_option_id ?? null) !== null;
   const hasNumeric =
     (spec.value_number ?? null) !== null || (spec.value_number_max ?? null) !== null;
 
-  const modeCount = [hasPreset, hasOption, hasNumeric].filter(Boolean).length;
-  if (modeCount > 1) {
+  if (hasOption && hasNumeric) {
     throw new ValidationError(
-      "Bucket spec row may set only one of preset, option, or numeric bounds",
+      "Bucket spec row may set only one of option or numeric bounds",
       {
         field,
         code: "bucket_spec_exclusive",
@@ -63,27 +55,6 @@ export const assertBucketSpecMutualExclusion = (
   }
 };
 
-export const assertThresholdPresetBelongsToDef = async (
-  client: PoolClient,
-  specDefId: string,
-  presetId: string,
-  field: string,
-): Promise<void> => {
-  const result = await client.query<{ id: string }>(
-    `SELECT id FROM spec_threshold_preset WHERE id = $1 AND spec_def_id = $2`,
-    [presetId, specDefId],
-  );
-
-  if (result.rows.length === 0) {
-    throw new ValidationError("spec_threshold_preset_id does not belong to spec def", {
-      field,
-      code: "invalid_spec_preset",
-      spec_def_id: specDefId,
-      spec_threshold_preset_id: presetId,
-    });
-  }
-};
-
 export const assertBucketSpecWritable = async (
   client: PoolClient,
   spec: EstimateConditionSpecPatchRow,
@@ -91,15 +62,6 @@ export const assertBucketSpecWritable = async (
   context?: string,
 ): Promise<void> => {
   assertBucketSpecMutualExclusion(spec, field, context);
-
-  if (spec.spec_threshold_preset_id) {
-    await assertThresholdPresetBelongsToDef(
-      client,
-      spec.spec_def_id,
-      spec.spec_threshold_preset_id,
-      field,
-    );
-  }
 
   if (
     spec.value_number !== null &&
@@ -127,17 +89,15 @@ export const insertConditionBucketSpecTx = async (
        estimate_condition_id,
        spec_def_id,
        spec_option_id,
-       spec_threshold_preset_id,
        value_boolean,
        value_number,
        value_number_max
      )
-     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+     VALUES ($1, $2, $3, $4, $5, $6)`,
     [
       estimateConditionId,
       spec.spec_def_id,
       spec.spec_option_id ?? null,
-      spec.spec_threshold_preset_id ?? null,
       spec.value_boolean ?? null,
       spec.value_number ?? null,
       spec.value_number_max ?? null,
@@ -155,17 +115,15 @@ export const insertLineBucketSpecTx = async (
        estimate_line_id,
        spec_def_id,
        spec_option_id,
-       spec_threshold_preset_id,
        value_boolean,
        value_number,
        value_number_max
      )
-     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+     VALUES ($1, $2, $3, $4, $5, $6)`,
     [
       estimateLineId,
       spec.spec_def_id,
       spec.spec_option_id ?? null,
-      spec.spec_threshold_preset_id ?? null,
       spec.value_boolean ?? null,
       spec.value_number ?? null,
       spec.value_number_max ?? null,

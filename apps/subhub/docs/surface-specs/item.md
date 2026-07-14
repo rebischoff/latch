@@ -16,7 +16,7 @@
 | 2 | **List pane** | **Tree**, not flat table — full org category forest in list-detail **left pane** |
 | 3 | **Detail — all nodes** | **`name`**, `sort_order` editable; **`node_type`** badge + promote/demote (`category` ↔ `item`); **`parent_id`** reparent within same scope root (non-quotable parents only) |
 | 4 | **Detail — leaf items** | **No spec Fields at all** *(37ai, 2026-07-12)* — `spec_participation` and `item_spec_participation` are removed. Narrowing at estimate/part time uses the item's scope-root namespace directly (V2) — nothing to author on the leaf itself |
-| 5 | **Detail — scope roots** | **`spec_definitions`** *(37o UI pivot)* — **Specs** tab: sortable `FieldArrayTable` (Name · Type · Details). Types: `enum` \| `boolean` \| `number`. Details popover: **enum** options + **threshold presets** (label + option set); **number** unit / decimals + **threshold presets** (label + min/max); **boolean** blank. Presets are catalog-only ([A1](../decisions/catalog.md#decision-spec-threshold-presets--numeric-bucket-ranges-2026-07-12)); estimators consume them on the estimate C panel ([37ah](../tasks/37ah-spec-threshold-presets-estimate-ui.md)). Type/unit locked when value-bearing rows exist |
+| 5 | **Detail — scope roots** | **`spec_definitions`** *(37o UI pivot)* — **Specs** tab: sortable `FieldArrayTable` (Name · Type · Details). Types: `enum` \| `boolean` \| `number`. Details popover: **enum** options; **number** unit / decimals; **boolean** blank. Threshold presets removed ([41ao](../tasks/41ao-drop-threshold-presets.md)); estimators author number filters via min/max popover on the estimate C panel. Type/unit locked when value-bearing rows exist |
 | 6 | **Detail — category nodes** | **No spec Fields** — pure organizational grouping |
 | 7 | **Create** | Toolbar **New root** + **New child** (child requires selected tree node) |
 | 8 | **Delete** | Block when referenced (`site_scope`, `estimate_scope`, `item_category`, `part_category`, `manufacturer_part_spec`, children) — structured `ConflictError` |
@@ -120,7 +120,7 @@
 - **`root_category_id` / `root_category_name`:** denormalized read — ancestor root for nested nodes (spec namespace).
 - **`default_phase_template_id`:** writable on POST/PATCH **only when** `parent_id IS NULL`; reject on nested nodes.
 
-### `spec_definitions` element (scope roots only, 37o UI pivot + 37af presets)
+### `spec_definitions` element (scope roots only, 37o UI pivot)
 
 **Read DTO** — flat namespace owned by the scope root (`spec_def` where `scope_root_item_id` = this item):
 
@@ -134,28 +134,18 @@
   "decimal_places": null,
   "sort_order": 1,
   "options": [
-    { "id": "<uuid>", "display_name": "135", "sort_order": 1 }
-  ],
-  "presets": [
-    {
-      "id": "<uuid>",
-      "label": "High",
-      "sort_order": 1,
-      "option_ids": ["<uuid>"],
-      "value_number": null,
-      "value_number_max": null
-    }
+    { "id": "<uuid>", "display_name": "Low", "sort_order": 1 },
+    { "id": "<uuid>", "display_name": "High", "sort_order": 2 }
   ],
   "in_use_part_count": 0
 }
 ```
 
 - **`options[]`:** enum defs only — `spec_option` rows for this def.
-- **`presets[]`:** threshold shortcuts ([37af](../tasks/37af-spec-threshold-presets-catalog-ui.md)). **Enum** presets use `option_ids[]` (junction `spec_threshold_preset_option`); numeric columns stay null. **Number** presets use `value_number` / `value_number_max` in the def's **display unit** on GET/PATCH (DAL stores canonical); `option_ids` is empty. **Boolean** defs omit presets (`[]`). Author in the Specs tab **Details** popover only ([A1](../decisions/catalog.md#decision-spec-threshold-presets--numeric-bucket-ranges-2026-07-12)).
 - **Visibility:** scope roots only — categories and leaf items return no `spec_definitions` Field.
 - **`in_use_part_count` only** *(37ai, 2026-07-12)* — `in_use_participation_count` dropped; nothing left to count once `item_spec_participation` is gone.
 
-**PATCH:** `spec_definitions[]` replace-array on scope roots. Enum diff-upserts `options[]` and `presets[]`; rejects empty enum preset option sets, orphan `option_ids`, and in-use preset/option deletes ([T2/T9](../decisions/catalog.md#decision-spec-threshold-presets--numeric-bucket-ranges-2026-07-12)).
+**PATCH:** `spec_definitions[]` replace-array on scope roots. Enum diff-upserts `options[]`; rejects in-use option deletes.
 
 ### No `spec_participation` element (removed, 37ai — 2026-07-12)
 
@@ -209,7 +199,7 @@ Leaf items (`node_type = item`) render **no spec section**. There is nothing to 
 
 **Create child:** POST with `profile.name`, `profile.parent_id` = selected node (must exist).
 
-**`spec_definitions` (37o):** definition CRUD (`spec_def` + `options[]` + `presets[]`, enum diff-upsert, `spec_option_in_use` block) on `item_detail`'s own Specs tab, scope roots only — reject PATCH on any other `node_type`.
+**`spec_definitions` (37o):** definition CRUD (`spec_def` + `options[]`, enum diff-upsert, `spec_option_in_use` block) on `item_detail`'s own Specs tab, scope roots only — reject PATCH on any other `node_type`.
 
 **No `spec_participation` write path** *(37ai)* — removed; there is no PATCH body key for it anymore.
 
@@ -277,7 +267,7 @@ Master-detail per [routing-and-libraries.md](../routing-and-libraries.md). **Lis
 
 **Empty detail:** placeholder *“Select a category”* when no selection.
 
-**Leaf detail (37ai, 2026-07-12):** no spec section — nothing to select, nothing to display. **Category detail:** no spec section, unchanged. **Scope root detail:** Specs tab (`spec_definitions`) only.
+**Leaf detail (37ai, 2026-07-12):** no spec section — nothing to select, nothing to display. **Category detail:** no spec section, unchanged. **Scope root detail:** Specs tab (`spec_definitions`) only — URL `?tab=specs`; default (omit `tab`) is General. Specs is unavailable on category/item leaves; carried `?tab=specs` falls back to General and the URL is cleaned. Tree select preserves `tab` via `buildDetailHref` when the next node still offers Specs.
 
 **Pattern reuse:** Tree chrome similar to [`SiteGeographyTree`](../../components/sites/SiteGeographyTree.tsx) but **read-only structure in list** with **select** (not site PATCH); detail is standard `SurfaceFormRoot`.
 

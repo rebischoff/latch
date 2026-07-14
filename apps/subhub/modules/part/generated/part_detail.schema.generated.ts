@@ -13,7 +13,7 @@ export const PartDetailFieldIds = {
 export type PartDetailFieldId = (typeof PartDetailFieldIds)[keyof typeof PartDetailFieldIds];
 
 export const partDetailColumnMap = {
-  profile: ["manufacturer_part.id", "manufacturer_part.manufacturer_party_id", "manufacturer_part.mpn", "manufacturer_part.description", "manufacturer_part.unit", "manufacturer_part.purchase_unit", "manufacturer_part.units_per_purchase"],
+  profile: ["manufacturer_part.id", "manufacturer_part.manufacturer_party_id", "manufacturer_part.mpn", "manufacturer_part.description", "manufacturer_part.unit", "manufacturer_part.purchase_unit", "manufacturer_part.units_per_purchase", "manufacturer_part.discontinued"],
   vendor_pricing: [],
   item_links: [],
   part_specs: [],
@@ -30,6 +30,7 @@ export const PartDetailSchema = z.object({
     unit: z.string(),
     purchase_unit: z.string().nullable(),
     units_per_purchase: z.number(),
+    discontinued: z.boolean(),
   }),
   vendor_pricing: z.array(z.object({ user_id: z.string() })),
   item_links: z.array(z.object({ user_id: z.string() })),
@@ -47,6 +48,7 @@ export const PartDetailPatchSchema = z.object({
       unit: z.string().optional(),
       purchase_unit: z.string().nullable().optional(),
       units_per_purchase: z.number().optional(),
+      discontinued: z.boolean().optional(),
     })
     .optional(),
   vendor_pricing: z.array(z.object({ user_id: z.string() })).optional(),

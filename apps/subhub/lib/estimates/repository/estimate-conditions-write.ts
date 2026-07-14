@@ -19,6 +19,7 @@ import {
 type FlatCondition = {
   complexity_factor_id: string | null;
   id: string;
+  include_discontinued: boolean;
   included_labor_phases: Array<{ labor_phase_id: string }>;
   labor_phases_explicit: boolean;
   name: string;
@@ -48,6 +49,7 @@ const flattenConditions = (
       root_item_id: resolvedRootItemId,
       sort_order: row.sort_order ?? index + 1,
       complexity_factor_id: row.complexity_factor_id ?? null,
+      include_discontinued: row.include_discontinued ?? false,
       labor_phases_explicit: isRoot
         ? true
         : Boolean(row.labor_phases_explicit),
@@ -496,14 +498,15 @@ export const replaceEstimateConditionsTx = async (
     await client.query(
       `INSERT INTO estimate_condition (
          id, estimate_id, parent_condition_id, root_item_id, name,
-         complexity_factor_id, labor_phases_explicit, sort_order
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         complexity_factor_id, labor_phases_explicit, include_discontinued, sort_order
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        ON CONFLICT (id) DO UPDATE SET
          parent_condition_id = EXCLUDED.parent_condition_id,
          root_item_id = EXCLUDED.root_item_id,
          name = EXCLUDED.name,
          complexity_factor_id = EXCLUDED.complexity_factor_id,
          labor_phases_explicit = EXCLUDED.labor_phases_explicit,
+         include_discontinued = EXCLUDED.include_discontinued,
          sort_order = EXCLUDED.sort_order,
          estimate_id = EXCLUDED.estimate_id`,
       [
@@ -514,6 +517,7 @@ export const replaceEstimateConditionsTx = async (
         condition.name,
         condition.complexity_factor_id,
         condition.labor_phases_explicit,
+        condition.include_discontinued,
         condition.sort_order,
       ],
     );

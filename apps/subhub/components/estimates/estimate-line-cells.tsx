@@ -1,6 +1,7 @@
 "use client";
 
-import { Button, Input, InputNumber, Select, Space, Tag, TreeSelect, Typography } from "antd";
+import { LockOutlined, UnlockOutlined } from "@ant-design/icons";
+import { Button, Input, InputNumber, Select, TreeSelect, Typography } from "antd";
 import type { TreeSelectProps } from "antd";
 import {
   Controller,
@@ -20,6 +21,7 @@ import {
   useEstimatePartPicker,
   type ItemTreeNode,
 } from "@/lib/hooks/use-estimate-item-picker";
+import { buildConditionDraft } from "@/lib/estimates/condition-draft";
 
 export const LINE_TABLE_COLUMN_WIDTHS = {
   item_id: 280,
@@ -32,7 +34,8 @@ export const LINE_TABLE_COLUMN_WIDTHS = {
   unit_labor: 90,
   unit_price_target: 100,
   unit_cost: 110,
-  locks: 110,
+  material_lock: 36,
+  sales_lock: 36,
   unit_price: 100,
   ext_sell: 100,
   actions: 48,
@@ -134,26 +137,34 @@ export const PartCell = ({
   const estimateConditionId = useWatch({
     name: lineFieldPath(index, "estimate_condition_id"),
   }) as string | undefined;
+  const conditions = (useWatch({ name: "conditions" }) ??
+    []) as EstimateConditionFormRow[];
   const { setValue } = useFormContext<EstimateLineEditorFormValues>();
 
-  const { data: parts } = useEstimatePartPicker(
+  const draft = estimateConditionId
+    ? buildConditionDraft(conditions, estimateConditionId)
+    : undefined;
+
+  const materialLocked = useWatch({
+    name: lineFieldPath(index, "material_locked"),
+  }) as boolean | undefined;
+
+  const { data: parts, isLoading } = useEstimatePartPicker(
     itemId,
     estimateConditionId ?? null,
     Boolean(itemId && estimateConditionId),
+    draft,
   );
 
   if (!itemId) {
     return <Typography.Text type="secondary">—</Typography.Text>;
   }
 
-  if (!parts || parts.length <= 1) {
-    const single = parts?.[0];
-    return (
-      <Typography.Text type="secondary">
-        {single ? single.mpn : parts?.length === 0 ? "No match" : "—"}
-      </Typography.Text>
-    );
-  }
+  const options = (parts ?? []).map((part) => ({
+    value: part.id,
+    label: part.mpn,
+  }));
+  const empty = !isLoading && options.length === 0;
 
   return (
     <Controller<EstimateLineEditorFormValues>
@@ -164,15 +175,14 @@ export const PartCell = ({
             size="small"
             style={{ width: "100%" }}
             allowClear
-            placeholder="Pick PN"
+            loading={isLoading}
+            placeholder={empty ? "No match" : "Pick PN"}
             value={value ?? undefined}
-            disabled={disabled}
-            options={parts.map((part) => ({
-              value: part.id,
-              label: part.mpn,
-            }))}
+            disabled={disabled || Boolean(materialLocked)}
+            options={options}
             onChange={(next) => {
               onChange(next ?? null);
+              // Clear leaves material_locked as-is; estimator unlocks via lock control.
               if (next) {
                 setValue(lineFieldPath(index, "material_locked"), true, {
                   shouldDirty: true,
@@ -284,84 +294,79 @@ export const MoneyCell = ({
   />
 );
 
-export const LockCell = ({
+export const MaterialLockCell = ({
   index,
-  writable,
   disabled,
   onPreview,
-}: PreviewAwareCellProps) => {
-  const salesLocked = Boolean(
-    useWatch({ name: lineFieldPath(index, "sales_locked") }),
-  );
+}: Omit<PreviewAwareCellProps, "writable">) => {
   const materialLocked = Boolean(
     useWatch({ name: lineFieldPath(index, "material_locked") }),
+  );
+  const { setValue } = useFormContext<EstimateLineEditorFormValues>();
+  const label = materialLocked
+    ? "Unlock material (re-resolve PN)"
+    : "Lock material (item + part)";
+
+  return (
+    <Button
+      type="text"
+      size="small"
+      disabled={disabled}
+      title={label}
+      aria-label={label}
+      icon={materialLocked ? <LockOutlined /> : <UnlockOutlined />}
+      onClick={() => {
+        if (materialLocked) {
+          setValue(lineFieldPath(index, "material_locked"), false, {
+            shouldDirty: true,
+          });
+          onPreview?.(index);
+        } else {
+          setValue(lineFieldPath(index, "material_locked"), true, {
+            shouldDirty: true,
+          });
+        }
+      }}
+    />
+  );
+};
+
+export const SalesLockCell = ({
+  index,
+  disabled,
+}: Omit<PreviewAwareCellProps, "writable" | "onPreview">) => {
+  const salesLocked = Boolean(
+    useWatch({ name: lineFieldPath(index, "sales_locked") }),
   );
   const unitPriceTarget = useWatch({
     name: lineFieldPath(index, "unit_price_target"),
   });
   const { setValue } = useFormContext<EstimateLineEditorFormValues>();
-
-  if (!writable) {
-    return (
-      <Space size={4}>
-        {salesLocked ? <Tag>Sell</Tag> : null}
-        {materialLocked ? <Tag>Mat</Tag> : null}
-        {!salesLocked && !materialLocked ? <Tag>Fluid</Tag> : null}
-      </Space>
-    );
-  }
+  const label = salesLocked ? "Unlock sell (sync to target)" : "Lock sell";
 
   return (
-    <Space size={4}>
-      <Button
-        size="small"
-        type={salesLocked ? "primary" : "default"}
-        ghost={salesLocked}
-        disabled={disabled}
-        title={salesLocked ? "Unlock sell (sync to target)" : "Lock sell"}
-        onClick={() => {
-          if (salesLocked) {
-            setValue(lineFieldPath(index, "sales_locked"), false, {
-              shouldDirty: true,
-            });
-            setValue(lineFieldPath(index, "unit_price"), Number(unitPriceTarget ?? 0), {
-              shouldDirty: true,
-            });
-          } else {
-            setValue(lineFieldPath(index, "sales_locked"), true, {
-              shouldDirty: true,
-            });
-          }
-        }}
-      >
-        S
-      </Button>
-      <Button
-        size="small"
-        type={materialLocked ? "primary" : "default"}
-        ghost={materialLocked}
-        disabled={disabled}
-        title={
-          materialLocked
-            ? "Unlock material (re-resolve PN)"
-            : "Lock material (item + part)"
+    <Button
+      type="text"
+      size="small"
+      disabled={disabled}
+      title={label}
+      aria-label={label}
+      icon={salesLocked ? <LockOutlined /> : <UnlockOutlined />}
+      onClick={() => {
+        if (salesLocked) {
+          setValue(lineFieldPath(index, "sales_locked"), false, {
+            shouldDirty: true,
+          });
+          setValue(lineFieldPath(index, "unit_price"), Number(unitPriceTarget ?? 0), {
+            shouldDirty: true,
+          });
+        } else {
+          setValue(lineFieldPath(index, "sales_locked"), true, {
+            shouldDirty: true,
+          });
         }
-        onClick={() => {
-          if (materialLocked) {
-            setValue(lineFieldPath(index, "material_locked"), false, {
-              shouldDirty: true,
-            });
-            onPreview?.(index);
-          } else {
-            setValue(lineFieldPath(index, "material_locked"), true, {
-              shouldDirty: true,
-            });
-          }
-        }}
-      >
-        M
-      </Button>
-    </Space>
+      }}
+    />
   );
 };
 

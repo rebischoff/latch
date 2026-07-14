@@ -4,17 +4,16 @@ import { useCallback, useRef, useState } from "react";
 import { useFormContext } from "react-hook-form";
 
 import type {
-  EstimateConditionFormRow,
   EstimateLineEditorFormValues,
   EstimateLineFormRow,
 } from "@/components/estimates/estimate-line-tree";
-import { findConditionPath } from "@/components/estimates/estimate-line-selection";
+import { buildConditionDraft } from "@/lib/estimates/condition-draft";
 import {
   fetchEstimateLinePreview,
-  type EstimateLinePreviewConditionDraft,
   type EstimateLinePreviewResultLine,
 } from "@/lib/surface-api";
 
+/** Preview money/part fields returned by the server line-preview endpoint. */
 const PREVIEW_FIELDS = [
   "part_id",
   "vendor_part_id",
@@ -45,40 +44,6 @@ const toPreviewLine = (line: EstimateLineFormRow) => ({
   description: line.description,
   vendor_part_id: line.vendor_part_id,
 });
-
-const buildConditionDraft = (
-  conditions: EstimateConditionFormRow[],
-  conditionId: string,
-): EstimateLinePreviewConditionDraft | undefined => {
-  const path = findConditionPath(conditions, conditionId);
-  if (!path) {
-    return undefined;
-  }
-
-  let node: EstimateConditionFormRow | undefined;
-  let nodes = conditions;
-  for (const index of path) {
-    node = nodes[index];
-    nodes = node?.conditions ?? [];
-  }
-  if (!node) {
-    return undefined;
-  }
-
-  return {
-    complexity_factor_id: node.complexity_factor_id,
-    labor_phases_explicit: node.labor_phases_explicit,
-    included_labor_phases: node.included_labor_phases.map(
-      (phase) => phase.labor_phase_id,
-    ),
-    specs: node.specs.map((spec) => ({
-      spec_def_id: spec.spec_def_id,
-      spec_option_id: spec.spec_option_id,
-      value_boolean: spec.value_boolean,
-      value_number: spec.value_number,
-    })),
-  };
-};
 
 const applyPreviewResults = (
   setValue: ReturnType<typeof useFormContext<EstimateLineEditorFormValues>>["setValue"],
@@ -122,9 +87,11 @@ export const useEstimateLinePreview = (estimateId: string | undefined) => {
 
       try {
         const conditions = getValues("conditions") ?? [];
-        const condition_draft = options?.includeDraft
-          ? buildConditionDraft(conditions, conditionId)
-          : undefined;
+        // Always prefer form condition state so preview matches Part Select draft filter.
+        const condition_draft =
+          options?.includeDraft === false
+            ? undefined
+            : buildConditionDraft(conditions, conditionId);
 
         const result = await fetchEstimateLinePreview(estimateId, {
           condition_id: conditionId,
@@ -161,7 +128,7 @@ export const useEstimateLinePreview = (estimateId: string | undefined) => {
       if (!line?.estimate_condition_id || !line.item_id) {
         return;
       }
-      await runPreview(line.estimate_condition_id, [line]);
+      await runPreview(line.estimate_condition_id, [line], { includeDraft: true });
     },
     [getValues, runPreview],
   );

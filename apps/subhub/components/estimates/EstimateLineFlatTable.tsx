@@ -18,10 +18,11 @@ import {
   ExtSellCell,
   ItemCell,
   LINE_TABLE_COLUMN_WIDTHS,
-  LockCell,
+  MaterialLockCell,
   MoneyCell,
   PartCell,
   QuantityCell,
+  SalesLockCell,
   SellCell,
   TotalSellFooter,
   UnitCell,
@@ -106,7 +107,25 @@ export const EstimateLineFlatTable = ({
   );
 
   const columns = useMemo((): ColumnsType<FlatLineRow> => {
-    const base: ColumnsType<FlatLineRow> = [
+    const base: ColumnsType<FlatLineRow> = [];
+
+    if (writableLines) {
+      base.push({
+        key: "material_lock",
+        title: "",
+        width: LINE_TABLE_COLUMN_WIDTHS.material_lock,
+        fixed: "left",
+        render: (_value, record) => (
+          <MaterialLockCell
+            index={record.index}
+            disabled={disabled}
+            onPreview={onPreviewLine}
+          />
+        ),
+      });
+    }
+
+    base.push(
       {
         key: "item_id",
         title: "Item",
@@ -241,19 +260,20 @@ export const EstimateLineFlatTable = ({
           />
         ),
       },
-      {
-        key: "locks",
-        title: "Locks",
-        width: LINE_TABLE_COLUMN_WIDTHS.locks,
+    );
+
+    if (writableLines) {
+      base.push({
+        key: "sales_lock",
+        title: "",
+        width: LINE_TABLE_COLUMN_WIDTHS.sales_lock,
         render: (_value, record) => (
-          <LockCell
-            index={record.index}
-            writable={writableLines}
-            disabled={disabled}
-            onPreview={onPreviewLine}
-          />
+          <SalesLockCell index={record.index} disabled={disabled} />
         ),
-      },
+      });
+    }
+
+    base.push(
       {
         key: "unit_price",
         title: "Sell",
@@ -268,7 +288,7 @@ export const EstimateLineFlatTable = ({
         width: LINE_TABLE_COLUMN_WIDTHS.ext_sell,
         render: (_value, record) => <ExtSellCell index={record.index} />,
       },
-    ];
+    );
 
     if (showActionsColumn) {
       base.push({
