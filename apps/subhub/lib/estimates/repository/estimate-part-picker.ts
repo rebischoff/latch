@@ -65,11 +65,13 @@ export const loadConditionIncludeDiscontinued = async (
     }
     seen.add(current);
 
-    const result = await client.query<{
-      include_discontinued: boolean;
-      include_discontinued_explicit: boolean;
-      parent_condition_id: string | null;
-    }>(
+    const result: {
+      rows: Array<{
+        include_discontinued: boolean;
+        include_discontinued_explicit: boolean;
+        parent_condition_id: string | null;
+      }>;
+    } = await client.query(
       `SELECT include_discontinued, include_discontinued_explicit, parent_condition_id
        FROM estimate_condition
        WHERE id = $1`,
@@ -102,11 +104,13 @@ export const loadConditionLaborOnly = async (
     }
     seen.add(current);
 
-    const result = await client.query<{
-      labor_only: boolean;
-      labor_only_explicit: boolean;
-      parent_condition_id: string | null;
-    }>(
+    const result: {
+      rows: Array<{
+        labor_only: boolean;
+        labor_only_explicit: boolean;
+        parent_condition_id: string | null;
+      }>;
+    } = await client.query(
       `SELECT labor_only, labor_only_explicit, parent_condition_id
        FROM estimate_condition
        WHERE id = $1`,
