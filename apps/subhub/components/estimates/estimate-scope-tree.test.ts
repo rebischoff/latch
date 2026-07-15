@@ -14,6 +14,7 @@ describe("buildCommercialTree", () => {
       makeCondition({
         id: "root-1",
         name: "Bldg A",
+        site_zone_id: "zone-1",
         root_item_id: "item-root",
         conditions: [
           makeCondition({
@@ -33,7 +34,7 @@ describe("buildCommercialTree", () => {
 });
 
 describe("addRootCondition / addConditionUnder / remove", () => {
-  it("adds a root condition from catalog root with spec template", () => {
+  it("adds a root condition from site zone with spec template", () => {
     const template = [
       {
         spec_def_id: "def-slc",
@@ -44,8 +45,16 @@ describe("addRootCondition / addConditionUnder / remove", () => {
         value_number: null,
       },
     ];
-    const next = addRootCondition([], "root-1", "Intrusion", template);
+    const next = addRootCondition([], {
+      siteZoneId: "zone-1",
+      siteZoneName: "Bldg A Intrusion",
+      name: "Bldg A Intrusion",
+      rootItemId: "root-1",
+      rootItemName: "Intrusion",
+      specTemplate: template,
+    });
     expect(next).toHaveLength(1);
+    expect(next[0]?.site_zone_id).toBe("zone-1");
     expect(next[0]?.root_item_id).toBe("root-1");
     expect(next[0]?.labor_phases_explicit).toBe(false);
     expect(next[0]?.specs).toHaveLength(1);
@@ -54,16 +63,26 @@ describe("addRootCondition / addConditionUnder / remove", () => {
 
   it("adds a child condition under a root", () => {
     const conditions = [
-      makeCondition({ id: "root-1", name: "Bldg A", root_item_id: "item-root" }),
+      makeCondition({
+        id: "root-1",
+        name: "Bldg A",
+        site_zone_id: "zone-1",
+        root_item_id: "item-root",
+      }),
     ];
     const result = addConditionUnder(conditions, "root-1");
     expect(result?.conditions[0]?.conditions).toHaveLength(1);
     expect(result?.conditions[0]?.conditions[0]?.root_item_id).toBeNull();
+    expect(result?.conditions[0]?.conditions[0]?.site_zone_id).toBeNull();
     expect(result?.conditionId).toBeTruthy();
   });
 
   it("removes conditions", () => {
-    const roots = addRootCondition([], "root-1", "Intrusion");
+    const roots = addRootCondition([], {
+      siteZoneId: "zone-1",
+      name: "Intrusion",
+      rootItemId: "root-1",
+    });
     const withCond = addConditionUnder(roots, roots[0]!.id)!;
     const afterChildRemove = removeConditionById(
       withCond.conditions,

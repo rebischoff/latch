@@ -30,11 +30,14 @@ const EstimateConditionPatchElementSchema: z.ZodType<{
   conditions?: unknown[];
   id?: string;
   include_discontinued?: boolean;
+  include_discontinued_explicit?: boolean;
   included_labor_phases?: Array<{ labor_phase_id: string }>;
+  labor_only?: boolean;
+  labor_only_explicit?: boolean;
   labor_phases_explicit?: boolean;
   name: string;
   parent_condition_id?: string | null;
-  root_item_id?: string | null;
+  site_zone_id?: string | null;
   sort_order: number;
   specs: Array<{
     spec_def_id: string;
@@ -49,10 +52,13 @@ const EstimateConditionPatchElementSchema: z.ZodType<{
       id: z.string().optional(),
       name: z.string().min(1),
       parent_condition_id: z.string().nullable().optional(),
-      root_item_id: z.string().nullable().optional(),
+      site_zone_id: z.string().nullable().optional(),
       sort_order: z.number(),
       complexity_factor_id: z.string().nullable().optional(),
       include_discontinued: z.boolean().optional(),
+      include_discontinued_explicit: z.boolean().optional(),
+      labor_only: z.boolean().optional(),
+      labor_only_explicit: z.boolean().optional(),
       labor_phases_explicit: z.boolean().optional(),
       included_labor_phases: z.array(EstimateConditionLaborPhasePatchElementSchema).optional(),
       specs: z.array(EstimateConditionSpecPatchElementSchema),
@@ -205,12 +211,19 @@ export type EstimateConditionRow = {
   conditions: EstimateConditionRow[];
   id: string;
   include_discontinued: boolean;
+  include_discontinued_explicit: boolean;
   included_labor_phases: EstimateConditionLaborPhaseRow[];
+  labor_only: boolean;
+  labor_only_explicit: boolean;
   labor_phases_explicit: boolean;
   name: string;
   parent_condition_id: string | null;
+  /** Derived from linked root site_zone — null on children. */
   root_item_id: string | null;
   root_item_name: string | null;
+  /** Required on roots; null on children (42b). */
+  site_zone_id: string | null;
+  site_zone_name: string | null;
   sort_order: number;
   specs: EstimateConditionSpecRow[];
 };

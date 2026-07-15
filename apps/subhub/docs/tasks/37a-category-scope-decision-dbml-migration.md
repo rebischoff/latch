@@ -63,8 +63,8 @@ Lock the **categories-only scope model**, amend **DBML**, and ship an **executab
 | **[37d](./37d-category-catalog-dal-surfaces.md)** | Catalog — `category_list` / `category_detail` (tree list pane), DAL, `spec_def` / `category_spec_def` |
 | **37e** | Estimate scope DAL + Scope tab (checkboxes, spec panel, labor context) |
 | **37f** | Line items — TreeSelect, part resolution, costing snapshots |
-| **37g** | [Commercial costing](../tasks/37g-commercial-costing.md) — org rate tables, category defaults, full engine |
-| **37h** | Job line / win path column renames; amend job DBML refs |
+| **37g** | [Commercial costing](./37g-commercial-costing.md) — org rate tables, category defaults, full engine |
+| **37h** | ~~Job line / win path column renames~~ — **Cancelled (2026-07-15)**. Renames already in **033** / **045**. Win/copy = [46](./46-estimate-win-lose-job-copy.md) |
 
 ---
 

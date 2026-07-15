@@ -20,36 +20,47 @@ type FlatCondition = {
   complexity_factor_id: string | null;
   id: string;
   include_discontinued: boolean;
+  include_discontinued_explicit: boolean;
   included_labor_phases: Array<{ labor_phase_id: string }>;
+  labor_only: boolean;
+  labor_only_explicit: boolean;
   labor_phases_explicit: boolean;
   name: string;
   parent_condition_id: string | null;
-  root_item_id: string | null;
+  site_zone_id: string | null;
   sort_order: number;
   specs: EstimateConditionSpecPatchRow[];
+};
+
+type RootSiteZone = {
+  id: string;
+  parent_zone_id: string | null;
+  root_item_id: string | null;
+  site_id: string;
 };
 
 const flattenConditions = (
   conditions: EstimateConditionPatchRow[] | undefined,
   parentId: string | null,
-  rootItemId: string | null,
   out: FlatCondition[],
 ): void => {
   for (const [index, row] of (conditions ?? []).entries()) {
     const id = row.id ?? crypto.randomUUID();
     const isRoot = parentId === null;
-    const resolvedRootItemId = isRoot
-      ? (row.root_item_id ?? null)
-      : null;
 
     out.push({
       id,
       name: row.name,
       parent_condition_id: parentId,
-      root_item_id: resolvedRootItemId,
+      site_zone_id: row.site_zone_id ?? null,
       sort_order: row.sort_order ?? index + 1,
       complexity_factor_id: row.complexity_factor_id ?? null,
       include_discontinued: row.include_discontinued ?? false,
+      include_discontinued_explicit: isRoot
+        ? true
+        : Boolean(row.include_discontinued_explicit),
+      labor_only: row.labor_only ?? false,
+      labor_only_explicit: isRoot ? true : Boolean(row.labor_only_explicit),
       labor_phases_explicit: isRoot
         ? true
         : Boolean(row.labor_phases_explicit),
@@ -60,7 +71,6 @@ const flattenConditions = (
     flattenConditions(
       row.conditions as EstimateConditionPatchRow[] | undefined,
       id,
-      isRoot ? resolvedRootItemId : rootItemId,
       out,
     );
   }
@@ -108,30 +118,65 @@ const assertConditionOwnedByEstimate = async (
   }
 };
 
-const assertRootItemExists = async (
+const loadEstimateSiteId = async (
   client: PoolClient,
-  rootItemId: string,
-): Promise<void> => {
-  const result = await client.query<{ id: string; parent_id: string | null }>(
-    `SELECT id, parent_id FROM item WHERE id = $1`,
-    [rootItemId],
+  estimateId: string,
+): Promise<string> => {
+  const result = await client.query<{ site_id: string }>(
+    `SELECT site_id FROM estimate WHERE id = $1`,
+    [estimateId],
   );
-
-  if (result.rows.length === 0) {
-    throw new ValidationError("Unknown root_item_id", {
+  const siteId = result.rows[0]?.site_id;
+  if (!siteId) {
+    throw new ValidationError("Unknown estimate", {
       field: "conditions",
-      code: "unknown_root_item",
-      root_item_id: rootItemId,
+      code: "unknown_estimate",
+      estimate_id: estimateId,
     });
   }
+  return siteId;
+};
 
-  if (result.rows[0]?.parent_id !== null) {
-    throw new ValidationError("root_item_id must be a catalog root", {
+const assertRootSiteZone = async (
+  client: PoolClient,
+  siteZoneId: string,
+  estimateSiteId: string,
+): Promise<RootSiteZone> => {
+  const result = await client.query<RootSiteZone>(
+    `SELECT id, site_id, parent_zone_id, root_item_id
+     FROM site_zone WHERE id = $1`,
+    [siteZoneId],
+  );
+  const zone = result.rows[0];
+  if (!zone) {
+    throw new ValidationError("Unknown site_zone_id", {
       field: "conditions",
-      code: "root_not_root",
-      root_item_id: rootItemId,
+      code: "unknown_site_zone",
+      site_zone_id: siteZoneId,
     });
   }
+  if (zone.site_id !== estimateSiteId) {
+    throw new ValidationError("site_zone_id must belong to the estimate site", {
+      field: "conditions",
+      code: "site_zone_wrong_site",
+      site_zone_id: siteZoneId,
+    });
+  }
+  if (zone.parent_zone_id !== null) {
+    throw new ValidationError("site_zone_id must be a root-level site zone", {
+      field: "conditions",
+      code: "site_zone_not_root",
+      site_zone_id: siteZoneId,
+    });
+  }
+  if (!zone.root_item_id) {
+    throw new ValidationError("Root site zone must have root_item_id", {
+      field: "conditions",
+      code: "site_zone_missing_root_item",
+      site_zone_id: siteZoneId,
+    });
+  }
+  return zone;
 };
 
 const assertSpecDefInScopePanel = async (
@@ -344,7 +389,7 @@ export const collectConditionIdsFromPatch = (
   conditions: EstimateConditionPatchRow[],
 ): Set<string> => {
   const flat: FlatCondition[] = [];
-  flattenConditions(conditions, null, null, flat);
+  flattenConditions(conditions, null, flat);
   return new Set(flat.map((row) => row.id));
 };
 
@@ -355,25 +400,41 @@ export const replaceEstimateConditionsTx = async (
   lineItems?: EstimateLineItemPatchRow[],
 ): Promise<Set<string>> => {
   const flat: FlatCondition[] = [];
-  flattenConditions(rows, null, null, flat);
+  flattenConditions(rows, null, flat);
 
+  const estimateSiteId = await loadEstimateSiteId(client, estimateId);
   const rootItemByConditionId = new Map<string, string>();
+  const seenRootZones = new Set<string>();
+
   for (const row of flat) {
     if (row.parent_condition_id === null) {
-      if (!row.root_item_id) {
-        throw new ValidationError("Root condition requires root_item_id", {
+      if (!row.site_zone_id) {
+        throw new ValidationError("Root condition requires site_zone_id", {
           field: "conditions",
-          code: "missing_root_item",
+          code: "missing_site_zone",
           id: row.id,
         });
       }
-      rootItemByConditionId.set(row.id, row.root_item_id);
+      if (seenRootZones.has(row.site_zone_id)) {
+        throw new ValidationError(
+          "Only one root condition per site zone is allowed on an estimate",
+          {
+            field: "conditions",
+            code: "duplicate_site_zone",
+            id: row.id,
+            site_zone_id: row.site_zone_id,
+          },
+        );
+      }
+      seenRootZones.add(row.site_zone_id);
+      const zone = await assertRootSiteZone(client, row.site_zone_id, estimateSiteId);
+      rootItemByConditionId.set(row.id, zone.root_item_id as string);
     }
   }
 
   const resolveTreeRootItemId = (node: FlatCondition): string => {
     if (node.parent_condition_id === null) {
-      return node.root_item_id as string;
+      return rootItemByConditionId.get(node.id) as string;
     }
     let current: string | null = node.parent_condition_id;
     const seen = new Set<string>();
@@ -386,8 +447,11 @@ export const replaceEstimateConditionsTx = async (
       if (!parent) {
         break;
       }
-      if (parent.parent_condition_id === null && parent.root_item_id) {
-        return parent.root_item_id;
+      if (parent.parent_condition_id === null) {
+        const rootItemId = rootItemByConditionId.get(parent.id);
+        if (rootItemId) {
+          return rootItemId;
+        }
       }
       current = parent.parent_condition_id;
     }
@@ -417,12 +481,10 @@ export const replaceEstimateConditionsTx = async (
       });
     }
 
-    if (condition.parent_condition_id === null) {
-      await assertRootItemExists(client, condition.root_item_id as string);
-    } else if (condition.root_item_id !== null) {
-      throw new ValidationError("Child condition must not set root_item_id", {
+    if (condition.parent_condition_id !== null && condition.site_zone_id !== null) {
+      throw new ValidationError("Child condition must not set site_zone_id", {
         field: "conditions",
-        code: "child_root_item",
+        code: "child_site_zone",
         id: condition.id,
       });
     }
@@ -497,27 +559,34 @@ export const replaceEstimateConditionsTx = async (
   for (const condition of ordered) {
     await client.query(
       `INSERT INTO estimate_condition (
-         id, estimate_id, parent_condition_id, root_item_id, name,
-         complexity_factor_id, labor_phases_explicit, include_discontinued, sort_order
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+         id, estimate_id, parent_condition_id, site_zone_id, name,
+         complexity_factor_id, labor_phases_explicit, labor_only, labor_only_explicit,
+         include_discontinued, include_discontinued_explicit, sort_order
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
        ON CONFLICT (id) DO UPDATE SET
          parent_condition_id = EXCLUDED.parent_condition_id,
-         root_item_id = EXCLUDED.root_item_id,
+         site_zone_id = EXCLUDED.site_zone_id,
          name = EXCLUDED.name,
          complexity_factor_id = EXCLUDED.complexity_factor_id,
          labor_phases_explicit = EXCLUDED.labor_phases_explicit,
+         labor_only = EXCLUDED.labor_only,
+         labor_only_explicit = EXCLUDED.labor_only_explicit,
          include_discontinued = EXCLUDED.include_discontinued,
+         include_discontinued_explicit = EXCLUDED.include_discontinued_explicit,
          sort_order = EXCLUDED.sort_order,
          estimate_id = EXCLUDED.estimate_id`,
       [
         condition.id,
         estimateId,
         condition.parent_condition_id,
-        condition.root_item_id,
+        condition.site_zone_id,
         condition.name,
         condition.complexity_factor_id,
         condition.labor_phases_explicit,
+        condition.labor_only,
+        condition.labor_only_explicit,
         condition.include_discontinued,
+        condition.include_discontinued_explicit,
         condition.sort_order,
       ],
     );

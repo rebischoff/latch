@@ -100,8 +100,10 @@ export const mergeBucketSpecs = (
 };
 
 /**
- * Same merge as `loadMergedBucketForLine`, but when `draftSpecs` is provided the
- * leaf condition's DB rows are replaced by the draft (preview / unsaved C panel).
+ * When `draftSpecs` is provided it is the **effective** form-merged condition
+ * bucket (root→leaf) from the client — use it as the full condition tier and do
+ * not re-merge ancestor DB rows (those may lag unsaved C-panel edits).
+ * When omitted, merge persisted condition ancestors (root→leaf) then line.
  */
 export const loadMergedBucketWithDraft = async (
   client: Pool | PoolClient,
@@ -109,20 +111,20 @@ export const loadMergedBucketWithDraft = async (
   lineId: string | null,
   draftSpecs: BucketSpecValue[] | undefined,
 ): Promise<MergedBucketSpecs> => {
+  const lineSpecs =
+    lineId !== null ? await loadLineBucketSpecs(client, lineId) : [];
+
+  if (draftSpecs !== undefined) {
+    return mergeBucketSpecs(draftSpecs, lineSpecs);
+  }
+
   const conditionSpecsRootToLeaf: BucketSpecValue[] = [];
   const leafToRoot = await loadConditionAncestorIds(client, conditionId);
   for (const ancestorId of [...leafToRoot].reverse()) {
-    if (draftSpecs && ancestorId === conditionId) {
-      conditionSpecsRootToLeaf.push(...draftSpecs);
-    } else {
-      conditionSpecsRootToLeaf.push(
-        ...(await loadConditionBucketSpecs(client, ancestorId)),
-      );
-    }
+    conditionSpecsRootToLeaf.push(
+      ...(await loadConditionBucketSpecs(client, ancestorId)),
+    );
   }
-
-  const lineSpecs =
-    lineId !== null ? await loadLineBucketSpecs(client, lineId) : [];
 
   return mergeBucketSpecs(conditionSpecsRootToLeaf, lineSpecs);
 };

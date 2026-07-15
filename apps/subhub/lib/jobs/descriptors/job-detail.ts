@@ -2,6 +2,8 @@ import type { Manifest } from "@latch/contracts";
 import type { SurfaceDescriptor } from "@latch/dal";
 import { z } from "zod";
 
+import type { JobCostSummary } from "../repository/job-cost-summary";
+
 const JobStakeholderPatchElementSchema = z
   .object({
     party_id: z.string(),
@@ -85,6 +87,7 @@ export type JobStakeholderRow = {
 };
 
 export type JobDetailRelated = {
+  cost_summary: JobCostSummary;
   line_items: JobLineItemRow[];
   stakeholders: JobStakeholderRow[];
 };
@@ -147,6 +150,16 @@ const formatJobDetailRow = (row: JobDetailRow): Record<string, unknown> => ({
 const normalizeJobDetailRelated = (
   related: JobDetailStoreRelated,
 ): JobDetailRelated => ({
+  cost_summary: (related as JobDetailRelated).cost_summary ?? {
+    contract: 0,
+    budget: 0,
+    rebudgeted: 0,
+    committed: 0,
+    actual_material: 0,
+    margin_vs_budget: 0,
+    margin_vs_rebudgeted: 0,
+    margin_vs_actual: 0,
+  },
   line_items: (related.line_items ?? []) as JobLineItemRow[],
   stakeholders: (related.stakeholders ?? []) as JobStakeholderRow[],
 });
@@ -170,6 +183,8 @@ export const projectJobDetailRow = (
       estimate_id: row.estimate_id,
       estimate_display_title: row.estimate_display_title,
     };
+    // Derived cost layers (task 45) — not a separate Surface Field.
+    dto.cost_summary = normalized.cost_summary;
   }
 
   if (manifest.fields.stakeholders?.includes("read")) {

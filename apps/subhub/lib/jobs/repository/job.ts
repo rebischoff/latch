@@ -2,6 +2,7 @@ import type { Pool } from "pg";
 
 import type { JobDetailRelated, JobDetailRow } from "../descriptors/job-detail";
 import type { JobListRow } from "../descriptors/job-list";
+import { loadJobCostSummary } from "./job-cost-summary";
 import { loadJobLineItems } from "./job-lines";
 import { loadJobStakeholders } from "./job-stakeholders";
 
@@ -69,6 +70,7 @@ export const loadJobDetailRelated = async (
   pool: Pool,
   jobId: string,
 ): Promise<JobDetailRelated> => ({
+  cost_summary: await loadJobCostSummary(pool, jobId),
   line_items: await loadJobLineItems(pool, jobId),
   stakeholders: await loadJobStakeholders(pool, jobId),
 });

@@ -138,6 +138,10 @@ Rollups: by job, phase name, scope group, area, trade/system, SOV allocation.
 | Field | Progress entries |
 | Billing | Billable, SOV |
 
+### UI spike (2026-07-14)
+
+Temporary **Field** tab prototype at `/jobs/[id]?tab=field`: antd `Table` with fixture rows at **part × location** grain (TBD parts, Unplaced bucket, local phase checkboxes + Request order). Component: `JobFieldExploreTable`. **Does not lock schema** — explores amending J1 before a real 5c pass.
+
 ---
 
 ## Related

@@ -100,11 +100,12 @@ In-building scope on **`site_section` / `site_location`** (site-owned); estimate
 | `job_party_relation` | Catalog of engagement stakeholder roles (estimate + job) |
 | `estimate`, `estimate_party`, `estimate_section`, `estimate_line` | Quote at `site_id`; sections by `category`; snapshot lines |
 | `job`, `job_party` | Work at a `site`; per-job stakeholders |
-| `job_line`, `job_line_part`, `job_work_item` | Sold scope + engineering buy list; field status (all-or-nothing per phase) → billable staging |
-| `change_order`, `change_order_line` | Job scope deltas |
+| `job_line`, `job_line_part`, `scope_phase` | Sold scope + engineering buy list; field progress (fractional qty per phase) → billable staging |
+| `job_line_cost_revision` | Internal re-budget of `job_line.unit_cost` (not a change order) |
+| `change_order`, `change_order_line` | Job scope deltas; approve reconciles BOM + `scope_phase` |
 | `requested_order`, `requested_order_line` | Requisition — BOM or ad-hoc parts before PO |
 | `purchase_order`, `purchase_order_line`, `purchase_order_line_shipment` | Vendor commitment from job / requisition |
-| `material_receipt`, `material_receipt_line`, `job_material_movement` | Job-site inventory (received vs on hand) |
+| `material_receipt`, `material_receipt_line`, `job_material_movement` | Job-site inventory (received vs on hand); `material_receipt_line.unit_cost` = material actual |
 | `billable_line` | Earned / billable staging before customer invoice |
 | `invoice`, `invoice_line`, `schedule_of_value`, `sov_line`, `sov_allocation` | Customer billing + SOV milestones |
 
@@ -149,7 +150,9 @@ flowchart TB
     job
     job_party
     job_line
-    jwi["job_work_item"]
+    jlp["job_line_part"]
+    jlcr["job_line_cost_revision"]
+    co["change_order"]
   end
 
   subgraph slice6a["Slice 6a — DBML draft (procurement)"]
@@ -184,8 +187,9 @@ flowchart TB
   job --- job_party
   job_party --- jpr
   job_party --- party
-  job_line -.-> jwi
-  jwi -.-> site_location
+  job_line -.-> jlp
+  jlp -.-> jlcr
+  job_line -.-> co
   part -.-> job_line
   item -.-> job_line
   job_line -.-> job

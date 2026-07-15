@@ -20,18 +20,113 @@ import {
 import { replaceEstimateLineItemsTx } from "./estimate-lines-write";
 import { replaceEstimateStakeholdersTx } from "./estimate-stakeholders";
 
-export const assertSiteIdUnchanged = (
-  existing: Pick<EstimateDetailRow, "site_id">,
+/** Statuses where profile.site_id must not change (S8). */
+const SITE_FROZEN_STATUSES = new Set(["won", "lost", "expired"]);
+
+export const assertSiteIdChangeAllowed = (
+  existing: Pick<EstimateDetailRow, "site_id" | "status">,
   nextSiteId: string,
 ): void => {
   if (nextSiteId === existing.site_id) {
     return;
   }
 
-  throw new ConflictError("Cannot change site_id after estimate is created", {
-    field: "profile",
-    code: "site_id_immutable",
-  });
+  if (SITE_FROZEN_STATUSES.has(existing.status)) {
+    throw new ConflictError("Cannot change site_id on a frozen estimate", {
+      field: "profile",
+      code: "site_id_frozen",
+    });
+  }
+};
+
+/**
+ * When site_id changes, body must include empty `conditions` + `line_items`
+ * (client warn-and-clear). Reject non-empty collections or omit-while-DB-has-structure.
+ */
+export const assertSiteChangeClearsStructure = ({
+  existingSiteId,
+  nextSiteId,
+  status,
+  body,
+  existingConditionCount,
+  existingLineCount,
+}: {
+  existingSiteId: string;
+  nextSiteId: string | undefined;
+  status: string;
+  body: unknown;
+  existingConditionCount: number;
+  existingLineCount: number;
+}): void => {
+  if (nextSiteId === undefined || nextSiteId === existingSiteId) {
+    return;
+  }
+
+  assertSiteIdChangeAllowed({ site_id: existingSiteId, status }, nextSiteId);
+
+  const patch =
+    typeof body === "object" && body !== null
+      ? (body as { conditions?: unknown; line_items?: unknown })
+      : {};
+
+  const conditions = patch.conditions;
+  const lineItems = patch.line_items;
+
+  if (Array.isArray(conditions) && conditions.length > 0) {
+    throw new ConflictError(
+      "Changing site_id requires empty conditions and line_items in the same request",
+      {
+        field: "profile",
+        code: "site_change_requires_clear",
+      },
+    );
+  }
+
+  if (Array.isArray(lineItems) && lineItems.length > 0) {
+    throw new ConflictError(
+      "Changing site_id requires empty conditions and line_items in the same request",
+      {
+        field: "profile",
+        code: "site_change_requires_clear",
+      },
+    );
+  }
+
+  const hasExistingStructure =
+    existingConditionCount > 0 || existingLineCount > 0;
+
+  if (
+    hasExistingStructure &&
+    (conditions === undefined || lineItems === undefined)
+  ) {
+    throw new ConflictError(
+      "Changing site_id requires empty conditions and line_items in the same request",
+      {
+        field: "profile",
+        code: "site_change_requires_clear",
+      },
+    );
+  }
+};
+
+export const countEstimateStructure = async (
+  client: Pool | PoolClient,
+  estimateId: string,
+): Promise<{ conditionCount: number; lineCount: number }> => {
+  const result = await client.query<{
+    condition_count: number;
+    line_count: number;
+  }>(
+    `SELECT
+       (SELECT COUNT(*)::int FROM estimate_condition WHERE estimate_id = $1) AS condition_count,
+       (SELECT COUNT(*)::int FROM estimate_line WHERE estimate_id = $1) AS line_count`,
+    [estimateId],
+  );
+
+  return {
+    conditionCount: result.rows[0]?.condition_count ?? 0,
+    lineCount: result.rows[0]?.line_count ?? 0,
+  };
 };
 
 export const assertSiteExists = async (
@@ -79,10 +174,10 @@ const assertSourceEstimateExists = async (
 const validateEstimateWriteRow = async (
   client: Pool | PoolClient,
   row: EstimateDetailWriteRow,
-  existing?: Pick<EstimateDetailRow, "site_id">,
+  existing?: Pick<EstimateDetailRow, "site_id" | "status">,
 ): Promise<void> => {
   if (existing !== undefined) {
-    assertSiteIdUnchanged(existing, row.site_id);
+    assertSiteIdChangeAllowed(existing, row.site_id);
   }
 
   await assertSiteExists(client, row.site_id);
@@ -231,7 +326,7 @@ export const updateEstimate = async (
   pool: Pool,
   actorId: string,
   row: EstimateDetailWriteRow,
-  existing: Pick<EstimateDetailRow, "site_id">,
+  existing: Pick<EstimateDetailRow, "site_id" | "status">,
 ): Promise<void> => {
   await withPermissionDb(pool, actorId, async (client) => {
     await validateEstimateWriteRow(client, row, existing);

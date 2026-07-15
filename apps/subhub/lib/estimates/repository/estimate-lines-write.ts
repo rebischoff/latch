@@ -13,7 +13,8 @@ const syncQuantityFromAllocations = (
 ): EstimateLineItemPatchRow => {
   const qtyManual = row.qty_manual ?? false;
   if (qtyManual) {
-    return { ...row, qty_manual: true };
+    // Exclusive SoT (Z5/Z8): qty mode clears places.
+    return { ...row, qty_manual: true, allocations: [] };
   }
 
   const allocated = allocatedSum(row);

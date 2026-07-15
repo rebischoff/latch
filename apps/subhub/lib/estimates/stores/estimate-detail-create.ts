@@ -17,7 +17,12 @@ import {
   type EstimateDetailRow,
   type EstimateDetailWriteRow,
 } from "../descriptors/estimate-detail";
-import { insertEstimate, loadEstimateDetail } from "../repository";
+import {
+  assertSiteChangeClearsStructure,
+  countEstimateStructure,
+  insertEstimate,
+  loadEstimateDetail,
+} from "../repository";
 
 export const parseEstimateCreateBody = (
   ctx: PermissionContext,
@@ -100,6 +105,27 @@ export const extendEstimateDetailDal = (
     }
 
     assertCollectionsPatchAllowed(existing.status, body);
+
+    const nextSiteId =
+      typeof body === "object" &&
+      body !== null &&
+      typeof (body as { profile?: { site_id?: unknown } }).profile?.site_id ===
+        "string"
+        ? (body as { profile: { site_id: string } }).profile.site_id
+        : undefined;
+
+    if (nextSiteId !== undefined && nextSiteId !== existing.site_id) {
+      const structure = await countEstimateStructure(pool, id);
+      assertSiteChangeClearsStructure({
+        existingSiteId: existing.site_id,
+        nextSiteId,
+        status: existing.status,
+        body,
+        existingConditionCount: structure.conditionCount,
+        existingLineCount: structure.lineCount,
+      });
+    }
+
     await estimateDetailBaseDal.patch(ctx, id, body);
     return estimateDetailBaseDal.get(ctx, id);
   },

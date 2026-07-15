@@ -29,6 +29,7 @@ const TOP_ROW_MAX_HEIGHT = 320;
 export const EstimateLineItemsPanels = ({
   estimateId,
   manifest,
+  siteId,
   siteSelected = true,
 }: EstimateLineItemsPanelsProps) => {
   const { control } = useFormContext<EstimateLineEditorFormValues>();
@@ -99,6 +100,7 @@ export const EstimateLineItemsPanels = ({
             selection={selection}
             writable={writableConditions}
             disabled={disabled}
+            siteId={siteId}
             onSelect={setSelection}
           />
         </div>

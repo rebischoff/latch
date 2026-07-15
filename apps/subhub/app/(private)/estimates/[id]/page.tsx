@@ -41,7 +41,10 @@ const EstimateIdPage = async ({ params }: EstimateIdPageProps) => {
   }
 
   await requireAuth(routes.estimates.detail(id));
-  const canNavigateSite = await resolveSiteDetailLinkAccess();
+  const [canNavigateSite, canCreateSite] = await Promise.all([
+    resolveSiteDetailLinkAccess(),
+    resolveSiteCreateAccess(),
+  ]);
 
   await prefetchEstimateSitePicker();
   const { state, manifest } = await prefetchSurfaceDetail("estimate_detail", id);
@@ -52,7 +55,7 @@ const EstimateIdPage = async ({ params }: EstimateIdPageProps) => {
         estimateId={id}
         manifest={manifest}
         canNavigateSite={canNavigateSite}
-        canCreateSite={false}
+        canCreateSite={canCreateSite}
       />
     </HydrationBoundary>
   );

@@ -70,3 +70,47 @@ export const resolveEffectiveLaborPhases = (
   }
   return null;
 };
+
+/**
+ * First leaf→root node with `*_explicit`; else `false`.
+ * Shared by labor_only and include_discontinued (43 L11–L12).
+ */
+const resolveEffectiveExplicitBoolean = (
+  conditions: EstimateConditionFormRow[],
+  conditionPath: number[],
+  explicitKey: "labor_only_explicit" | "include_discontinued_explicit",
+  valueKey: "labor_only" | "include_discontinued",
+): boolean => {
+  const ancestry = getConditionAncestry(conditions, conditionPath);
+  for (let i = ancestry.length - 1; i >= 0; i -= 1) {
+    const node = ancestry[i];
+    if (node?.[explicitKey]) {
+      return Boolean(node[valueKey]);
+    }
+  }
+  return false;
+};
+
+/** Effective labor_only for a condition path (43 L2 / L11). */
+export const resolveEffectiveLaborOnly = (
+  conditions: EstimateConditionFormRow[],
+  conditionPath: number[],
+): boolean =>
+  resolveEffectiveExplicitBoolean(
+    conditions,
+    conditionPath,
+    "labor_only_explicit",
+    "labor_only",
+  );
+
+/** Effective include_discontinued for a condition path (43 L12). */
+export const resolveEffectiveIncludeDiscontinued = (
+  conditions: EstimateConditionFormRow[],
+  conditionPath: number[],
+): boolean =>
+  resolveEffectiveExplicitBoolean(
+    conditions,
+    conditionPath,
+    "include_discontinued_explicit",
+    "include_discontinued",
+  );

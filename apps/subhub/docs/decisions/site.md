@@ -6,6 +6,25 @@
 
 ---
 
+### Decision: site zone tree unification (2026-07-14)
+
+**Status:** **Locked** (task 42a).
+
+| # | Topic | Choice |
+|---|--------|--------|
+| D1 | **Table shape** | Collapse `site_scope` + `site_zone` into one self-referencing `site_zone` table. Root rows (`parent_zone_id IS NULL`) are scope instances ("base zone"); `root_item_id` **required** on scope roots, **null** on all children. |
+| D2 | **Root delete semantics** | **Block** — a root row cannot be deleted while it has any children. No cascade, no auto-reparent. Matches existing block-on-reference posture. |
+| D3 | **FK collapse** | `site_asset.site_scope_id` + `site_asset.site_zone_id` → single `site_asset.site_zone_id` (any node). Same collapse on `job_scope_group` when present. |
+| D4 | **Migration approach** | Big-bang, dev DB, no compat layer — insert one root `site_zone` per `site_scope` (preserve `id` when no collision), reparent former top-level zones via `parent_zone_id`, drop `site_scope`. |
+| D5 | **Duplicate names / duplicate root categories** | Unchanged from [D7/37c](#decision-site-scopes--zones--api-rename--picker-auth-2026-07-01) — not enforced v1. |
+| D6 | **General bucket** | Remains **retired** ([039](../migrations/039-retire-general-scope-plan.md) / 37f). No synthetic General root; Field vocabulary stays `scopes` only (no `general_zones` restore). |
+
+**Amends:** [category root instances](#decision-site-scopes--zones--category-root-instances-2026-06-30) (two-table shape) — DDL now single `site_zone` tree; API/Field ids unchanged.
+
+**Task:** [42a](../tasks/42a-site-zone-tree-unification.md) · **Planning:** [14-site-estimate-zone-unification.md](../planning/14-site-estimate-zone-unification.md) § 1 · **Spec:** [`site.md`](../surface-specs/site.md)
+
+---
+
 ### Decision: site scopes & zones — API rename + picker auth (2026-07-01)
 
 **Status:** **Locked** (task 37c).

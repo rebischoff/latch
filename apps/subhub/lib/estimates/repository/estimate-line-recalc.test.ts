@@ -179,6 +179,7 @@ describe("recalcProductLine", () => {
       }),
       expect.anything(),
       false,
+      false,
     );
   });
 
@@ -242,6 +243,52 @@ describe("recalcProductLine", () => {
     );
 
     expect(result.unit_price).toBeCloseTo(result.unit_price_target);
+  });
+
+  it("forces M/F/I = 0, clears part/vendor/lock, keeps labor when laborOnly", async () => {
+    const result = await recalcProductLine(
+      makeClient("draft"),
+      {
+        ...baseLine(),
+        part_id: "pinned-part",
+        material_locked: true,
+        unit_price: 50,
+        is_new: false,
+      },
+      buildCatalog(),
+      { laborOnly: true },
+    );
+
+    expect(resolveLineMaterial).not.toHaveBeenCalled();
+    expect(result.part_id).toBeNull();
+    expect(result.vendor_part_id).toBeNull();
+    expect(result.material_locked).toBe(false);
+    expect(result.unit_material).toBe(0);
+    expect(result.unit_freight).toBe(0);
+    expect(result.unit_incidental).toBe(0);
+    expect(result.unit_labor).toBe(125);
+    expect(result.unit_cost).toBe(125);
+    // Labor markup 10% only → 137.5
+    expect(result.unit_price_target).toBeCloseTo(137.5);
+    expect(result.unit_price).toBeCloseTo(137.5);
+  });
+
+  it("respects sales_locked when laborOnly", async () => {
+    const result = await recalcProductLine(
+      makeClient("draft"),
+      {
+        ...baseLine(),
+        sales_locked: true,
+        unit_price: 999,
+        is_new: false,
+      },
+      buildCatalog(),
+      { laborOnly: true },
+    );
+
+    expect(result.unit_price).toBe(999);
+    expect(result.unit_price_target).toBeCloseTo(137.5);
+    expect(result.unit_labor).toBe(125);
   });
 });
 

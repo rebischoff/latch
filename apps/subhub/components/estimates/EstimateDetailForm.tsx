@@ -30,6 +30,10 @@ import {
   type EstimateSiteTreeFormRow,
 } from "@/components/estimates/estimate-line-tree";
 import {
+  allLeafIdsInSiteTree,
+  normalizeExclusiveLine,
+} from "@/components/estimates/estimate-line-zone-tree";
+import {
   estimateScopeSpecToPatchBody,
   estimateScopeSpecsToDisplay,
 } from "@/lib/estimates/estimate-scope-spec-form";
@@ -235,6 +239,10 @@ const mapConditions = (rows: unknown): EstimateConditionFormRow[] => {
           typeof condition.root_item_id === "string" ? condition.root_item_id : null,
         root_item_name:
           typeof condition.root_item_name === "string" ? condition.root_item_name : null,
+        site_zone_id:
+          typeof condition.site_zone_id === "string" ? condition.site_zone_id : null,
+        site_zone_name:
+          typeof condition.site_zone_name === "string" ? condition.site_zone_name : null,
         sort_order:
           typeof condition.sort_order === "number"
             ? condition.sort_order
@@ -244,7 +252,11 @@ const mapConditions = (rows: unknown): EstimateConditionFormRow[] => {
             ? condition.complexity_factor_id
             : null,
         labor_phases_explicit: condition.labor_phases_explicit === true,
+        labor_only: condition.labor_only === true,
+        labor_only_explicit: condition.labor_only_explicit === true,
         include_discontinued: condition.include_discontinued === true,
+        include_discontinued_explicit:
+          condition.include_discontinued_explicit === true,
         included_labor_phases: mapLaborPhases(condition.included_labor_phases),
         specs: mapSpecs(condition.specs),
         conditions: mapTree(condition.conditions, id),
@@ -363,6 +375,12 @@ const buildDefaultValues = (
       }
     | undefined;
 
+  const site_tree = mapSiteTree(data?.site_tree);
+  const leafIds = allLeafIdsInSiteTree(site_tree);
+  const line_items = mapLineItems(data?.line_items).map((line) =>
+    normalizeExclusiveLine(line, leafIds),
+  );
+
   return {
     profile: {
       title: profile?.title ?? "",
@@ -372,8 +390,8 @@ const buildDefaultValues = (
     },
     stakeholders: mapStakeholders(data?.stakeholders),
     conditions: mapConditions(data?.conditions),
-    site_tree: mapSiteTree(data?.site_tree),
-    line_items: mapLineItems(data?.line_items),
+    site_tree,
+    line_items,
   };
 };
 
@@ -442,7 +460,7 @@ export const EstimateDetailForm = ({
       ? buildDefaultValues(undefined)
       : buildDefaultValues(detail?.data);
     const pickedId = persistedPickerSelectedIdRef.current;
-    if (isCreate && pickedId) {
+    if (pickedId) {
       return {
         ...base,
         profile: {
@@ -502,31 +520,26 @@ export const EstimateDetailForm = ({
   );
 
   const prevSiteIdRef = useRef<string | undefined>(undefined);
+  const siteChangeConfirmOpenRef = useRef(false);
   const siteId = watch("profile.site_id");
-  const { data: createSiteTreeResponse } = useEstimateSiteTree(
-    isCreate && siteId ? siteId : undefined,
-  );
+  const { data: siteTreeResponse } = useEstimateSiteTree(siteId || undefined);
 
   useEffect(() => {
-    if (!isCreate) {
-      return;
-    }
-
     if (!siteId) {
       setValue("site_tree", null, { shouldDirty: false });
       return;
     }
 
-    const tree = createSiteTreeResponse?.data.site_tree;
+    const tree = siteTreeResponse?.data.site_tree;
     if (!tree) {
       return;
     }
 
     setValue("site_tree", mapSiteTree(tree), { shouldDirty: false });
-  }, [createSiteTreeResponse?.data.site_tree, isCreate, setValue, siteId]);
+  }, [setValue, siteId, siteTreeResponse?.data.site_tree]);
 
   useEffect(() => {
-    if (!isCreate) {
+    if (siteChangeConfirmOpenRef.current) {
       return;
     }
 
@@ -536,14 +549,45 @@ export const EstimateDetailForm = ({
       return;
     }
 
-    if (prev !== siteId && prev !== "") {
-      setValue("conditions", [], { shouldDirty: true });
-      setValue("site_tree", null, { shouldDirty: false });
-      setValue("line_items", [], { shouldDirty: true });
+    if (prev === siteId) {
+      return;
     }
 
-    prevSiteIdRef.current = siteId;
-  }, [isCreate, setValue, siteId]);
+    // First pick / empty → site: no confirm (S4).
+    if (prev === "") {
+      prevSiteIdRef.current = siteId;
+      return;
+    }
+
+    const conditions = form.getValues("conditions") ?? [];
+    const lineItems = form.getValues("line_items") ?? [];
+    const hasStructure = conditions.length > 0 || lineItems.length > 0;
+
+    if (!hasStructure) {
+      setValue("site_tree", null, { shouldDirty: false });
+      prevSiteIdRef.current = siteId;
+      return;
+    }
+
+    siteChangeConfirmOpenRef.current = true;
+    modal.confirm({
+      title: "Change site?",
+      content: "Changing site clears conditions and line items. Save to persist.",
+      okText: "Change site",
+      onOk: () => {
+        setValue("conditions", [], { shouldDirty: true });
+        setValue("line_items", [], { shouldDirty: true });
+        setValue("site_tree", null, { shouldDirty: false });
+        prevSiteIdRef.current = siteId;
+        siteChangeConfirmOpenRef.current = false;
+      },
+      onCancel: () => {
+        setValue("profile.site_id", prev, { shouldDirty: true });
+        prevSiteIdRef.current = prev;
+        siteChangeConfirmOpenRef.current = false;
+      },
+    });
+  }, [form, modal, setValue, siteId]);
 
   const siteOptions = useMemo(() => {
     const options = sitePickerOptions(sitePicker?.data.rows);
@@ -585,16 +629,8 @@ export const EstimateDetailForm = ({
         return;
       }
 
-      const profileBody = (() => {
-        if (isCreate) {
-          return values.profile;
-        }
-        const { site_id: _siteId, ...rest } = values.profile;
-        return rest;
-      })();
-
       const body: Record<string, unknown> = {
-        profile: profileBody,
+        profile: values.profile,
       };
 
       if (fieldAllows(activeManifest, "stakeholders", "write")) {
@@ -612,10 +648,13 @@ export const EstimateDetailForm = ({
             id: condition.id,
             name: condition.name,
             parent_condition_id: condition.parent_condition_id,
-            root_item_id: condition.root_item_id,
+            site_zone_id: condition.site_zone_id,
             sort_order: conditionIndex + 1,
             complexity_factor_id: condition.complexity_factor_id,
             include_discontinued: condition.include_discontinued,
+            include_discontinued_explicit: condition.include_discontinued_explicit,
+            labor_only: condition.labor_only,
+            labor_only_explicit: condition.labor_only_explicit,
             labor_phases_explicit: condition.labor_phases_explicit,
             included_labor_phases: condition.included_labor_phases.map((phase) => ({
               labor_phase_id: phase.labor_phase_id,
@@ -797,6 +836,11 @@ export const EstimateDetailForm = ({
   const initialLoading = !isCreate && isLoading && !detail;
   const blocking = !isCreate && isFetching && Boolean(detail);
   const status = profile?.status ?? "draft";
+  const siteFrozen =
+    !isCreate &&
+    (status === "won" || status === "lost" || status === "expired");
+  const siteWritable =
+    fieldAllows(activeManifest, "profile", "write") && !siteFrozen;
 
   const generalTab = (
     <>
@@ -807,7 +851,7 @@ export const EstimateDetailForm = ({
             name="profile.title"
             label="Title"
           />
-          {isCreate ? (
+          {siteWritable ? (
             <LinkedSelectInput<EstimateDetailFormValues>
               field="profile"
               name="profile.site_id"

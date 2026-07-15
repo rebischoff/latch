@@ -16,7 +16,7 @@
 | 4 | **List DAL order** | Fixed **`title` asc** (stable pagination; no sort UI) |
 | 5 | **Create** | POST **`title` + `site_id`**; defaults `job_kind = project`, `status = planned` |
 | 6 | **`profile` PATCH** | `title`, `site_id`, `status`, `job_kind` — block entire PATCH when `status = cancelled` |
-| 7 | **`site_id` change** | Allowed only when `estimate_id` is null **and** no `job_line` rows |
+| 7 | **`site_id` change** | **Amended 2026-07-14** — warn-and-clear (allow with lines); freeze when `estimate_id` set ([decision](../decisions/estimate.md#decision-estimate--job-site-anchor--warn-and-clear-not-immutable-2026-07-14)) |
 | 8 | **`estimate_id`** | Read-only; link to estimate when grant |
 | 9 | **`parent_job_id`** | **Defer** 5a |
 | 10 | **Stakeholders** | Replace-array; add `sort_order` on `job_party`; standard catalog pickers + progressive-setup suggested relation names in empty state |
@@ -212,7 +212,7 @@ Same commercial shape as [`estimate.md`](./estimate.md) `line_items`, plus job l
 |------|---------|
 | `status` | `planned` \| `active` \| `cancelled` |
 | `job_kind` | `project` \| `service` \| `warranty` |
-| `site_id` change | Reject when `estimate_id` set or any `job_line` rows exist |
+| `site_id` change | Allow when `estimate_id` is null; clear `line_items` on change (warn-and-clear); reject when `estimate_id` set |
 | `cancelled` | Reject entire PATCH |
 
 **`stakeholders` validation:**
@@ -239,7 +239,7 @@ Same commercial shape as [`estimate.md`](./estimate.md) `line_items`, plus job l
 
 ## F — Domain rules
 
-- **Site anchor** — every job has `site_id`; lines FK `site_location_id` on that site only ([geography decision](../decisions/estimate.md#decision-estimate--job-line-grouping--site-geography-2026-06-17)).
+- **Site anchor** — every job has `site_id`; lines/places scoped to that site only. **`site_id` writable while editable** — warn-and-clear when changing with lines; **frozen when `estimate_id` set** ([decision](../decisions/estimate.md#decision-estimate--job-site-anchor--warn-and-clear-not-immutable-2026-07-14)).
 - **Engagements** — one `job` table; `job_kind` distinguishes project / service / warranty; `parent_job_id` deferred in 5a UI ([engagements decision](../decisions/job.md#decision-engagements--job_kind-2026-06-17)).
 - **Stakeholders** — graph on `job_party`; no sole `customer_id` on `job` ([anchor decision](../decisions/job.md#decision-job-anchor-and-stakeholders--deferred-to-job-slice-2026-06-15)).
 - **Snapshots** — sold line commercial fields frozen on save ([general decision](../decisions/general.md#decision-line-item-snapshots-on-estimate--job--invoice-2026-06-12)).
@@ -316,6 +316,7 @@ URL `?tab=` keys: `overview` (default, omit), `scope`, `field`, `billing`. Same-
 
 | Field | Add | Pickers | Empty state |
 |-------|-----|---------|-------------|
+| `profile.site_id` | — | [`LinkedSelectInput`](../../components/form/LinkedSelectInput.tsx) — same chrome as estimate; **writable** while not cancelled and `estimate_id` null; **read-only + open** when `estimate_id` set or cancelled; change with lines → confirm clear ([decision](../decisions/estimate.md#decision-estimate--job-site-anchor--warn-and-clear-not-immutable-2026-07-14)) | Required on create |
 | `stakeholders` | Add stakeholder | Any `party`; relation from full `job_party_relation_table` list (sorted `sort_order` → `display_name`) | Catalog empty: block add; list **suggested default relation names** (Customer, Property owner, Bill to, Sold to, General contractor, Subcontractor, Subcontract through) + CTA → `/party-relations` |
 | `line_items` | — (5a) | — | Scope tab stub |
 
@@ -345,8 +346,9 @@ URL `?tab=` keys: `overview` (default, omit), `scope`, `field`, `billing`. Same-
 
 | Topic | Handling |
 |-------|----------|
-| **Empty job, site change** | `site_id` PATCH allowed when no `estimate_id` and no `job_line` rows |
-| **Won estimate anchor** | `estimate_id` set → `site_id` frozen |
+| **Site change (no estimate link)** | Allowed even with lines — UI confirm clears `line_items`; Save persists; stakeholders unchanged |
+| **Won estimate anchor** | `estimate_id` set → `site_id` frozen (read-only + open) |
+| **Cancelled** | Entire profile read-only (existing) |
 | **Lines without UI** | Win-copy may populate `job_line` before Scope tab; GET omits `line_items` until manifest grants |
 | **`job_kind` on service/warranty** | Writable on PATCH in 5a; `parent_job_id` UI deferred |
 | **`cancelled` job** | Detail viewable; Save disabled; PATCH → `ConflictError` |

@@ -7,20 +7,12 @@ import type {
   SiteZoneRow,
 } from "../descriptors/site-detail";
 
-type SiteScopeBaseRow = {
-  id: string;
-  name: string;
-  sort_order: number;
-  status: string;
-  root_item_id: string;
-  root_item_name: string;
-};
-
 type SiteZoneFlatRow = {
   id: string;
   name: string;
   parent_zone_id: string | null;
-  site_scope_id: string | null;
+  root_item_id: string | null;
+  root_item_name: string | null;
   sort_order: number;
   status: string;
 };
@@ -61,6 +53,11 @@ const loadReferencedZoneIds = async (
        INNER JOIN estimate e ON e.id = el.estimate_id
        WHERE e.site_id = $1
        UNION
+       SELECT ec.site_zone_id, 'estimate'::text AS blocker
+       FROM estimate_condition ec
+       INNER JOIN estimate e ON e.id = ec.estimate_id
+       WHERE e.site_id = $1 AND ec.site_zone_id IS NOT NULL
+       UNION
        SELECT site_zone_id, 'job'::text AS blocker
        FROM job_line jl
        INNER JOIN job j ON j.id = jl.job_id
@@ -90,59 +87,42 @@ export const loadSiteScopes = async (
   pool: Pool,
   siteId: string,
 ): Promise<{ scopes: SiteScopeRow[] }> => {
-  const [scopesResult, zonesResult, references] = await Promise.all([
-    pool.query<SiteScopeBaseRow>(
-      `SELECT
-         ss.id,
-         ss.root_item_id,
-         c.name AS root_item_name,
-         ss.name,
-         ss.sort_order,
-         ss.status
-       FROM site_scope ss
-       INNER JOIN item c ON c.id = ss.root_item_id
-       WHERE ss.site_id = $1
-       ORDER BY ss.sort_order ASC, ss.id ASC`,
-      [siteId],
-    ),
+  const [zonesResult, references] = await Promise.all([
     pool.query<SiteZoneFlatRow>(
       `SELECT
-         id,
-         site_scope_id,
-         parent_zone_id,
-         name,
-         sort_order,
-         status
-       FROM site_zone
-       WHERE site_id = $1
-       ORDER BY sort_order ASC, id ASC`,
+         sz.id,
+         sz.parent_zone_id,
+         sz.root_item_id,
+         c.name AS root_item_name,
+         sz.name,
+         sz.sort_order,
+         sz.status
+       FROM site_zone sz
+       LEFT JOIN item c ON c.id = sz.root_item_id
+       WHERE sz.site_id = $1
+       ORDER BY sz.sort_order ASC, sz.id ASC`,
       [siteId],
     ),
     loadReferencedZoneIds(pool, siteId),
   ]);
 
-  const zonesByScopeId = new Map<string | null, SiteZoneFlatRow[]>();
-  for (const zone of zonesResult.rows) {
-    const key = zone.site_scope_id ?? null;
-    const bucket = zonesByScopeId.get(key) ?? [];
-    bucket.push(zone);
-    zonesByScopeId.set(key, bucket);
-  }
+  const roots = zonesResult.rows.filter(
+    (row) => row.parent_zone_id === null && row.root_item_id !== null,
+  );
+  const children = zonesResult.rows.filter((row) => row.parent_zone_id !== null);
 
-  const scopeSubtreeReferenced = (scopeId: string): boolean => {
-    const scopeZones = zonesByScopeId.get(scopeId) ?? [];
-    return scopeZones.some((zone) => references.ids.has(zone.id));
-  };
+  const hasDirectChild = (rootId: string): boolean =>
+    children.some((row) => row.parent_zone_id === rootId);
 
-  const scopes: SiteScopeRow[] = scopesResult.rows.map((scope) => ({
-    id: scope.id,
-    root_item_id: scope.root_item_id,
-    root_item_name: scope.root_item_name,
-    name: scope.name,
-    sort_order: scope.sort_order,
-    status: scope.status,
-    can_delete: !scopeSubtreeReferenced(scope.id),
-    zones: nestZones(zonesByScopeId.get(scope.id) ?? [], null, references.ids),
+  const scopes: SiteScopeRow[] = roots.map((root) => ({
+    id: root.id,
+    root_item_id: root.root_item_id as string,
+    root_item_name: root.root_item_name ?? "",
+    name: root.name,
+    sort_order: root.sort_order,
+    status: root.status,
+    can_delete: !hasDirectChild(root.id) && !references.ids.has(root.id),
+    zones: nestZones(children, root.id, references.ids),
   }));
 
   return { scopes };

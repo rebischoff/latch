@@ -6,6 +6,57 @@
 
 ---
 
+### Decision: estimate win → job handoff (2026-07-14)
+
+**Status:** **Locked** (W0–W7, 2026-07-15) — wave **5b** thick. Canonical detail in [`estimate.md`](./estimate.md#decision-estimate-win--job-handoff-2026-07-14).
+
+---
+
+### Decision: change order — BOM and scope phase reconciliation (2026-07-14)
+
+**Status:** **Locked** (task [45](../tasks/45-job-costing-and-change-order-reconciliation.md)). **Amends:** [change orders — unified `job_line` ledger (2026-06-17)](#decision-change-orders--unified-job_line-ledger-2026-06-17) — that decision covered `job_line` only; this locks what happens to `job_line_part` (engineered BOM) and `scope_phase` (field progress) on approve. **Companion:** [`costing.md`](./costing.md) (re-budget, cost layers). **Planning:** [`planning/15-job-costing-and-change-orders.md`](../planning/15-job-costing-and-change-orders.md).
+
+**Choice (by `change_order_line.line_action`):**
+
+| Action | `job_line` (unchanged 2026-06-17) | `job_line_part` (BOM) | `scope_phase` / progress |
+|--------|-----------------------------------|------------------------|--------------------------|
+| **`add`** | New `job_line` | New BOM explosion — same path as manual line add / win-copy | New `scope_phase` rows seeded same as any new line (37n resolver) |
+| **`deduct`** | Target `job_line.status = voided` | Void/cancel associated `job_line_part` rows | Void `scope_phase` rows |
+| **`revise`** | Target voided; new replacement `job_line` (`superseded_by_job_line_id`) | Old line's BOM voided; replacement gets a fresh BOM explosion — do not diff-patch old rows | New `scope_phase` rows on replacement; **carry forward `completed_qty`** proportionally from the superseded line's phases (matched by `name` / `sequence`) so a revise never erases real field progress |
+
+**Guardrails (block vs. warn):**
+
+| Condition | Rule |
+|-----------|------|
+| `deduct` / `revise` target has `job_line_part` rows already `on_purchase_order` / `received` (per procurement rollup) | **Block approve** with a structured conflict — can't un-buy delivered/committed material without a separate procurement decision (return-to-vendor, keep-as-surplus). Approver resolves procurement first, then re-approves the CO. |
+| `deduct` / `revise` target has `scope_phase.completed_qty > 0` on any phase | **Warn, don't block** — completed field work stays true. `deduct` still voids the phase, but existing `progress_entry_line` rows are never deleted (audit trail of real work done, even on a line later cut from contract). |
+
+**Rationale:** The 2026-06-17 decision locked the sold-line ledger mechanics but left BOM/procurement and field-progress fallout implicit — building wave 5d without these rules risks orphaned open requisitions (deduct a line that's already been bought) or silently erased field progress (revise a line that's half-installed). Locking this now, before 5d starts, avoids relitigating it mid-implementation.
+
+**Not in scope:** Automatic vendor-return workflow when a `deduct` is blocked on committed material (PM resolves manually via existing procurement Surfaces); CO-level margin-impact UI (see [`costing.md`](./costing.md)).
+
+---
+
+### Decision: estimate + job site anchor — warn-and-clear, not immutable (2026-07-14)
+
+**Status:** **Locked** (task 44). **Canonical detail:** [`estimate.md`](./estimate.md#decision-estimate--job-site-anchor--warn-and-clear-not-immutable-2026-07-14) (**S1–S9**). **Supersedes:** wave-5a rule “`site_id` change only when no `estimate_id` and no `job_line` rows” ([wave 5 amendments](#decision-job-wave-5--implementation-order-2026-06-23)).
+
+**Choice (job-specific):**
+
+| Topic | Choice |
+|-------|--------|
+| Writable | Same as estimate — `LinkedSelectInput` while Overview/`profile` writable and job not `cancelled` |
+| Lines present | Allowed — confirm + clear `line_items` (and any job place FKs) before dirtying; Save persists |
+| **`estimate_id` set** | **Site frozen** — read-only + open icon; DAL rejects change (won-estimate anchor) |
+| `cancelled` | Entire profile frozen (existing) |
+| Stakeholders | Not cleared on site change |
+
+**Rationale:** Operators should not learn different site rules on jobs vs estimates. Link to a won estimate still pins site.
+
+**Task:** [44](../tasks/44-site-anchor-warn-and-clear.md).
+
+---
+
 ### Decision: job scope group — implicit General (J4 locked 2026-06-27)
 
 **Choice:** `job_line.job_scope_group_id` **nullable**. DAL/UI expose synthetic **General** group for lines with null FK. Real `job_scope_group` rows when organized by area, phase, SOV, or from `estimate_system` win mapping.
@@ -76,7 +127,7 @@ Session locked in [`job.md`](../surface-specs/job.md) — overrides or extends r
 | List | `title` + site name only; defer search, sort UI, filters; DAL `title` asc |
 | `billing_settings` | Omit from 5a YAML; DB defaults only; Overview section in **6b** |
 | `profile` PATCH | `title`, `site_id`, `status`, **`job_kind`**; block all PATCH when `cancelled` |
-| `site_id` change | Only when no `estimate_id` and no `job_line` rows |
+| `site_id` change | **Amended 2026-07-14** — warn-and-clear; freeze only when `estimate_id` set ([decision](./job.md#decision-estimate--job-site-anchor--warn-and-clear-not-immutable-2026-07-14)); historical: only when no `estimate_id` and no `job_line` rows |
 | Delete | Defer 5a — no DELETE route |
 | `complete` | Declare in policy YAML; no toolbar handler until **5c** |
 | Stakeholders | Add `job_party.sort_order`; standard catalog pickers + suggested relation names in empty state |
@@ -128,6 +179,8 @@ Session locked in [`job.md`](../surface-specs/job.md) — overrides or extends r
 
 
 ### Decision: change orders — unified `job_line` ledger (2026-06-17)
+
+**Status:** Locked. **Amended 2026-07-14** — [BOM and scope phase reconciliation](#decision-change-order--bom-and-scope-phase-reconciliation-2026-07-14) locks the `job_line_part` / `scope_phase` fallout this decision left implicit.
 
 **Choice:**
 

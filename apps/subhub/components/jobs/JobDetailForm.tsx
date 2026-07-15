@@ -9,12 +9,17 @@ import {
 } from "@latch/contracts";
 import { App, Space, Tag, Typography } from "antd";
 import Link from "next/link";
-import { notFound, useRouter } from "next/navigation";
-import { useCallback, useMemo } from "react";
+import { notFound, usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useForm, type Resolver } from "react-hook-form";
 import { z } from "zod";
 
+import { FormFieldItem } from "@/components/form/FormFieldItem";
 import { FormSection } from "@/components/form/FormSection";
+import {
+  LinkedSelectControl,
+  LinkedSelectInput,
+} from "@/components/form/LinkedSelectInput";
 import { SelectInput } from "@/components/form/SelectInput";
 import { TextInput } from "@/components/form/TextInput";
 import { useSurfaceFormChrome } from "@/components/surface/SurfaceFormChromeContext";
@@ -22,21 +27,27 @@ import { DetailHeader } from "@/components/surface/DetailHeader";
 import { SurfaceFormLayout } from "@/components/surface/SurfaceFormLayout";
 import { SurfaceFormRoot } from "@/components/surface/SurfaceFormRoot";
 import { useFieldMode } from "@/components/surface/useFieldMode";
+import { JobCostSummaryPanel } from "@/components/jobs/JobCostSummaryPanel";
+import { JobFieldExploreTable } from "@/components/jobs/JobFieldExploreTable";
 import {
   JobStakeholderFields,
   validateJobStakeholderDuplicates,
   type JobStakeholderFormRow,
 } from "@/components/jobs/JobStakeholderFields";
+import { useApplyPickerReturn } from "@/lib/hooks/use-apply-picker-return";
 import { useJobSitePicker } from "@/lib/hooks/use-job-site-picker";
 import { useDetailTab } from "@/lib/hooks/use-detail-tab";
 import { useSurfaceListCreate } from "@/lib/hooks/use-surface-list-create";
 import { useSurfaceDetail } from "@/lib/hooks/use-surface-detail";
 import { useSurfacePatch } from "@/lib/hooks/use-surface-patch";
+import { jobSitePickerKey } from "@/lib/hooks/surface-query-keys";
 import {
   JobDetailCreateSchema,
   JobDetailPatchSchema,
 } from "@/lib/jobs/descriptors/job-detail";
+import type { JobCostSummary } from "@/lib/jobs/repository/job-cost-summary";
 import { routes } from "@/lib/nav-routes";
+import { buildPickerCreateUrl, parseReturnContext } from "@/lib/picker-return-context";
 import { navigateOnCancel } from "@/lib/surface-navigation";
 import { SurfaceApiError } from "@/lib/surface-api";
 
@@ -72,6 +83,7 @@ type JobDetailFormProps = {
   manifest: Manifest;
   canNavigateSite: boolean;
   canNavigateEstimate: boolean;
+  canCreateSite: boolean;
 };
 
 type JobDetailFormValues = {
@@ -82,6 +94,8 @@ type JobDetailFormValues = {
     status?: string;
   };
   stakeholders: JobStakeholderFormRow[];
+  /** Hidden — used for warn-and-clear when Scope editor is still stubbed. */
+  line_items: unknown[];
 };
 
 const mapStakeholders = (rows: unknown): JobStakeholderFormRow[] => {
@@ -103,6 +117,8 @@ const mapStakeholders = (rows: unknown): JobStakeholderFormRow[] => {
   });
 };
 
+const mapLineItems = (rows: unknown): unknown[] => (Array.isArray(rows) ? rows : []);
+
 const buildDefaultValues = (
   data: Record<string, unknown> | undefined,
   isCreate: boolean,
@@ -114,6 +130,7 @@ const buildDefaultValues = (
         site_id: "",
       },
       stakeholders: [],
+      line_items: [],
     };
   }
 
@@ -134,6 +151,7 @@ const buildDefaultValues = (
       status: profile?.status ?? "planned",
     },
     stakeholders: mapStakeholders(data?.stakeholders),
+    line_items: mapLineItems(data?.line_items),
   };
 };
 
@@ -184,9 +202,17 @@ export const JobDetailForm = ({
   manifest,
   canNavigateSite,
   canNavigateEstimate,
+  canCreateSite,
 }: JobDetailFormProps) => {
   const isCreate = jobId === "new";
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const pickerReturn = parseReturnContext(searchParams);
+  const persistedPickerSelectedIdRef = useRef<string | null>(null);
+  if (pickerReturn.selectedId) {
+    persistedPickerSelectedIdRef.current = pickerReturn.selectedId;
+  }
   const { message, modal } = App.useApp();
   const { data: detail, isLoading, isFetching, error } = useSurfaceDetail(
     "job_detail",
@@ -209,13 +235,22 @@ export const JobDetailForm = ({
       }
     | undefined;
 
-  const defaultValues = useMemo(
-    () =>
-      isCreate
-        ? buildDefaultValues(undefined, true)
-        : buildDefaultValues(detail?.data, false),
-    [detail?.data, isCreate],
-  );
+  const defaultValues = useMemo(() => {
+    const base = isCreate
+      ? buildDefaultValues(undefined, true)
+      : buildDefaultValues(detail?.data, false);
+    const pickedId = persistedPickerSelectedIdRef.current;
+    if (pickedId) {
+      return {
+        ...base,
+        profile: {
+          ...base.profile,
+          site_id: pickedId,
+        },
+      };
+    }
+    return base;
+  }, [detail?.data, isCreate, pickerReturn.selectedId]);
 
   const resolver = useMemo(() => {
     const baseSchema = (isCreate ? JobDetailCreateSchema : JobDetailPatchSchema) as z.ZodObject<
@@ -224,6 +259,7 @@ export const JobDetailForm = ({
     const narrowed = narrowPatchSchema(baseSchema, activeManifest) as z.ZodObject<z.ZodRawShape>;
     const loosened = narrowed.extend({
       stakeholders: z.array(z.object({}).passthrough()).optional(),
+      line_items: z.array(z.object({}).passthrough()).optional(),
     });
 
     return zodResolver(loosened);
@@ -234,10 +270,49 @@ export const JobDetailForm = ({
     defaultValues,
   });
 
+  const { setValue, watch } = form;
+
+  useApplyPickerReturn({
+    setValue,
+    returnField: "profile.site_id",
+    pickerQueryKey: jobSitePickerKey,
+  });
+
+  const returnTo = useMemo(() => {
+    const query = searchParams.toString();
+    return query ? `${pathname}?${query}` : pathname;
+  }, [pathname, searchParams]);
+
+  const siteCreateUrl = useMemo(
+    () =>
+      buildPickerCreateUrl({
+        target: "site",
+        returnTo,
+        returnField: "profile.site_id",
+      }),
+    [returnTo],
+  );
+
+  const prevSiteIdRef = useRef<string | undefined>(undefined);
+  const siteChangeConfirmOpenRef = useRef(false);
+
+  const siteId = watch("profile.site_id");
+  const status = watch("profile.status") ?? profile?.status ?? "planned";
+  const jobKind = watch("profile.job_kind") ?? profile?.job_kind ?? "project";
+  const isCancelled = !isCreate && status === "cancelled";
+  const siteFrozen =
+    !isCreate && (isCancelled || Boolean(profile?.estimate_id));
+  const siteWritable =
+    fieldAllows(activeManifest, "profile", "write") && !siteFrozen;
+  const showAddSite =
+    canCreateSite && fieldAllows(activeManifest, "profile", "write") && !siteFrozen;
+
   const siteOptions = useMemo(() => {
     const options = sitePickerOptions(sitePicker?.data.rows);
-    const currentId = profile?.site_id;
-    const currentName = profile?.site_display_name;
+    const currentId = siteId || profile?.site_id;
+    const currentName =
+      profile?.site_display_name ??
+      options.find((option) => option.value === currentId)?.label;
     if (
       currentId &&
       currentName &&
@@ -246,17 +321,55 @@ export const JobDetailForm = ({
       return [...options, { value: currentId, label: currentName }];
     }
     return options;
-  }, [profile?.site_display_name, profile?.site_id, sitePicker?.data.rows]);
+  }, [profile?.site_display_name, profile?.site_id, siteId, sitePicker?.data.rows]);
 
   const {
     formState: { isDirty },
-    watch,
   } = form;
 
-  const siteId = watch("profile.site_id");
-  const status = watch("profile.status") ?? profile?.status ?? "planned";
-  const jobKind = watch("profile.job_kind") ?? profile?.job_kind ?? "project";
-  const isCancelled = !isCreate && status === "cancelled";
+  useEffect(() => {
+    if (siteChangeConfirmOpenRef.current || siteFrozen) {
+      return;
+    }
+
+    const prev = prevSiteIdRef.current;
+    if (prev === undefined) {
+      prevSiteIdRef.current = siteId;
+      return;
+    }
+
+    if (prev === siteId) {
+      return;
+    }
+
+    if (prev === "") {
+      prevSiteIdRef.current = siteId;
+      return;
+    }
+
+    const lineItems = form.getValues("line_items") ?? [];
+    if (lineItems.length === 0) {
+      prevSiteIdRef.current = siteId;
+      return;
+    }
+
+    siteChangeConfirmOpenRef.current = true;
+    modal.confirm({
+      title: "Change site?",
+      content: "Changing site clears line items. Save to persist.",
+      okText: "Change site",
+      onOk: () => {
+        setValue("line_items", [], { shouldDirty: true });
+        prevSiteIdRef.current = siteId;
+        siteChangeConfirmOpenRef.current = false;
+      },
+      onCancel: () => {
+        setValue("profile.site_id", prev, { shouldDirty: true });
+        prevSiteIdRef.current = prev;
+        siteChangeConfirmOpenRef.current = false;
+      },
+    });
+  }, [form, modal, setValue, siteFrozen, siteId]);
 
   const canSave = patchableFieldIds(activeManifest).length > 0 && !isCancelled;
   const saving = patch.isPending || create.isPending;
@@ -394,9 +507,6 @@ export const JobDetailForm = ({
 
   const initialLoading = !isCreate && isLoading && !detail;
   const blocking = !isCreate && isFetching && Boolean(detail);
-  const siteDisplayName =
-    profile?.site_display_name ??
-    siteOptions.find((option) => option.value === siteId)?.label;
 
   const overviewTab = (
     <>
@@ -407,33 +517,35 @@ export const JobDetailForm = ({
             name="profile.title"
             label="Title"
           />
-          <SelectInput<JobDetailFormValues>
-            field="profile"
-            name="profile.site_id"
-            label="Site"
-            options={siteOptions}
-            loading={sitePickerLoading}
-            selectProps={{
-              showSearch: true,
-              optionFilterProp: "label",
-            }}
-          />
-          {siteId ? (
-            <div style={{ marginBottom: 16 }}>
-              <Space>
-                <Typography.Text type="secondary">Open:</Typography.Text>
-                {canNavigateSite ? (
-                  <Link href={routes.sites.detail(siteId)}>
-                    {siteDisplayName ?? siteId}
-                  </Link>
-                ) : (
-                  <Typography.Text type="secondary">
-                    {siteDisplayName ?? siteId}
-                  </Typography.Text>
-                )}
-              </Space>
-            </div>
-          ) : null}
+          {siteWritable ? (
+            <LinkedSelectInput<JobDetailFormValues>
+              field="profile"
+              name="profile.site_id"
+              label="Site"
+              options={siteOptions}
+              loading={sitePickerLoading}
+              canLink={canNavigateSite}
+              linkHref={routes.sites.detail}
+              canAddNew={showAddSite}
+              addNewHref={siteCreateUrl}
+              addNewLabel="Add site"
+              selectProps={{
+                showSearch: true,
+                optionFilterProp: "label",
+              }}
+            />
+          ) : (
+            <FormFieldItem label="Site">
+              <LinkedSelectControl
+                mode="read"
+                value={siteId}
+                options={siteOptions}
+                loading={sitePickerLoading}
+                canLink={canNavigateSite}
+                linkHref={routes.sites.detail}
+              />
+            </FormFieldItem>
+          )}
           {!isCreate && isCancelled ? (
             <ProfileJobKind jobKind={jobKind} />
           ) : !isCreate ? (
@@ -472,6 +584,11 @@ export const JobDetailForm = ({
           ) : null}
         </FormSection>
       ) : null}
+      {!isCreate ? (
+        <JobCostSummaryPanel
+          summary={detail?.data.cost_summary as JobCostSummary | undefined}
+        />
+      ) : null}
       {fieldAllows(activeManifest, "stakeholders", "read") ? (
         <JobStakeholderFields manifest={activeManifest} />
       ) : null}
@@ -498,10 +615,12 @@ export const JobDetailForm = ({
     </Typography.Paragraph>
   );
 
-  const fieldTab = (
+  const fieldTab = isCreate ? (
     <Typography.Paragraph type="secondary">
-      Field status ships in wave 5c.
+      Save the job first to explore field progress.
     </Typography.Paragraph>
+  ) : (
+    <JobFieldExploreTable />
   );
 
   const billingTab = (

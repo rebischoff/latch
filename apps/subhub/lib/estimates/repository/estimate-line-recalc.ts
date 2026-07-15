@@ -19,7 +19,10 @@ import {
   type MergedBucketSpecs,
 } from "./estimate-bucket-specs";
 import { resolveLineMaterial } from "./estimate-part-resolver";
-import { loadConditionIncludeDiscontinued } from "./estimate-part-picker";
+import {
+  loadConditionIncludeDiscontinued,
+  loadConditionLaborOnly,
+} from "./estimate-part-picker";
 
 export type RecalcLineInput = EstimateLineItemPatchRow & {
   id: string;
@@ -42,6 +45,7 @@ export type RecalcContextOverrides = {
   bucket?: MergedBucketSpecs;
   complexity?: ComplexityContext;
   includeDiscontinued?: boolean;
+  laborOnly?: boolean;
   laborPhases?: string[] | null;
 };
 
@@ -77,7 +81,7 @@ export const recalcProductLine = async (
 ): Promise<RecalcLineOutput> => {
   const commercialCatalog = catalog ?? (await loadCommercialCatalog(client));
   const salesLocked = line.sales_locked ?? false;
-  const materialLocked = line.material_locked ?? false;
+  let materialLocked = line.material_locked ?? false;
   const status = await loadEstimateStatus(client, line.estimate_condition_id);
 
   if (status && status !== "draft") {
@@ -98,6 +102,64 @@ export const recalcProductLine = async (
       unit_cost: unitCost,
       unit_price_target: unitPriceTarget,
       unit_price: salesLocked ? line.unit_price : unitPriceTarget,
+    };
+  }
+
+  const laborOnly =
+    overrides?.laborOnly ??
+    (await loadConditionLaborOnly(client, line.estimate_condition_id));
+
+  const [conditionLaborPhases, complexity] = await Promise.all([
+    overrides?.laborPhases !== undefined
+      ? Promise.resolve(overrides.laborPhases)
+      : loadConditionLaborPhases(client, line.estimate_condition_id),
+    overrides?.complexity
+      ? Promise.resolve(overrides.complexity)
+      : loadComplexityContext(client, line.estimate_condition_id),
+  ]);
+  const baseLabor = resolveFilteredLaborCost(
+    commercialCatalog,
+    line.item_id,
+    conditionLaborPhases,
+  );
+  const complexityPercent = resolveComplexityPercent(complexity);
+  const unitLabor = baseLabor * (complexityPercent / 100);
+
+  // L3–L4: labor-only skips material resolve; force M/F/I = 0; clear part/vendor/lock.
+  if (laborOnly) {
+    materialLocked = false;
+    const unitMaterial = 0;
+    const unitFreight = 0;
+    const unitIncidental = 0;
+    const unitCost = unitLabor;
+    const markup = resolveRate(
+      commercialCatalog,
+      line.item_id,
+      "markup",
+    ) as MarkupProfile | null;
+    const unitPriceTarget = computeUnitPriceTarget(
+      unitMaterial,
+      unitLabor,
+      unitFreight,
+      unitIncidental,
+      markup,
+    );
+    const unitPrice = salesLocked ? line.unit_price : unitPriceTarget;
+
+    return {
+      ...line,
+      sales_locked: salesLocked,
+      material_locked: materialLocked,
+      part_id: null,
+      vendor_part_id: null,
+      item_id: line.item_id,
+      unit_material: unitMaterial,
+      unit_labor: unitLabor,
+      unit_freight: unitFreight,
+      unit_incidental: unitIncidental,
+      unit_cost: unitCost,
+      unit_price_target: unitPriceTarget,
+      unit_price: unitPrice,
     };
   }
 
@@ -135,22 +197,6 @@ export const recalcProductLine = async (
   ) as CostAddOnProfile | null;
   const unitFreight = computeAddOnUnit(freightProfile, unitMaterial);
   const unitIncidental = computeAddOnUnit(incidentalProfile, unitMaterial);
-
-  const [conditionLaborPhases, complexity] = await Promise.all([
-    overrides?.laborPhases !== undefined
-      ? Promise.resolve(overrides.laborPhases)
-      : loadConditionLaborPhases(client, line.estimate_condition_id),
-    overrides?.complexity
-      ? Promise.resolve(overrides.complexity)
-      : loadComplexityContext(client, line.estimate_condition_id),
-  ]);
-  const baseLabor = resolveFilteredLaborCost(
-    commercialCatalog,
-    line.item_id,
-    conditionLaborPhases,
-  );
-  const complexityPercent = resolveComplexityPercent(complexity);
-  const unitLabor = baseLabor * (complexityPercent / 100);
 
   const unitCost = unitMaterial + unitLabor + unitFreight + unitIncidental;
   const markup = resolveRate(

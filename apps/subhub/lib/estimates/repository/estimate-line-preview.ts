@@ -15,6 +15,7 @@ import {
 } from "./estimate-commercial";
 import {
   loadConditionIncludeDiscontinued,
+  loadConditionLaborOnly,
 } from "./estimate-part-picker";
 import {
   recalcProductLine,
@@ -39,6 +40,9 @@ export const EstimateLinePreviewConditionDraftSchema = z
     labor_phases_explicit: z.boolean().optional(),
     included_labor_phases: z.array(z.string()).optional(),
     include_discontinued: z.boolean().optional(),
+    include_discontinued_explicit: z.boolean().optional(),
+    labor_only: z.boolean().optional(),
+    labor_only_explicit: z.boolean().optional(),
     specs: z.array(PreviewSpecSchema).optional(),
   })
   .strict();
@@ -81,6 +85,7 @@ export type EstimateLinePreviewResultLine = {
   id: string;
   part_id: string | null;
   vendor_part_id: string | null;
+  material_locked: boolean;
   unit_material: number;
   unit_freight: number;
   unit_incidental: number;
@@ -168,16 +173,41 @@ const resolveDraftIncludeDiscontinued = async (
   conditionId: string,
   draft: EstimateLinePreviewRequest["condition_draft"],
 ): Promise<boolean> => {
+  // Client may send effective boolean (buildConditionDraft) or explicit+value.
+  if (draft?.include_discontinued_explicit === false) {
+    const ancestors = await loadConditionAncestorIds(client, conditionId);
+    const parentId = ancestors[1] ?? null;
+    return parentId
+      ? loadConditionIncludeDiscontinued(client, parentId)
+      : false;
+  }
   if (draft?.include_discontinued !== undefined) {
     return draft.include_discontinued;
   }
   return loadConditionIncludeDiscontinued(client, conditionId);
 };
 
+const resolveDraftLaborOnly = async (
+  client: Pool | PoolClient,
+  conditionId: string,
+  draft: EstimateLinePreviewRequest["condition_draft"],
+): Promise<boolean> => {
+  if (draft?.labor_only_explicit === false) {
+    const ancestors = await loadConditionAncestorIds(client, conditionId);
+    const parentId = ancestors[1] ?? null;
+    return parentId ? loadConditionLaborOnly(client, parentId) : false;
+  }
+  if (draft?.labor_only !== undefined) {
+    return draft.labor_only;
+  }
+  return loadConditionLaborOnly(client, conditionId);
+};
+
 const toPreviewResult = (row: RecalcLineOutput): EstimateLinePreviewResultLine => ({
   id: row.id,
   part_id: row.part_id ?? null,
   vendor_part_id: row.vendor_part_id ?? null,
+  material_locked: row.material_locked ?? false,
   unit_material: row.unit_material,
   unit_freight: row.unit_freight,
   unit_incidental: row.unit_incidental,
@@ -189,7 +219,7 @@ const toPreviewResult = (row: RecalcLineOutput): EstimateLinePreviewResultLine =
 
 /**
  * Non-persisting commercial preview for 1..n lines under a condition.
- * Reuses `recalcProductLine`; never writes lock flags or line rows.
+ * Reuses `recalcProductLine`; applies part clear + material_locked clear when labor-only.
  */
 export const previewEstimateLines = async (
   client: Pool | PoolClient,
@@ -215,12 +245,14 @@ export const previewEstimateLines = async (
     value_number_max: spec.value_number_max ?? null,
   }));
 
-  const [catalog, complexity, laborPhases, includeDiscontinued] = await Promise.all([
-    loadCommercialCatalog(client),
-    resolveDraftComplexity(client, request.condition_id, draft),
-    resolveDraftLaborPhases(client, request.condition_id, draft),
-    resolveDraftIncludeDiscontinued(client, request.condition_id, draft),
-  ]);
+  const [catalog, complexity, laborPhases, includeDiscontinued, laborOnly] =
+    await Promise.all([
+      loadCommercialCatalog(client),
+      resolveDraftComplexity(client, request.condition_id, draft),
+      resolveDraftLaborPhases(client, request.condition_id, draft),
+      resolveDraftIncludeDiscontinued(client, request.condition_id, draft),
+      resolveDraftLaborOnly(client, request.condition_id, draft),
+    ]);
 
   const results: EstimateLinePreviewResultLine[] = [];
 
@@ -237,6 +269,7 @@ export const previewEstimateLines = async (
       complexity,
       laborPhases,
       includeDiscontinued,
+      laborOnly,
     };
 
     const input: RecalcLineInput = {

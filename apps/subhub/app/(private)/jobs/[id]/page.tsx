@@ -8,6 +8,7 @@ import {
   prefetchSurfaceCreate,
   prefetchSurfaceDetail,
   resolveEstimateDetailLinkAccess,
+  resolveSiteCreateAccess,
   resolveSiteDetailLinkAccess,
 } from "@/lib/surfaces/prefetch-surface-query";
 
@@ -20,9 +21,10 @@ const JobIdPage = async ({ params }: JobIdPageProps) => {
 
   if (id === "new") {
     await requireAuth(routes.jobs.new);
-    const [canNavigateSite, canNavigateEstimate] = await Promise.all([
+    const [canNavigateSite, canNavigateEstimate, canCreateSite] = await Promise.all([
       resolveSiteDetailLinkAccess(),
       resolveEstimateDetailLinkAccess(),
+      resolveSiteCreateAccess(),
     ]);
 
     await prefetchJobSitePicker();
@@ -35,15 +37,17 @@ const JobIdPage = async ({ params }: JobIdPageProps) => {
           manifest={manifest}
           canNavigateSite={canNavigateSite}
           canNavigateEstimate={canNavigateEstimate}
+          canCreateSite={canCreateSite}
         />
       </HydrationBoundary>
     );
   }
 
   await requireAuth(routes.jobs.detail(id));
-  const [canNavigateSite, canNavigateEstimate] = await Promise.all([
+  const [canNavigateSite, canNavigateEstimate, canCreateSite] = await Promise.all([
     resolveSiteDetailLinkAccess(),
     resolveEstimateDetailLinkAccess(),
+    resolveSiteCreateAccess(),
   ]);
 
   await prefetchJobSitePicker();
@@ -56,6 +60,7 @@ const JobIdPage = async ({ params }: JobIdPageProps) => {
         manifest={manifest}
         canNavigateSite={canNavigateSite}
         canNavigateEstimate={canNavigateEstimate}
+        canCreateSite={canCreateSite}
       />
     </HydrationBoundary>
   );

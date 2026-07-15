@@ -27,6 +27,7 @@ _Operations backbone forks **resolved** (2026-06-27). Optional: [J3 phase weight
 | [09-migration-notes.md](../planning/09-migration-notes.md) | DBML / migration order |
 | [11-categories-scope-model.md](../planning/11-categories-scope-model.md) | Category roots replace catalog `system` |
 | [12-master-detail-chrome.md](../planning/12-master-detail-chrome.md) | Shared toolbar + create navigation (2026-07-01) |
+| [15-job-costing-and-change-orders.md](../planning/15-job-costing-and-change-orders.md) | Job budget/committed/actual/margin layers; re-budget vs. CO; CO ↔ BOM ↔ scope phase reconciliation (2026-07-14) |
 
 ## Domain files
 
@@ -41,12 +42,20 @@ _Operations backbone forks **resolved** (2026-06-27). Optional: [J3 phase weight
 | [catalog.md](./catalog.md) | Parts, items, categories, labor phases |
 | [procurement.md](./procurement.md) | Requisitions, POs, receipts, inventory |
 | [billing.md](./billing.md) | Billable staging, invoices, SOV |
+| [costing.md](./costing.md) | Job budget/committed/actual/margin, re-budget |
 | [cross-cutting.md](./cross-cutting.md) | Notes, attachments, seeding, progressive setup |
 
 ## All decisions (by date)
 
 | Decision | File | Date | Status |
 |----------|------|------|--------|
+| Estimate win → job handoff (W0–W7 thick 5b) | [estimate.md](./estimate.md#decision-estimate-win--job-handoff-2026-07-14) | 2026-07-15 | **locked** (5b) |
+| Job costing — budget/committed/actual/margin layers | [costing.md](./costing.md#decision-job-costing--budget--committed--actual--margin-layers-2026-07-14) | 2026-07-14 | **locked** ([45](../tasks/45-job-costing-and-change-order-reconciliation.md); planning only, no schema yet) |
+| `material_receipt_line.unit_cost` — material actual cost | [costing.md](./costing.md#decision-material_receipt_lineunit_cost--material-actual-cost-2026-07-14) | 2026-07-14 | **locked** ([45](../tasks/45-job-costing-and-change-order-reconciliation.md)) |
+| Re-budget — `job_line_cost_revision`, distinct from change order | [costing.md](./costing.md#decision-re-budget--job_line_cost_revision-distinct-from-change-order-2026-07-14) | 2026-07-14 | **locked** ([45](../tasks/45-job-costing-and-change-order-reconciliation.md)) |
+| Change order — BOM and scope phase reconciliation | [job.md](./job.md#decision-change-order--bom-and-scope-phase-reconciliation-2026-07-14) | 2026-07-14 | **locked** ([45](../tasks/45-job-costing-and-change-order-reconciliation.md); amends [2026-06-17](./job.md#decision-change-orders--unified-job_line-ledger-2026-06-17)) |
+| Condition labor only + Y4 discontinued inherit (L1–L12) | [estimate.md](./estimate.md#decision-condition-labor-only--y4-discontinued-2026-07-14) | 2026-07-14 | **locked** ([43](../tasks/43-estimate-labor-only.md); amends W2b) |
+| Line Items zone tree popover — checkable tree + exclusive qty (Z1–Z8) | [estimate.md](./estimate.md#decision-line-items-zone-tree-popover--exclusive-qty-2026-07-14) | 2026-07-14 | **locked** ([42c](../tasks/42c-estimate-line-zone-tree-popover.md); amends G3/X3) |
 | Detail tab persistence — URL `?tab=` + availability fallback | [general.md](./general.md#decision-detail-tab-persistence--url-tab--availability-fallback-2026-07-13) | 2026-07-13 | **locked** ([40](../tasks/40-detail-tab-persistence.md)) |
 | Spec participation removed — namespace narrowing + part-row presence (V1–V8) | [catalog.md](./catalog.md) | 2026-07-12 | **locked** ([37ai](../tasks/37ai-spec-participation-removal.md)) |
 | Spec threshold presets + numeric bucket ranges (A1–T10) | [catalog.md](./catalog.md) | 2026-07-12 | **superseded** by [41ao](../tasks/41ao-drop-threshold-presets.md) (numeric ranges retained) |
@@ -77,7 +86,8 @@ _Operations backbone forks **resolved** (2026-06-27). Optional: [J3 phase weight
 | Estimate scope — checkbox site tree, item-first lines | [estimate.md](./estimate.md) | 2026-06-30 | **locked** |
 | Site scopes & zones — category root instances | [site.md](./site.md) | 2026-06-30 | **locked** |
 | Site geography UI — systems & areas tree table | [site.md](./site.md) | 2026-06-30 | **locked** |
-| Estimate site anchor — gate lines, immutable after create | [estimate.md](./estimate.md) | 2026-06-30 | **locked** |
+| Estimate site anchor — gate lines, immutable after create | [estimate.md](./estimate.md) | 2026-06-30 | **superseded** 2026-07-14 ([warn-and-clear](./estimate.md#decision-estimate--job-site-anchor--warn-and-clear-not-immutable-2026-07-14)) |
+| Estimate + job site anchor — warn-and-clear, not immutable | [estimate.md](./estimate.md), [job.md](./job.md) | 2026-07-14 | **locked** |
 | System specs + part compatibility (C2) | [catalog.md](./catalog.md) | 2026-06-27 | **locked** |
 | Location confidence — defer v1 (E4) | [estimate.md](./estimate.md) | 2026-06-27 | **locked** |
 | Estimate — estimate_system tabs | [estimate.md](./estimate.md) | 2026-06-27 | **locked** |

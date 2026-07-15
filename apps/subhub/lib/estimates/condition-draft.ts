@@ -3,6 +3,11 @@ import type {
   EstimateConditionSpecFormRow,
 } from "@/components/estimates/estimate-line-tree";
 import { findConditionPath } from "@/components/estimates/estimate-line-selection";
+import {
+  resolveEffectiveBucketSpecs,
+  resolveEffectiveIncludeDiscontinued,
+  resolveEffectiveLaborOnly,
+} from "@/lib/estimates/estimate-bucket-specs-form";
 
 export type ConditionDraftSpec = {
   spec_def_id: string;
@@ -15,6 +20,9 @@ export type ConditionDraftSpec = {
 export type ConditionDraft = {
   complexity_factor_id?: string | null;
   include_discontinued?: boolean;
+  include_discontinued_explicit?: boolean;
+  labor_only?: boolean;
+  labor_only_explicit?: boolean;
   labor_phases_explicit?: boolean;
   included_labor_phases?: string[];
   specs?: ConditionDraftSpec[];
@@ -31,6 +39,12 @@ export const toConditionDraftSpecs = (
     value_number_max: spec.value_number_max ?? null,
   }));
 
+/**
+ * Draft for parts picker / line preview.
+ * Specs are the **effective** form merge (root→leaf) so unsaved ancestor
+ * C-panel edits apply under child conditions — not leaf-own + ancestor DB.
+ * labor_only / include_discontinued are **effective** Y4 resolves (43).
+ */
 export const buildConditionDraft = (
   conditions: EstimateConditionFormRow[],
   conditionId: string,
@@ -52,12 +66,15 @@ export const buildConditionDraft = (
 
   return {
     complexity_factor_id: node.complexity_factor_id,
-    include_discontinued: node.include_discontinued,
+    include_discontinued: resolveEffectiveIncludeDiscontinued(conditions, path),
+    include_discontinued_explicit: node.include_discontinued_explicit,
+    labor_only: resolveEffectiveLaborOnly(conditions, path),
+    labor_only_explicit: node.labor_only_explicit,
     labor_phases_explicit: node.labor_phases_explicit,
     included_labor_phases: node.included_labor_phases.map(
       (phase) => phase.labor_phase_id,
     ),
-    specs: toConditionDraftSpecs(node.specs),
+    specs: toConditionDraftSpecs(resolveEffectiveBucketSpecs(conditions, path)),
   };
 };
 
@@ -91,6 +108,7 @@ export const fingerprintConditionDraft = (
 
   return JSON.stringify({
     i: draft.include_discontinued ?? false,
+    l: draft.labor_only ?? false,
     s: fingerprintConditionDraftSpecs(draft.specs),
   });
 };

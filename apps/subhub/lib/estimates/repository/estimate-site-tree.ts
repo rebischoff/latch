@@ -1,4 +1,6 @@
-import type { Pool } from "pg";
+import { ValidationError } from "@latch/contracts";
+import { withPermissionDb } from "@latch/pg-session";
+import type { Pool, PoolClient } from "pg";
 
 import { scopePanelDefs } from "@/lib/catalog/repository/item-effective-specs";
 
@@ -9,18 +11,21 @@ import type {
   EstimateScopeSpecRow,
 } from "../descriptors/estimate-detail";
 
-type SiteScopeBaseRow = {
-  id: string;
-  name: string;
-  root_item_id: string;
-};
-
 type SiteZoneFlatRow = {
   id: string;
   name: string;
   parent_zone_id: string | null;
-  site_scope_id: string | null;
+  root_item_id: string | null;
   sort_order: number;
+};
+
+export type EstimateRootSiteZoneRow = {
+  id: string;
+  name: string;
+  root_item_id: string;
+  root_item_name: string | null;
+  sort_order: number;
+  status: string;
 };
 
 const nestZones = (
@@ -45,45 +50,138 @@ export const loadEstimateSiteTree = async (
   pool: Pool,
   siteId: string,
 ): Promise<EstimateSiteTreeRow> => {
-  const [scopesResult, zonesResult] = await Promise.all([
-    pool.query<SiteScopeBaseRow>(
-      `SELECT ss.id, ss.name, ss.root_item_id
-       FROM site_scope ss
-       WHERE ss.site_id = $1
-       ORDER BY ss.sort_order ASC, ss.id ASC`,
-      [siteId],
-    ),
-    pool.query<SiteZoneFlatRow>(
-      `SELECT id, site_scope_id, parent_zone_id, name, sort_order
-       FROM site_zone
-       WHERE site_id = $1
-       ORDER BY sort_order ASC, id ASC`,
-      [siteId],
-    ),
-  ]);
+  const zonesResult = await pool.query<SiteZoneFlatRow>(
+    `SELECT id, parent_zone_id, root_item_id, name, sort_order
+     FROM site_zone
+     WHERE site_id = $1
+     ORDER BY sort_order ASC, id ASC`,
+    [siteId],
+  );
 
-  const zonesByScopeId = new Map<string | null, SiteZoneFlatRow[]>();
-  for (const zone of zonesResult.rows) {
-    const key = zone.site_scope_id ?? null;
-    const bucket = zonesByScopeId.get(key) ?? [];
-    bucket.push(zone);
-    zonesByScopeId.set(key, bucket);
-  }
+  const roots = zonesResult.rows.filter(
+    (row) => row.parent_zone_id === null && row.root_item_id !== null,
+  );
+  const children = zonesResult.rows.filter((row) => row.parent_zone_id !== null);
 
-  const scopes: EstimateSiteScopeTreeRow[] = scopesResult.rows.map((scope) => ({
-    id: scope.id,
-    name: scope.name,
-    root_item_id: scope.root_item_id,
-    zones: nestZones(zonesByScopeId.get(scope.id) ?? [], null),
+  const scopes: EstimateSiteScopeTreeRow[] = roots.map((root) => ({
+    id: root.id,
+    name: root.name,
+    root_item_id: root.root_item_id as string,
+    zones: nestZones(children, root.id),
   }));
 
   return {
     scopes,
     spec_templates: await loadSpecTemplatesForRoots(
       pool,
-      scopesResult.rows.map((scope) => scope.root_item_id),
+      roots.map((root) => root.root_item_id as string),
     ),
   };
+};
+
+/** Root-level site_zone rows for estimate Add-root picker (42b). */
+export const listRootSiteZonesForSite = async (
+  pool: Pool,
+  siteId: string,
+): Promise<EstimateRootSiteZoneRow[]> => {
+  const result = await pool.query<EstimateRootSiteZoneRow>(
+    `SELECT
+       sz.id,
+       sz.name,
+       sz.root_item_id,
+       i.name AS root_item_name,
+       sz.sort_order,
+       sz.status
+     FROM site_zone sz
+     LEFT JOIN item i ON i.id = sz.root_item_id
+     WHERE sz.site_id = $1
+       AND sz.parent_zone_id IS NULL
+       AND sz.root_item_id IS NOT NULL
+     ORDER BY sz.sort_order ASC, sz.name ASC, sz.id ASC`,
+    [siteId],
+  );
+  return result.rows;
+};
+
+const assertCatalogRootItem = async (
+  client: PoolClient,
+  rootItemId: string,
+): Promise<string> => {
+  const result = await client.query<{ id: string; name: string; parent_id: string | null }>(
+    `SELECT id, name, parent_id FROM item WHERE id = $1`,
+    [rootItemId],
+  );
+  const row = result.rows[0];
+  if (!row) {
+    throw new ValidationError("Unknown root_item_id", {
+      field: "root_item_id",
+      code: "unknown_root_item",
+      root_item_id: rootItemId,
+    });
+  }
+  if (row.parent_id !== null) {
+    throw new ValidationError("root_item_id must be a catalog root", {
+      field: "root_item_id",
+      code: "root_not_root",
+      root_item_id: rootItemId,
+    });
+  }
+  return row.name;
+};
+
+/** Create a proposed root site_zone for estimate Add-root "New…" (42b D4). */
+export const createProposedRootSiteZone = async (
+  pool: Pool,
+  actorId: string,
+  input: { name?: string; rootItemId: string; siteId: string },
+): Promise<EstimateRootSiteZoneRow> => {
+  return withPermissionDb(pool, actorId, async (client) => {
+    const site = await client.query<{ id: string }>(
+      `SELECT id FROM site WHERE id = $1`,
+      [input.siteId],
+    );
+    if (site.rows.length === 0) {
+      throw new ValidationError("Unknown site_id", {
+        field: "site_id",
+        code: "unknown_site",
+        site_id: input.siteId,
+      });
+    }
+
+    const rootItemName = await assertCatalogRootItem(client, input.rootItemId);
+    const name = (input.name?.trim() || rootItemName).trim();
+    if (!name) {
+      throw new ValidationError("name is required", {
+        field: "name",
+        code: "required",
+      });
+    }
+
+    const sortResult = await client.query<{ max: number | null }>(
+      `SELECT MAX(sort_order) AS max
+       FROM site_zone
+       WHERE site_id = $1 AND parent_zone_id IS NULL`,
+      [input.siteId],
+    );
+    const sortOrder = (sortResult.rows[0]?.max ?? 0) + 1;
+    const id = crypto.randomUUID();
+
+    await client.query(
+      `INSERT INTO site_zone (
+         id, site_id, parent_zone_id, root_item_id, name, sort_order, status
+       ) VALUES ($1, $2, NULL, $3, $4, $5, 'proposed')`,
+      [id, input.siteId, input.rootItemId, name, sortOrder],
+    );
+
+    return {
+      id,
+      name,
+      root_item_id: input.rootItemId,
+      root_item_name: rootItemName,
+      sort_order: sortOrder,
+      status: "proposed",
+    };
+  });
 };
 
 /** Blank scope-panel rows for catalog root(s) — used by site_tree and Add scope. */

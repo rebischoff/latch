@@ -2,8 +2,12 @@ import type { Pool } from "pg";
 
 import type { JobLineItemRow } from "../descriptors/job-detail";
 
-const mapLineItemRow = (row: JobLineItemRow): JobLineItemRow => ({
+type LineQueryRow = Omit<JobLineItemRow, "phase_id">;
+
+const mapLineItemRow = (row: LineQueryRow): JobLineItemRow => ({
   ...row,
+  // `job_line.phase_id` dropped in migration 045; keep DTO field for compat.
+  phase_id: null,
   quantity: Number(row.quantity),
   unit_cost: Number(row.unit_cost),
   unit_price: Number(row.unit_price),
@@ -13,7 +17,7 @@ export const loadJobLineItems = async (
   pool: Pool,
   jobId: string,
 ): Promise<JobLineItemRow[]> => {
-  const result = await pool.query<JobLineItemRow>(
+  const result = await pool.query<LineQueryRow>(
     `SELECT
        jl.id,
        jl.line_number,
@@ -27,7 +31,6 @@ export const loadJobLineItems = async (
        jl.unit_price,
        jl.site_zone_id,
        jl.site_asset_id,
-       jl.phase_id,
        jl.item_id,
        jl.part_id,
        jl.vendor_part_id,

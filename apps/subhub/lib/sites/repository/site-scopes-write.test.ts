@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   assertNoReferencedZoneDeletes,
+  assertNoRootWithChildrenDeletes,
   flattenZoneTree,
 } from "./site-scopes-write";
 
@@ -21,7 +22,6 @@ describe("flattenZoneTree", () => {
         },
       ],
       "scope-1",
-      null,
       0,
       new Set(),
     );
@@ -29,8 +29,7 @@ describe("flattenZoneTree", () => {
     expect(flat).toHaveLength(2);
     expect(flat[0]).toMatchObject({
       name: "Floor 1",
-      site_scope_id: "scope-1",
-      parent_zone_id: null,
+      parent_zone_id: "scope-1",
       sort_order: 1,
     });
     expect(flat[1]).toMatchObject({
@@ -57,7 +56,7 @@ describe("flattenZoneTree", () => {
       };
     }
 
-    expect(() => flattenZoneTree([node], null, null, 0, new Set())).toThrow(ValidationError);
+    expect(() => flattenZoneTree([node], null, 0, new Set())).toThrow(ValidationError);
   });
 });
 
@@ -91,6 +90,48 @@ describe("assertNoReferencedZoneDeletes", () => {
 
     expect(() =>
       assertNoReferencedZoneDeletes(["zone-1"], references, "scopes"),
+    ).not.toThrow();
+  });
+});
+
+describe("assertNoRootWithChildrenDeletes", () => {
+  it("blocks deleting a root that still has children", () => {
+    expect(() =>
+      assertNoRootWithChildrenDeletes(
+        ["root-1"],
+        [
+          { id: "root-1", parent_zone_id: null, root_item_id: "item-1" },
+          { id: "zone-1", parent_zone_id: "root-1", root_item_id: null },
+        ],
+      ),
+    ).toThrow(ConflictError);
+
+    try {
+      assertNoRootWithChildrenDeletes(
+        ["root-1"],
+        [
+          { id: "root-1", parent_zone_id: null, root_item_id: "item-1" },
+          { id: "zone-1", parent_zone_id: "root-1", root_item_id: null },
+        ],
+      );
+    } catch (error) {
+      expect(isConflictError(error)).toBe(true);
+      expect(error).toMatchObject({
+        details: {
+          field: "scopes",
+          code: "has_children",
+          id: "root-1",
+        },
+      });
+    }
+  });
+
+  it("allows deleting an empty root", () => {
+    expect(() =>
+      assertNoRootWithChildrenDeletes(
+        ["root-1"],
+        [{ id: "root-1", parent_zone_id: null, root_item_id: "item-1" }],
+      ),
     ).not.toThrow();
   });
 });

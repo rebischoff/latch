@@ -20,6 +20,8 @@
 6. [11-categories-scope-model.md](./11-categories-scope-model.md) — **locked 2026-06-30** — category roots replace catalog `system` ([37a](../tasks/37a-category-scope-decision-dbml-migration.md))
 7. [12-master-detail-chrome.md](./12-master-detail-chrome.md) — **planning 2026-07-01** — shared toolbar + create navigation ([38](../tasks/38-master-detail-chrome.md)); categories create fix follows Layer 2
 8. [13-toolbar-chrome.md](./13-toolbar-chrome.md) — **planning 2026-07-02** — slot-based toolbar communication ([39](../tasks/39-toolbar-chrome-slots.md)); category New child parent id
+9. [14-site-estimate-zone-unification.md](./14-site-estimate-zone-unification.md) — **§§ 1–3 shipped (42a/42b/42c, 2026-07-14)**; asset-level history deferred
+10. [15-job-costing-and-change-orders.md](./15-job-costing-and-change-orders.md) — **locked 2026-07-14** — budget/committed/actual/margin layers; re-budget vs. CO; CO ↔ BOM ↔ scope phase reconciliation ([45](../tasks/45-job-costing-and-change-order-reconciliation.md))
 
 ## Locked at a glance (2026-06-27)
 
@@ -32,6 +34,7 @@
 | Job | Job = work order v1; scope group → scope item → scope phase → progress entries |
 | Procurement | `vendor_part.lead_time_days`; ad-hoc parts on PO allowed |
 | Billing | Three layers unchanged; SOV allocations extend to scope groups/phases |
+| Job costing | Budget/committed/actual(material)/margin are DAL rollups; `job_line_cost_revision` re-budget event; CO approve reconciles `job_line_part` + `scope_phase` |
 
 ## Related
 

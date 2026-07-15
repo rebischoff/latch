@@ -13,11 +13,16 @@ type EstimateConditionBaseRow = {
   complexity_factor_id: string | null;
   id: string;
   include_discontinued: boolean;
+  include_discontinued_explicit: boolean;
+  labor_only: boolean;
+  labor_only_explicit: boolean;
   labor_phases_explicit: boolean;
   name: string;
   parent_condition_id: string | null;
   root_item_id: string | null;
   root_item_name: string | null;
+  site_zone_id: string | null;
+  site_zone_name: string | null;
   sort_order: number;
 };
 
@@ -246,11 +251,16 @@ const buildConditionTree = (
       id: row.id,
       name: row.name,
       parent_condition_id: row.parent_condition_id,
+      site_zone_id: row.site_zone_id,
+      site_zone_name: row.site_zone_name,
       root_item_id: row.root_item_id,
       root_item_name: row.root_item_name,
       sort_order: row.sort_order,
       complexity_factor_id: row.complexity_factor_id,
       include_discontinued: row.include_discontinued,
+      include_discontinued_explicit: row.include_discontinued_explicit,
+      labor_only: row.labor_only,
+      labor_only_explicit: row.labor_only_explicit,
       labor_phases_explicit: row.labor_phases_explicit,
       included_labor_phases: laborByConditionId.get(row.id) ?? [],
       specs: specsByConditionId.get(row.id) ?? [],
@@ -288,14 +298,20 @@ export const loadEstimateConditions = async (
        ec.id,
        ec.name,
        ec.parent_condition_id,
-       ec.root_item_id,
+       ec.site_zone_id,
+       sz.name AS site_zone_name,
+       sz.root_item_id,
        i.name AS root_item_name,
        ec.sort_order,
        ec.complexity_factor_id,
        ec.include_discontinued,
+       ec.include_discontinued_explicit,
+       ec.labor_only,
+       ec.labor_only_explicit,
        ec.labor_phases_explicit
      FROM estimate_condition ec
-     LEFT JOIN item i ON i.id = ec.root_item_id
+     LEFT JOIN site_zone sz ON sz.id = ec.site_zone_id
+     LEFT JOIN item i ON i.id = sz.root_item_id
      WHERE ec.estimate_id = $1
      ORDER BY ec.sort_order ASC, ec.id ASC`,
     [estimateId],

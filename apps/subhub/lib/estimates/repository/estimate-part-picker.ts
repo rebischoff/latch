@@ -55,14 +55,74 @@ export const loadConditionIncludeDiscontinued = async (
   client: Pool | PoolClient,
   estimateConditionId: string,
 ): Promise<boolean> => {
-  const result = await client.query<{ include_discontinued: boolean }>(
-    `SELECT include_discontinued
-     FROM estimate_condition
-     WHERE id = $1`,
-    [estimateConditionId],
-  );
+  // Y4 leaf→root: first include_discontinued_explicit wins (43 L12).
+  let current: string | null = estimateConditionId;
+  const seen = new Set<string>();
 
-  return result.rows[0]?.include_discontinued ?? false;
+  while (current) {
+    if (seen.has(current)) {
+      break;
+    }
+    seen.add(current);
+
+    const result = await client.query<{
+      include_discontinued: boolean;
+      include_discontinued_explicit: boolean;
+      parent_condition_id: string | null;
+    }>(
+      `SELECT include_discontinued, include_discontinued_explicit, parent_condition_id
+       FROM estimate_condition
+       WHERE id = $1`,
+      [current],
+    );
+    const row = result.rows[0];
+    if (!row) {
+      return false;
+    }
+    if (row.include_discontinued_explicit) {
+      return row.include_discontinued;
+    }
+    current = row.parent_condition_id;
+  }
+
+  return false;
+};
+
+export const loadConditionLaborOnly = async (
+  client: Pool | PoolClient,
+  estimateConditionId: string,
+): Promise<boolean> => {
+  // Y4 leaf→root: first labor_only_explicit wins (43 L11); else false.
+  let current: string | null = estimateConditionId;
+  const seen = new Set<string>();
+
+  while (current) {
+    if (seen.has(current)) {
+      break;
+    }
+    seen.add(current);
+
+    const result = await client.query<{
+      labor_only: boolean;
+      labor_only_explicit: boolean;
+      parent_condition_id: string | null;
+    }>(
+      `SELECT labor_only, labor_only_explicit, parent_condition_id
+       FROM estimate_condition
+       WHERE id = $1`,
+      [current],
+    );
+    const row = result.rows[0];
+    if (!row) {
+      return false;
+    }
+    if (row.labor_only_explicit) {
+      return row.labor_only;
+    }
+    current = row.parent_condition_id;
+  }
+
+  return false;
 };
 
 const resolveIncludeDiscontinued = (

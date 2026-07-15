@@ -232,19 +232,21 @@ export const loadItemDeleteBlockers = async (
     });
   }
 
-  if (await tableExists(pool, "site_scope")) {
+  if (await tableExists(pool, "site_zone")) {
     const countResult = await pool.query<{ count: number }>(
       `SELECT COUNT(*)::int AS count
-       FROM site_scope
-       WHERE root_item_id = $1`,
+       FROM site_zone
+       WHERE root_item_id = $1
+         AND parent_zone_id IS NULL`,
       [categoryId],
     );
     const count = countResult.rows[0]?.count ?? 0;
     if (count > 0) {
       const sampleResult = await pool.query<{ label: string }>(
         `SELECT name AS label
-         FROM site_scope
+         FROM site_zone
          WHERE root_item_id = $1
+           AND parent_zone_id IS NULL
          ORDER BY name ASC, id ASC
          LIMIT $2`,
         [categoryId, DELETE_BLOCKER_SAMPLE_LIMIT],

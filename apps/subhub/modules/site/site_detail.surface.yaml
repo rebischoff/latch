@@ -16,7 +16,6 @@ tables:
   - site
   - site_contact
   - site_contact_relation
-  - site_scope
   - site_zone
 
 fields:
@@ -35,5 +34,5 @@ fields:
     # logical — DAL maps to site_contact; see docs/child-collections.md
     columns: []
   - id: scopes
-    # logical — DAL maps to site_scope + nested site_zone
+    # logical — DAL maps to site_zone tree (roots + nested children)
     columns: []

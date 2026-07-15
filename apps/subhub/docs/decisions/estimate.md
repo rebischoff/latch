@@ -13,6 +13,287 @@
 > **Amended (2026-07-11):** [dual line locks + live preview](#decision-estimate-dual-line-locks-and-live-preview-2026-07-11) — replace `lock` enum with `sales_locked` + `material_locked`; server line-preview before Save ([37aa](../tasks/37aa-estimate-line-live-preview.md)).
 >
 > **Walkthrough (2026-07-13):** [line item pick + costing walkthrough](#decision-line-item-pick--costing-walkthrough-2026-07-13) — confirm triggers; walk calc steps.
+>
+> **Amended (2026-07-14):** [estimate root condition → site zone link](#decision-estimate-root-condition--site-zone-link-2026-07-14) — amends [X2](#x2--scope--condition-tree-ownership--ui-locked-2026-07-09) and [G1](#g1--site-geography-stays-place-only-locked); hybrid FK + Line Items zone icon ([42b](../tasks/42b-estimate-condition-zone-link.md)).
+>
+> **Amended (2026-07-14):** [Line Items zone tree popover](#decision-line-items-zone-tree-popover--exclusive-qty-2026-07-14) — amends [G3](#g3--line-quantity-and-zone-allocations-locked) / [X3](#x3--qty-unset-vs-db-locked-2026-07-09); checkable root-scoped tree + exclusive qty ↔ places ([42c](../tasks/42c-estimate-line-zone-tree-popover.md)).
+>
+> **Amended (2026-07-14):** [condition labor only + Y4 discontinued](#decision-condition-labor-only--y4-discontinued-2026-07-14) — commercial **Labor only** mode; amends [W2b](#w2b--discontinued-part-filter-locked-2026-07-13) bare toggle → Y4 inherit ([43](../tasks/43-estimate-labor-only.md)).
+>
+> **Amended (2026-07-14):** [site anchor — warn-and-clear](#decision-estimate--job-site-anchor--warn-and-clear-not-immutable-2026-07-14) — supersedes [immutable after create](#decision-estimate-site-anchor--gate-lines-immutable-after-create-2026-06-30); site stays writable; change with structure confirms + clears ([44](../tasks/44-site-anchor-warn-and-clear.md)).
+>
+> **Locked (2026-07-15):** [estimate win → job handoff](#decision-estimate-win--job-handoff-2026-07-14) — wave **5b** thick (W0–W7).
+
+---
+
+### Decision: estimate win → job handoff (2026-07-14)
+
+**Status:** **Locked** (W0–W7, 2026-07-15) — wave **5b** [task 46](../tasks/46-estimate-win-lose-job-copy.md). **Amends:** [one won estimate → one job](#decision-estimate--estimate_system-tabs-system-specs-no-section-v1-2026-06-27) (E3) — now **one job per catalog scope** on the won estimate (S2a). **Companion:** [`job.md`](./job.md). **Keeps:** G4 unresolved pool as a later job-side filter (not a second inventory).
+
+**W0–W7** locked (thick 5b).
+
+#### W1a — Cardinality (locked — amended for S2a)
+
+**Choice:**
+
+| Link | Rule |
+|------|------|
+| **Job → estimate** | At most one source quote — nullable `job.estimate_id` |
+| **Job → catalog scope** | When won from an estimate: **required** `job.catalog_scope_item_id` → catalog root `item` (`node_type = scope`) |
+| **Estimate → jobs** | **One live job per catalog scope** on that estimate — `UNIQUE (estimate_id, catalog_scope_item_id)` where `estimate_id IS NOT NULL` |
+| **Manual jobs** | `estimate_id` null allowed; `catalog_scope_item_id` optional until product requires it for manual create |
+
+**Win:** If the estimate’s lines span **N** distinct catalog scopes (resolved from each line’s `item_id` → scope root), create **N jobs**, partition lines by catalog scope, copy stakeholders onto **each** job.
+
+**Supersedes earlier W1a draft** that said “at most one live job per estimate.”
+
+**Rationale:** A job is one engagement for **one catalog scope** on one site. Multi-system quotes become parallel jobs, not one mixed job.
+
+#### W1b — Job deleted after win (locked — B1, amended for S2a)
+
+**Choice: B1** — Estimate stays `won`. Recreate is allowed for any **(estimate, catalog scope)** pair that has **no** live job — same win-copy path for that slice only (new job id). While a live job already exists for that pair, recreate is a structured conflict.
+
+Deleting one of N jobs does **not** reset estimate status; other catalog-scope jobs may remain.
+
+**Rejected — B2 / B3:** unchanged from prior lock.
+
+**Rationale:** Hard delete can orphan one catalog-scope slice; recreate that slice without rewriting lifecycle or wiping sibling jobs.
+
+#### W0 — Vocabulary for win / job handoff (locked — Option A)
+
+| Term | Meaning | Do not use for |
+|------|---------|----------------|
+| **Catalog scope** | Catalog root `item` (`node_type = scope`) — trade/system template (e.g. Fire Alarm) | Estimate commercial trees; site places; job organizers |
+| **Condition** | Estimate-owned commercial node (instance of work). Forest under an estimate; roots + children are all conditions (Y1) | Catalog roots; site zones |
+| **Site zone** | Place node on the site tree (root or leaf) | Commercial instances |
+| **Job group** | Optional `job_scope_group` production organizer **inside one job** (J4) — zone/phase/SOV buckets; **not** how FA vs Intrusion are split (that is separate jobs under S2a) | Catalog scope; estimate condition; a second job |
+| **Phase** | `scope_phase` progress step on a `job_line` (install / program / test) | Bare “scope” |
+| **Job Scope tab** (UI label only) | Shell tab for sold **lines** — industry “what’s in contract”; not catalog scope | Implying `job_scope_group` or catalog roots |
+
+**Rejected — Option B** (retire “scope” in product UI → “system root” / “work group”): larger rename than 5b needs.  
+**Rejected — Option C** (root = “scope instance”, children = “condition”): fights Y1 (every commercial node is a condition).
+
+**Rationale:** Pins overloaded “scope” before win-copy and job UI; matches locked condition-only tree.
+
+#### W1c — Other estimates on the same site (locked — C1-guided)
+
+**Choice: C1-guided** — A second estimate on the same site **may** win into **its own job(s)** (separate engagement; still one job per catalog scope per W1a/S2a). When the site already has an **active** job, Win must **confirm intent** before creating new job(s):
+
+| Choice in confirm | Outcome |
+|-------------------|---------|
+| **New job(s)** | Proceed — win → job(s) for estimate B’s catalog scope(s) |
+| **Add-on to existing job** | Do **not** win B — steer to open the existing job / change-order path (5d); Estimate B stays un-won |
+
+No automatic “same condition / same catalog scope” matching in 5b — soft copy in the confirm only.
+
+**Rejected — C1-raw / C2 / C3:** unchanged.
+
+**Rationale:** Site ≠ single engagement; add-ons belong on the live job (CO), not a second won quote — but only when the operator says so.
+
+#### W2 — Copy matrix (locked — M2)
+
+**Choice: M2** — On win (per catalog-scope job):
+
+| Copy | Target |
+|------|--------|
+| `site_id`, title prefill, `estimate_id`, `catalog_scope_item_id` | `job` |
+| `estimate_party` | `job_party` on **each** created job |
+| Each in-scope `estimate_line` | `job_line` — commercial snapshot (qty, unit, costs/prices, item/part/vendor, description); `source = estimate`; `estimate_line_id` provenance |
+| `estimate_line_spec` (when rows exist) | `job_line_spec` |
+
+**Not in W2:** condition forest, condition specs, zone allocation rules (**W3–W4**), BOM / phase seed (**later**).
+
+**Rejected — M1** (no line specs): loses sold spec snapshot.  
+**Rejected — M3** (copy condition forest *instead of* line snapshots): superseded by amended **W3** — we now copy **both** lines (M2) **and** editable job conditions.
+
+#### W3 — Conditions + costing on the job (locked — amends prior “estimate-only”)
+
+**Supersedes** the earlier W3 draft (“do not copy the condition forest”).
+
+**Choice: C2 with sold-price freeze (C4-leaning for contract $):**
+
+| Layer | Behavior |
+|-------|----------|
+| **Conditions** | **Copy** the estimate condition forest (+ specs, labor phases, labor-only / discontinued knobs, complexity) onto **job-owned** tables (`job_condition*` — names TBD in 5b). Engineer may edit the same knobs as the estimator. Edits do **not** write back to the estimate. |
+| **Lines** | Still copied (W2/M2). Each line keeps provenance (`estimate_line_id`) and a **sold snapshot** at win: at least **`sold_unit_price`** (and preferably **`sold_unit_cost`** + cost buckets: material / labor / freight / incidental) — immutable from engineering. |
+| **Live costing** | Engineer can recalc **current** `unit_material` / `unit_labor` / `unit_freight` / `unit_incidental` / `unit_cost` (and targets) when conditions, items, parts, or line set change — same commercial engine as estimate. |
+| **Sold price** | **`unit_price` (contract)** is **not** changed by engineering recalc or knob tweaks. Compare UI: **sold** vs **current cost** (and margin vs sold price) so decisions are informed. Changing customer price / sold qty that affects contract $ → **change order** (task 45), not silent edit. |
+| **Add / delete lines** | Allowed for engineering to meet project scope; **current** freight / incidental / labor / material buckets **recompute**. New/removed lines that change **contract** sell $ still go through **CO** (or land as $0 / non-billable until CO) — exact billable rule can be a 5b sub-step; default: engineering may add lines for cost/BOM/progress, but **sold unit_price on new lines is 0** until a CO sets contract price (or product picks “must CO before add”). |
+| **Unresolved (G4)** | Part-open / unplaced lines are where knobs + PN resolution matter most; sold+placed lines still show dual costing but don’t rewrite sold price. |
+
+**Rejected — C1** (no job conditions): blocks engineer from estimator knobs and live cost comparison.  
+**Rejected — C3** (read-only conditions): not enough to tweak toward exact parts.  
+**Rejected — silent sell-price recalc:** sold price is the contract ceiling for margin decisions.
+
+**Rationale:** Ops need estimate-like costing and configuration after win, while the customer-facing sold price stays stable unless a CO says otherwise. Dual numbers (sold vs current cost) make “is this still okay?” visible.
+
+**Schema implication (5b):** `job_condition` (+ spec / labor_phase children) + sold snapshot columns (or side table) on `job_line`; wire shared costing against job conditions.
+
+#### W4 — Zone / place handoff (locked)
+
+**Choice:** Place mappings **continue from estimate → job** and stay **editable on the job** (reassign, assign unplaced qty, clear places, etc.).
+
+| Rule | Detail |
+|------|--------|
+| **Carry forward** | Each `estimate_line_allocation` copies onto the corresponding `job_line` as a job-side place row |
+| **Schema** | New **`job_line_allocation`** (`job_line_id`, `site_zone_id`, `quantity`) — same idea as estimate allocations. Do **not** rely on a single `job_line.site_zone_id` as the only place truth (that column may stay for display/compat or be filled only when exactly one allocation) |
+| **Unplaced** | Lines with **no** estimate allocations → job line with **no** allocations (unassigned qty = line qty); PM assigns places on the job later |
+| **Edit** | Job owns place assignment after win — changing places does **not** write back to the estimate |
+| **5b UI** | Win **copies** allocations. Full job place-edit UI may ship with Scope / G4; 5b must land **DAL + schema** so edit is not blocked on another migration |
+
+**Rejected — leave multi-place as null on win:** loses estimate door/zone schedule.  
+**Rejected — explode to many job lines on win:** makes later reassignment awkward; sold line identity should stay one row when the quote was one line.  
+**Rejected — estimate-only places forever:** job field work needs local edits.
+
+**Rationale:** Optional zone mapping on the estimate is real sold intent; ops must refine places without reopening the quote.
+
+#### W5 — BOM / phase seed (locked — P1)
+
+**Choice: P1** — On win (per created `job_line`), seed when possible:
+
+| Seed | When |
+|------|------|
+| **`scope_phase`** | Line has `item_id` and a resolvable job/estimate condition for labor inclusion — use existing seed helper (37n): one phase per included labor phase; `planned_qty` = line qty |
+| **`job_line_part` (BOM)** | Line has `part_id` — create BOM row(s) from sold part (same path as manual/CO add). Labor-only / no-part lines get **no** BOM row |
+
+Re-seed policy: skip if the line already has phase/BOM rows (idempotent recreate per W1b).
+
+**Rejected — P2** (phases only): leaves buy-list empty after win.  
+**Rejected — P3** (neither): Field + procurement start blank for no good reason.
+
+**Rationale:** Win should leave the job ready for progress tracking and material demand, not only a price ledger.
+
+#### W6 — Win / lose UI & API (locked — action buttons)
+
+**Choice: dedicated Surface actions**, not status dropdown + Save.
+
+| Topic | Rule |
+|-------|------|
+| **Chrome** | Estimate detail toolbar: **Win** / **Lose** (manifest `win` / `lose`). Status remains a **read-only** lifecycle tag — not a PATCH field |
+| **Lose** | Confirm → `status = lost`; no job created |
+| **Win** | Confirm → run handoff (W1–W5). If site has an **active** job → **W1c** intent dialog before commit |
+| **When** | Win from `draft` or `sent`. Lose when not already `won` (and grant allows) |
+| **After win (1 job)** | Navigate to that job |
+| **After win (N jobs)** | **U1** — navigate to the first created job; toast/message lists the other jobs (links) |
+| **Recreate (W1b)** | When `won` and a catalog-scope slice has no live job: toolbar **Create job** (same copy path for missing slice(s)) — not “set status to won again” |
+| **Save** | Draft edits only — **never** creates jobs or flips win/lose |
+
+**Rejected — status Select + Save:** hides job-creating side effects; conflates `write` with `win`/`lose`; blocks clean recreate.
+
+**API:** `POST` (or Surface action routes) for `win` / `lose` / recreate — re-resolve manifest per action.
+
+**Rationale:** Win is a transaction with N jobs, conditions, allocations, BOM, phases, and sold snapshots — it must be an explicit action.
+
+#### W7 — 5b scope boundary (locked — thick)
+
+**Choice: thick 5b** — Win handoff **plus** engineer-facing job UI for the locked model, not schema-only.
+
+| In **5b** | Deferred |
+|-----------|----------|
+| Win / Lose / Create-job actions + API | CO Surfaces (**5d**) |
+| Multi-job by catalog scope + `catalog_scope_item_id` + UNIQUE | Procurement UI beyond BOM seed |
+| Copy lines, line specs, sold snapshots | Full Field progress entry UI (**5c**) |
+| Copy **editable** `job_condition*` + knobs UI (estimate-parity C panel) | Billing tab |
+| Live costing + **sold vs current cost** compare on job Scope | |
+| `job_line_allocation` copy + **place-edit** on job | |
+| BOM + phase seed (W5 P1) | |
+| Job Scope: lines grid with add/delete (engineering; sold price rules per W3) | |
+| Docs: retire **37h**; STATUS → this task | |
+
+**Rationale:** Leaving knobs/costing/places schema-only would strand the W3/W4 product intent; thick 5b proves the engineer loop after win.
+
+---
+
+**Session status:** **W0–W7 locked.** Ready to author wave **5b** implementation task.
+
+---
+
+### Decision: estimate + job site anchor — warn-and-clear, not immutable (2026-07-14)
+
+**Status:** **Locked** (task 44). **Supersedes:** [estimate site anchor — immutable after create (2026-06-30)](#decision-estimate-site-anchor--gate-lines-immutable-after-create-2026-06-30). **Parity:** same product rules on [`job.md`](./job.md#decision-estimate--job-site-anchor--warn-and-clear-not-immutable-2026-07-14) (job file mirrors; this block is canonical). **Keeps:** Line Items gated on non-empty `site_id`; `LinkedSelectInput` chrome; stakeholders not cleared on site change.
+
+**Problem:** Hard-locking `site_id` after first save forced a text-only “goto” control and blocked legitimate re-anchoring (wrong site picked, site merged, etc.). Zone-linked conditions and allocations make a silent site move unsafe — but a **warn + clear structure** is enough; immutability is not required.
+
+**Choice (S1–S9):**
+
+| # | Topic | Choice |
+|---|--------|--------|
+| **S1** | **Writable** | `profile.site_id` stays writable on create **and** edit whenever `profile` write is granted and the record is editable (not lifecycle-frozen). |
+| **S2** | **No hard lock for lines** | Presence or absence of conditions / line items does **not** freeze site. |
+| **S3** | **Warn-and-clear** | Changing `site_id` (A→B or clear) when the form has any `conditions` or `line_items` → confirm: *Changing site clears conditions and line items. Save to persist.* Cancel keeps prior site. |
+| **S4** | **Empty switch** | Site empty→first pick, or A→B with empty structure → no confirm; just switch. |
+| **S5** | **Client clear** | On confirm: clear `conditions`, `line_items`, and `site_tree` in form state (`shouldDirty`); do **not** clear stakeholders. |
+| **S6** | **Persist** | Save / PATCH persists new `site_id` and empty (or replaced) collections. Revert restores prior site + structure. |
+| **S7** | **DAL** | Allow PATCH `profile.site_id` change. In the same transaction when site changes: **replace** conditions + line items from body (client sends cleared arrays) **or** auto-delete existing conditions/lines if collections omitted — prefer **require empty collections in body when site changes** and reject with structured conflict if non-empty body would keep old-zone FKs. Drop `site_id_immutable`. |
+| **S8** | **Still frozen** | Estimate: `won` / `lost` / `expired` (existing lifecycle freeze). Job: `cancelled`; **`estimate_id` set** → site frozen (won-estimate anchor). |
+| **S9** | **Chrome** | Always `LinkedSelectInput` when writable; when frozen (S8), read-only label + open icon (not a fake disabled select unless product later prefers it). Gate Line Items tab on non-empty `site_id` (unchanged). |
+
+**Rationale:** Quote/job structure is property-scoped; moving site invalidates `site_zone` FKs on conditions and allocations. Confirm + clear preserves that invariant without blocking site correction. Job and estimate share one rule so operators learn one pattern.
+
+**Spec:** [`estimate.md`](../surface-specs/estimate.md) · [`job.md`](../surface-specs/job.md) · **Task:** [44](../tasks/44-site-anchor-warn-and-clear.md).
+
+---
+
+### Decision: condition labor only + Y4 discontinued (2026-07-14)
+
+**Status:** **Locked** (task 43). **Amends:** [W2b](#w2b--discontinued-part-filter-locked-2026-07-13) — `include_discontinued` gains Y4 inherit/override (was bare per-node checkbox). **Extends:** [Y3](#y3--knobs-on-every-condition-locked) / [Y4](#y4--c-inherit-checkbox-locked) commercial knobs; [dual locks + live preview](#decision-estimate-dual-line-locks-and-live-preview-2026-07-11) apply rules when labor-only. **Keeps:** condition-only commercial tree; catalog emergent labor-only items ([D2](./catalog.md#decision-unified-item-tree--merge-category--item-node-anchored-estimate-lines-2026-07-05)); win→job schema deferred.
+
+**Problem:** Estimators often quote install labor when material is furnished by others (OFCI / GC-supplied). Catalog already has emergent labor-only *items*; this is a **condition** commercial mode for material-bearing items — labor as if installing, no material/freight/incidental, no part to order. Conditions (not lines) own the mode. Bare `include_discontinued` also lacked Y4 inherit.
+
+| # | Topic | Choice |
+|---|-------|--------|
+| **L1** | **Naming** | Store `labor_only`. UI **Labor only** (helper: material by others — labor still calculated). |
+| **L2** | **Scope** | On every `estimate_condition`. Children use **Y4** inherit/override (same affordance as complexity / phases / specs) — not a lone Discontinued-style switch. Effective value for a line = leaf→root walk. |
+| **L3** | **Costing** | When effective labor-only: `unit_material` / `unit_freight` / `unit_incidental` **forced 0** (including flat add-ons); `unit_labor` = normal item phases × complexity; `unit_cost` / `unit_price_target` = labor (+ labor markup) only; `sales_locked` respected. |
+| **L4** | **Part identity** | Clear `part_id` / `vendor_part_id`; clear `material_locked`; **skip** material resolver. `item_id` remains required (labor source). |
+| **L5** | **Specs / discontinued UI** | Stay **visible/editable** while labor-only (no part/cost effect until labor-only off). |
+| **L6** | **Toggle off** | Re-resolve / normal recalc (same as other config knobs). |
+| **L7** | **LI columns** | When **selected** condition is effectively labor-only: **hide** Part, Unit, Material, Freight, Incidental, and material-lock. Keep Item, zone, Qty, Labor, Target, Cost, sales lock, Sell. |
+| **L8** | **Catalog** | Orthogonal — no item-picker restriction. Condition flag forces M/F/I = 0 even on material-bearing items. |
+| **L9** | **Win → job** | **Defer** job schema/flag. **Intent:** labor-only lines are still job scope with the same completion lifecycle; difference is **nothing to order** (no required part), not “non-job.” |
+| **L10** | **Line-level** | **No.** Mixed buy vs labor-only = sibling conditions (that is what conditions are for). |
+| **L11** | **Storage + C UI** | `labor_only_explicit boolean NOT NULL DEFAULT false` + `labor_only boolean NOT NULL DEFAULT false` (phase-style). Root: always own (no override checkbox). Child: override checkbox → unchecked inherit (read-only effective); checked edit own `labor_only`. |
+| **L12** | **Discontinued Y4** | **Same task.** Migrate `include_discontinued` to `include_discontinued_explicit` + `include_discontinued` with the same Y4 UI. Backfill: `include_discontinued_explicit = true` on existing rows (preserve current per-node values). |
+
+**Task:** [43](../tasks/43-estimate-labor-only.md) · **Spec:** [`estimate.md`](../surface-specs/estimate.md)
+
+---
+
+### Decision: Line Items zone tree popover — exclusive qty (2026-07-14)
+
+**Status:** **Locked** (task 42c). **Amends:** [G3](#g3--line-quantity-and-zone-allocations-locked) and [X3](#x3--qty-unset-vs-db-locked-2026-07-09) — places **or** bare commercial qty, never both (no unallocated remainder while allocations exist). **Keeps:** `estimate_line_allocation` table; condition-root subtree scoping ([D8](#decision-estimate-root-condition--site-zone-link-2026-07-14)); `qty_manual` flag (repurposed for exclusive modes).
+
+| # | Topic | Choice |
+|---|-------|--------|
+| **Z1** | **Picker chrome** | Zone icon opens a **Popover/Modal** with Ant `Tree` `checkable` showing the line’s condition-**root** site-zone subtree only (42b D8). Not the whole site; not the estimate condition tree. |
+| **Z2** | **Cascade check** | Check/uncheck a **parent** → check/uncheck **all descendants**. Partial child selection → parent **indeterminate**. |
+| **Z3** | **Persist leaf-only** | `estimate_line_allocation` rows exist **only for leaf zones** (nodes with no children in the site subtree). Parents are cascade / bulk-qty UI only — never stored as allocation rows. |
+| **Z4** | **Qty on tree** | Every node shows an `InputNumber` when relevant: **leaves** = per-place qty (default **1** when checked); **parents** = bulk control — setting parent qty writes the same **N** onto every **checked** descendant leaf (overwrites mixed values). Unchecked leaves have no editable qty (or disabled). |
+| **Z5** | **Exclusive SoT** | **Tree mode** (`qty_manual = false`): any tree edit sets `quantity = sum(leaf allocation qtys)`, or **1** when no allocations. **Qty mode** (`qty_manual = true`): user edits line **Qty** → **uncheck entire tree** and clear `allocations[]`. Places **or** bare commercial qty — **not both**. Drops G3’s “qty 50 + 40 placed + 10 unallocated.” |
+| **Z6** | **Switch edges** | Tree → type Qty: wipe allocations, keep typed qty, `qty_manual = true`. Qty mode → check any zone: `qty_manual = false`, rebuild from tree, qty follows sum. Optional “Sync qty to places” is unnecessary. |
+| **Z7** | **Apply / form** | Draft edits stay local until **Apply**; then write `allocations[]` + `quantity` + `qty_manual` into RHF (`shouldDirty`). Estimate PATCH unchanged (replace allocations). |
+| **Z8** | **Legacy data** | On open/Apply (or load normalize): if `qty_manual = true` **and** allocations exist → **prefer qty** (clear allocations). If allocations reference a **non-leaf** `site_zone_id` → **drop** those rows. No DB migration required for v1. |
+
+**Task:** [42c](../tasks/42c-estimate-line-zone-tree-popover.md) · **Planning:** [14-site-estimate-zone-unification.md](../planning/14-site-estimate-zone-unification.md) · **Spec:** [`estimate.md`](../surface-specs/estimate.md)
+
+---
+
+### Decision: estimate root condition ↔ site zone link (2026-07-14)
+
+**Status:** **Locked** (task 42b). **Amends:** [X2](#x2--scope--condition-tree-ownership--ui-locked-2026-07-09) (Add root no longer catalog-root-only; roots link a site base zone) and [G1](#g1--site-geography-stays-place-only-locked) (site geography remains place-only, but root conditions now **reference** a root `site_zone` for zone-picker scoping). **Keeps:** commercial tree estimate-owned; condition **name** independently editable; site CRUD remains on site Scopes & zones.
+
+| # | Topic | Choice |
+|---|-------|--------|
+| D1 | **Root FK** | `estimate_condition.site_zone_id` — **NOT NULL on root conditions** (`parent_condition_id IS NULL`); must reference a **root-level** `site_zone` (`parent_zone_id IS NULL`) belonging to the estimate's `site_id`; **NULL on children** (nest via `parent_condition_id` only). |
+| D2 | **Drop stored `root_item_id`** | Remove `estimate_condition.root_item_id`. Derive catalog root by joining linked root's `site_zone.root_item_id` at read time. |
+| D3 | **Name handling (hybrid)** | `estimate_condition.name` stays independently editable, prefilled from the linked zone's `name` at creation only. Renaming the site zone later does **not** rewrite an already-created condition's name. |
+| D4 | **Add root UI** | "Add root" lists the site's existing root `site_zone` rows **and** a "New…" option that creates a `proposed` root `site_zone` inline (name + root-item picker) before attaching the condition. |
+| D5 | **Duplicate roots** | `UNIQUE (estimate_id, site_zone_id)` where `parent_condition_id IS NULL` — one root condition per base zone per estimate. |
+| D6 | **Delete guard** | Block delete of a `site_zone` while any `estimate_condition.site_zone_id` references it, **regardless of estimate status**. |
+| D7 | **Zone icon (Line Items)** | Remove the **Places** column/label; add an icon-only zone control immediately before the **Qty** column. Same `estimate_line_allocation` model. |
+| D8 | **Zone icon source** | Picker options = the line's condition's **root** zone subtree only (walk up to root condition → flatten that root `site_zone`'s descendants) — not the whole site tree. |
+
+**Task:** [42b](../tasks/42b-estimate-condition-zone-link.md) · **Planning:** [14-site-estimate-zone-unification.md](../planning/14-site-estimate-zone-unification.md) §§ 2–3 · **Prerequisite:** [42a](../tasks/42a-site-zone-tree-unification.md) · **Spec:** [`estimate.md`](../surface-specs/estimate.md)
 
 ---
 
@@ -68,6 +349,8 @@ Save re-runs the same `recalcProductLine` path for persistence. Preview is best-
 | **(d)** | Author on **`part_detail` profile** only — no part list badge/filter v1 |
 
 **Task:** [41ak](../tasks/41ak-part-discontinued-filter.md) — **complete** (2026-07-13).
+
+> **Amended (2026-07-14):** Bare per-node checkbox → **Y4 inherit/override** via `include_discontinued_explicit` + value — see [L12](#decision-condition-labor-only--y4-discontinued-2026-07-14) / [43](../tasks/43-estimate-labor-only.md). Filter semantics (a)–(d) unchanged.
 
 ---
 
@@ -189,6 +472,8 @@ On **root** conditions: no ancestry — checkbox hidden / N/A; controls always o
 
 **Phases detail:** unchecked = inherit; checked + empty multi-select = explicit “no phases” (distinct from inherit).
 
+**Boolean knobs (2026-07-14):** `labor_only` and `include_discontinued` use the same override checkbox + phase-style `*_explicit` sentinel — see [L11–L12](#decision-condition-labor-only--y4-discontinued-2026-07-14).
+
 #### Y5 — S panel (locked)
 
 **Choice:** **S** is a condition forest only.
@@ -227,7 +512,9 @@ On **root** conditions: no ancestry — checkbox hidden / N/A; controls always o
 
 #### G1 — Site geography stays place-only (locked)
 
-**Choice:** Keep **site-owned** `site_scope` / `site_zone` tree **as-is** for where work takes place. Zones may be deep (building → section → door). Estimate does **not** move this tree onto the quote. Site geography CRUD remains on site **Scopes & zones**.
+**Choice:** Keep **site-owned** `site_zone` tree (unified, [42a](../tasks/42a-site-zone-tree-unification.md)) for where work takes place. Zones may be deep (building → section → door). Estimate does **not** move this tree onto the quote. Site geography CRUD remains on site **Scopes & zones**.
+
+**Amended (2026-07-14):** Root `estimate_condition` rows **reference** a root `site_zone` via hybrid FK ([D1–D8](#decision-estimate-root-condition--site-zone-link-2026-07-14)) so Line Items zone pickers have an unambiguous subtree — geography ownership and CRUD stay on the site.
 
 **Rationale:** Fine install places belong on the site registry across estimates/jobs; commercial overrides are quote-local.
 
@@ -266,15 +553,17 @@ Bldg B Intrusion          ← scope instance (same catalog root, second instance
 | **Line `quantity`** | Commercial qty (what you sell / cost against) |
 | **Allocations** | Optional rows: site zone × qty-per-zone (default **1** when a location is added; editable per location) |
 | **Allocated** | `sum(allocation.qty)` |
-| **Unallocated** | `quantity − allocated` when `quantity` is set — **derived**, not a substitute for the qty column |
+| **Unallocated** | ~~`quantity − allocated` when `quantity` is set~~ — **removed** by [Z5](#decision-line-items-zone-tree-popover--exclusive-qty-2026-07-14) |
 
-**Qty modes:**
+**Qty modes (historical G3 — amended 2026-07-14 by [Z1–Z8](#decision-line-items-zone-tree-popover--exclusive-qty-2026-07-14)):**
 
 1. **Qty unset** (new line / never manually typed) — allocating **drives** quantity (`quantity` follows `allocated`).
-2. **Qty manually set** — quantity is source of truth; invariant **`quantity ≥ allocated`**; unallocated = remainder for job/ops.
-3. **Optional sync** — user may re-enable “keep qty in sync with locations” (behaves like unset again).
+2. **Qty manually set** — ~~quantity is source of truth; invariant `quantity ≥ allocated`; unallocated = remainder~~ → **exclusive:** typing Qty clears all allocations (`qty_manual = true`).
+3. **Optional sync** — ~~re-enable allocate-driven~~ → unnecessary; tree Apply always syncs qty when used.
 
-**Invalid:** `allocated > quantity` (e.g. qty 0 with 43 allocated) — **over-allocated**, not negative unallocated. Block or confirm bump of quantity; never persist over-allocate on save/send/win.
+**Invalid (historical):** `allocated > quantity` — superseded by exclusive modes (allocations cleared in qty mode; tree mode sets qty = allocated sum).
+
+**Amended (2026-07-14):** Exclusive tree ↔ qty ([Z5–Z6](#decision-line-items-zone-tree-popover--exclusive-qty-2026-07-14)); leaf-only allocations ([Z3](#decision-line-items-zone-tree-popover--exclusive-qty-2026-07-14)).
 
 **Rationale:** Supports ROM (qty only), door schedules (allocations), and qty > 1 per location without exploding lines.
 
@@ -318,7 +607,7 @@ Work **one sub-decision at a time.** **G5a–G5e locked** — implement via [37x
 | `estimate_line_allocation` | `estimate_line_id`, `site_zone_id`, `quantity` (default 1) — G3 places |
 | `estimate_line.site_zone_id` | **Drop** after migrating any existing single-zone rows into one allocation row |
 
-**Invariant:** `sum(allocation.quantity) ≤ line.quantity` when quantity is set (G3). Condition must belong to the line’s `estimate_scope_id`.
+**Invariant (historical):** `sum(allocation.quantity) ≤ line.quantity` when quantity is set (G3). **Amended by Z5:** exclusive modes — qty mode has no allocations; tree mode sets qty = allocated sum. Condition must belong to the line’s estimate (post-37y: `estimate_condition_id`).
 
 **Rationale:** Matches multi-place / qty-per-zone / unallocated; severs dual-duty `site_zone_id`.
 
@@ -388,10 +677,12 @@ Work **one at a time** while implementing [37x](../tasks/37x-estimate-conditions
 
 | Topic | Rule |
 |-------|------|
-| **Ownership** | Commercial tree is **owned by the estimate** — nothing to do with site `site_scope` / `site_zone` for structure. No require/link `site_scope_id` when adding a scope instance. |
-| **Schema** | `estimate_scope`: `root_item_id` + editable **`name`** (prefill from root, like site). `estimate_condition`: nested under scope (`parent_condition_id`), editable **`name`**. `site_scope_id` unused for quoting (nullable / ignore). |
-| **Tree UX** | Same pattern as site [`SiteScopesZonesTree`](../../components/sites/SiteScopesZonesTree.tsx): Add scope ▾ (catalog root), add child under selection, select node, delete (X1 block if lines). |
-| **Label edit** | **Not** inline in the tree (unlike site). Selected node’s **name** edits in the adjacent **C** form together with labor complexity (conditions only), phases, and specs. |
+| **Ownership** | Commercial tree is **owned by the estimate**. Structure (parent/child conditions, names, complexity, specs) is estimate-local. |
+| **Schema** | `estimate_condition`: forest under estimate; roots link a site base zone (`site_zone_id`); children nest via `parent_condition_id`; editable **`name`**. Catalog `root_item_id` is **derived** from the linked zone (not stored). |
+| **Tree UX** | Same pattern as site [`SiteScopesZonesTree`](../../components/sites/SiteScopesZonesTree.tsx): Add root ▾ (pick existing root `site_zone` or **New…** proposed zone), add child under selection, select node, delete (X1 block if lines). |
+| **Label edit** | **Not** inline in the tree (unlike site). Selected node’s **name** edits in the adjacent **C** form together with labor complexity, phases, and specs. |
+
+**Amended (2026-07-14):** Add root binds a root `site_zone` ([D1–D8](#decision-estimate-root-condition--site-zone-link-2026-07-14)); commercial tree remains estimate-owned — the FK scopes Line Items zone options, it does not make the site tree the commercial structure.
 
 **Rationale:** Parity with site tree chrome for add/select/delete; keep C as the single edit surface for node identity + commercial knobs.
 
@@ -407,10 +698,12 @@ Work **one at a time** while implementing [37x](../tasks/37x-estimate-conditions
 | Mode | Behavior |
 |------|----------|
 | **`qty_manual = false`** | Allocations **drive** `quantity` (`quantity` follows `sum(allocation.qty)`, or 1 when no allocations) |
-| **User edits quantity** | Set `qty_manual = true`; thereafter invariant **`quantity ≥ allocated`** (G3) |
-| **Optional sync on** | Clear `qty_manual` (back to allocate-driven) |
+| **User edits quantity** | Set `qty_manual = true`; **clear `allocations[]`** ([Z5–Z6](#decision-line-items-zone-tree-popover--exclusive-qty-2026-07-14)) — ~~thereafter invariant `quantity ≥ allocated` (G3)~~ |
+| **Optional sync on** | ~~Clear `qty_manual`~~ — superseded: checking any zone sets `qty_manual = false` and rebuilds from tree |
 
-**Rationale:** Persists G3 across reload without nullable qty in every cost path.
+**Amended (2026-07-14):** Exclusive modes via [Z1–Z8](#decision-line-items-zone-tree-popover--exclusive-qty-2026-07-14).
+
+**Rationale:** Persists allocate-driven vs manual qty across reload without nullable qty in every cost path.
 
 ##### X4 — 37x delivery scope (locked 2026-07-09)
 
@@ -627,16 +920,18 @@ If **LI** row drag is implemented, **optional:** drop on **S** scope/zone node r
 
 ### Decision: estimate site anchor — gate lines, immutable after create (2026-06-30)
 
-**Choice:**
+**Status:** **Superseded (2026-07-14)** by [warn-and-clear, not immutable](#decision-estimate--job-site-anchor--warn-and-clear-not-immutable-2026-07-14) ([44](../tasks/44-site-anchor-warn-and-clear.md)). Historical choice below retained for audit.
+
+**Choice (historical):**
 
 - `profile.site_id` required on create; **not patchable** after estimate row exists.
 - Line Items tab + **Scope** tab gated on non-empty `site_id` in form (create) or loaded DTO (edit).
 - **Create only:** changing `site_id` clears `scopes` and `line_items` client-side.
 - Site field: `LinkedSelectInput` pattern (`… Add site` → `/sites/new` + picker return).
 
-**Rationale:** Quote scope is property-scoped; moving site after save invalidates scope buckets and line placement. Stricter than job site change (estimate always anchored at create).
+**Rationale (historical):** Quote scope is property-scoped; moving site after save invalidates scope buckets and line placement. Stricter than job site change (estimate always anchored at create).
 
-**Spec:** [`estimate.md`](../surface-specs/estimate.md) · **Task:** [33](../tasks/33-estimate-site-anchor.md).
+**Spec:** [`estimate.md`](../surface-specs/estimate.md) · **Task:** [33](../tasks/33-estimate-site-anchor.md) (shipped immutability; **44** replaces).
 
 ---
 

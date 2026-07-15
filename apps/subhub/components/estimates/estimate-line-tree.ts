@@ -62,18 +62,24 @@ export type EstimateConditionFormRow = {
   conditions: EstimateConditionFormRow[];
   id: string;
   include_discontinued: boolean;
+  include_discontinued_explicit: boolean;
   included_labor_phases: EstimateConditionLaborPhaseFormRow[];
+  labor_only: boolean;
+  labor_only_explicit: boolean;
   labor_phases_explicit: boolean;
   name: string;
   parent_condition_id: string | null;
-  /** Required on roots; null on children (resolve from tree root in UI). */
+  /** Derived from linked root site_zone — null on children. */
   root_item_id: string | null;
   root_item_name?: string | null;
+  /** Required on roots; null on children (42b). */
+  site_zone_id: string | null;
+  site_zone_name?: string | null;
   sort_order: number;
   specs: EstimateConditionSpecFormRow[];
 };
 
-/** Site geography for Places… picker (not commercial tree). */
+/** Site geography for line zone allocations (not commercial tree). */
 export type EstimateSiteZoneTreeFormRow = {
   id: string;
   name: string;
@@ -151,11 +157,16 @@ export const makeCondition = (
   id: crypto.randomUUID(),
   name: "New condition",
   parent_condition_id: null,
+  site_zone_id: null,
+  site_zone_name: null,
   root_item_id: null,
   root_item_name: null,
   sort_order: 1,
   complexity_factor_id: null,
   include_discontinued: false,
+  include_discontinued_explicit: false,
+  labor_only: false,
+  labor_only_explicit: false,
   labor_phases_explicit: false,
   included_labor_phases: [],
   specs: [],
@@ -337,6 +348,36 @@ export const rootItemIdForCondition = (
   }
 
   return path[0]?.root_item_id ?? null;
+};
+
+/** Resolve root site_zone_id for a condition (walk to forest root). */
+export const rootSiteZoneIdForCondition = (
+  conditionId: string,
+  conditions: EstimateConditionFormRow[],
+): string | null => {
+  const findPath = (
+    rows: EstimateConditionFormRow[],
+    path: EstimateConditionFormRow[] = [],
+  ): EstimateConditionFormRow[] | null => {
+    for (const row of rows) {
+      const next = [...path, row];
+      if (row.id === conditionId) {
+        return next;
+      }
+      const nested = findPath(row.conditions, next);
+      if (nested) {
+        return nested;
+      }
+    }
+    return null;
+  };
+
+  const path = findPath(conditions);
+  if (!path || path.length === 0) {
+    return null;
+  }
+
+  return path[0]?.site_zone_id ?? null;
 };
 
 export const rootItemIdForParentKey = (

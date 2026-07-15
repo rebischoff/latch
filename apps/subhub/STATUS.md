@@ -1,15 +1,15 @@
 # STATUS — SubHub
 
 > App-local quarterback. Platform pointer: [`../../STATUS.md`](../../STATUS.md).
-> Updated: 2026-07-13.
+> Updated: 2026-07-15.
 
 - **Package:** `@latch/subhub` · **Port:** 3003
 - **Docs:** [`docs/README.md`](./docs/README.md) · **Tasks:** [`docs/tasks/01-task-index.md`](./docs/tasks/01-task-index.md)
-- **State:** Migrations **037**–**071** applied on dev. Tasks **29–36**, **37a**–**37z**, **37aa**, **37ac**, **37ad**, **37ae**–**37aj**, **38**, **39**, **40**, **41ak**, **41al**, **41am**, **41an**, **41ao** complete; **41ab** superseded/reverted by **37ac**.
+- **State:** Migrations **037**–**075** applied on dev. Tasks **29–36**, **37a**–**37z**, **37aa**, **37ac**, **37ad**, **37ae**–**37aj**, **38**, **39**, **40**, **41ak**, **41al**, **41am**, **41an**, **41ao**, **42a**, **42b**, **42c**, **43**, **44**, **45** complete; **41ab** superseded/reverted by **37ac**; **37h cancelled** (obsolete).
 
 ## Right now — do this next
 
-**[37h — Job FK renames](./docs/tasks/37a-category-scope-decision-dbml-migration.md)** — rename job FKs per category-scope decision.
+**[46 — Estimate win / lose → job copy (5b thick)](./docs/tasks/46-estimate-win-lose-job-copy.md)** — DBML/migration first (`catalog_scope_item_id`, `job_condition*`, `job_line_allocation`, sold snapshots); then Win DAL + engineer Scope UI.
 
 ## Blockers
 
@@ -20,11 +20,22 @@
 | Slice | Focus | State |
 |-------|--------|-------|
 | **03 — Catalog** | Spec participation removal (namespace narrowing + wildcard matching) | **37ai complete** (2026-07-12) |
-| **04 — Estimates** | Part Select UX + discontinued filter (walkthrough W1/W2a/W2b) | **41ak complete** (2026-07-13) |
-| **05 — Jobs** | 5b+ / 37h | Unresolved pool (G4) later; FK renames next |
+| **04 — Estimates** | Site warn-and-clear (S1–S9) | **44 complete** (2026-07-14) |
+| **05 — Jobs** | **5b** ([46](./docs/tasks/46-estimate-win-lose-job-copy.md)) | Decisions W0–W7 locked; implement next; **37h cancelled**; **45** ready for 5d later |
 
 ## Recently completed
 
+- **46 decisions locked + task authored — estimate win → job (5b thick)** — one job per catalog scope (S2a); editable job conditions + sold vs current costing; place allocations; Win/Lose actions; 37h cancelled as obsolete (2026-07-15).
+- **45 — Job costing + CO/BOM/scope-phase reconciliation** — migration **075** (`job_line_cost_revision`, CO/BOM/`scope_phase` DDL, conditional `material_receipt_line.unit_cost`); re-budget DAL; `approveChangeOrder` C4–C6; job cost summary on Overview; CO approve guard alert for 5d (2026-07-14).
+- **45 decisions locked — job costing + CO/BOM/scope-phase reconciliation** — budget/committed/actual(material)/margin as DAL rollups; new `job_line_cost_revision` re-budget entity distinct from change orders; CO `deduct`/`revise` reconciles `job_line_part` + `scope_phase` (block on committed material, warn + carry-forward completed qty); new `decisions/costing.md`; task authored (2026-07-14).
+- **44 — Site warn-and-clear** — drop `site_id` immutability; confirm clears conditions/lines; estimate + job `LinkedSelect` parity; estimate requires empty collections on site change; job auto-clears lines (2026-07-14).
+- **44 decisions locked (S1–S9) — site warn-and-clear** — supersedes immutable-after-create; confirm clears conditions/lines; job parity + `estimate_id` freeze; task authored (2026-07-14).
+- **43 — Condition labor only + Y4 discontinued** — `labor_only` commercial mode; force M/F/I = 0; clear part; Y4 UI for labor-only + discontinued; migration **074** (2026-07-14).
+- **43 decisions locked (L1–L12) — labor only + Y4 discontinued** — condition commercial mode; force M/F/I = 0; clear part; Y4 storage/UI; same-task discontinued inherit fix; task authored (2026-07-14).
+- **42c — Line Items zone tree popover** — checkable root-scoped tree; cascade + parent bulk qty; leaf-only allocations; exclusive qty ↔ places (amends G3/X3); no schema (2026-07-14).
+- **42b — Estimate condition ↔ site zone link** — root conditions FK to root `site_zone`; drop stored `root_item_id`; Add-root zone picker + New…; Line Items zone icon before Qty; migration **073** (2026-07-14).
+- **42a — Site zone tree unification** — collapsed `site_scope`+`site_zone` into one self-referencing `site_zone` tree; migration **072**; root-delete blocked while children exist (2026-07-14).
+- **42a/42b authored — site/estimate zone unification** — unify `site_scope`+`site_zone` into one tree; bind estimate root conditions to a root site zone (hybrid link); Line Items zone icon replaces Places column; asset-level history explicitly deferred (2026-07-14).
 - **41ao — Drop threshold presets + number popover** — removed preset tables/FKs/UI/matcher; shared `SpecNumberValuePopover`; migration **071** (2026-07-13).
 - **41am — Part boolean spec Select** — Part Specs tab boolean defs use `Select` (True / False, allowClear → omit row / N/A) instead of Checkbox (2026-07-13).
 - **41an — Candela Low/High** — enum options Low|High only; rewrote seeds 062/065/066/068; forward migration 070; strobe parts seeded Low (2026-07-13).
@@ -61,12 +72,25 @@
 
 ## Pointers
 
+- [Task 46 — estimate win → job (5b thick)](./docs/tasks/46-estimate-win-lose-job-copy.md) ← **next**
+- [Decision — estimate win → job handoff (W0–W7)](./docs/decisions/estimate.md#decision-estimate-win--job-handoff-2026-07-14)
+- [Task 45 — job costing + CO/BOM/scope-phase reconciliation](./docs/tasks/45-job-costing-and-change-order-reconciliation.md) ✅
+- [Decision — job costing layers + re-budget](./docs/decisions/costing.md)
+- [Decision — CO/BOM/scope_phase reconciliation](./docs/decisions/job.md#decision-change-order--bom-and-scope-phase-reconciliation-2026-07-14)
+- [Task 37h — job FK renames](./docs/tasks/37a-category-scope-decision-dbml-migration.md) — **cancelled** (obsolete)
+- [Task 44 — site warn-and-clear](./docs/tasks/44-site-anchor-warn-and-clear.md) ✅
+- [Decision — site warn-and-clear (S1–S9)](./docs/decisions/estimate.md#decision-estimate--job-site-anchor--warn-and-clear-not-immutable-2026-07-14)
+- [Task 43 — labor only + Y4 discontinued](./docs/tasks/43-estimate-labor-only.md) ✅
+- [Decision — labor only (L1–L12)](./docs/decisions/estimate.md#decision-condition-labor-only--y4-discontinued-2026-07-14)
+- [Task 42c — zone tree popover](./docs/tasks/42c-estimate-line-zone-tree-popover.md) ✅
+- [Task 42b — estimate condition zone link](./docs/tasks/42b-estimate-condition-zone-link.md) ✅
+- [Task 42a — site zone tree unification](./docs/tasks/42a-site-zone-tree-unification.md) ✅
+- [Planning — site/estimate zone unification](./docs/planning/14-site-estimate-zone-unification.md)
 - [Task 41ao — drop threshold presets](./docs/tasks/41ao-drop-threshold-presets.md) ✅
 - [Task 41am — part boolean spec Select](./docs/tasks/41am-part-boolean-spec-select.md) ✅
 - [Task 41al — boolean spec Select (C panel)](./docs/tasks/41al-estimate-boolean-spec-select.md) ✅
 - [Task 41ak — part discontinued filter](./docs/tasks/41ak-part-discontinued-filter.md) ✅
 - [Decision — discontinued filter (W2b)](./docs/decisions/estimate.md#w2b--discontinued-part-filter-locked-2026-07-13)
-- [Task 37h — job FK renames](./docs/tasks/37a-category-scope-decision-dbml-migration.md) ← **next**
 - [Task 40 — detail tab persistence](./docs/tasks/40-detail-tab-persistence.md) ✅
 - [Decision — detail tab persistence](./docs/decisions/general.md#decision-detail-tab-persistence--url-tab--availability-fallback-2026-07-13)
 - [Task 37aj — Part Select + seed parity](./docs/tasks/37aj-estimate-part-select-and-seed.md) ✅

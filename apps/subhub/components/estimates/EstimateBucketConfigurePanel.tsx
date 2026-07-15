@@ -4,6 +4,7 @@ import { Checkbox, Input, Typography } from "antd";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Controller, useFormContext, useWatch } from "react-hook-form";
 
+import { EstimateConditionBooleanY4Fields } from "@/components/estimates/EstimateConditionBooleanY4Fields";
 import { EstimateScopeLaborPhaseFields } from "@/components/estimates/EstimateScopeLaborPhaseFields";
 import { EstimateScopeSpecFields } from "@/components/estimates/EstimateScopeSpecFields";
 import {
@@ -64,6 +65,9 @@ export const EstimateBucketConfigurePanel = ({
     return JSON.stringify({
       complexity_factor_id: node.complexity_factor_id,
       include_discontinued: node.include_discontinued,
+      include_discontinued_explicit: node.include_discontinued_explicit,
+      labor_only: node.labor_only,
+      labor_only_explicit: node.labor_only_explicit,
       labor_phases_explicit: node.labor_phases_explicit,
       included_labor_phases: node.included_labor_phases,
       specs: node.specs,
@@ -170,25 +174,11 @@ export const EstimateBucketConfigurePanel = ({
         disabled={disabled}
       />
 
-      <Controller
-        control={control}
-        name={conditionPathToRhf(binding.conditionPath, "include_discontinued")}
-        render={({ field: { value, onChange } }) => (
-          <FormFieldItem label="Discontinued">
-            <Checkbox
-              checked={value === true}
-              disabled={disabled || !writable}
-              onChange={(event) => {
-                onChange(event.target.checked);
-                setValue(
-                  conditionPathToRhf(binding.conditionPath, "include_discontinued"),
-                  event.target.checked,
-                  { shouldDirty: true },
-                );
-              }}
-            />
-          </FormFieldItem>
-        )}
+      <EstimateConditionBooleanY4Fields
+        binding={binding}
+        isChild={isChild}
+        writable={writable}
+        disabled={disabled}
       />
 
       <EstimateScopeSpecFields

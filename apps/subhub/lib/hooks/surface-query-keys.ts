@@ -11,6 +11,9 @@ export const estimateSitePickerKey = ["estimate", "site-picker"] as const;
 export const estimateSiteTreeKey = (siteId: string) =>
   ["estimate", "site-tree", siteId] as const;
 
+export const estimateSiteZonesPickerKey = (siteId: string) =>
+  ["estimate", "site-zones-picker", siteId] as const;
+
 export const itemRootPickerKey = ["catalog", "category-root-picker"] as const;
 
 export const partItemTreePickerKey = (searchQuery?: string) =>

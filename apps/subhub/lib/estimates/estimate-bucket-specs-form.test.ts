@@ -5,6 +5,8 @@ import {
   mergeBucketSpecLayers,
   resolveEffectiveBucketSpecs,
   resolveEffectiveComplexityFactorId,
+  resolveEffectiveIncludeDiscontinued,
+  resolveEffectiveLaborOnly,
   resolveEffectiveLaborPhases,
 } from "./estimate-bucket-specs-form";
 import type { EstimateConditionFormRow } from "@/components/estimates/estimate-line-tree";
@@ -150,6 +152,56 @@ describe("resolveEffectiveLaborPhases", () => {
     expect(resolveEffectiveLaborPhases(conditions, [0])).toEqual([
       { labor_phase_id: "p1" },
     ]);
+  });
+});
+
+describe("resolveEffectiveLaborOnly / include_discontinued", () => {
+  it("inherits from first explicit ancestor; child can override", () => {
+    const conditions = [
+      makeCondition({
+        id: "root-1",
+        labor_only_explicit: true,
+        labor_only: true,
+        include_discontinued_explicit: true,
+        include_discontinued: true,
+        conditions: [
+          makeCondition({
+            id: "c1",
+            labor_only_explicit: false,
+            labor_only: false,
+            include_discontinued_explicit: true,
+            include_discontinued: false,
+          }),
+        ],
+      }),
+    ];
+
+    expect(resolveEffectiveLaborOnly(conditions, [0])).toBe(true);
+    expect(resolveEffectiveLaborOnly(conditions, [0, 0])).toBe(true);
+    expect(resolveEffectiveIncludeDiscontinued(conditions, [0])).toBe(true);
+    expect(resolveEffectiveIncludeDiscontinued(conditions, [0, 0])).toBe(false);
+  });
+
+  it("defaults to false when no ancestor is explicit", () => {
+    const conditions = [
+      makeCondition({
+        id: "root-1",
+        labor_only_explicit: false,
+        labor_only: true,
+        include_discontinued_explicit: false,
+        include_discontinued: true,
+        conditions: [
+          makeCondition({
+            id: "c1",
+            labor_only_explicit: false,
+            include_discontinued_explicit: false,
+          }),
+        ],
+      }),
+    ];
+
+    expect(resolveEffectiveLaborOnly(conditions, [0, 0])).toBe(false);
+    expect(resolveEffectiveIncludeDiscontinued(conditions, [0, 0])).toBe(false);
   });
 });
 

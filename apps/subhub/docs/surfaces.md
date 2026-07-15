@@ -460,7 +460,7 @@ Applies to **customer, vendor, manufacturer, property_owner** detail lenses — 
 
 **Tabs (`estimate_detail`, 37y):** **General** · **Line Items** — three-panel **S** / **C** / **LI**; S = condition forest.
 
-**Prerequisite:** `site_id` on estimate (immutable after create). Site `site_zone` registry used only for line **Places…** allocations — not for commercial structure.
+**Prerequisite:** `site_id` on estimate (required; **warn-and-clear** on change — not immutable after create). Site `site_zone` registry used for root condition links + line zone allocations.
 
 **`estimate_list` columns:** `title`, `site` name, `status`, `estimate_date`
 

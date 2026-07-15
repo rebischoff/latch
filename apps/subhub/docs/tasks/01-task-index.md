@@ -117,7 +117,7 @@ flowchart TD
 | **30** | [30-backbone-surfaces-review.md](./30-backbone-surfaces-review.md) | `codegen:check` + impact matrix + schema README — **complete** (2026-06-29) |
 | **31** | [31-estimate-backbone-migrations.md](./31-estimate-backbone-migrations.md) | Estimate-minimal DDL + discussed dev seeds (`028`–`031`) — **complete** (2026-06-29) |
 | **32** | [32-estimate-wave-4e.md](./32-estimate-wave-4e.md) | Estimate `estimate_system` tabs + backbone DAL/UI — **complete** |
-| **33** | [33-estimate-site-anchor.md](./33-estimate-site-anchor.md) | Site anchor — gate lines, immutable site, Add site picker return — **complete** |
+| **33** | [33-estimate-site-anchor.md](./33-estimate-site-anchor.md) | Site anchor — gate lines, immutable site, Add site picker return — **complete** (immutability **superseded** by [44](./44-site-anchor-warn-and-clear.md)) |
 
 ---
 
@@ -272,7 +272,20 @@ flowchart LR
 | **41am** | [41am-part-boolean-spec-select.md](./41am-part-boolean-spec-select.md) | Part Specs boolean Select (True/False, allowClear → omit row) — **complete** (2026-07-13) |
 | **41an** | [41an-candela-low-high.md](./41an-candela-low-high.md) | Candela enum Low/High; rewrite seeds + migration 070; strobe parts Low — **complete** (2026-07-13) |
 | **41ao** | [41ao-drop-threshold-presets.md](./41ao-drop-threshold-presets.md) | Drop threshold presets; estimate number popover parity — **complete** (2026-07-13) |
-| **37h** | *(see 37a chain)* | Job `site_zone_id` FK renames |
+| **37h** | *(cancelled 2026-07-15)* | Job FK renames — **obsolete** (033/045). Win/copy → [46](./46-estimate-win-lose-job-copy.md) |
+
+### Site / estimate zone unification — tasks 42a–42c
+
+**Planning:** [14-site-estimate-zone-unification.md](../planning/14-site-estimate-zone-unification.md). Asset-level history explicitly deferred — not part of this series.
+
+| # | Task | Delivers |
+|---|------|----------|
+| **42a** | [42a-site-zone-tree-unification.md](./42a-site-zone-tree-unification.md) | Collapse `site_scope` + `site_zone` into one self-referencing tree; single FK on `site_asset` / `job_scope_group` — **complete** (2026-07-14) |
+| **42b** | [42b-estimate-condition-zone-link.md](./42b-estimate-condition-zone-link.md) | Estimate root condition → root `site_zone` link (hybrid); Add-root zone picker; Line Items zone icon replaces Places column — **complete** (2026-07-14) |
+| **42c** | [42c-estimate-line-zone-tree-popover.md](./42c-estimate-line-zone-tree-popover.md) | Zone icon popover: checkable root-scoped tree, cascade + parent bulk qty, leaf-only allocations; exclusive qty ↔ places (amends G3/X3) — **complete** (2026-07-14) |
+| **43** | [43-estimate-labor-only.md](./43-estimate-labor-only.md) | Condition **Labor only** (L1–L12); Y4 inherit for labor-only + discontinued; force M/F/I = 0; hide LI material columns — **complete** (2026-07-14) |
+| **44** | [44-site-anchor-warn-and-clear.md](./44-site-anchor-warn-and-clear.md) | Site warn-and-clear (S1–S9) — drop immutability; confirm clears conditions/lines; estimate + job parity — **complete** (2026-07-14) |
+| **45** | [45-job-costing-and-change-order-reconciliation.md](./45-job-costing-and-change-order-reconciliation.md) | Job costing (budget/committed/actual/margin rollups + `job_line_cost_revision` re-budget) + CO ↔ BOM ↔ scope_phase reconciliation (C1–C6) — **complete** (2026-07-14); migration **075** |
 
 ### Backbone pass (estimate finish) — tasks 29–32
 
@@ -407,7 +420,9 @@ Field detail: [`surfaces.md`](../surfaces.md). DBML: [`current.dbml`](../schema/
 | # | Task | Delivers |
 |---|------|----------|
 | 23 | [23-job-wave-5a.md](./23-job-wave-5a.md) | Job wave **5a** shell — migration, YAML, DAL, API, Overview UI — **complete** |
-| 24+ | *TBD* | 5b win/lose, 5c field, 5d change orders |
+| 45 | [45-job-costing-and-change-order-reconciliation.md](./45-job-costing-and-change-order-reconciliation.md) | CO ↔ BOM ↔ scope_phase reconciliation (C1–C6) + job costing model — **complete** (2026-07-14); 5d mounts Surfaces on approve DAL |
+| **46** | [46-estimate-win-lose-job-copy.md](./46-estimate-win-lose-job-copy.md) | Wave **5b** thick — Win/Lose/Create-job; one job per catalog scope; conditions + sold/current costing + places — **authored** (2026-07-15); implement next |
+| 24+ | *TBD* | 5c field, 5d change-order Surfaces (must follow [45](./45-job-costing-and-change-order-reconciliation.md) + [46](./46-estimate-win-lose-job-copy.md)) |
 
 ---
 

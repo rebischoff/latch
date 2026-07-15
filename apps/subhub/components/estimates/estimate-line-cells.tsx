@@ -216,6 +216,7 @@ export const QuantityCell = ({ index, writable, disabled }: CellProps) => {
             onChange={(next) => {
               onChange(next ?? 0);
               setValue(lineFieldPath(index, "qty_manual"), true, { shouldDirty: true });
+              setValue(lineFieldPath(index, "allocations"), [], { shouldDirty: true });
             }}
           />
         ) : (

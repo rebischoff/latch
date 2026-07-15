@@ -2,7 +2,7 @@
 
 import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
 import { fieldAllows, surfaceAllows, type Manifest } from "@latch/contracts";
-import { Button, Space, Table, Typography } from "antd";
+import { Button, Table, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useMemo } from "react";
 import { useFieldArray, useFormContext, useWatch } from "react-hook-form";
@@ -31,10 +31,12 @@ import {
 import {
   emptyLineItemsCopy,
   filterLinesForSelection,
+  findConditionPath,
   type EstimateBucketSelection,
 } from "@/components/estimates/estimate-line-selection";
-import { EstimateLinePlacesButton } from "@/components/estimates/EstimateLinePlacesButton";
+import { EstimateLineZoneButton } from "@/components/estimates/EstimateLineZoneButton";
 import { useFormUi } from "@/components/surface/useFormUi";
+import { resolveEffectiveLaborOnly } from "@/lib/estimates/estimate-bucket-specs-form";
 
 type FlatLineRow = {
   index: number;
@@ -76,6 +78,17 @@ export const EstimateLineFlatTable = ({
     [lineItems, selection],
   );
 
+  const laborOnly = useMemo(() => {
+    if (!selection) {
+      return false;
+    }
+    const path = findConditionPath(conditions, selection.estimateConditionId);
+    if (!path) {
+      return false;
+    }
+    return resolveEffectiveLaborOnly(conditions, path);
+  }, [conditions, selection]);
+
   const flatRows = useMemo((): FlatLineRow[] => {
     const rows: FlatLineRow[] = [];
     lineItems.forEach((line, index) => {
@@ -109,7 +122,7 @@ export const EstimateLineFlatTable = ({
   const columns = useMemo((): ColumnsType<FlatLineRow> => {
     const base: ColumnsType<FlatLineRow> = [];
 
-    if (writableLines) {
+    if (writableLines && !laborOnly) {
       base.push({
         key: "material_lock",
         title: "",
@@ -125,23 +138,24 @@ export const EstimateLineFlatTable = ({
       });
     }
 
-    base.push(
-      {
-        key: "item_id",
-        title: "Item",
-        width: LINE_TABLE_COLUMN_WIDTHS.item_id,
-        fixed: "left",
-        render: (_value, record) => (
-          <ItemCell
-            index={record.index}
-            writable={writableLines}
-            disabled={disabled}
-            conditions={conditions}
-            onPreview={onPreviewLine}
-          />
-        ),
-      },
-      {
+    base.push({
+      key: "item_id",
+      title: "Item",
+      width: LINE_TABLE_COLUMN_WIDTHS.item_id,
+      fixed: "left",
+      render: (_value, record) => (
+        <ItemCell
+          index={record.index}
+          writable={writableLines}
+          disabled={disabled}
+          conditions={conditions}
+          onPreview={onPreviewLine}
+        />
+      ),
+    });
+
+    if (!laborOnly) {
+      base.push({
         key: "part_id",
         title: "Part",
         width: LINE_TABLE_COLUMN_WIDTHS.part_id,
@@ -153,68 +167,94 @@ export const EstimateLineFlatTable = ({
             onPreview={onPreviewLine}
           />
         ),
-      },
-      {
-        key: "quantity",
-        title: "Qty",
-        width: LINE_TABLE_COLUMN_WIDTHS.quantity,
-        render: (_value, record) => (
-          <QuantityCell index={record.index} writable={writableLines} disabled={disabled} />
-        ),
-      },
-      {
-        key: "unit",
-        title: "Unit",
-        width: LINE_TABLE_COLUMN_WIDTHS.unit,
-        render: (_value, record) => (
-          <UnitCell index={record.index} writable={writableLines} disabled={disabled} />
-        ),
-      },
-      {
-        key: "unit_material",
-        title: "Material",
-        width: LINE_TABLE_COLUMN_WIDTHS.unit_material,
-        render: (_value, record) => (
-          <MoneyCell
+      });
+    }
+
+    if (writableLines) {
+      base.push({
+        key: "_zones",
+        title: "",
+        width: 40,
+        render: (_value: unknown, record: FlatLineRow) => (
+          <EstimateLineZoneButton
             index={record.index}
-            field="unit_material"
-            writable={writableLines}
             disabled={disabled}
-            readOnly
-            previewing={isPreviewing?.(record.line.id)}
+            siteTree={siteTree}
+            conditions={conditions}
+            estimateConditionId={record.line.estimate_condition_id}
           />
         ),
-      },
-      {
-        key: "unit_freight",
-        title: "Freight",
-        width: LINE_TABLE_COLUMN_WIDTHS.unit_freight,
-        render: (_value, record) => (
-          <MoneyCell
-            index={record.index}
-            field="unit_freight"
-            writable={writableLines}
-            disabled={disabled}
-            readOnly
-            previewing={isPreviewing?.(record.line.id)}
-          />
-        ),
-      },
-      {
-        key: "unit_incidental",
-        title: "Incidental",
-        width: LINE_TABLE_COLUMN_WIDTHS.unit_incidental,
-        render: (_value, record) => (
-          <MoneyCell
-            index={record.index}
-            field="unit_incidental"
-            writable={writableLines}
-            disabled={disabled}
-            readOnly
-            previewing={isPreviewing?.(record.line.id)}
-          />
-        ),
-      },
+      });
+    }
+
+    base.push({
+      key: "quantity",
+      title: "Qty",
+      width: LINE_TABLE_COLUMN_WIDTHS.quantity,
+      render: (_value, record) => (
+        <QuantityCell index={record.index} writable={writableLines} disabled={disabled} />
+      ),
+    });
+
+    if (!laborOnly) {
+      base.push(
+        {
+          key: "unit",
+          title: "Unit",
+          width: LINE_TABLE_COLUMN_WIDTHS.unit,
+          render: (_value, record) => (
+            <UnitCell index={record.index} writable={writableLines} disabled={disabled} />
+          ),
+        },
+        {
+          key: "unit_material",
+          title: "Material",
+          width: LINE_TABLE_COLUMN_WIDTHS.unit_material,
+          render: (_value, record) => (
+            <MoneyCell
+              index={record.index}
+              field="unit_material"
+              writable={writableLines}
+              disabled={disabled}
+              readOnly
+              previewing={isPreviewing?.(record.line.id)}
+            />
+          ),
+        },
+        {
+          key: "unit_freight",
+          title: "Freight",
+          width: LINE_TABLE_COLUMN_WIDTHS.unit_freight,
+          render: (_value, record) => (
+            <MoneyCell
+              index={record.index}
+              field="unit_freight"
+              writable={writableLines}
+              disabled={disabled}
+              readOnly
+              previewing={isPreviewing?.(record.line.id)}
+            />
+          ),
+        },
+        {
+          key: "unit_incidental",
+          title: "Incidental",
+          width: LINE_TABLE_COLUMN_WIDTHS.unit_incidental,
+          render: (_value, record) => (
+            <MoneyCell
+              index={record.index}
+              field="unit_incidental"
+              writable={writableLines}
+              disabled={disabled}
+              readOnly
+              previewing={isPreviewing?.(record.line.id)}
+            />
+          ),
+        },
+      );
+    }
+
+    base.push(
       {
         key: "unit_labor",
         title: "Labor",
@@ -294,29 +334,19 @@ export const EstimateLineFlatTable = ({
       base.push({
         key: "_actions",
         title: "",
-        width: LINE_TABLE_COLUMN_WIDTHS.actions + 72,
-        render: (_value, record) => (
-          <Space size={0}>
-            {writableLines ? (
-              <EstimateLinePlacesButton
-                index={record.index}
-                disabled={disabled}
-                siteTree={siteTree}
-              />
-            ) : null}
-            {allowRemoveLine ? (
-              <Button
-                type="text"
-                danger
-                size="small"
-                icon={<DeleteOutlined />}
-                aria-label="Remove line"
-                disabled={disabled}
-                onClick={() => removeLineAt(record.index)}
-              />
-            ) : null}
-          </Space>
-        ),
+        width: LINE_TABLE_COLUMN_WIDTHS.actions,
+        render: (_value, record) =>
+          allowRemoveLine ? (
+            <Button
+              type="text"
+              danger
+              size="small"
+              icon={<DeleteOutlined />}
+              aria-label="Remove line"
+              disabled={disabled}
+              onClick={() => removeLineAt(record.index)}
+            />
+          ) : null,
       });
     }
 
@@ -326,6 +356,7 @@ export const EstimateLineFlatTable = ({
     conditions,
     disabled,
     isPreviewing,
+    laborOnly,
     onPreviewLine,
     removeLineAt,
     showActionsColumn,

@@ -1,6 +1,6 @@
 # Estimates — `estimate_list` · `estimate_detail`
 
-> **Wave:** 4e · **Status:** backbone + **37y condition-only commercial tree** (2026-07-09); **37aa** live preview + dual locks (**complete** 2026-07-11) · **Implementation:** [task 32](../tasks/32-estimate-wave-4e.md) wave 4e; [task 37w](../tasks/37w-estimate-line-items-panels.md) three-panel shell; [task 37x](../tasks/37x-estimate-conditions-allocations.md) (superseded for roots); [task 37y](../tasks/37y-condition-only-commercial-tree.md) condition forest; [task 37aa](../tasks/37aa-estimate-line-live-preview.md) live preview · **Planning:** [`02-estimates.md`](../planning/02-estimates.md) · **Catalog:** [`surfaces.md`](../surfaces.md#estimate_list--estimate_detail) · **DBML:** `estimate`, `estimate_party`, `estimate_condition`, `estimate_line`, `estimate_line_allocation` · **Decisions:** [dual locks + live preview](../decisions/estimate.md#decision-estimate-dual-line-locks-and-live-preview-2026-07-11), [condition-only tree Y1–Y5](../decisions/estimate.md#decision-condition-only-commercial-tree-2026-07-09), [scope / condition / zone / qty](../decisions/estimate.md#decision-estimate-scope-condition-zone-and-line-qty-2026-07-09), [three-panel layout](../decisions/estimate.md#decision-estimate-line-items-tab--three-panel-layout-2026-07-08), [site anchor](../decisions/estimate.md#decision-estimate-site-anchor--gate-lines-immutable-after-create-2026-06-30)
+> **Wave:** 4e · **Status:** backbone + **37y condition-only commercial tree** (2026-07-09); **37aa** live preview + dual locks (**complete** 2026-07-11) · **Implementation:** [task 32](../tasks/32-estimate-wave-4e.md) wave 4e; [task 37w](../tasks/37w-estimate-line-items-panels.md) three-panel shell; [task 37x](../tasks/37x-estimate-conditions-allocations.md) (superseded for roots); [task 37y](../tasks/37y-condition-only-commercial-tree.md) condition forest; [task 37aa](../tasks/37aa-estimate-line-live-preview.md) live preview · **Planning:** [`02-estimates.md`](../planning/02-estimates.md) · **Catalog:** [`surfaces.md`](../surfaces.md#estimate_list--estimate_detail) · **DBML:** `estimate`, `estimate_party`, `estimate_condition`, `estimate_line`, `estimate_line_allocation` · **Decisions:** [dual locks + live preview](../decisions/estimate.md#decision-estimate-dual-line-locks-and-live-preview-2026-07-11), [condition-only tree Y1–Y5](../decisions/estimate.md#decision-condition-only-commercial-tree-2026-07-09), [scope / condition / zone / qty](../decisions/estimate.md#decision-estimate-scope-condition-zone-and-line-qty-2026-07-09), [three-panel layout](../decisions/estimate.md#decision-estimate-line-items-tab--three-panel-layout-2026-07-08), [site anchor warn-and-clear](../decisions/estimate.md#decision-estimate--job-site-anchor--warn-and-clear-not-immutable-2026-07-14)
 
 **Related:** Site anchor via `profile.site_id` → [`site_detail`](./site.md). Stakeholder catalog: [`job-party-relation.md`](./job-party-relation.md). Win → job copy in wave **4b** → [`job.md`](./job.md).
 
@@ -39,7 +39,7 @@
 | 10 | **`site_system_id`** | Always **`null`** on create/patch in 4e. Link/copy deferred to 4c′ / win. |
 | 11 | **Win → job** | Reconcile quote **areas** → `site_area` at win (4b). `site_asset` on site at install / `job.complete` — not from quote asset rows. |
 | 12 | **List / create / delete** | Unchanged from 4a — list columns `title`, site name, `status`, `estimate_date`; POST `title` + `site_id`; hard delete `draft` only when allowed |
-| 13 | **Site anchor (task 33)** | `profile.site_id` required on create; **writable create only** — read-only + open icon after first save; DAL rejects PATCH `site_id` change; Line Items tab + `systems` picker gated on non-empty `site_id`; create: changing site clears `systems` + `line_items` |
+| 13 | **Site anchor (task 33 → 44)** | `profile.site_id` required on create; **writable while editable** — warn-and-clear when changing site with conditions/lines; Line Items gated on non-empty `site_id`; freeze only for `won`/`lost`/`expired` ([decision](../decisions/estimate.md#decision-estimate--job-site-anchor--warn-and-clear-not-immutable-2026-07-14)) |
 
 **Supersedes (4a):** flat-only line grid; `estimate_section_id` / `site_location_id` on lines; grouped-by-place toggle keyed off `site_section` / `site_location`; proposed `site_location` writes on estimate Save.
 
@@ -94,7 +94,7 @@
 
 | Field id | Type | Writable | Columns / child table | Notes |
 |----------|------|----------|-------------------------|-------|
-| `profile` | scalar | read + write | `title`, `site_id`, `status`, `estimate_date`, `valid_until`, `source_estimate_id`, `category_id` | `status` read-only except via `win`/`lose` actions; **`site_id` writable create only** — read-only + link after first save ([decision](../decisions/estimate.md#decision-estimate-site-anchor--gate-lines-immutable-after-create-2026-06-30)) |
+| `profile` | scalar | read + write | `title`, `site_id`, `status`, `estimate_date`, `valid_until`, `source_estimate_id`, `category_id` | `status` read-only except via `win`/`lose` actions; **`site_id` writable while editable** — warn-and-clear on change with structure; freeze for `won`/`lost`/`expired` ([decision](../decisions/estimate.md#decision-estimate--job-site-anchor--warn-and-clear-not-immutable-2026-07-14)) |
 | `stakeholders` | collection | read + write | `estimate_party` | `party_id`, `relation_id`, `sort_order` |
 | `systems` | collection | read + write | `estimate_system` + nested `estimate_system_spec` | Logical Field — `columns: []` in YAML; see below |
 | `line_items` | collection | read + write | `estimate_line` | Flat persist; tree UI parents are not separate Fields |
@@ -118,7 +118,7 @@
 }
 ```
 
-Writable PATCH keys: manifest-narrowed subset of above; **`status`** not writable via PATCH body (actions only). **`site_id`** not patchable after estimate row exists — DAL `ConflictError` `{ code: "site_id_immutable" }`.
+Writable PATCH keys: manifest-narrowed subset of above; **`status`** not writable via PATCH body (actions only). **`site_id`** patchable when status allows profile edit; on change, body must clear `conditions` + `line_items` (or DAL replaces them empty) — see [warn-and-clear](../decisions/estimate.md#decision-estimate--job-site-anchor--warn-and-clear-not-immutable-2026-07-14). Reject site change when `won` / `lost` / `expired`.
 
 ### Collection — `stakeholders` element
 
@@ -265,7 +265,7 @@ Read path merges catalog `system_spec_def` rows for each `system_id` with saved 
 | Operation | Body keys | Semantics |
 |-----------|-----------|-----------|
 | `create` | `profile` (`title`, `site_id`), optional `stakeholders`, optional `systems`, optional `line_items` | Insert `estimate` status `draft`; validate `site_id` exists |
-| `patch` | manifest-narrowed `profile`, `stakeholders`, `systems`, `line_items` | Scalar profile keys; collections replace-array; **`profile.site_id` immutable** — reject change with `ConflictError` `{ code: "site_id_immutable" }` |
+| `patch` | manifest-narrowed `profile`, `stakeholders`, `systems`, `line_items` | Scalar profile keys; collections replace-array; **`profile.site_id` changeable** — on change, clear conditions + line items (S7); reject when lifecycle-frozen (`won`/`lost`/`expired`) |
 | `delete` | — | Hard delete when allowed; pre-check job reference when `won` |
 | `win` | — | Set `status = won`; create `job` + copy parties/lines (4b — when job slice ready) |
 | `lose` | — | Set `status = lost` |
@@ -312,7 +312,7 @@ Estimate PATCH **must not** INSERT/UPDATE `site_area`, `site_asset`, or `site_sy
 
 ## F — Domain rules
 
-- **Site anchor** — every estimate has `site_id`; quote structure uses optional **`estimate_system`** blocks keyed to catalog `system` ([`02-estimates.md`](../planning/02-estimates.md)). **`site_id` locked after first POST** — quote scope is property-scoped; stricter than job site change.
+- **Site anchor** — every estimate has `site_id`; quote structure uses condition forest + lines scoped to that site’s zones ([`02-estimates.md`](../planning/02-estimates.md)). **`site_id` writable while editable** — changing site with structure requires confirm + clear ([warn-and-clear](../decisions/estimate.md#decision-estimate--job-site-anchor--warn-and-clear-not-immutable-2026-07-14)); same pattern as job (except job freezes when `estimate_id` set).
 - **General bucket** — `estimate_system_id = null` for ROM, mobilization, and quote-wide lines.
 - **One block per catalog system** — at most one `estimate_system` row per `system_id` per estimate.
 - **Commercial vs system blocks** — `estimate_section` retired; do not confuse catalog `system` blocks with CSI commercial rollups (still deferred).
@@ -350,22 +350,22 @@ Master-detail: list in `estimates/layout.tsx`, detail in `[id]/page.tsx` ([`rout
 │ ┌──────────────────────┬──────────────────────┐              │
 │ │ S — Structure        │ C — Configuration    │              │
 │ ├──────────────────────┴──────────────────────┤              │
-│ │ LI — flat line table (full width) + Places…  │              │
+│ │ LI — flat line table (full width) + zone icon │              │
 │ │ FieldArrayTable-style Add line footer        │              │
 │ └──────────────────────────────────────────────┘              │
 │ ── footer ── total ext sell (visible bucket)               │
 └──────────────────────────────────────────────────────────────┘
 ```
 
-**Shared components:** `EstimateDetailForm` + `EstimateLineItemsPanels` (`EstimateQuoteStructureTree`, `EstimateBucketConfigurePanel`, `EstimateLineFlatTable`, `EstimateLinePlacesButton`).
+**Shared components:** `EstimateDetailForm` + `EstimateLineItemsPanels` (`EstimateQuoteStructureTree`, `EstimateBucketConfigurePanel`, `EstimateLineFlatTable`, `EstimateLineZoneButton`).
 
-### Three panels (37w topology · 37y content)
+### Three panels (37w topology · 37y content · 42b zone link)
 
 | Panel | Id | Role |
 |-------|-----|------|
-| **S** | structure | Estimate-owned **condition forest** — Add root ▾ / Add condition / Delete (X1 block if lines); names edit in **C** |
-| **C** | config | Bound to **S** selection — **name**, **complexity**, labor phases, **include discontinued**, specs on every node; child inherit checkboxes (Y4) |
-| **LI** | lines | Flat **37f** column grid; filtered by **S** selection; **Add line** footer; **Places…** allocations |
+| **S** | structure | Estimate-owned **condition forest** — Add root ▾ (pick/create root `site_zone`) / Add condition / Delete (X1 block if lines); names edit in **C** |
+| **C** | config | Bound to **S** selection — **name**, **complexity**, labor phases, **Labor only**, **Include discontinued**, specs on every node; child inherit checkboxes (Y4) |
+| **LI** | lines | Flat **37f** column grid; filtered by **S** selection; **Add line** footer; **zone icon** allocations (before Qty); when selected condition is effectively **labor-only**, hide Part / Unit / Material / Freight / Incidental / material-lock ([L7](../decisions/estimate.md#decision-condition-labor-only--y4-discontinued-2026-07-14)) |
 
 ### Selection → LI filter (37y Y5)
 
@@ -375,33 +375,37 @@ Master-detail: list in `estimates/layout.tsx`, detail in `[id]/page.tsx` ([`rout
 
 **S** selection is **client-only** (not persisted). Default on load: first root condition. Add-line gated until a condition is selected.
 
-### Commercial tree (37y Y1 / Y5)
+### Commercial tree (37y Y1 / Y5 · 42b)
 
-Tree is **estimate-owned condition forest** — roots carry `root_item_id` (catalog root); children nest via `parent_condition_id`. Site geography is place-only via line **Places…** / `estimate_line_allocation`.
+Tree is **estimate-owned condition forest** — roots carry `site_zone_id` (FK → root-level `site_zone` on the estimate’s site); catalog `root_item_id` / zone name are **derived** on read; children nest via `parent_condition_id` (`site_zone_id` null). Site geography stays place-only via line allocations (`estimate_line_allocation`) scoped to that root’s zone subtree.
 
-Empty forest → prompt to **Add root** (catalog root picker).
+Empty forest → prompt to **Add root** (existing root zones + **New…** proposed zone).
+
+**Condition DTO (roots):** `site_zone_id`, `site_zone_name`, derived `root_item_id` / `root_item_name`, plus name / complexity / phases / specs. **Children:** `site_zone_id` null; inherit catalog root from ancestry.
 
 ### Add / delete (client until Save)
 
 | Action | Control | Behavior |
 |--------|---------|----------|
 | **Select node** | **S** tree click | Filters **LI**; binds **C** |
-| **Configure** | **C** panel fields | Name; complexity; labor phases; **include discontinued** (default off); specs — child inherit checkboxes |
+| **Add root** | **S** Add root ▾ | Pick existing root `site_zone`, or **New…** (catalog root → create `proposed` zone then attach); one root condition per base zone (D5) |
+| **Configure** | **C** panel fields | Name; complexity; labor phases; **Labor only** (default off); **Include discontinued** (default off); specs — child Y4 Override checkboxes ([L11–L12](../decisions/estimate.md#decision-condition-labor-only--y4-discontinued-2026-07-14)) |
 | **Add line** | **LI** dashed **Add line** footer | Append standalone row for selected condition |
-| **Places** | **Places…** on line | Allocations (default qty 1); `qty_manual` sync rules (G3/X3) |
+| **Zones** | Icon before **Qty** | Checkable **root-scoped** zone tree (cascade + parent bulk qty); **leaf-only** `allocations[]`; exclusive qty ↔ places ([Z1–Z8](../decisions/estimate.md#decision-line-items-zone-tree-popover--exclusive-qty-2026-07-14)) |
 | **Delete node** | **S** Delete | Blocked if lines reference node or descendants (X1) |
 | **Delete line** | Row delete in **LI** | Remove line only |
 
-**Not in 37y:** kit UI; summary chips; win→job condition/allocation copy (X4); LI drag→**S** retarget (deferred).
+**Not in 37y/42b/42c:** kit UI; summary chips; win→job condition/allocation copy (X4); LI drag→**S** retarget (deferred); asset pinning from estimates.
 
-### Line columns (37f / LI · **37aa dual locks + preview**)
+### Line columns (37f / LI · **37aa dual locks + preview** · **42c zone tree**)
 
 | Column | Notes |
 |--------|-------|
-| Item | `TreeSelect` — root category subtree for condition tree’s `root_item_id`; change → **server line-preview** (that line); blocked when `material_locked` |
+| Item | `TreeSelect` — root category subtree for condition tree’s derived `root_item_id`; change → **server line-preview** (that line); blocked when `material_locked` |
 | Part | `Select` or text — resolver / preview; manual PN → `material_locked` |
 | Description | `Input` |
-| Qty | `InputNumber` — updates **ext sell** only (no unit costing preview) |
+| Zone | Icon-only (`EnvironmentOutlined`) — checkable tree modal (condition-root subtree); leaf-only allocations |
+| Qty | `InputNumber` — updates **ext sell** only; edit → `qty_manual = true` + clear allocations (exclusive SoT) |
 | Unit | `Input` |
 | Material / Freight / Incidental / Labor | read-only — preview + save snapshots |
 | Target / Cost | read-only |
@@ -445,7 +449,7 @@ Empty forest → prompt to **Add root** (catalog root picker).
 
 | Field | Add | Pickers | Empty state |
 |-------|-----|---------|-------------|
-| `profile.site_id` | — | [`LinkedSelectInput`](../../components/form/LinkedSelectInput.tsx) — site list; **`… Add site`** last option when `site_detail` `write` + field writable → `/sites/new` + picker return ([decision](../decisions/estimate.md#decision-estimate-site-anchor--gate-lines-immutable-after-create-2026-06-30), [linked picker](../decisions/general.md#decision-linked-picker-control-linkedselectinput--2026-06-24)); **create:** writable select; **edit:** read-only label + open icon when `site_detail` `read` | Required on create |
+| `profile.site_id` | — | [`LinkedSelectInput`](../../components/form/LinkedSelectInput.tsx) — site list; **`… Add site`** when `site_detail` `write` + field writable → `/sites/new` + picker return ([decision](../decisions/estimate.md#decision-estimate--job-site-anchor--warn-and-clear-not-immutable-2026-07-14), [linked picker](../decisions/general.md#decision-linked-picker-control-linkedselectinput--2026-06-24)); **writable** while profile editable; **read-only + open icon** only when lifecycle-frozen (`won`/`lost`/`expired`); change with conditions/lines → confirm clear | Required on create |
 | `stakeholders` | Add stakeholder | Any `party`; relation from `job_party_relation_table` | "No stakeholders" |
 | `scopes` | Implicit include on **C** edit or **Add line** | **S** panel selects `site_tree` scope/zone — **does not create site geography** | CTA to `/sites/[id]` when site has zero scopes |
 | `line_items` | **Add line** footer in **LI** panel | Item `TreeSelect` scoped to line's `estimate_scope`; part resolver — **Line Items tab hidden until `site_id` set** | "Select a scope or zone" / bucket-specific empty copy per W3 |
@@ -465,7 +469,7 @@ Empty forest → prompt to **Add root** (catalog root picker).
 | Event | Transition | Notes |
 |-------|------------|-------|
 | Create | POST | `draft`; `title` + `site_id` required |
-| Edit profile | PATCH | scalar keys; **`site_id` must not change** on existing row |
+| Edit profile | PATCH | scalar keys including `site_id` (warn-and-clear when structure present); freeze when `won`/`lost`/`expired` |
 | Edit lines / systems | PATCH | replace-array `systems`, `line_items` |
 | Send (manual) | PATCH `status` → `sent` | **Optional v1** |
 | Win | `win` action | `won` + job create (4b) |
@@ -479,8 +483,9 @@ Empty forest → prompt to **Add root** (catalog root picker).
 
 | Topic | Handling |
 |-------|----------|
-| **No site selected (create)** | Line Items tab absent; `systems` picker hidden; stakeholders still editable; hint on General tab when line items read granted |
-| **Site change on create** | Changing `profile.site_id` to a different id (or clearing to `""`) clears `systems` and `line_items` in form state; first pick from empty does not clear |
+| **No site selected (create)** | Line Items tab absent; stakeholders still editable; hint on General tab when line items read granted |
+| **Site change (create or edit)** | Changing `profile.site_id` (or clearing) when form has conditions/lines → confirm; on OK clear `conditions` + `line_items` + `site_tree`; first pick from empty does not confirm; Save persists; stakeholders unchanged |
+| **Site change when frozen** | `won` / `lost` / `expired` — site read-only; DAL rejects change |
 | **ROM / no systems** | Valid once site selected — General parent only; all lines `estimate_system_id = null`; **site still required** on POST |
 | **Mixed quote** | General lines + one or more system blocks in same estimate |
 | **Line without catalog ids** | Valid — description + qty + cost + sell suffice |
@@ -531,11 +536,17 @@ Empty forest → prompt to **Add root** (catalog root picker).
 - [x] ROM (General only) + mixed quote round-trip (2026-06-29)
 - [ ] `win` → job copy (4b)
 
-### Task 33 (site anchor)
+### Task 33 (site anchor) — historical
 
 - [x] Line Items tab + systems picker gated on non-empty `profile.site_id` (2026-06-30)
-- [x] `profile.site_id` writable create only; read-only + open icon on edit (2026-06-30)
-- [x] DAL rejects PATCH `site_id` change — `ConflictError` `{ code: "site_id_immutable" }` (2026-06-30)
+- [x] `profile.site_id` writable create only; read-only + open icon on edit (2026-06-30) — **superseded by task 44**
+- [x] DAL rejects PATCH `site_id` change — `ConflictError` `{ code: "site_id_immutable" }` (2026-06-30) — **superseded by task 44**
 - [x] `LinkedSelectInput` + `… Add site` picker return on create (2026-06-30)
 - [x] Create: changing or clearing site resets `systems` + `line_items` (2026-06-30)
 - [x] `codegen:check` + targeted tests + build (2026-06-30)
+
+### Task 44 (site warn-and-clear)
+
+- [x] Estimate + job: Site writable while editable; confirm clear when structure present (2026-07-14)
+- [x] DAL allows site change; clears structure; drop `site_id_immutable`; freeze won/lost/expired + job `estimate_id` (2026-07-14)
+- [x] Same `LinkedSelectInput` chrome on jobs (remove text “Open:” link pattern) (2026-07-14)

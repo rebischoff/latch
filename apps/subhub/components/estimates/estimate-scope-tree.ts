@@ -57,19 +57,26 @@ export const buildEstimateScopeTree = buildCommercialTree;
 
 export const addRootCondition = (
   conditions: EstimateConditionFormRow[],
-  rootItemId: string,
-  rootItemName: string,
-  specTemplate: EstimateConditionSpecFormRow[] = [],
+  input: {
+    name: string;
+    rootItemId: string;
+    rootItemName?: string | null;
+    siteZoneId: string;
+    siteZoneName?: string | null;
+    specTemplate?: EstimateConditionSpecFormRow[];
+  },
 ): EstimateConditionFormRow[] => [
   ...conditions,
   makeCondition({
-    name: rootItemName,
+    name: input.name,
     parent_condition_id: null,
-    root_item_id: rootItemId,
-    root_item_name: rootItemName,
+    site_zone_id: input.siteZoneId,
+    site_zone_name: input.siteZoneName ?? input.name,
+    root_item_id: input.rootItemId,
+    root_item_name: input.rootItemName ?? input.name,
     sort_order: conditions.length + 1,
     labor_phases_explicit: false,
-    specs: specTemplate.map((spec) => ({ ...spec })),
+    specs: (input.specTemplate ?? []).map((spec) => ({ ...spec })),
   }),
 ];
 

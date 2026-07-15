@@ -17,6 +17,7 @@ import {
 const PREVIEW_FIELDS = [
   "part_id",
   "vendor_part_id",
+  "material_locked",
   "unit_material",
   "unit_freight",
   "unit_incidental",

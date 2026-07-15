@@ -51,34 +51,24 @@ const assertPatchStatus = (status: string): void => {
   }
 };
 
-const countJobLines = async (
-  client: Pool | PoolClient,
-  jobId: string,
-): Promise<number> => {
-  const result = await client.query<{ count: number }>(
-    `SELECT COUNT(*)::int AS count FROM job_line WHERE job_id = $1`,
-    [jobId],
-  );
-
-  return result.rows[0]?.count ?? 0;
-};
-
-const assertSiteIdChangeAllowed = async (
-  client: Pool | PoolClient,
-  existing: JobDetailRow,
+/**
+ * Site change allowed when `estimate_id` is null (S8).
+ * Existing line items are auto-cleared in `updateJob` (job Scope UI is stubbed;
+ * clients cannot PATCH `line_items` yet).
+ */
+export const assertSiteIdChangeAllowed = (
+  existing: Pick<JobDetailRow, "site_id" | "estimate_id">,
   nextSiteId: string,
-): Promise<void> => {
+): void => {
   if (nextSiteId === existing.site_id) {
     return;
   }
 
   if (existing.estimate_id !== null) {
-    throw new ConflictError("Cannot change site_id when job is linked to an estimate");
-  }
-
-  const lineCount = await countJobLines(client, existing.id);
-  if (lineCount > 0) {
-    throw new ConflictError("Cannot change site_id when job has line items");
+    throw new ConflictError("Cannot change site_id when job is linked to an estimate", {
+      field: "profile",
+      code: "site_id_frozen",
+    });
   }
 };
 
@@ -92,7 +82,7 @@ const validateJobWriteRow = async (
   assertPatchStatus(row.status);
 
   if (existing !== undefined) {
-    await assertSiteIdChangeAllowed(client, existing, row.site_id);
+    assertSiteIdChangeAllowed(existing, row.site_id);
   }
 };
 
@@ -143,6 +133,8 @@ export const updateJob = async (
   await withPermissionDb(pool, actorId, async (client) => {
     await validateJobWriteRow(client, row, existing);
 
+    const siteChanged = row.site_id !== existing.site_id;
+
     await client.query(
       `UPDATE job
        SET title = $2,
@@ -153,5 +145,10 @@ export const updateJob = async (
        WHERE id = $1`,
       [row.id, row.title, row.site_id, row.job_kind, row.status],
     );
+
+    // Auto-clear lines when site changes (warn-and-clear; Scope editor still stubbed).
+    if (siteChanged) {
+      await replaceJobLineItemsTx(client, row.id, row.site_id, []);
+    }
   });
 };

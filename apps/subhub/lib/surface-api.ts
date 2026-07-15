@@ -338,6 +338,9 @@ export type EstimateLinePreviewConditionDraft = {
   labor_phases_explicit?: boolean;
   included_labor_phases?: string[];
   include_discontinued?: boolean;
+  include_discontinued_explicit?: boolean;
+  labor_only?: boolean;
+  labor_only_explicit?: boolean;
   specs?: Array<{
     spec_def_id: string;
     spec_option_id?: string | null;
@@ -351,6 +354,7 @@ export type EstimateLinePreviewResultLine = {
   id: string;
   part_id: string | null;
   vendor_part_id: string | null;
+  material_locked: boolean;
   unit_material: number;
   unit_freight: number;
   unit_incidental: number;
@@ -387,6 +391,42 @@ export const fetchEstimateSiteTree = async (
     `/api/estimates/pickers/site-tree?site_id=${encodeURIComponent(siteId)}`,
   );
   return parseResponse<EstimateSiteTreePickerData>(response);
+};
+
+export type EstimateRootSiteZonePickerRow = {
+  id: string;
+  name: string;
+  root_item_id: string;
+  root_item_name: string | null;
+  sort_order: number;
+  status: string;
+};
+
+export type EstimateSiteZonesPickerData = {
+  rows: EstimateRootSiteZonePickerRow[];
+  total: number;
+};
+
+export const fetchEstimateSiteZonesPicker = async (
+  siteId: string,
+): Promise<ApiSuccessBody<EstimateSiteZonesPickerData>> => {
+  const response = await fetch(
+    `/api/estimates/pickers/site-zones?site_id=${encodeURIComponent(siteId)}`,
+  );
+  return parseResponse<EstimateSiteZonesPickerData>(response);
+};
+
+export const createEstimateProposedSiteZone = async (body: {
+  name?: string;
+  root_item_id: string;
+  site_id: string;
+}): Promise<ApiSuccessBody<{ row: EstimateRootSiteZonePickerRow }>> => {
+  const response = await fetch("/api/estimates/pickers/site-zones", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  return parseResponse<{ row: EstimateRootSiteZonePickerRow }>(response);
 };
 
 export type CategoryRootPickerRow = {
