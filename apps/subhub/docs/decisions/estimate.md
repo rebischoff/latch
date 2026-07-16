@@ -23,14 +23,35 @@
 > **Amended (2026-07-14):** [site anchor — warn-and-clear](#decision-estimate--job-site-anchor--warn-and-clear-not-immutable-2026-07-14) — supersedes [immutable after create](#decision-estimate-site-anchor--gate-lines-immutable-after-create-2026-06-30); site stays writable; change with structure confirms + clears ([44](../tasks/44-site-anchor-warn-and-clear.md)).
 >
 > **Locked (2026-07-15):** [estimate win → job handoff](#decision-estimate-win--job-handoff-2026-07-14) — wave **5b** thick (W0–W7).
+>
+> **Amended (2026-07-15):** Job Scope UI locks (**Scope-U1** / **Scope-E1** / **Scope-F1** / **Scope-S1**) under [W3](#w3--conditions--costing-on-the-job-locked--amends-prior-estimate-only) — estimate-parity S/C/LI; add at $0; freeze sold$/qty/description.
+>
+> **Amended (2026-07-15):** [Scope-F1 dual qty + Job LI parity (JLI-1…7)](#w3--conditions--costing-on-the-job-locked--amends-prior-estimate-only) — `sold_quantity` frozen + working `quantity` editable; Sold badge removed; Item/Part + job zone danger ([47](../tasks/47-job-line-items-parity.md)).
+>
+> **Locked (2026-07-15):** [estimate / job / CO commercial boundaries (JC1–JC7)](#decision-estimate--job--co-commercial-boundaries-2026-07-15) — as-sold via estimate Win; Jobs New kept; CO = separate Surfaces; condition drift; mid-job progress ([48](../tasks/48-job-create-front-doors-condition-drift.md) / [49](../tasks/49-change-order-surfaces.md)).
+
+---
+
+### Decision: estimate / job / CO commercial boundaries (2026-07-15)
+
+**Status:** **Locked** (JC1–JC7). **Canonical detail:** [`job.md`](./job.md#decision-estimate--job--co-commercial-boundaries-2026-07-15). **Planning:** [`planning/16-estimate-job-co-boundaries.md`](../planning/16-estimate-job-co-boundaries.md).
+
+**Estimate-facing summary:**
+
+| # | Choice |
+|---|--------|
+| **JC1** | Contract signed outside SubHub → **rebuild estimate** to match signed $, then **Win** — not a sold-$ editor on the job |
+| **JC2** | Estimate **Win** / Create-job remains the path that plants sold contract lines; Jobs → New stays for non-sold / service / warranty |
+| **JC3** | Do **not** add `estimate.type = change_order`. COs are job-anchored documents (wave **5d**); share commercial helpers only |
+| **W1c** | Unchanged — second estimate on a site with an active job steers **add-on → CO**, not a second Win by default |
 
 ---
 
 ### Decision: estimate win → job handoff (2026-07-14)
 
-**Status:** **Locked** (W0–W7, 2026-07-15) — wave **5b** [task 46](../tasks/46-estimate-win-lose-job-copy.md). **Amends:** [one won estimate → one job](#decision-estimate--estimate_system-tabs-system-specs-no-section-v1-2026-06-27) (E3) — now **one job per catalog scope** on the won estimate (S2a). **Companion:** [`job.md`](./job.md). **Keeps:** G4 unresolved pool as a later job-side filter (not a second inventory).
+**Status:** **Locked** (W0–W7 + Scope-U1/E1/F1/S1, 2026-07-15) — wave **5b** [task 46](../tasks/46-estimate-win-lose-job-copy.md). **Amends:** [one won estimate → one job](#decision-estimate--estimate_system-tabs-system-specs-no-section-v1-2026-06-27) (E3) — now **one job per catalog scope** on the won estimate (S2a). **Companion:** [`job.md`](./job.md). **Keeps:** G4 unresolved pool as a later job-side filter (not a second inventory).
 
-**W0–W7** locked (thick 5b).
+**W0–W7** + Job Scope (**Scope-U1/E1/F1/S1**) locked (thick 5b).
 
 #### W1a — Cardinality (locked — amended for S2a)
 
@@ -117,17 +138,28 @@ No automatic “same condition / same catalog scope” matching in 5b — soft c
 | **Conditions** | **Copy** the estimate condition forest (+ specs, labor phases, labor-only / discontinued knobs, complexity) onto **job-owned** tables (`job_condition*` — names TBD in 5b). Engineer may edit the same knobs as the estimator. Edits do **not** write back to the estimate. |
 | **Lines** | Still copied (W2/M2). Each line keeps provenance (`estimate_line_id`) and a **sold snapshot** at win: at least **`sold_unit_price`** (and preferably **`sold_unit_cost`** + cost buckets: material / labor / freight / incidental) — immutable from engineering. |
 | **Live costing** | Engineer can recalc **current** `unit_material` / `unit_labor` / `unit_freight` / `unit_incidental` / `unit_cost` (and targets) when conditions, items, parts, or line set change — same commercial engine as estimate. |
-| **Sold price** | **`unit_price` (contract)** is **not** changed by engineering recalc or knob tweaks. Compare UI: **sold** vs **current cost** (and margin vs sold price) so decisions are informed. Changing customer price / sold qty that affects contract $ → **change order** (task 45), not silent edit. |
-| **Add / delete lines** | Allowed for engineering to meet project scope; **current** freight / incidental / labor / material buckets **recompute**. New/removed lines that change **contract** sell $ still go through **CO** (or land as $0 / non-billable until CO) — exact billable rule can be a 5b sub-step; default: engineering may add lines for cost/BOM/progress, but **sold unit_price on new lines is 0** until a CO sets contract price (or product picks “must CO before add”). |
+| **Sold price** | **`unit_price` / sold snapshot (contract)** is **not** changed by engineering recalc or knob tweaks. Compare UI: **sold** vs **current cost** (and margin vs sold price). Changing contract $ / **`sold_quantity`** → **change order** (**5d**), not silent edit. |
+| **Add / delete lines (**Scope-E1**)** | **Add** allowed anytime; new lines default **`sold_unit_price = 0`** and **`sold_quantity = 0`** (engineering cost/BOM/progress). **Delete** allowed when sold $ is **0**. **Delete blocked** when sold $ **> 0** — use CO **`deduct`** (**5d**). Rejected: “must open CO before any add.” |
+| **Freeze surface (**Scope-F1**)** — **amended 2026-07-15 (JLI)** | On sold contract lines, UI **read-only:** **unit price / sold_***, **`sold_quantity`**, **description**. **Working `quantity` is editable without a CO** (drives current/eventual actual cost + margin). Still editable: conditions/knobs, part pin, places, live cost. Ext sold = `sold_quantity × sold_unit_price`; current cost = `quantity × unit_cost`. |
+| **Job LI UX (**JLI-1…7**)** | No Sold badge. Columns: Item (RO), Part (editable), zone **icon** before Qty (no zone tags on row), Sold qty \| Qty. **Job-only** danger when places don’t cover working qty. Task [47](../tasks/47-job-line-items-parity.md). |
+| **Scope UI (**Scope-U1**)** | Job Scope = **estimate-parity** three panels: **S** condition tree, **C** config, **LI** line items — same topology as estimate Scope (`EstimateLineItemsPanels` shape), not a thin table-only Scope. |
+| **Components (**Scope-S1**)** | **Job-specific** Scope shell; **reuse shared helpers** (costing, trees, place popovers) where they fit; **YAGNI** — no mega shared form with estimate/job mode flags. |
 | **Unresolved (G4)** | Part-open / unplaced lines are where knobs + PN resolution matter most; sold+placed lines still show dual costing but don’t rewrite sold price. |
+
+> **Naming:** **Scope-U1** here is Job Scope topology — distinct from W6 multi-job navigate **U1**.
 
 **Rejected — C1** (no job conditions): blocks engineer from estimator knobs and live cost comparison.  
 **Rejected — C3** (read-only conditions): not enough to tweak toward exact parts.  
-**Rejected — silent sell-price recalc:** sold price is the contract ceiling for margin decisions.
+**Rejected — silent sell-price recalc:** sold price is the contract ceiling for margin decisions.  
+**Rejected — thin Job Scope table:** engineer needs estimate-like S/C/LI after win.  
+**Rejected — must CO before add:** slows engineering; $0 sold lines are enough until **5d**.  
+**Rejected — shared mega form:** YAGNI; fork UI, share helpers.
 
-**Rationale:** Ops need estimate-like costing and configuration after win, while the customer-facing sold price stays stable unless a CO says otherwise. Dual numbers (sold vs current cost) make “is this still okay?” visible.
+**Rationale:** Ops need estimate-like costing and configuration after win, while the customer-facing sold price stays stable unless a CO says otherwise. Dual numbers (sold vs current cost) make “is this still okay?” visible. Add/delete stay local for $0 engineering work; only removing sold contract $ forces CO. Dual qty lets engineers fix install count / zones without a CO when they cannot bill the customer more.
 
-**Schema implication (5b):** `job_condition` (+ spec / labor_phase children) + sold snapshot columns (or side table) on `job_line`; wire shared costing against job conditions.
+**Schema implication (5b + 47):** `job_condition` (+ spec / labor_phase children) + sold snapshot columns on `job_line` including **`sold_quantity`**; wire shared costing against job conditions. Working `quantity` remains the live/install driver.
+
+**CO vs engineering (locked with JLI-4):** CO when contract changes (sold unit $, sold qty, void/revise sold scope). No CO for zones, working qty, part, knobs, live cost, $0 adds, or re-budget.
 
 #### W4 — Zone / place handoff (locked)
 
@@ -197,14 +229,14 @@ Re-seed policy: skip if the line already has phase/BOM rows (idempotent recreate
 | Live costing + **sold vs current cost** compare on job Scope | |
 | `job_line_allocation` copy + **place-edit** on job | |
 | BOM + phase seed (W5 P1) | |
-| Job Scope: lines grid with add/delete (engineering; sold price rules per W3) | |
+| Job Scope **estimate-parity** S/C/LI (**Scope-U1**); add/delete + freeze per **Scope-E1** / **Scope-F1**; job shell + shared helpers (**Scope-S1**) | |
 | Docs: retire **37h**; STATUS → this task | |
 
 **Rationale:** Leaving knobs/costing/places schema-only would strand the W3/W4 product intent; thick 5b proves the engineer loop after win.
 
 ---
 
-**Session status:** **W0–W7 locked.** Ready to author wave **5b** implementation task.
+**Session status:** **W0–W7 + Scope-U1/E1/F1/S1 locked.** Implement via task [46](../tasks/46-estimate-win-lose-job-copy.md).
 
 ---
 

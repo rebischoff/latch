@@ -6,9 +6,70 @@
 
 ---
 
+### Decision: job Field progress — boolean zone snapshot (5c) (2026-07-16)
+
+**Status:** **Locked** (F1–F9). **Planning:** [`planning/18-job-field-progress.md`](../planning/18-job-field-progress.md). **Task:** [51](../tasks/51-job-field-progress.md) — **Complete** (2026-07-16). **Amends:** [field progress — scope phase + progress entries (2026-06-27)](#decision-field-progress--scope-phase--progress-entries-2026-06-27) and [J2](#decision-progress-entry-workflow--none-in-v1-j2-locked-2026-06-27) **for the v1 Field product path** — visit ledger / `progress_entry*` UI deferred; mutable snapshot instead. **Depends on:** Scope + `scope_phase` seed ([45](../tasks/45-job-costing-and-change-order-reconciliation.md)–[47](../tasks/47-job-line-items-parity.md)). **Orthogonal to:** [49](../tasks/49-change-order-surfaces.md) (5d).
+
+**Problem:** Field tab is fixture-only; ops need persisted “where are we?” for the job and for invoice staging, without a progress approval workflow or auto-billing.
+
+| # | Topic | Choice |
+|---|--------|--------|
+| **F1** | Granularity | **Boolean** complete/not per labor phase (no partial qty in Field UI) |
+| **F2** | Geography | Tag with **`site_zone_id` only** (no `site_area_id` / `site_asset_id` on Field writes) |
+| **F3** | History | **No** `progress_entry*` product path in v1 — mutable snapshot; billing reads current % when creating invoices |
+| **F4** | Tree | Allocations → zones + pseudo **General** (ex-Unplaced); **no All Zones**; one scope category per job |
+| **F5** | Field id | **`field_progress`** on `job_detail` (drop `work_items` / `job_work_item`) |
+| **F6** | Save | Whole-job Save on `job_detail`; later tech-only Surface reuses same writes |
+| **F7** | Wave | Progress only — no Complete / as-built publish in 5c |
+| **Lifecycle** | Labels | **Derived:** not started (0%) / in progress / completed (100%); **stale** overlay on in-progress; **cancelled** explicit at 0% only (locks Field). Completed ≠ fully billed |
+| **F8** | % | **Hours-weighted**, compute on read — **never store** job % or lifecycle (except cancelled) |
+| **F9** | Denominator | Include **General**; active lines only; boolean ⇒ no over-complete |
+
+**Persistence:** complete flags per `(scope_phase_id, site_zone_id | General)` — not `scope_phase` alone when a line has multiple places. `progress_entry*` stays in DBML unused by this UI.
+
+**Rationale:** Zone×phase done/not matches contractor “room complete” reporting; hours-weighted % matches unequal phase effort; derived lifecycle avoids a second manual status; cancel-at-zero keeps kill-switch simple; publish/as-built stays a separate irreversible step.
+
+**Pins (task 51):** stale = **30 days** without Field write; cancel **only** at progress = 0%.
+
+---
+
+### Decision: estimate / job / CO commercial boundaries (2026-07-15)
+
+**Status:** **Locked** (JC1–JC7). **Planning:** [`planning/16-estimate-job-co-boundaries.md`](../planning/16-estimate-job-co-boundaries.md). **Tasks:** [48](../tasks/48-job-create-front-doors-condition-drift.md) (front doors + drift), [49](../tasks/49-change-order-surfaces.md) (wave **5d** Surfaces). **Companion:** [`estimate.md`](./estimate.md#decision-estimate--job--co-commercial-boundaries-2026-07-15). **Keeps:** W3 / JLI-4 sold freeze; [45](../tasks/45-job-costing-and-change-order-reconciliation.md) CO approve BOM/phase rules; separate `change_order_*` tables ([2026-06-17](#decision-change-orders--unified-job_line-ledger-2026-06-17)).
+
+**Problem:** After 5b, product needed clear answers for: jobs sold outside the system; whether Jobs → New survives; whether COs should collapse into `estimate` with a type flag; how mid-job condition edits vs COs interact with line status and field progress.
+
+| # | Topic | Choice |
+|---|--------|--------|
+| **JC1** | **External / as-sold contract** | Reconstruct an **estimate** (match signed $ via normal sell locks), then **Win**. **Do not** edit sold contract $ on Job Scope. |
+| **JC2** | **Job create front doors** | **Keep** Jobs → New for `service` / `warranty` / blank `project` shells (`estimate_id` null; Scope-E1 sold $0). **Sold contract lines** only via estimate **Win** / Create-job, or later **CO approve**. Optional later: “New from estimate…” = Win shortcut — not a second sold editor. |
+| **JC3** | **CO document shape** | Keep **`change_order` / `change_order_line`**. **Two Surfaces** (`estimate_detail`, `change_order_detail`). **Share** commercial helpers (costing, S/C/LI, part/zone pickers) — **YAGNI** mega form / `estimate.type = change_order`. **Approve ≠ Win.** Optional `change_order.estimate_id` when priced as a mini-quote first. |
+| **JC4** | **Job LI after CO** | Default Scope LI / rollups = `job_line.status = active` only. **Deduct** → void; **revise** → void + replacement. **Reject** zero-out or UI-only hide of sold lines. Optional “Show history / superseded” later. |
+| **JC5** | **Condition drift flag** | Job conditions stay **editable** (W3). At win, snapshot **`complexity_factor_id_at_win`** on `job_condition`. C panel flags when current complexity ≠ at-win (null baseline = no flag — manual jobs / post-win adds). Phase-set drift badge **deferred** (same spirit later). Edits without contract $ change need **no CO**; optional re-budget when cost moves. |
+| **JC6** | **Mid-job phase remove + progress** | Dropping a labor phase (e.g. Install) after field progress: if **sold $ / sold qty / sold scope** changes → **CO `revise`** (preferred) or `deduct`. Approve per [45](../tasks/45-job-costing-and-change-order-reconciliation.md): **never delete** `progress_entry*`; void old `scope_phase`; **carry `completed_qty`** to matching phases on replacement; warn if progress existed. If contract unchanged → job condition / plan edit only — **do not** hard-delete phases that have progress FKs. |
+| **JC7** | **Partial place / zone cut on sold line** | Customer should not pay for some places → **CO revise** with new allocations / sold qty. Internal-only → working qty / places (JLI). **No** auto cross-line zone sync between unrelated lines. |
+
+**Rejected**
+
+- Sold-$ editor on Job Scope for as-sold imports  
+- Estimate-only job create (kills warranty/service front door)  
+- `estimate.type ∈ {change_order, add-on, …}` as the CO document  
+- One Surface with `changeOrder=true` mode flags  
+- Zeroing sold lines so CO replacements “don’t confuse” the grid  
+
+**Rationale:** One contract authoring path (estimate Win + CO approve); ops keep estimate-like knobs on the job; field history survives mid-job contract change; CO stays a job-anchored delta document with shared commercial UX.
+
+**Schema implication (48):** `job_condition.complexity_factor_id_at_win` (nullable). **5d (49):** `change_order_*` Surfaces + shared helpers; no merge into `estimate`.
+
+**Parked (not locked):** Service / warranty ticket UX, T&M commercial model, fixed/NTE service front door, blank-job **Add condition** — [`planning/17-service-warranty-tm-open.md`](../planning/17-service-warranty-tm-open.md) (SW0–SW5). Do not treat Jobs → New Scope as a finished ticket/T&M product until that session closes.
+
+---
+
 ### Decision: estimate win → job handoff (2026-07-14)
 
-**Status:** **Locked** (W0–W7, 2026-07-15) — wave **5b** thick. Canonical detail in [`estimate.md`](./estimate.md#decision-estimate-win--job-handoff-2026-07-14).
+**Status:** **Locked** (W0–W7 + Scope-U1/E1/F1/S1, 2026-07-15) — wave **5b** thick. Canonical detail in [`estimate.md`](./estimate.md#decision-estimate-win--job-handoff-2026-07-14). **Amended (2026-07-15):** [JC1–JC7 commercial boundaries](#decision-estimate--job--co-commercial-boundaries-2026-07-15) — as-sold via estimate; Jobs New kept; CO Surfaces separate; condition drift flag; mid-job progress retention.
+
+**Job Scope (companion):** Estimate-parity **S / C / LI** (**Scope-U1**); add lines at **sold $0**, delete only when sold $0 (**Scope-E1**); freeze sold$/`sold_quantity`/description — **working qty editable** (**Scope-F1**, amended [47](../tasks/47-job-line-items-parity.md)); job-specific shell + shared helpers (**Scope-S1**). CO when contract $ / sold qty changes; not for zones, working qty, or $0 engineering adds. CO Surfaces remain **5d** ([49](../tasks/49-change-order-surfaces.md)).
 
 ---
 
@@ -161,14 +222,14 @@ Session locked in [`job.md`](../surface-specs/job.md) — overrides or extends r
 
 ### Decision: field progress — scope phase + progress entries (2026-06-27)
 
-**Status:** Locked. Supersedes [field status — `job_work_item` (2026-06-17)](#decision-field-status--job_work_item-2026-06-17--superseded). Planning: [`07-open-decisions.md`](../planning/07-open-decisions.md#j1--field-progress-model--locked-2026-06-27).
+**Status:** Locked (schema spine). **Amended for v1 Field UI (2026-07-16)** by [boolean zone snapshot (5c)](#decision-job-field-progress--boolean-zone-snapshot-5c-2026-07-16) — product path is mutable zone×phase booleans + hours-weighted derived %; `progress_entry*` not used in 5c. Planning: [`07-open-decisions.md`](../planning/07-open-decisions.md#j1--field-progress-model--locked-2026-06-27), [`18-job-field-progress.md`](../planning/18-job-field-progress.md).
 
-**Choice:** **`scope_phase`** (`planned_qty`, `completed_qty`) + **`progress_entry`** / **`progress_entry_line`**. Drop **`job_work_item`** from DBML — never migrated.
+**Choice:** **`scope_phase`** (`planned_qty`, `completed_qty`) + **`progress_entry`** / **`progress_entry_line`** (ledger retained in DBML). Drop **`job_work_item`** from DBML — never migrated.
 
-- Progress entry lines sum into `scope_phase.completed_qty` (fractional — e.g. 6 of 10).
-- Optional `site_area_id` / `site_asset_id` on entry lines.
-- Billing `qty_installed` reads phase rollups — see [billing](../decisions/billing.md).
-- History → `latch_audit` on progress mutations.
+- Progress entry lines *may* sum into `scope_phase.completed_qty` (fractional) in a later visit-ledger wave.
+- v1 Field: boolean complete per phase × `site_zone` / General; optional rollup into `completed_qty`.
+- Billing `qty_installed` reads phase rollups — see [billing](../decisions/billing.md); v1 invoices still manual (B4).
+- Mutation history → `latch_audit` (no product progress-entry history in 5c).
 
 **Rationale:** One production model; supports qty-based progress and v2 scheduling without remodel.
 

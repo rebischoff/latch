@@ -3,6 +3,7 @@ import { withPermissionDb } from "@latch/pg-session";
 import type { Pool, PoolClient } from "pg";
 
 import { tableExists } from "../../sites/repository/sql-utils";
+import { seedBomFromSoldLineTx } from "./job-line-bom-seed";
 import { seedScopePhasesForJobLineTx } from "./scope-phase-seed";
 
 export type ChangeOrderLineAction = "add" | "deduct" | "revise";
@@ -229,55 +230,6 @@ const nextJobLineNumber = async (
     [jobId],
   );
   return (result.rows[0]?.max ?? 0) + 1;
-};
-
-const seedBomFromSoldLineTx = async (
-  client: PoolClient,
-  jobLineId: string,
-): Promise<void> => {
-  if (!(await tableExists(client, "job_line_part"))) {
-    return;
-  }
-
-  const existing = await client.query<{ count: number }>(
-    `SELECT COUNT(*)::int AS count FROM job_line_part WHERE job_line_id = $1`,
-    [jobLineId],
-  );
-  if ((existing.rows[0]?.count ?? 0) > 0) {
-    return;
-  }
-
-  const line = await client.query<{
-    part_id: string | null;
-    vendor_part_id: string | null;
-    description: string;
-    quantity: string | number;
-    unit: string;
-    unit_cost: string | number;
-  }>(
-    `SELECT part_id, vendor_part_id, description, quantity, unit, unit_cost
-     FROM job_line WHERE id = $1`,
-    [jobLineId],
-  );
-  const sold = line.rows[0];
-  if (!sold?.part_id) {
-    return;
-  }
-
-  await client.query(
-    `INSERT INTO job_line_part (
-       job_line_id, part_id, vendor_part_id, description, quantity, unit, unit_cost, sort_order
-     ) VALUES ($1, $2, $3, $4, $5, $6, $7, 1)`,
-    [
-      jobLineId,
-      sold.part_id,
-      sold.vendor_part_id,
-      sold.description,
-      sold.quantity,
-      sold.unit,
-      sold.unit_cost,
-    ],
-  );
 };
 
 const voidBomForJobLineTx = async (

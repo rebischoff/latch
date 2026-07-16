@@ -13,10 +13,62 @@ export type SeedScopePhaseInput = {
   /** @deprecated Prefer estimate_condition_id (37y). */
   estimate_scope_id?: string | null;
   estimate_condition_id: string | null;
+  /** Post-win engineer adds seed phases from the job condition forest (task 46 Step 4). */
+  job_condition_id?: string | null;
   item_id: string | null;
   job_line_id: string;
   quantity: number;
   site_zone_id: string | null;
+};
+
+/** Job-condition variant of `loadConditionLaborPhases` (walks `job_condition*`). */
+const loadJobConditionLaborPhases = async (
+  client: PoolClient,
+  jobConditionId: string,
+): Promise<string[] | null> => {
+  if (!(await tableExists(client, "job_condition_labor_phase"))) {
+    return null;
+  }
+
+  let current: string | null = jobConditionId;
+  const seen = new Set<string>();
+
+  while (current) {
+    if (seen.has(current)) {
+      break;
+    }
+    seen.add(current);
+
+    const metaResult: {
+      rows: Array<{
+        labor_phases_explicit: boolean;
+        parent_condition_id: string | null;
+      }>;
+    } = await client.query(
+      `SELECT labor_phases_explicit, parent_condition_id
+       FROM job_condition WHERE id = $1`,
+      [current],
+    );
+    const meta = metaResult.rows[0];
+    if (!meta) {
+      break;
+    }
+
+    if (meta.labor_phases_explicit) {
+      const result = await client.query<{ labor_phase_id: string }>(
+        `SELECT labor_phase_id
+         FROM job_condition_labor_phase
+         WHERE job_condition_id = $1
+         ORDER BY sort_order ASC, labor_phase_id ASC`,
+        [current],
+      );
+      return result.rows.map((row) => row.labor_phase_id);
+    }
+
+    current = meta.parent_condition_id;
+  }
+
+  return null;
 };
 
 export const seedScopePhasesForJobLineTx = async (
@@ -24,7 +76,12 @@ export const seedScopePhasesForJobLineTx = async (
   input: SeedScopePhaseInput,
 ): Promise<void> => {
   const conditionId = input.estimate_condition_id;
-  if (!(await tableExists(client, "scope_phase")) || !input.item_id || !conditionId) {
+  const jobConditionId = input.job_condition_id ?? null;
+  if (
+    !(await tableExists(client, "scope_phase")) ||
+    !input.item_id ||
+    (!conditionId && !jobConditionId)
+  ) {
     return;
   }
 
@@ -42,8 +99,11 @@ export const seedScopePhasesForJobLineTx = async (
     return;
   }
 
-  // 37x X4 / 37y: win→job condition handoff still deferred — seed from condition phases.
-  const conditionPhases = await loadConditionLaborPhases(client, conditionId);
+  // On win, phases are identical to the source estimate condition. For post-win
+  // engineer adds the source is the job condition forest (`job_condition_id`).
+  const conditionPhases = jobConditionId
+    ? await loadJobConditionLaborPhases(client, jobConditionId)
+    : await loadConditionLaborPhases(client, conditionId!);
   const included = resolveIncludedLaborPhaseIds(conditionPhases, laborGroup);
   const filtered = filterLaborGroupByInclusion(laborGroup, included);
   if (filtered.length === 0) {

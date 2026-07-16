@@ -307,6 +307,15 @@ export const useMasterDetailToolbar = (
       }
     }
 
+    // Surface-specific actions (e.g. estimate Win / Lose / Create job).
+    if (
+      (routeMode === "edit" || routeMode === "create") &&
+      chrome?.extraActions &&
+      chrome.extraActions.length > 0
+    ) {
+      items.push(...chrome.extraActions);
+    }
+
     return items;
   }, [
     childCreateBlocked,

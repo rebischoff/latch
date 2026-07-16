@@ -1,19 +1,23 @@
 # STATUS — SubHub
 
 > App-local quarterback. Platform pointer: [`../../STATUS.md`](../../STATUS.md).
-> Updated: 2026-07-15.
+> Updated: 2026-07-16.
 
 - **Package:** `@latch/subhub` · **Port:** 3003
 - **Docs:** [`docs/README.md`](./docs/README.md) · **Tasks:** [`docs/tasks/01-task-index.md`](./docs/tasks/01-task-index.md)
-- **State:** Migrations **037**–**075** applied on dev. Tasks **29–36**, **37a**–**37z**, **37aa**, **37ac**, **37ad**, **37ae**–**37aj**, **38**, **39**, **40**, **41ak**, **41al**, **41am**, **41an**, **41ao**, **42a**, **42b**, **42c**, **43**, **44**, **45** complete; **41ab** superseded/reverted by **37ac**; **37h cancelled** (obsolete).
+- **State:** Migrations **037**–**079** applied on dev. Tasks **29–36**, **37a**–**37z**, **37aa**, **37ac**, **37ad**, **37ae**–**37aj**, **38**, **39**, **40**, **41ak**, **41al**, **41am**, **41an**, **41ao**, **42a**, **42b**, **42c**, **43**, **44**, **45**, **46**, **47**, **48**, **50**, **51** complete; **49** ready; **41ab** superseded/reverted by **37ac**; **37h cancelled** (obsolete).
 
 ## Right now — do this next
 
-**[46 — Estimate win / lose → job copy (5b thick)](./docs/tasks/46-estimate-win-lose-job-copy.md)** — DBML/migration first (`catalog_scope_item_id`, `job_condition*`, `job_line_allocation`, sold snapshots); then Win DAL + engineer Scope UI.
+**[49 — Change-order Surfaces (5d)](./docs/tasks/49-change-order-surfaces.md)** — CO Surfaces + Approve on [45](./docs/tasks/45-job-costing-and-change-order-reconciliation.md) DAL.
 
 ## Blockers
 
 - _(none)_
+
+## Parked (needs product discussion)
+
+- **[17 — Service / warranty / T&M](./docs/planning/17-service-warranty-tm-open.md)** — SW0 blank-job Add condition; SW1–SW5 T&M, fixed service, ticket fields. JC1–JC2 stay locked; do not implement until session.
 
 ## Active slice
 
@@ -21,10 +25,20 @@
 |-------|--------|-------|
 | **03 — Catalog** | Spec participation removal (namespace narrowing + wildcard matching) | **37ai complete** (2026-07-12) |
 | **04 — Estimates** | Site warn-and-clear (S1–S9) | **44 complete** (2026-07-14) |
-| **05 — Jobs** | **5b** ([46](./docs/tasks/46-estimate-win-lose-job-copy.md)) | Decisions W0–W7 locked; implement next; **37h cancelled**; **45** ready for 5d later |
+| **05 — Jobs** | **5b + 47–51 complete**; **49** ready (5d) | Field progress shipped (2026-07-16) |
 
 ## Recently completed
 
+- **51 — Field progress (5c)** — `job_field_progress_cell` + `field_progress`; hours-weighted % + lifecycle; Field tab persist; cancel-at-0%; migration **079** (2026-07-16).
+- **51 authored — Field progress (5c)** — Ready; F1–F9 + stale 30d + cancel-at-0%; parallel with 49 (2026-07-16).
+- **5c Field progress — product locked (F1–F9)** — boolean zone×phase; General; hours-weighted derived %; lifecycle; no history / no Complete in-wave; planning [18](./docs/planning/18-job-field-progress.md) (2026-07-16).
+- **Parked open discussion — service / warranty / T&M** — planning [17](./docs/planning/17-service-warranty-tm-open.md) (SW0–SW5); decisions index Open row (2026-07-15).
+- **50 — Job Scope editable on create** — create POST nested `conditions` / `line_items`; Scope tab after site pick (estimate parity); site warn-and-clear clears both collections (2026-07-15).
+- **JC1–JC7 locked + tasks 48/49 authored** — as-sold via estimate Win; Jobs New kept; CO = separate Surfaces + shared helpers; complexity drift; mid-job progress retention; planning [16](./docs/planning/16-estimate-job-co-boundaries.md) (2026-07-15).
+- **47 — Job LI parity (JLI-1…7)** — migration **077** `sold_quantity`; win seeds dual qty; working qty editable; Item RO + Part Select; zone icon + job unplaced danger; Scope-F1 amended; contract rollup × sold qty (2026-07-15).
+- **47 authored — Job LI parity (JLI-1…7)** — dual `sold_quantity` / working qty; remove Sold badge; Item RO + Part editable; zone icon + job danger; Scope-F1 amend; task ready (2026-07-15).
+- **46 — Estimate win / lose → job copy (5b thick)** — migration **076**; win/lose/recreate DAL; Win/Lose/Create-job actions; job_condition* + sold snapshots + allocations; estimate-parity Job Scope (Scope-U1/E1/F1/S1) (2026-07-15).
+- **46 Scope UI locks (Scope-U1/E1/F1/S1)** — estimate-parity Job Scope; add @ $0 / delete $0 only; freeze sold$/qty/description; job shell + shared helpers; task 46 Step 5 rewritten (2026-07-15).
 - **46 decisions locked + task authored — estimate win → job (5b thick)** — one job per catalog scope (S2a); editable job conditions + sold vs current costing; place allocations; Win/Lose actions; 37h cancelled as obsolete (2026-07-15).
 - **45 — Job costing + CO/BOM/scope-phase reconciliation** — migration **075** (`job_line_cost_revision`, CO/BOM/`scope_phase` DDL, conditional `material_receipt_line.unit_cost`); re-budget DAL; `approveChangeOrder` C4–C6; job cost summary on Overview; CO approve guard alert for 5d (2026-07-14).
 - **45 decisions locked — job costing + CO/BOM/scope-phase reconciliation** — budget/committed/actual(material)/margin as DAL rollups; new `job_line_cost_revision` re-budget entity distinct from change orders; CO `deduct`/`revise` reconciles `job_line_part` + `scope_phase` (block on committed material, warn + carry-forward completed qty); new `decisions/costing.md`; task authored (2026-07-14).
@@ -72,7 +86,15 @@
 
 ## Pointers
 
-- [Task 46 — estimate win → job (5b thick)](./docs/tasks/46-estimate-win-lose-job-copy.md) ← **next**
+- [Task 49 — CO Surfaces (5d)](./docs/tasks/49-change-order-surfaces.md) ← **do next**
+- [Task 51 — Field progress (5c)](./docs/tasks/51-job-field-progress.md) ✅
+- [Planning 18 — Field progress 5c](./docs/planning/18-job-field-progress.md) ✅
+- [Decision — Field progress F1–F9](./docs/decisions/job.md#decision-job-field-progress--boolean-zone-snapshot-5c-2026-07-16)
+- [Task 48 — front doors + complexity drift](./docs/tasks/48-job-create-front-doors-condition-drift.md) ✅
+- [Decision — JC1–JC7 commercial boundaries](./docs/decisions/job.md#decision-estimate--job--co-commercial-boundaries-2026-07-15)
+- [Planning 16 — estimate/job/CO boundaries](./docs/planning/16-estimate-job-co-boundaries.md)
+- [Task 47 — Job LI parity (JLI)](./docs/tasks/47-job-line-items-parity.md) ✅
+- [Task 46 — estimate win → job (5b thick)](./docs/tasks/46-estimate-win-lose-job-copy.md) ✅
 - [Decision — estimate win → job handoff (W0–W7)](./docs/decisions/estimate.md#decision-estimate-win--job-handoff-2026-07-14)
 - [Task 45 — job costing + CO/BOM/scope-phase reconciliation](./docs/tasks/45-job-costing-and-change-order-reconciliation.md) ✅
 - [Decision — job costing layers + re-budget](./docs/decisions/costing.md)

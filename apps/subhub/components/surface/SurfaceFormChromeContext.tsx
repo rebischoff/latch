@@ -13,6 +13,8 @@ import {
   type ReactNode,
 } from "react";
 
+import type { ToolbarAction } from "@/components/shell/SurfaceToolbar";
+
 export type SurfaceFormChromeMode = "create" | "edit";
 
 export type SurfaceFormChromeRegistration = {
@@ -27,6 +29,8 @@ export type SurfaceFormChromeRegistration = {
   onDelete?: () => void;
   onCancel?: () => void;
   onSaveAndNew?: () => void;
+  /** Surface-specific toolbar actions appended after Save/Delete (e.g. Win/Lose). */
+  extraActions?: ToolbarAction[];
 };
 
 type SurfaceFormChromeContextValue = {
@@ -39,6 +43,34 @@ type SurfaceFormChromeContextValue = {
 const SurfaceFormChromeContext = createContext<SurfaceFormChromeContextValue | null>(
   null,
 );
+
+/** Compare extra actions by the visible/gating scalars (handlers change each render). */
+const extraActionsRenderEqual = (
+  prev: ToolbarAction[] | undefined,
+  next: ToolbarAction[] | undefined,
+): boolean => {
+  if (prev === next) {
+    return true;
+  }
+  if (!prev || !next || prev.length !== next.length) {
+    return false;
+  }
+
+  return prev.every((prevAction, index) => {
+    const nextAction = next[index]!;
+    return (
+      prevAction.key === nextAction.key &&
+      prevAction.label === nextAction.label &&
+      prevAction.priority === nextAction.priority &&
+      prevAction.danger === nextAction.danger &&
+      prevAction.disabled === nextAction.disabled &&
+      prevAction.loading === nextAction.loading &&
+      prevAction.surfaceAction === nextAction.surfaceAction &&
+      prevAction.field === nextAction.field &&
+      prevAction.fieldAction === nextAction.fieldAction
+    );
+  });
+};
 
 /** Scalar fields only — handler refs change every render (e.g. form.handleSubmit). */
 const registrationRenderEqual = (
@@ -59,7 +91,8 @@ const registrationRenderEqual = (
     Boolean(prev.onRevert) === Boolean(next.onRevert) &&
     Boolean(prev.onDelete) === Boolean(next.onDelete) &&
     Boolean(prev.onCancel) === Boolean(next.onCancel) &&
-    Boolean(prev.onSaveAndNew) === Boolean(next.onSaveAndNew)
+    Boolean(prev.onSaveAndNew) === Boolean(next.onSaveAndNew) &&
+    extraActionsRenderEqual(prev.extraActions, next.extraActions)
   );
 };
 

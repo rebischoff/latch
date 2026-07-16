@@ -3,6 +3,7 @@
 import { LockOutlined, UnlockOutlined } from "@ant-design/icons";
 import { Button, Input, InputNumber, Select, TreeSelect, Typography } from "antd";
 import type { TreeSelectProps } from "antd";
+import { useCallback } from "react";
 import {
   Controller,
   useFormContext,
@@ -21,6 +22,7 @@ import {
   useEstimatePartPicker,
   type ItemTreeNode,
 } from "@/lib/hooks/use-estimate-item-picker";
+import { useFilteredPartAutofill } from "@/lib/hooks/use-filtered-part-autofill";
 import { buildConditionDraft } from "@/lib/estimates/condition-draft";
 
 export const LINE_TABLE_COLUMN_WIDTHS = {
@@ -134,6 +136,10 @@ export const PartCell = ({
   onPreview,
 }: PreviewAwareCellProps) => {
   const itemId = useWatch({ name: lineFieldPath(index, "item_id") }) as string | null;
+  const partId = useWatch({ name: lineFieldPath(index, "part_id") }) as
+    | string
+    | null
+    | undefined;
   const estimateConditionId = useWatch({
     name: lineFieldPath(index, "estimate_condition_id"),
   }) as string | undefined;
@@ -156,14 +162,39 @@ export const PartCell = ({
     draft,
   );
 
-  if (!itemId) {
-    return <Typography.Text type="secondary">—</Typography.Text>;
-  }
-
   const options = (parts ?? []).map((part) => ({
     value: part.id,
     label: part.mpn,
   }));
+
+  const onAdoptPart = useCallback(
+    (part: { value: string }) => {
+      setValue(lineFieldPath(index, "part_id"), part.value, { shouldDirty: true });
+      onPreview?.(index);
+    },
+    [index, onPreview, setValue],
+  );
+
+  const onClearPart = useCallback(() => {
+    setValue(lineFieldPath(index, "part_id"), null, { shouldDirty: true });
+    onPreview?.(index);
+  }, [index, onPreview, setValue]);
+
+  useFilteredPartAutofill({
+    enabled: writable && !disabled,
+    itemId,
+    partId,
+    materialLocked: Boolean(materialLocked),
+    isLoading,
+    options,
+    onAdopt: onAdoptPart,
+    onClear: onClearPart,
+  });
+
+  if (!itemId) {
+    return <Typography.Text type="secondary">—</Typography.Text>;
+  }
+
   const empty = !isLoading && options.length === 0;
 
   return (

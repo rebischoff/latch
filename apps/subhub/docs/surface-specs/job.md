@@ -70,27 +70,28 @@
 |----------|------|----------|---------|-------|
 | `summary` | scalar (list projection) | read | `job.id`, `title`, `site.name` | Site name as `site_display_name` in DTO |
 
-**List columns (5a):** `title`, `site_display_name` only.
+**List columns:** `title`, `site_display_name`, derived Field lifecycle + % (task 51).
 
 **Search / sort / filter UI:** deferred — DAL uses fixed `title` asc; optional `limit` / `offset` pagination on `GET /api/jobs`.
 
-### `job_detail` — wave 5a
+### `job_detail` — Fields (through wave 5c)
 
 | Field id | Type | Writable | Columns / child table | Notes |
 |----------|------|----------|-------------------------|-------|
 | `profile` | scalar | read + write | `title`, `site_id`, `job_kind`, `status`, `estimate_id` | `estimate_id` read-only; see PATCH rules |
 | `stakeholders` | collection | read + write | `job_party` | `party_id`, `relation_id`, `sort_order` |
-
-**Omit in 5a YAML / manifest:** `line_items`, `work_items`, `billable_items`, `sov_milestones`, `billing_settings`, `notes`, `attachments`.
+| `conditions` | collection | read + write | `job_condition*` | Scope commercial forest (46+) |
+| `line_items` | collection | read + write | `job_line` + allocations | Scope LI (46/47/50) |
+| `field_progress` | collection | read + write | `job_field_progress_cell` | Zone×phase boolean board (51); read DTO includes derived `%` / lifecycle / zone tree |
 
 **Deferred Fields (later waves):**
 
 | Field | Wave | Notes |
 |-------|------|-------|
-| `line_items` | **4d′** | `job_line` — Scope tab; flat then grouped-by-place |
-| `work_items` | **5c** | `job_work_item` — Field tab |
 | `billing_settings` | **6b** | Overview section when billing ships |
 | `billable_items`, `sov_milestones` | **6b** | Billing tab — [`job-billing-fields.md`](./job-billing-fields.md) |
+
+~~`work_items` / `job_work_item`~~ — dropped; replaced by **`field_progress`** (51 / F5).
 
 ### Scalar — `profile` (read DTO excerpt)
 
@@ -159,6 +160,28 @@ Same commercial shape as [`estimate.md`](./estimate.md) `line_items`, plus job l
 
 **Replace-array** on Save when Field is granted (4d′+). Operational reports sum `status = active` only ([change-order decision](../decisions/job.md#decision-change-orders--unified-job_line-ledger-2026-06-17)).
 
+### Collection — `field_progress` (wave 5c)
+
+**Decision:** [Field progress F1–F9](../decisions/job.md#decision-job-field-progress--boolean-zone-snapshot-5c-2026-07-16). **Planning:** [18](../planning/18-job-field-progress.md).
+
+**Writable PATCH:** replace-array of cells:
+
+```json
+[
+  { "scope_phase_id": "<uuid>", "site_zone_id": "<uuid>|null", "complete": true }
+]
+```
+
+`site_zone_id` null = **General** (unplaced). Omitted cells for the job's active scope phases are cleared (replace-array). Does **not** write `progress_entry*`.
+
+**Read DTO** (when `field_progress` granted): cells + `zone_tree` (category root → allocated zones → General; no All Zones) + `phases` + `work_rows` + `scope_phase_index` + derived `progress_pct` / `lifecycle` / `stale`.
+
+| Derived | Rule |
+|---------|------|
+| `%` | Hours-weighted; compute on read — never stored |
+| Lifecycle | cancelled (stored `job.status`) / not_started (0%) / in_progress / completed (100%); stale overlay if in_progress and no Field write for 30 days |
+| Cancel | `profile.status = cancelled` only when progress = 0%; blocks further Field writes |
+
 ---
 
 ## C — Policy
@@ -201,7 +224,7 @@ Same commercial shape as [`estimate.md`](./estimate.md) `line_items`, plus job l
 
 | Operation | Body keys | Semantics |
 |-----------|-----------|-----------|
-| `create` | `profile` (`title`, `site_id`) | Insert `job` with `job_kind = project`, `status = planned`; validate `site_id` exists |
+| `create` | `profile` (`title`, `site_id`); optional `stakeholders`, `conditions`, `line_items` | Insert `job` with `job_kind = project`, `status = planned`; validate `site_id` exists; nested collections via `replaceJobCollectionsTx` |
 | `patch` | manifest-narrowed `profile`, `stakeholders` | Reject when `status = cancelled`; scalar profile keys; stakeholders replace-array |
 | `delete` | — | **Not exposed in 5a** |
 | `complete` | — | **5c** — `status = complete`; publish site geography ([`site-geography.md`](./site-geography.md)) |
@@ -212,7 +235,7 @@ Same commercial shape as [`estimate.md`](./estimate.md) `line_items`, plus job l
 |------|---------|
 | `status` | `planned` \| `active` \| `cancelled` |
 | `job_kind` | `project` \| `service` \| `warranty` |
-| `site_id` change | Allow when `estimate_id` is null; clear `line_items` on change (warn-and-clear); reject when `estimate_id` set |
+| `site_id` change | Allow when `estimate_id` is null; clear `conditions` + `line_items` on change (warn-and-clear); reject when `estimate_id` set |
 | `cancelled` | Reject entire PATCH |
 
 **`stakeholders` validation:**
@@ -283,7 +306,7 @@ URL `?tab=` keys: `overview` (default, omit), `scope`, `field`, `billing`. Same-
 
 **Shared components:** `JobDetailForm` (production); `JobStakeholderFields` (mirror `EstimateStakeholderFields`).
 
-**Scope tab (4d′+):** shared line editor component (wave **3e**); flat default; grouped-by-place toggle after wave **2b** geography — same rules as [`estimate.md`](./estimate.md) § G.
+**Scope tab (4d′+):** shared line editor component (wave **3e**); flat default; grouped-by-place toggle after wave **2b** geography — same rules as [`estimate.md`](./estimate.md) § G. **Create:** Scope editable when `profile.site_id` is set (estimate Line Items parity — task **50**); one Save POSTs nested `conditions` / `line_items`.
 
 **Billing tab (6b+):** `billing_settings` section may move to Overview per [`job-billing-fields.md`](./job-billing-fields.md); SOV when `billing_model = progress_sov` ([billing decision](../decisions/billing.md#decision-sov-ui--nested-on-job_detail-billing-tab-2026-06-17)).
 
@@ -368,7 +391,7 @@ URL `?tab=` keys: `overview` (default, omit), `scope`, `field`, `billing`. Same-
 | **3 + 3e** | `part` / minimal `item`; shared line editor component |
 | **4d′** | Retrofit estimate Scope; **job Scope tab** + `line_items` in YAML/manifest |
 | **5b** | Estimate `win` / `lose`; job copy via internal DAL |
-| **5c** | Field tab (`work_items`); `complete` action + geography publish; `status = complete` |
+| **5c** | Field tab (`field_progress`); derived % + lifecycle; cancel-at-zero — **as-built publish / `complete` deferred** |
 | **5d** | Change orders |
 | **6b** | Billing tab + `billing_settings` on Overview; `billable_items`, `sov_milestones` |
 | **TBD** | `delete` action + blockers; list search/sort/filters; hub engagement links |

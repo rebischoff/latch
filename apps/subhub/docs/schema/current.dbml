@@ -1024,16 +1024,21 @@ Table estimate_line_allocation {
 TableGroup job [color: #e74c3c] {
   job
   job_party
+  job_condition
+  job_condition_spec
+  job_condition_labor_phase
   job_scope_group
   job_line
+  job_line_allocation
   job_line_part
   job_line_cost_revision
+  job_line_spec
   scope_phase
+  job_field_progress_cell
   progress_entry
   progress_entry_line
   job_system_spec
   job_area_spec
-  job_line_spec
   change_order
   change_order_line
 }
@@ -1042,6 +1047,7 @@ Table job {
   id text [pk, default: `gen_random_uuid()::text`]
   site_id text [not null, note: 'FK → site — where work happens']
   estimate_id text [note: 'nullable FK → estimate — source won quote']
+  catalog_scope_item_id text [note: 'nullable FK → item (node_type = scope) — required when won from estimate (46 W1a)']
   parent_job_id text [note: 'nullable FK → job — warranty / follow-up to prior job']
   job_kind text [not null, default: 'project', note: 'CHECK: project | service | warranty']
   billing_model text [not null, default: 'progress_line', note: 'CHECK: lump_sum | progress_line | progress_sov | tm']
@@ -1049,24 +1055,82 @@ Table job {
   bill_on_work_status text [not null, default: 'installed', note: 'CHECK: installed | verified — work_item threshold for auto billable from field status']
   retainage_pct numeric [not null, default: 0, note: 'contract retainage % withheld on progress invoices — e.g. 10']
   title text [not null, default: '']
-  status text [not null, default: 'planned', note: 'CHECK: planned | active | complete | cancelled']
+  status text [not null, default: 'planned', note: 'CHECK: planned | active | complete | cancelled — cancelled is the only stored lifecycle; not_started / in_progress / completed / stale are derived from field_progress (51 F)']
+  field_progress_updated_at timestamptz [note: 'nullable — last successful field_progress write; stale = in_progress and older than 30d (51)']
   created_at timestamptz [not null, default: `now()`]
   updated_at timestamptz [not null, default: `now()`]
 
+  indexes {
+    (estimate_id, catalog_scope_item_id) [unique, name: 'job_estimate_catalog_scope_unique', note: 'partial WHERE both NOT NULL — one job per catalog scope per estimate (46 W1a/S2a)']
+  }
+
   Note: '''
     Operations anchor — install projects, service calls, and warranty work share one model
-    (`job_kind`). No sole customer_id — graph on `job_party`. Site geography on `site_area` /
-    `site_asset`; lines FK `site_area_id` / `site_asset_id`. On `complete`, DAL publishes
-    proposed → active and applies relocations/removals to site registry (does not rewrite closed
-    job line FKs).
+    (`job_kind`). No sole customer_id — graph on `job_party`. Site geography on `site_zone` /
+    `site_asset`; lines use `job_line_allocation` (and optional single `site_zone_id` compat).
+    On `complete`, DAL publishes proposed → active and applies relocations/removals to site
+    registry (does not rewrite closed job line FKs).
 
-    **Scope model:** `job_scope_group` → `job_line` → `scope_phase` → `progress_entry` /
-    `progress_entry_line` (replaces `job_work_item` — J1 locked).
+    **Win handoff (46):** one job per catalog scope on a won estimate (`catalog_scope_item_id`
+    + UNIQUE with `estimate_id`). Commercial tree lives on `job_condition*`; sold lines on
+    `job_line` with sold_* snapshots.
+
+    **Scope / Field (51):** `job_line` → `scope_phase` → `job_field_progress_cell` (zone×phase
+    boolean snapshot). `progress_entry*` remains in DBML for a possible later visit ledger —
+    **not** written by the v1 Field product path. Job % and lifecycle (except cancelled) are
+    derived on read — never stored.
 
     **Billing:** `billing_model` selects lump-sum at complete, line progress, SOV milestones, or
     T&M. `billing_basis` drives auto `billable_line` generation (deferred v1 — manual staging first).
     Customer invoices always snapshot on `invoice` / `invoice_line` — see billing TableGroup.
   '''
+}
+
+Table job_condition {
+  id text [pk, default: `gen_random_uuid()::text`]
+  job_id text [not null, note: 'FK → job — forest owner (46 W3)']
+  parent_condition_id text [note: 'nullable FK → job_condition — null = root']
+  site_zone_id text [note: 'FK → site_zone (root only); NOT NULL on roots; null on children']
+  name text [not null]
+  complexity_factor_id text [note: 'nullable FK → complexity_factor — null = inherit ancestry / 100% at root']
+  complexity_factor_id_at_win text [note: 'nullable FK → complexity_factor — snapshot at win (JC5); null = no baseline (manual / post-win add)']
+  labor_phases_explicit boolean [not null, default: false]
+  labor_only boolean [not null, default: false]
+  labor_only_explicit boolean [not null, default: false]
+  include_discontinued boolean [not null, default: false]
+  include_discontinued_explicit boolean [not null, default: false]
+  sort_order int [not null, default: 0]
+
+  Note: '''
+    Job-owned commercial node — copied from `estimate_condition` on win (46 W3). Same shape as
+    estimate forest; engineer may edit knobs. Edits do not write back to the estimate.
+    `complexity_factor_id_at_win` seeded on win (= copied complexity); client cannot write it (48 JC5).
+    Partial unique (job_id, site_zone_id) WHERE parent_condition_id IS NULL.
+  '''
+}
+
+Table job_condition_spec {
+  id text [pk, default: `gen_random_uuid()::text`]
+  job_condition_id text [not null]
+  spec_def_id uuid [not null]
+  spec_option_id uuid [note: 'nullable — enum defs']
+  value_boolean boolean [note: 'nullable — boolean defs']
+  value_number numeric [note: 'nullable — number bucket lower bound']
+  value_number_max numeric [note: 'nullable — number bucket upper bound; null = +∞']
+
+  Note: 'Per-condition spec on the job — copied from estimate_condition_spec on win.'
+}
+
+Table job_condition_labor_phase {
+  job_condition_id text [not null]
+  labor_phase_id text [not null]
+  sort_order int [not null, default: 0]
+
+  indexes {
+    (job_condition_id, labor_phase_id) [pk]
+  }
+
+  Note: 'Own labor phases when `labor_phases_explicit` — empty junction = explicit no phases.'
 }
 
 Table job_party {
@@ -1105,17 +1169,33 @@ Table job_line {
   id text [pk, default: `gen_random_uuid()::text`]
   job_id text [not null]
   job_scope_group_id text [note: 'nullable FK → job_scope_group — null = implicit General (J4)']
+  job_condition_id text [note: 'nullable FK → job_condition — commercial bind after win (46)']
   line_number int [not null]
   line_role text [not null, default: 'standalone', note: 'CHECK: standalone | kit_header | kit_component']
   line_kind text [not null, default: 'product', note: 'CHECK: product | labor | expense']
   description text [not null, default: '']
-  quantity numeric [not null, default: 1]
+  quantity numeric [not null, default: 1, note: 'working/install qty — editable; places may drive; current cost driver']
+  sold_quantity numeric [not null, default: 0, note: 'contract qty frozen at win; Scope-E1 new lines = 0; change → CO (47 JLI)']
+  qty_manual boolean [not null, default: false, note: 'false = allocations drive quantity (working), not sold_quantity']
   unit text [not null, default: 'ea']
-  unit_cost numeric [not null, default: 0]
-  unit_price numeric [not null, default: 0]
-  site_zone_id text [note: 'nullable FK → site_zone — frozen for this job line']
+  unit_cost numeric [not null, default: 0, note: 'live current cost (engineering)']
+  unit_price numeric [not null, default: 0, note: 'contract unit price — frozen from sold snapshot on sold lines']
+  unit_price_target numeric [note: 'nullable — policy sell from markup at calc']
+  unit_material numeric [not null, default: 0]
+  unit_labor numeric [not null, default: 0]
+  unit_freight numeric [not null, default: 0]
+  unit_incidental numeric [not null, default: 0]
+  sold_unit_price numeric [not null, default: 0, note: 'frozen at win; Scope-E1 new lines = 0']
+  sold_unit_cost numeric [not null, default: 0]
+  sold_unit_material numeric [not null, default: 0]
+  sold_unit_labor numeric [not null, default: 0]
+  sold_unit_freight numeric [not null, default: 0]
+  sold_unit_incidental numeric [not null, default: 0]
+  site_zone_id text [note: 'nullable FK → site_zone — display/compat when exactly one allocation']
   site_asset_id text [note: 'nullable FK → site_asset — device-level scope']
   material_status text [note: 'nullable — carried from estimate']
+  sales_locked boolean [not null, default: false]
+  material_locked boolean [not null, default: false]
   item_id text [note: 'nullable FK → item — sold scope; may stay generic']
   part_id text [note: 'nullable FK → manufacturer_part']
   vendor_part_id text [note: 'nullable FK → vendor_part']
@@ -1133,9 +1213,26 @@ Table job_line {
 
   Note: '''
     Sold / contract scope — unified ledger from estimate win, change orders, or manual entry.
-    Engineering buy list on `job_line_part`. Field progress on `scope_phase` + `progress_entry`.
-    Operational reports sum `status = active` only; voided rows keep CO deduct provenance.
+    Places via `job_line_allocation` (W4). Sold_* + sold_quantity + unit_price are contract;
+    working `quantity` + live unit_* cost buckets are engineering (W3 / 47 JLI). Ext sold =
+    sold_quantity × sold_unit_price; current cost = quantity × unit_cost. Add @ sold $0 /
+    sold_quantity=0; delete sold $>0 → CO (Scope-E1). Engineering buy list on `job_line_part`.
+    Field progress on `scope_phase` + `progress_entry`. Operational reports sum `status = active`
+    only; voided rows keep CO deduct provenance.
   '''
+}
+
+Table job_line_allocation {
+  id text [pk, default: `gen_random_uuid()::text`]
+  job_line_id text [not null]
+  site_zone_id text [not null]
+  quantity numeric [not null, default: 1]
+
+  indexes {
+    (job_line_id, site_zone_id) [unique]
+  }
+
+  Note: 'Optional place rows: site zone × qty-per-zone. Copied from estimate on win (46 W4).'
 }
 
 Table job_line_part {
@@ -1187,17 +1284,36 @@ Table scope_phase {
   name text [not null, note: 'Install, Program, Test, Complete, …']
   sequence int [not null]
   planned_qty numeric [not null, default: 0]
-  completed_qty numeric [not null, default: 0]
-  progress_weight numeric [not null, default: 1]
+  completed_qty numeric [not null, default: 0, note: 'optional denorm from field_progress cells; % still derived from cells (51)']
+  progress_weight numeric [not null, default: 1, note: 'hours_per_unit from item matrix at seed — hours slice = weight × geography qty']
   billing_weight numeric [not null, default: 1]
   requires_previous_phase boolean [not null, default: false]
   target_date date [note: 'nullable — install target; order_by = target − vendor_part.lead_time_days (P2)']
   sort_order int [not null, default: 0]
 
   Note: '''
-    Per scope item (`job_line`) — fractional completion lives here (replaces `job_work_item`).
-    Seeded from resolved `item_labor_phase` filtered by estimate scope/zone inclusion on win (37n).
-    `progress_entry_line` quantities roll up into `completed_qty`.
+    Per scope item (`job_line`) — seeded from resolved `item_labor_phase` filtered by condition
+    inclusion on win / line create (37n). v1 Field product path uses `job_field_progress_cell`
+    (zone×phase boolean) — not fractional qty on this row alone (multi-place lines).
+  '''
+}
+
+Table job_field_progress_cell {
+  id text [pk, default: `gen_random_uuid()::text`]
+  scope_phase_id text [not null]
+  site_zone_id text [note: 'nullable FK → site_zone — null = General (unplaced) pseudo-geography']
+  complete boolean [not null, default: false]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (scope_phase_id, site_zone_id) [unique, name: 'job_field_progress_cell_phase_zone_unique', note: 'partial WHERE site_zone_id IS NOT NULL']
+    (scope_phase_id) [unique, name: 'job_field_progress_cell_phase_general_unique', note: 'partial WHERE site_zone_id IS NULL']
+  }
+
+  Note: '''
+    v1 Field tab snapshot (51 F1–F9) — boolean complete per (scope_phase, site_zone | General).
+    Surface Field `field_progress` replace-array. No progress history; billing reads derived %
+    when invoicing. Do not write `progress_entry*` from this path.
   '''
 }
 
@@ -1211,8 +1327,8 @@ Table progress_entry {
   created_at timestamptz [not null, default: `now()`]
 
   Note: '''
-    Field progress header — work date, crew, notes. No workflow/status v1 (J2) — save applies
-    immediately to `scope_phase.completed_qty`. Child collection on `job_detail` Field tab.
+    Visit-ledger header — **deferred** for product UI (51). Retained for a possible later
+    history wave. v1 Field writes `job_field_progress_cell` only.
   '''
 }
 
@@ -1221,11 +1337,12 @@ Table progress_entry_line {
   progress_entry_id text [not null]
   scope_phase_id text [not null]
   quantity_completed numeric [not null, default: 0]
-  site_area_id text [note: 'nullable FK → site_area']
-  site_asset_id text [note: 'nullable FK → site_asset']
+  site_zone_id text [note: 'nullable FK → site_zone — preferred geography tag (51); supersedes site_area_id for new work']
+  site_area_id text [note: 'nullable FK → site_area — legacy; ignore for new Field writes']
+  site_asset_id text [note: 'nullable FK → site_asset — device-level; not on v1 Field writes']
   sort_order int [not null, default: 0]
 
-  Note: 'One row per scope phase reported in this entry. Sums into `scope_phase.completed_qty`.'
+  Note: 'Deferred visit-ledger line. Prefer `site_zone_id` over `site_area_id` when revived.'
 }
 
 Table job_system_spec {
@@ -1256,13 +1373,13 @@ Table job_area_spec {
 Table job_line_spec {
   id text [pk, default: `gen_random_uuid()::text`]
   job_line_id text [not null]
-  system_spec_def_id uuid [not null]
-  system_spec_option_id uuid [note: 'nullable — enum defs']
+  spec_def_id uuid [not null]
+  spec_option_id uuid [note: 'nullable — enum defs']
   value_boolean boolean [note: 'nullable — boolean defs']
-  value_number numeric [note: 'nullable — number/range (canonical, 37p)']
-  value_number_max numeric [note: 'nullable — range part rows only']
+  value_number numeric [note: 'nullable — number bucket lower bound']
+  value_number_max numeric [note: 'nullable — number bucket upper bound; null = +∞']
 
-  Note: 'Per-line spec snapshot on win — copied from `estimate_line_spec`.'
+  Note: 'Per-line spec snapshot on win — copied from `estimate_line_spec` (46 W2; spec_def_id).'
 }
 
 Table change_order {
@@ -1764,6 +1881,12 @@ Ref: job_scope_group.root_item_id > item.id [delete: set null]
 Ref: job_scope_group.site_zone_id > site_zone.id [delete: set null]
 Ref: job_scope_group.sov_line_id > sov_line.id [delete: set null]
 Ref: job_line.job_id > job.id [delete: cascade]
+Ref: job_line.job_condition_id > job_condition.id [delete: set null]
+Ref: job_condition.job_id > job.id [delete: cascade]
+Ref: job_condition.parent_condition_id > job_condition.id [delete: cascade]
+Ref: job_condition.site_zone_id > site_zone.id [delete: restrict]
+Ref: job_condition.complexity_factor_id > complexity_factor.id [delete: set null]
+Ref: job_condition.complexity_factor_id_at_win > complexity_factor.id [delete: set null]
 Ref: job_line.job_scope_group_id > job_scope_group.id [delete: set null]
 Ref: job_line.parent_line_id > job_line.id [delete: set null]
 Ref: job_line.site_zone_id > site_zone.id [delete: set null]
@@ -1782,10 +1905,13 @@ Ref: job_line_part.site_asset_id > site_asset.id [delete: set null]
 Ref: job_line_cost_revision.job_line_id > job_line.id [delete: cascade]
 Ref: scope_phase.job_line_id > job_line.id [delete: cascade]
 Ref: scope_phase.labor_phase_id > labor_phase.id [delete: restrict]
+Ref: job_field_progress_cell.scope_phase_id > scope_phase.id [delete: cascade]
+Ref: job_field_progress_cell.site_zone_id > site_zone.id [delete: restrict]
 Ref: progress_entry.job_id > job.id [delete: cascade]
 Ref: progress_entry.entered_by > employee.party_id [delete: set null]
 Ref: progress_entry_line.progress_entry_id > progress_entry.id [delete: cascade]
 Ref: progress_entry_line.scope_phase_id > scope_phase.id [delete: restrict]
+Ref: progress_entry_line.site_zone_id > site_zone.id [delete: set null]
 Ref: progress_entry_line.site_area_id > site_area.id [delete: set null]
 Ref: progress_entry_line.site_asset_id > site_asset.id [delete: set null]
 Ref: job_system_spec.job_scope_group_id > job_scope_group.id [delete: cascade]

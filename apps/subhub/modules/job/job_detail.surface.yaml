@@ -16,7 +16,16 @@ tables:
   - job
   - job_party
   - job_party_relation
+  - job_condition
+  - job_condition_spec
+  - job_condition_labor_phase
+  - job_line
+  - job_line_allocation
+  - job_line_spec
+  - scope_phase
+  - job_field_progress_cell
   - site
+  - site_zone
   - estimate
 
 fields:
@@ -37,4 +46,13 @@ fields:
         nullable: true
   - id: stakeholders
     # logical — DAL maps to job_party; see docs/child-collections.md
+    columns: []
+  - id: conditions
+    # logical — DAL maps to job_condition forest + specs/phases (task 46 W3)
+    columns: []
+  - id: line_items
+    # logical — DAL maps to job_line + allocations + specs (task 46 W2/W4)
+    columns: []
+  - id: field_progress
+    # logical — DAL maps to job_field_progress_cell + derived board/%/lifecycle (task 51)
     columns: []

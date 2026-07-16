@@ -286,6 +286,11 @@ flowchart LR
 | **43** | [43-estimate-labor-only.md](./43-estimate-labor-only.md) | Condition **Labor only** (L1–L12); Y4 inherit for labor-only + discontinued; force M/F/I = 0; hide LI material columns — **complete** (2026-07-14) |
 | **44** | [44-site-anchor-warn-and-clear.md](./44-site-anchor-warn-and-clear.md) | Site warn-and-clear (S1–S9) — drop immutability; confirm clears conditions/lines; estimate + job parity — **complete** (2026-07-14) |
 | **45** | [45-job-costing-and-change-order-reconciliation.md](./45-job-costing-and-change-order-reconciliation.md) | Job costing (budget/committed/actual/margin rollups + `job_line_cost_revision` re-budget) + CO ↔ BOM ↔ scope_phase reconciliation (C1–C6) — **complete** (2026-07-14); migration **075** |
+| **46** | [46-estimate-win-lose-job-copy.md](./46-estimate-win-lose-job-copy.md) | Wave **5b** thick — Win/Lose/Create-job; estimate-parity Job Scope — **complete** (2026-07-15) |
+| **47** | [47-job-line-items-parity.md](./47-job-line-items-parity.md) | Job LI parity (**JLI-1…7**) — **complete** (2026-07-15) |
+| **48** | [48-job-create-front-doors-condition-drift.md](./48-job-create-front-doors-condition-drift.md) | JC1–JC2/JC5 — Jobs New + as-sold path; complexity at-win drift — **complete** (2026-07-15) |
+| **50** | [50-job-scope-on-create.md](./50-job-scope-on-create.md) | Job Scope editable on create (estimate parity) — **complete** (2026-07-15) |
+| **49** | [49-change-order-surfaces.md](./49-change-order-surfaces.md) | Wave **5d** CO Surfaces + Approve — **ready** (2026-07-15) |
 
 ### Backbone pass (estimate finish) — tasks 29–32
 
@@ -421,8 +426,12 @@ Field detail: [`surfaces.md`](../surfaces.md). DBML: [`current.dbml`](../schema/
 |---|------|----------|
 | 23 | [23-job-wave-5a.md](./23-job-wave-5a.md) | Job wave **5a** shell — migration, YAML, DAL, API, Overview UI — **complete** |
 | 45 | [45-job-costing-and-change-order-reconciliation.md](./45-job-costing-and-change-order-reconciliation.md) | CO ↔ BOM ↔ scope_phase reconciliation (C1–C6) + job costing model — **complete** (2026-07-14); 5d mounts Surfaces on approve DAL |
-| **46** | [46-estimate-win-lose-job-copy.md](./46-estimate-win-lose-job-copy.md) | Wave **5b** thick — Win/Lose/Create-job; one job per catalog scope; conditions + sold/current costing + places — **authored** (2026-07-15); implement next |
-| 24+ | *TBD* | 5c field, 5d change-order Surfaces (must follow [45](./45-job-costing-and-change-order-reconciliation.md) + [46](./46-estimate-win-lose-job-copy.md)) |
+| **46** | [46-estimate-win-lose-job-copy.md](./46-estimate-win-lose-job-copy.md) | Wave **5b** thick — Win/Lose/Create-job; one job per catalog scope; estimate-parity Job Scope (Scope-U1/E1/F1/S1) — **complete** (2026-07-15) |
+| **47** | [47-job-line-items-parity.md](./47-job-line-items-parity.md) | Job LI parity — dual sold/working qty; Item/Part; zone icon + job unplaced danger; amend Scope-F1 (**JLI-1…7**) — **complete** (2026-07-15) |
+| **48** | [48-job-create-front-doors-condition-drift.md](./48-job-create-front-doors-condition-drift.md) | JC1–JC2/JC5 — keep Jobs New; as-sold via estimate Win; `complexity_factor_id_at_win` + C drift badge — **complete** (2026-07-15) |
+| **50** | [50-job-scope-on-create.md](./50-job-scope-on-create.md) | Job Scope editable on create (estimate parity); nested collections on POST — **complete** (2026-07-15) |
+| **49** | [49-change-order-surfaces.md](./49-change-order-surfaces.md) | Wave **5d** — `change_order_*` Surfaces; shared commercial helpers; Approve on [45](./45-job-costing-and-change-order-reconciliation.md) DAL (**JC3/JC4/JC6**) — **ready** (2026-07-15) |
+| **51** | [51-job-field-progress.md](./51-job-field-progress.md) | Wave **5c** — Field boolean zone×phase snapshot; `field_progress`; hours-weighted derived % + lifecycle (**F1–F9**) — **complete** (2026-07-16) |
 
 ---
 

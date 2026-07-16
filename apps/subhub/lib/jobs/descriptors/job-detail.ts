@@ -3,6 +3,10 @@ import type { SurfaceDescriptor } from "@latch/dal";
 import { z } from "zod";
 
 import type { JobCostSummary } from "../repository/job-cost-summary";
+import type {
+  JobFieldProgressCellPatch,
+  JobFieldProgressDto,
+} from "../repository/job-field-progress";
 
 const JobStakeholderPatchElementSchema = z
   .object({
@@ -11,19 +15,113 @@ const JobStakeholderPatchElementSchema = z
   })
   .strict();
 
+const JobFieldProgressCellPatchElementSchema = z
+  .object({
+    scope_phase_id: z.string(),
+    site_zone_id: z.string().nullable(),
+    complete: z.boolean(),
+  })
+  .strict();
+
+const JobConditionLaborPhasePatchElementSchema = z
+  .object({
+    labor_phase_id: z.string(),
+  })
+  .strict();
+
+const JobConditionSpecPatchElementSchema = z
+  .object({
+    spec_def_id: z.string(),
+    spec_option_id: z.string().nullable().optional(),
+    value_number: z.number().nullable().optional(),
+    value_number_max: z.number().nullable().optional(),
+    value_boolean: z.boolean().nullable().optional(),
+  })
+  .strict();
+
+/**
+ * Engineering condition PATCH. `complexity_factor_id_at_win` is intentionally
+ * NOT writable (48 JC5) — win seeds it; manual / post-win adds keep null.
+ */
+const JobConditionPatchElementSchema: z.ZodType<{
+  complexity_factor_id?: string | null;
+  conditions?: unknown[];
+  id?: string;
+  include_discontinued?: boolean;
+  include_discontinued_explicit?: boolean;
+  included_labor_phases?: Array<{ labor_phase_id: string }>;
+  labor_only?: boolean;
+  labor_only_explicit?: boolean;
+  labor_phases_explicit?: boolean;
+  name: string;
+  parent_condition_id?: string | null;
+  site_zone_id?: string | null;
+  sort_order: number;
+  specs: Array<{
+    spec_def_id: string;
+    spec_option_id?: string | null;
+    value_boolean?: boolean | null;
+    value_number?: number | null;
+    value_number_max?: number | null;
+  }>;
+}> = z.lazy(() =>
+  z
+    .object({
+      id: z.string().optional(),
+      name: z.string().min(1),
+      parent_condition_id: z.string().nullable().optional(),
+      site_zone_id: z.string().nullable().optional(),
+      sort_order: z.number(),
+      complexity_factor_id: z.string().nullable().optional(),
+      include_discontinued: z.boolean().optional(),
+      include_discontinued_explicit: z.boolean().optional(),
+      labor_only: z.boolean().optional(),
+      labor_only_explicit: z.boolean().optional(),
+      labor_phases_explicit: z.boolean().optional(),
+      included_labor_phases: z
+        .array(JobConditionLaborPhasePatchElementSchema)
+        .optional(),
+      specs: z.array(JobConditionSpecPatchElementSchema),
+      conditions: z.array(JobConditionPatchElementSchema).optional(),
+    })
+    .strict(),
+);
+
+const JobLineAllocationPatchElementSchema = z
+  .object({
+    site_zone_id: z.string(),
+    quantity: z.number().positive(),
+  })
+  .strict();
+
+/**
+ * Engineering line PATCH. Sold snapshot columns (`sold_*` / `sold_quantity`) are
+ * intentionally NOT writable from the client (Scope-F1 / 47 JLI): new lines
+ * default to `sold_* = 0` / `sold_quantity = 0` server-side; existing sold lines
+ * keep their DB snapshot. Working `quantity` is writable.
+ */
 const JobLineItemPatchElementSchema = z
   .object({
     id: z.string().optional(),
     line_role: z.enum(["standalone", "kit_header", "kit_component"]),
-    line_kind: z.enum(["product", "labor", "expense"]),
+    line_kind: z.enum(["product", "labor", "expense"]).optional(),
     description: z.string(),
     quantity: z.number(),
+    qty_manual: z.boolean().optional(),
     unit: z.string(),
     unit_cost: z.number(),
     unit_price: z.number(),
+    unit_material: z.number().optional(),
+    unit_labor: z.number().optional(),
+    unit_freight: z.number().optional(),
+    unit_incidental: z.number().optional(),
+    unit_price_target: z.number().nullable().optional(),
+    job_condition_id: z.string().nullable().optional(),
+    allocations: z.array(JobLineAllocationPatchElementSchema).optional(),
+    sales_locked: z.boolean().optional(),
+    material_locked: z.boolean().optional(),
     site_zone_id: z.string().nullable().optional(),
     site_asset_id: z.string().nullable().optional(),
-    phase_id: z.string().nullable().optional(),
     item_id: z.string().nullable().optional(),
     part_id: z.string().nullable().optional(),
     vendor_part_id: z.string().nullable().optional(),
@@ -50,6 +148,10 @@ export const JobDetailPatchSchema = z
       .strict()
       .optional(),
     stakeholders: z.array(JobStakeholderPatchElementSchema).optional(),
+    conditions: z.array(JobConditionPatchElementSchema).optional(),
+    line_items: z.array(JobLineItemPatchElementSchema).optional(),
+    /** Replace-array of zone×phase cells (task 51). */
+    field_progress: z.array(JobFieldProgressCellPatchElementSchema).optional(),
   })
   .strict();
 
@@ -63,10 +165,14 @@ export const JobDetailCreateSchema = z
       })
       .strict(),
     stakeholders: z.array(JobStakeholderPatchElementSchema).optional(),
+    conditions: z.array(JobConditionPatchElementSchema).optional(),
+    line_items: z.array(JobLineItemPatchElementSchema).optional(),
   })
   .strict();
 
 export type JobDetailRow = {
+  catalog_scope_display_name: string | null;
+  catalog_scope_item_id: string | null;
   estimate_display_title: string | null;
   estimate_id: string | null;
   id: string;
@@ -86,8 +192,59 @@ export type JobStakeholderRow = {
   sort_order: number;
 };
 
+export type JobConditionLaborPhaseRow = {
+  labor_phase_id: string;
+  labor_phase_name: string;
+  sort_order: number;
+};
+
+export type JobConditionSpecRow = {
+  decimal_places: number | null;
+  def_display_name: string;
+  option_display_name: string | null;
+  options?: Array<{ display_name: string; id: string }>;
+  spec_def_id: string;
+  spec_option_id: string | null;
+  to_canonical_factor: number;
+  unit_symbol: string | null;
+  value_boolean: boolean | null;
+  value_number: number | null;
+  value_number_max: number | null;
+  value_type: "enum" | "boolean" | "number";
+};
+
+export type JobConditionRow = {
+  complexity_factor_id: string | null;
+  /** Win-time snapshot (JC5); read-only — not in writable patch schema. */
+  complexity_factor_id_at_win: string | null;
+  conditions: JobConditionRow[];
+  id: string;
+  include_discontinued: boolean;
+  include_discontinued_explicit: boolean;
+  included_labor_phases: JobConditionLaborPhaseRow[];
+  labor_only: boolean;
+  labor_only_explicit: boolean;
+  labor_phases_explicit: boolean;
+  name: string;
+  parent_condition_id: string | null;
+  root_item_id: string | null;
+  root_item_name: string | null;
+  site_zone_id: string | null;
+  site_zone_name: string | null;
+  sort_order: number;
+  specs: JobConditionSpecRow[];
+};
+
+export type JobLineAllocationRow = {
+  quantity: number;
+  site_zone_id: string;
+  site_zone_name?: string | null;
+};
+
 export type JobDetailRelated = {
   cost_summary: JobCostSummary;
+  conditions: JobConditionRow[];
+  field_progress: JobFieldProgressDto;
   line_items: JobLineItemRow[];
   stakeholders: JobStakeholderRow[];
 };
@@ -98,29 +255,57 @@ export type JobStakeholderPatchRow = {
 };
 
 export type JobLineItemRow = {
+  allocations: JobLineAllocationRow[];
   change_order_line_id: string | null;
   description: string;
   estimate_line_id: string | null;
   id: string;
   item_id: string | null;
+  item_name: string | null;
+  job_condition_id: string | null;
   line_kind: string;
   line_number: number;
   line_role: string;
+  material_locked: boolean;
   parent_line_id: string | null;
   part_id: string | null;
-  phase_id: string | null;
+  part_mpn: string | null;
+  qty_manual: boolean;
   quantity: number;
+  sales_locked: boolean;
   site_zone_id: string | null;
   site_asset_id: string | null;
+  sold_quantity: number;
+  sold_unit_cost: number;
+  sold_unit_freight: number;
+  sold_unit_incidental: number;
+  sold_unit_labor: number;
+  sold_unit_material: number;
+  sold_unit_price: number;
   sort_order: number;
   source: string;
   status: string;
   superseded_by_job_line_id: string | null;
   unit: string;
   unit_cost: number;
+  unit_freight: number;
+  unit_incidental: number;
+  unit_labor: number;
+  unit_material: number;
   unit_price: number;
+  unit_price_target: number | null;
   vendor_part_id: string | null;
 };
+
+export type JobConditionSpecPatchRow = z.infer<
+  typeof JobConditionSpecPatchElementSchema
+>;
+
+export type JobConditionPatchRow = z.infer<typeof JobConditionPatchElementSchema>;
+
+export type JobLineAllocationPatchRow = z.infer<
+  typeof JobLineAllocationPatchElementSchema
+>;
 
 export type JobLineItemPatchRow = z.infer<typeof JobLineItemPatchElementSchema>;
 
@@ -129,7 +314,11 @@ export type JobDetailWriteRow = Pick<
   "id" | "title" | "site_id" | "job_kind" | "status"
 >;
 
+export type JobFieldProgressPatchRow = JobFieldProgressCellPatch;
+
 export type JobDetailRelatedPatch = {
+  conditions?: JobConditionPatchRow[];
+  field_progress?: JobFieldProgressPatchRow[];
   line_items?: JobLineItemPatchRow[];
   stakeholders?: JobStakeholderPatchRow[];
 };
@@ -137,6 +326,8 @@ export type JobDetailRelatedPatch = {
 export type JobDetailStoreRelated = JobDetailRelated | JobDetailRelatedPatch;
 
 const formatJobDetailRow = (row: JobDetailRow): Record<string, unknown> => ({
+  catalog_scope_display_name: row.catalog_scope_display_name,
+  catalog_scope_item_id: row.catalog_scope_item_id,
   estimate_display_title: row.estimate_display_title,
   estimate_id: row.estimate_id,
   id: row.id,
@@ -145,6 +336,17 @@ const formatJobDetailRow = (row: JobDetailRow): Record<string, unknown> => ({
   site_id: row.site_id,
   status: row.status,
   title: row.title,
+});
+
+const emptyFieldProgress = (): JobFieldProgressDto => ({
+  cells: [],
+  zone_tree: [],
+  phases: [],
+  work_rows: [],
+  scope_phase_index: [],
+  progress_pct: 0,
+  lifecycle: "not_started",
+  stale: false,
 });
 
 const normalizeJobDetailRelated = (
@@ -160,6 +362,9 @@ const normalizeJobDetailRelated = (
     margin_vs_rebudgeted: 0,
     margin_vs_actual: 0,
   },
+  conditions: (related.conditions ?? []) as JobConditionRow[],
+  field_progress:
+    (related as JobDetailRelated).field_progress ?? emptyFieldProgress(),
   line_items: (related.line_items ?? []) as JobLineItemRow[],
   stakeholders: (related.stakeholders ?? []) as JobStakeholderRow[],
 });
@@ -182,6 +387,8 @@ export const projectJobDetailRow = (
       status: row.status,
       estimate_id: row.estimate_id,
       estimate_display_title: row.estimate_display_title,
+      catalog_scope_item_id: row.catalog_scope_item_id,
+      catalog_scope_display_name: row.catalog_scope_display_name,
     };
     // Derived cost layers (task 45) — not a separate Surface Field.
     dto.cost_summary = normalized.cost_summary;
@@ -191,8 +398,16 @@ export const projectJobDetailRow = (
     dto.stakeholders = normalized.stakeholders;
   }
 
+  if (manifest.fields.conditions?.includes("read")) {
+    dto.conditions = normalized.conditions;
+  }
+
   if (manifest.fields.line_items?.includes("read")) {
     dto.line_items = normalized.line_items;
+  }
+
+  if (manifest.fields.field_progress?.includes("read")) {
+    dto.field_progress = normalized.field_progress;
   }
 
   return dto;
@@ -242,12 +457,23 @@ export const jobDetailDescriptor: SurfaceDescriptor<
     if (typed.stakeholders !== undefined) {
       related.stakeholders = typed.stakeholders;
     }
+    if (typed.conditions !== undefined) {
+      related.conditions = typed.conditions as JobConditionPatchRow[];
+    }
+    if (typed.line_items !== undefined) {
+      related.line_items = typed.line_items as JobLineItemPatchRow[];
+    }
+    if (typed.field_progress !== undefined) {
+      related.field_progress = typed.field_progress as JobFieldProgressPatchRow[];
+    }
 
     return Object.keys(related).length > 0 ? related : undefined;
   },
   auditSnapshot: formatJobDetailRow,
   deleteAuditSnapshot: (row, related) => ({
     ...formatJobDetailRow(row),
+    conditions: normalizeJobDetailRelated(related).conditions,
+    field_progress: normalizeJobDetailRelated(related).field_progress.cells,
     line_items: normalizeJobDetailRelated(related).line_items,
     stakeholders: normalizeJobDetailRelated(related).stakeholders,
   }),

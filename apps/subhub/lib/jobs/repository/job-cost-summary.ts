@@ -36,10 +36,11 @@ export const loadJobCostSummary = async (
 ): Promise<JobCostSummary> => {
   const lines = await pool.query<{
     quantity: string | number;
-    unit_price: string | number;
+    sold_quantity: string | number;
+    sold_unit_price: string | number;
     unit_cost: string | number;
   }>(
-    `SELECT quantity, unit_price, unit_cost
+    `SELECT quantity, sold_quantity, sold_unit_price, unit_cost
      FROM job_line
      WHERE job_id = $1 AND status = 'active'`,
     [jobId],
@@ -48,9 +49,9 @@ export const loadJobCostSummary = async (
   let contract = 0;
   let budget = 0;
   for (const row of lines.rows) {
-    const qty = toNumber(row.quantity);
-    contract += qty * toNumber(row.unit_price);
-    budget += qty * toNumber(row.unit_cost);
+    // JLI-7: contract = sold_quantity × sold_unit_price; budget = quantity × unit_cost.
+    contract += toNumber(row.sold_quantity) * toNumber(row.sold_unit_price);
+    budget += toNumber(row.quantity) * toNumber(row.unit_cost);
   }
 
   // Re-budgeted = current unit_cost × qty (unit_cost already reflects latest revision).

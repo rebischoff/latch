@@ -9,8 +9,9 @@ import {
   type Manifest,
 } from "@latch/contracts";
 import { App, Tag, Typography } from "antd";
+import Link from "next/link";
 import { notFound, usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useForm, type Resolver } from "react-hook-form";
 import { z } from "zod";
 
@@ -73,7 +74,14 @@ import {
   navigateOnCancel,
   sanitizeReturnTo,
 } from "@/lib/surface-navigation";
-import { SurfaceApiError } from "@/lib/surface-api";
+import type { ToolbarAction } from "@/components/shell/SurfaceToolbar";
+import {
+  postEstimateCreateJob,
+  postEstimateLose,
+  postEstimateWin,
+  SurfaceApiError,
+  type EstimateWonJobSummary,
+} from "@/lib/surface-api";
 
 const STATUS_COLORS: Record<string, string> = {
   draft: "default",
@@ -815,6 +823,210 @@ export const EstimateDetailForm = ({
     });
   }, [message, modal, remove, router]);
 
+  const estimateStatus = profile?.status ?? "draft";
+  const isWinnableStatus = estimateStatus === "draft" || estimateStatus === "sent";
+  const isWonStatus = estimateStatus === "won";
+  const canWin = !isCreate && surfaceAllows(activeManifest, "win");
+  const canLose = !isCreate && surfaceAllows(activeManifest, "lose");
+
+  const [winPending, setWinPending] = useState(false);
+  const [losePending, setLosePending] = useState(false);
+
+  const navigateAfterJobs = useCallback(
+    (jobs: EstimateWonJobSummary[], successMessage: string) => {
+      if (jobs.length === 0) {
+        message.info("No new jobs were created");
+        router.refresh();
+        return;
+      }
+
+      const firstJob = jobs[0]!;
+      if (jobs.length === 1) {
+        message.success(successMessage);
+        router.push(routes.jobs.detail(firstJob.id));
+        return;
+      }
+
+      modal.success({
+        title: `${successMessage} — ${jobs.length} jobs`,
+        content: (
+          <div>
+            <Typography.Paragraph>
+              One job was created per catalog scope. Open a job:
+            </Typography.Paragraph>
+            {jobs.map((job) => (
+              <div key={job.id} style={{ marginBottom: 4 }}>
+                <Link href={routes.jobs.detail(job.id)}>{job.title || job.id}</Link>
+              </div>
+            ))}
+          </div>
+        ),
+        okText: "Open first job",
+        onOk: () => router.push(routes.jobs.detail(firstJob.id)),
+      });
+    },
+    [message, modal, router],
+  );
+
+  const runWin = useCallback(
+    async (proceedDespiteActiveSiteJobs: boolean) => {
+      setWinPending(true);
+      try {
+        const result = await postEstimateWin(
+          estimateId,
+          proceedDespiteActiveSiteJobs ? { proceedDespiteActiveSiteJobs: true } : undefined,
+        );
+        navigateAfterJobs(result.data.jobs, "Estimate won");
+      } catch (winError) {
+        if (winError instanceof SurfaceApiError) {
+          const details = winError.details as
+            | { code?: string; job_ids?: string[] }
+            | undefined;
+
+          if (winError.status === 409 && details?.code === "site_has_active_job") {
+            modal.confirm({
+              title: "Site already has an active job",
+              content:
+                "This site already has active job(s). Create new job(s) for this estimate, or steer this work into the existing job as an add-on / change order (handled outside win)?",
+              okText: "Create new job(s)",
+              cancelText: "Add-on / cancel",
+              onOk: () => runWin(true),
+            });
+            return;
+          }
+
+          if (details?.code === "no_lines") {
+            message.error("Add line items before winning this estimate");
+            return;
+          }
+
+          message.error(winError.message || "Unable to win estimate");
+          return;
+        }
+
+        message.error("Unable to win estimate");
+      } finally {
+        setWinPending(false);
+      }
+    },
+    [estimateId, message, modal, navigateAfterJobs],
+  );
+
+  const onWin = useCallback(() => {
+    if (isDirty) {
+      message.warning("Save your changes before winning the estimate.");
+      return;
+    }
+
+    modal.confirm({
+      title: "Win this estimate?",
+      content:
+        "Match signed contract $ on this estimate first. Win copies sold lines to the job — do not edit sold $ on Job Scope afterward.",
+      okText: "Win",
+      onOk: () => runWin(false),
+    });
+  }, [isDirty, message, modal, runWin]);
+
+  const onLose = useCallback(() => {
+    modal.confirm({
+      title: "Mark estimate lost?",
+      content: "This marks the estimate lost. It can no longer be won.",
+      okText: "Mark lost",
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        setLosePending(true);
+        try {
+          await postEstimateLose(estimateId);
+          message.success("Estimate marked lost");
+          router.refresh();
+        } catch (loseError) {
+          if (loseError instanceof SurfaceApiError) {
+            message.error(loseError.message || "Unable to mark estimate lost");
+          } else {
+            message.error("Unable to mark estimate lost");
+          }
+        } finally {
+          setLosePending(false);
+        }
+      },
+    });
+  }, [estimateId, message, modal, router]);
+
+  const onCreateJob = useCallback(async () => {
+    setWinPending(true);
+    try {
+      const result = await postEstimateCreateJob(estimateId);
+      navigateAfterJobs(result.data.jobs, "Job(s) created");
+    } catch (createError) {
+      if (createError instanceof SurfaceApiError) {
+        message.error(createError.message || "Unable to create job");
+      } else {
+        message.error("Unable to create job");
+      }
+    } finally {
+      setWinPending(false);
+    }
+  }, [estimateId, message, navigateAfterJobs]);
+
+  const extraActions = useMemo<ToolbarAction[]>(() => {
+    if (isCreate) {
+      return [];
+    }
+
+    const actions: ToolbarAction[] = [];
+
+    if (isWinnableStatus && canWin) {
+      actions.push({
+        key: "win",
+        label: "Win",
+        priority: "primary",
+        surfaceAction: "win",
+        disabled: winPending || saving,
+        loading: winPending,
+        onClick: onWin,
+      });
+    }
+
+    if (isWinnableStatus && canLose) {
+      actions.push({
+        key: "lose",
+        label: "Lose",
+        priority: "secondary",
+        surfaceAction: "lose",
+        danger: true,
+        disabled: losePending || saving,
+        loading: losePending,
+        onClick: onLose,
+      });
+    }
+
+    if (isWonStatus && canWin) {
+      actions.push({
+        key: "create-job",
+        label: "Create job",
+        priority: "secondary",
+        surfaceAction: "win",
+        disabled: winPending || saving,
+        loading: winPending,
+        onClick: onCreateJob,
+      });
+    }
+
+    return actions;
+  }, [
+    canLose,
+    canWin,
+    isCreate,
+    isWinnableStatus,
+    isWonStatus,
+    losePending,
+    onCreateJob,
+    onLose,
+    onWin,
+    saving,
+    winPending,
+  ]);
+
   useSurfaceFormChrome({
     mode: isCreate ? "create" : "edit",
     manifest: activeManifest,
@@ -827,6 +1039,7 @@ export const EstimateDetailForm = ({
     onRevert: isCreate ? undefined : onRevert,
     onCancel: isCreate ? onCancel : undefined,
     onSaveAndNew,
+    extraActions,
   });
 
   if (!isCreate && error instanceof SurfaceApiError && error.status === 404) {
@@ -892,6 +1105,13 @@ export const EstimateDetailForm = ({
           />
           {!isCreate ? <ProfileStatus status={status} /> : null}
         </FormSection>
+      ) : null}
+
+      {!isCreate && (estimateStatus === "draft" || estimateStatus === "sent") ? (
+        <Typography.Paragraph type="secondary" style={{ marginBottom: 16 }}>
+          As-sold reconstruction: match signed contract $ on this estimate, then Win —
+          do not edit sold $ on the job.
+        </Typography.Paragraph>
       ) : null}
 
       {fieldAllows(activeManifest, "line_items", "read") && !siteId ? (

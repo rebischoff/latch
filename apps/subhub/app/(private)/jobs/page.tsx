@@ -8,7 +8,7 @@ const JobsPage = async () => {
   return (
     <SelectFromListPlaceholder
       title="Select a job"
-      description="Choose a job from the list to view and edit its profile."
+      description="Choose a job from the list, or New for service/warranty/blank project shells. Sold contract lines come from estimate Win — do not edit sold $ on the job."
     />
   );
 };

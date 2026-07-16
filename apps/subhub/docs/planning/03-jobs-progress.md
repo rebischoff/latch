@@ -138,9 +138,9 @@ Rollups: by job, phase name, scope group, area, trade/system, SOV allocation.
 | Field | Progress entries |
 | Billing | Billable, SOV |
 
-### UI spike (2026-07-14)
+### UI spike (2026-07-15) → locked 5c plan (2026-07-16)
 
-Temporary **Field** tab prototype at `/jobs/[id]?tab=field`: antd `Table` with fixture rows at **part × location** grain (TBD parts, Unplaced bucket, local phase checkboxes + Request order). Component: `JobFieldExploreTable`. **Does not lock schema** — explores amending J1 before a real 5c pass.
+Explore prototype informed product locks — see **[`18-job-field-progress.md`](./18-job-field-progress.md)** (F1–F9). Component: `JobFieldExplorePanels` (fixtures until task ships). **No All Zones**; Unplaced → **General**; boolean phases; hours-weighted derived %; no `progress_entry*` history in v1.
 
 ---
 

@@ -22,6 +22,9 @@
 8. [13-toolbar-chrome.md](./13-toolbar-chrome.md) — **planning 2026-07-02** — slot-based toolbar communication ([39](../tasks/39-toolbar-chrome-slots.md)); category New child parent id
 9. [14-site-estimate-zone-unification.md](./14-site-estimate-zone-unification.md) — **§§ 1–3 shipped (42a/42b/42c, 2026-07-14)**; asset-level history deferred
 10. [15-job-costing-and-change-orders.md](./15-job-costing-and-change-orders.md) — **locked 2026-07-14** — budget/committed/actual/margin layers; re-budget vs. CO; CO ↔ BOM ↔ scope phase reconciliation ([45](../tasks/45-job-costing-and-change-order-reconciliation.md))
+11. [16-estimate-job-co-boundaries.md](./16-estimate-job-co-boundaries.md) — **locked 2026-07-15** — as-sold via estimate Win; Jobs New kept; CO Surfaces separate; condition drift; mid-job progress ([48](../tasks/48-job-create-front-doors-condition-drift.md), [49](../tasks/49-change-order-surfaces.md))
+12. [17-service-warranty-tm-open.md](./17-service-warranty-tm-open.md) — **open / parked 2026-07-15** — T&M, fixed service, warranty tickets, blank-job Add condition (SW0–SW5); do not implement until locked
+13. [18-job-field-progress.md](./18-job-field-progress.md) — **complete 2026-07-16** — Field tab 5c; task [51](../tasks/51-job-field-progress.md)
 
 ## Locked at a glance (2026-06-27)
 

@@ -6,6 +6,7 @@
 
 | Fork | Doc | Notes |
 |------|-----|--------|
+| Service / warranty / T&M (SW1–SW5); blank-job Add condition (SW0) | [planning/17-service-warranty-tm-open.md](../planning/17-service-warranty-tm-open.md) | **Parked** 2026-07-15 — needs decision session; JC1–JC2 stay locked |
 | _(none — Y1–Y5 locked)_ | [estimate.md](./estimate.md#decision-condition-only-commercial-tree-2026-07-09) | Implement [37y](../tasks/37y-condition-only-commercial-tree.md). |
 
 _Operations backbone forks **resolved** (2026-06-27). Optional: [J3 phase weights](../planning/07-open-decisions.md#J3)._
@@ -28,6 +29,8 @@ _Operations backbone forks **resolved** (2026-06-27). Optional: [J3 phase weight
 | [11-categories-scope-model.md](../planning/11-categories-scope-model.md) | Category roots replace catalog `system` |
 | [12-master-detail-chrome.md](../planning/12-master-detail-chrome.md) | Shared toolbar + create navigation (2026-07-01) |
 | [15-job-costing-and-change-orders.md](../planning/15-job-costing-and-change-orders.md) | Job budget/committed/actual/margin layers; re-budget vs. CO; CO ↔ BOM ↔ scope phase reconciliation (2026-07-14) |
+| [16-estimate-job-co-boundaries.md](../planning/16-estimate-job-co-boundaries.md) | As-sold via estimate Win; Jobs New kept; CO Surfaces separate; condition drift; mid-job progress (JC1–JC7, 2026-07-15) |
+| [17-service-warranty-tm-open.md](../planning/17-service-warranty-tm-open.md) | **Open / parked** — T&M, fixed service, warranty tickets, blank-job Add condition (2026-07-15) |
 
 ## Domain files
 
@@ -49,7 +52,10 @@ _Operations backbone forks **resolved** (2026-06-27). Optional: [J3 phase weight
 
 | Decision | File | Date | Status |
 |----------|------|------|--------|
-| Estimate win → job handoff (W0–W7 thick 5b) | [estimate.md](./estimate.md#decision-estimate-win--job-handoff-2026-07-14) | 2026-07-15 | **locked** (5b) |
+| Job Field progress — boolean zone snapshot (5c) (F1–F9) | [job.md](./job.md#decision-job-field-progress--boolean-zone-snapshot-5c-2026-07-16) | 2026-07-16 | **locked** ([51](../tasks/51-job-field-progress.md) ready; [planning/18](../planning/18-job-field-progress.md)) |
+| Estimate / job / CO commercial boundaries (JC1–JC7) | [job.md](./job.md#decision-estimate--job--co-commercial-boundaries-2026-07-15) | 2026-07-15 | **locked** ([48](../tasks/48-job-create-front-doors-condition-drift.md), [49](../tasks/49-change-order-surfaces.md); companion [estimate.md](./estimate.md#decision-estimate--job--co-commercial-boundaries-2026-07-15)) |
+| Estimate win → job handoff (W0–W7 + Scope-U1/E1/F1/S1 thick 5b) | [estimate.md](./estimate.md#decision-estimate-win--job-handoff-2026-07-14) | 2026-07-15 | **locked** (5b) |
+| Job LI parity — dual qty + Item/Part + zone danger (JLI-1…7; amends Scope-F1) | [estimate.md](./estimate.md#w3--conditions--costing-on-the-job-locked--amends-prior-estimate-only) | 2026-07-15 | **locked** ([47](../tasks/47-job-line-items-parity.md)) |
 | Job costing — budget/committed/actual/margin layers | [costing.md](./costing.md#decision-job-costing--budget--committed--actual--margin-layers-2026-07-14) | 2026-07-14 | **locked** ([45](../tasks/45-job-costing-and-change-order-reconciliation.md); planning only, no schema yet) |
 | `material_receipt_line.unit_cost` — material actual cost | [costing.md](./costing.md#decision-material_receipt_lineunit_cost--material-actual-cost-2026-07-14) | 2026-07-14 | **locked** ([45](../tasks/45-job-costing-and-change-order-reconciliation.md)) |
 | Re-budget — `job_line_cost_revision`, distinct from change order | [costing.md](./costing.md#decision-re-budget--job_line_cost_revision-distinct-from-change-order-2026-07-14) | 2026-07-14 | **locked** ([45](../tasks/45-job-costing-and-change-order-reconciliation.md)) |

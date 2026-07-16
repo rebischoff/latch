@@ -5,5 +5,6 @@ export * from "./repository/estimate-lines-write";
 export * from "./repository/estimate-stakeholders";
 export * from "./repository/estimate-conditions";
 export * from "./repository/estimate-conditions-write";
+export * from "./repository/estimate-win";
 export * from "./repository/estimate-site-tree";
 export * from "./repository/party-relations";

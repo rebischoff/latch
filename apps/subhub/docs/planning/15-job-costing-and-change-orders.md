@@ -61,11 +61,15 @@ The 2026-06-17 CO decision locked what happens to `job_line` on approve (`add` �
 
 ## Sequencing
 
-Implementation landed with task **45** (migration **075** + DAL + Overview cost panel). Remaining for wave **5d**:
+Implementation landed with task **45** (migration **075** + DAL + Overview cost panel). Remaining:
 
-1. **Change order Surfaces** — draft/edit CO UI calling `approveChangeOrder` / `previewChangeOrderApprove`.
-2. **Mount** `ChangeOrderApproveGuardsAlert` on approve confirmation.
-3. **Procurement tables** — committed / actual(material) rollups light up when PO + receipt DDL ships; `unit_cost` column is already conditional in **075**.
+1. **[48](../tasks/48-job-create-front-doors-condition-drift.md)** — as-sold / Jobs New copy + complexity drift (JC1–JC2/JC5).
+2. **[49](../tasks/49-change-order-surfaces.md) — Change order Surfaces (5d)** — draft/edit CO UI calling `approveChangeOrder` / `previewChangeOrderApprove`.
+3. **Mount** `ChangeOrderApproveGuardsAlert` on approve confirmation (ships with **49**).
+4. **Procurement tables** — committed / actual(material) rollups light up when PO + receipt DDL ships; `unit_cost` column is already conditional in **075**.
+5. **5c** Field progress UI — orthogonal; can ship before or after **49**.
+
+Boundaries: [16-estimate-job-co-boundaries.md](./16-estimate-job-co-boundaries.md) (JC1–JC7).
 
 ## Out of scope (this pass and v1 generally)
 

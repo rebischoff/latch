@@ -52,7 +52,7 @@ These tables are accessed only via parent Surfaces or DAL internals — no stand
 | `estimate_section` | Commercial `quote_sections` on `estimate_detail` — not site geography |
 | `estimate_party`, `job_party` | `stakeholders` collection on estimate/job detail |
 | `job_line_part` | Nested under `job_line` engineering / BOM — DAL-only or sub-field |
-| `job_work_item` | `work_items` nested on `job_detail` |
+| `job_field_progress_cell` | `field_progress` nested on `job_detail` (51; replaces obsolete `job_work_item`) |
 | `billable_line` | `billable_items` on `job_detail` — no `billable_line_list` |
 | `invoice_line` | `line_items` on `invoice_detail` |
 | `sov_line`, `sov_allocation` | `sov_milestones` on `job_detail` Billing tab — no standalone SOV Surface ([decision](./decisions/billing.md#decision-sov-ui--nested-on-job_detail-billing-tab-2026-06-17)) |
@@ -500,18 +500,18 @@ Applies to **customer, vendor, manufacturer, property_owner** detail lenses — 
 | **Anchor** | `job` |
 | **Route** | `/jobs`, `/jobs/[id]` |
 | **Nav group** | Operations |
-| **Tables** | `job`, `job_party`, `job_line`, `job_line_part`, `job_work_item` |
+| **Tables** | `job`, `job_party`, `job_condition*`, `job_line`, `job_line_part`, `scope_phase`, `job_field_progress_cell` |
 
 **Layout (O4):** Tabbed UI on one Surface — [decision](./decisions/job.md#decision-job_detail-layout--tabbed-2026-06-17).
 
 | Tab | Content |
 |-----|---------|
-| **Overview** | `profile`, `stakeholders`, `billing_settings` |
-| **Scope** | `line_items`; links to change orders + procurement Surfaces |
-| **Field** | `work_items` |
+| **Overview** | `profile`, `stakeholders`, derived Field lifecycle/%, `billing_settings` (6b) |
+| **Scope** | `conditions`, `line_items`; links to change orders + procurement Surfaces |
+| **Field** | `field_progress` (zone×phase boolean; 51) |
 | **Billing** | `billable_items`, `sov_milestones` (wave 6b); links to invoices |
 
-**`job_list` columns:** `title`, `site` name, `status`, `job_kind`
+**`job_list` columns:** `title`, `site` name, derived Field lifecycle + %
 
 **`job_detail` Fields:**
 
@@ -520,8 +520,9 @@ Applies to **customer, vendor, manufacturer, property_owner** detail lenses — 
 | `profile` | scalar | `title`, `site_id`, `estimate_id`, `parent_job_id`, `job_kind`, `status` |
 | `billing_settings` | scalar group | `billing_model`, `billing_basis`, `bill_on_work_status`, `retainage_pct` |
 | `stakeholders` | collection | `job_party` |
+| `conditions` | collection | `job_condition*` — commercial forest |
 | `line_items` | collection | `job_line` — sold scope; **same flat vs site-geography grouping** as estimate ([decision](./decisions/estimate.md#decision-estimate--job-line-grouping--site-geography-2026-06-17)) |
-| `work_items` | collection | `job_work_item` — field status per line × location × phase |
+| `field_progress` | collection | `job_field_progress_cell` — zone×phase boolean; derived % / lifecycle (51 F1–F9) |
 | `billable_items` | collection | `billable_line` — **wave 6b**; shown when billing section granted |
 | `sov_milestones` | collection | `schedule_of_value` + `sov_line` + `sov_allocation` — when `billing_model = progress_sov` ([decision](./decisions/billing.md#decision-sov-ui--nested-on-job_detail-billing-tab-2026-06-17)) |
 

@@ -327,14 +327,13 @@ export const resolveLineMaterial = async (
   const maxVendor = maxVendorAmongParts(filtered);
   const unitMaterial = maxVendor > 0 ? maxVendor : fallback;
 
+  // Unlocked + ambiguous → clear suggestion (O2). Locked path returned above.
   return {
-    part_id: input.part_id,
+    part_id: null,
     unit_material: unitMaterial,
-    part_match_alert: input.part_id ? null : "Multiple parts match — pick a PN or use max vendor cost",
+    part_match_alert: "Multiple parts match — pick a PN or use max vendor cost",
     filtered_part_count: filteredCount,
-    vendor_part_id: input.part_id
-      ? (await loadPartVendorPrice(client, input.part_id)).vendor_part_id
-      : null,
+    vendor_part_id: null,
   };
 };
 

@@ -3,6 +3,7 @@ import type { SurfaceDescriptor } from "@latch/dal";
 import { z } from "zod";
 
 import { JobListPatchSchema } from "../../../modules/job/generated/job_list.schema.generated";
+import type { JobFieldLifecycle } from "../repository/job-field-progress";
 
 export const JobListListQuerySchema = z.object({
   limit: z.number().int().positive().max(100).optional(),
@@ -11,7 +12,11 @@ export const JobListListQuerySchema = z.object({
 
 export type JobListRow = {
   id: string;
+  lifecycle: JobFieldLifecycle;
+  progress_pct: number;
   site_display_name: string;
+  stale: boolean;
+  status: string;
   title: string;
 };
 
@@ -19,6 +24,10 @@ const formatJobListRow = (row: JobListRow): Record<string, unknown> => ({
   id: row.id,
   site_display_name: row.site_display_name,
   title: row.title,
+  status: row.status,
+  lifecycle: row.lifecycle,
+  progress_pct: row.progress_pct,
+  stale: row.stale,
 });
 
 export const projectJobListRow = (
@@ -32,6 +41,10 @@ export const projectJobListRow = (
       id: row.id,
       title: row.title,
       site_display_name: row.site_display_name,
+      status: row.status,
+      lifecycle: row.lifecycle,
+      progress_pct: row.progress_pct,
+      stale: row.stale,
     };
   }
 

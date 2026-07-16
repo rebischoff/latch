@@ -8,7 +8,8 @@ import type {
   JobDetailRow,
   JobDetailWriteRow,
 } from "../descriptors/job-detail";
-import { replaceJobLineItemsTx } from "./job-lines-write";
+import { replaceJobCollectionsTx } from "./job-collections-write";
+import { assertJobCancelAllowed } from "./job-field-progress-write";
 import { replaceJobStakeholdersTx } from "./job-stakeholders";
 
 const JOB_KINDS = new Set(["project", "service", "warranty"]);
@@ -53,8 +54,7 @@ const assertPatchStatus = (status: string): void => {
 
 /**
  * Site change allowed when `estimate_id` is null (S8).
- * Existing line items are auto-cleared in `updateJob` (job Scope UI is stubbed;
- * clients cannot PATCH `line_items` yet).
+ * Existing conditions + line items are auto-cleared in `updateJob` (warn-and-clear).
  */
 export const assertSiteIdChangeAllowed = (
   existing: Pick<JobDetailRow, "site_id" | "estimate_id">,
@@ -112,8 +112,14 @@ export const insertJob = async (
         await replaceJobStakeholdersTx(client, row.id, related.stakeholders);
       }
 
-      if (related?.line_items !== undefined) {
-        await replaceJobLineItemsTx(client, row.id, row.site_id, related.line_items);
+      if (
+        related?.conditions !== undefined ||
+        related?.line_items !== undefined
+      ) {
+        await replaceJobCollectionsTx(client, row.id, row.site_id, {
+          conditions: related.conditions,
+          line_items: related.line_items,
+        });
       }
     });
   } catch (error) {
@@ -133,6 +139,10 @@ export const updateJob = async (
   await withPermissionDb(pool, actorId, async (client) => {
     await validateJobWriteRow(client, row, existing);
 
+    if (row.status === "cancelled" && existing.status !== "cancelled") {
+      await assertJobCancelAllowed(client, row.id);
+    }
+
     const siteChanged = row.site_id !== existing.site_id;
 
     await client.query(
@@ -146,9 +156,12 @@ export const updateJob = async (
       [row.id, row.title, row.site_id, row.job_kind, row.status],
     );
 
-    // Auto-clear lines when site changes (warn-and-clear; Scope editor still stubbed).
+    // Auto-clear conditions + lines when site changes (warn-and-clear).
     if (siteChanged) {
-      await replaceJobLineItemsTx(client, row.id, row.site_id, []);
+      await replaceJobCollectionsTx(client, row.id, row.site_id, {
+        conditions: [],
+        line_items: [],
+      });
     }
   });
 };

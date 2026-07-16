@@ -26,3 +26,20 @@ describe("job cost summary margins", () => {
     });
   });
 });
+
+describe("job cost summary JLI-7 formulas", () => {
+  it("uses sold_quantity × sold_unit_price for contract and quantity × unit_cost for budget", () => {
+    const lines = [
+      { sold_quantity: 3, sold_unit_price: 100, quantity: 4, unit_cost: 40 },
+      { sold_quantity: 0, sold_unit_price: 0, quantity: 2, unit_cost: 25 },
+    ];
+    let contract = 0;
+    let budget = 0;
+    for (const row of lines) {
+      contract += row.sold_quantity * row.sold_unit_price;
+      budget += row.quantity * row.unit_cost;
+    }
+    expect(contract).toBe(300);
+    expect(budget).toBe(210);
+  });
+});

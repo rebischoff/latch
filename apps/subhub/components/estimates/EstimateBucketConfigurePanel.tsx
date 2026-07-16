@@ -191,7 +191,7 @@ export const EstimateBucketConfigurePanel = ({
   );
 };
 
-type ComplexityFieldProps = {
+export type ComplexityFieldProps = {
   binding: EstimateBucketBinding;
   complexityLoading: boolean;
   complexityOptions: Array<{ value: string; label: string }>;
@@ -201,7 +201,13 @@ type ComplexityFieldProps = {
   writable: boolean;
 };
 
-const ComplexityField = ({
+/**
+ * Exported (task 46 Scope-S1) so `JobConditionConfigPanel` can reuse the
+ * complexity override control against a job-shaped `conditions` tree; the
+ * component only depends on `binding.conditionPath` + form context, not on
+ * anything estimate-specific.
+ */
+export const ComplexityField = ({
   binding,
   complexityLoading,
   complexityOptions,

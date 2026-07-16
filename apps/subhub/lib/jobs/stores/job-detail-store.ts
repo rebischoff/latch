@@ -10,7 +10,8 @@ import type {
 import {
   loadJobDetail,
   loadJobDetailRelated,
-  replaceJobLineItems,
+  replaceJobCollections,
+  replaceJobFieldProgress,
   replaceJobStakeholders,
   updateJob,
 } from "../repository";
@@ -59,8 +60,15 @@ export const createJobDetailStore = (
       await replaceJobStakeholders(pool, actorId, jobId, patch.stakeholders);
     }
 
-    if (patch.line_items !== undefined) {
-      await replaceJobLineItems(pool, actorId, jobId, job.site_id, patch.line_items);
+    if (patch.conditions !== undefined || patch.line_items !== undefined) {
+      await replaceJobCollections(pool, actorId, jobId, job.site_id, {
+        conditions: patch.conditions,
+        line_items: patch.line_items,
+      });
+    }
+
+    if (patch.field_progress !== undefined) {
+      await replaceJobFieldProgress(pool, actorId, jobId, patch.field_progress);
     }
   },
 

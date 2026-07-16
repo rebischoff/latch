@@ -28,7 +28,16 @@ import { SurfaceFormLayout } from "@/components/surface/SurfaceFormLayout";
 import { SurfaceFormRoot } from "@/components/surface/SurfaceFormRoot";
 import { useFieldMode } from "@/components/surface/useFieldMode";
 import { JobCostSummaryPanel } from "@/components/jobs/JobCostSummaryPanel";
-import { JobFieldExploreTable } from "@/components/jobs/JobFieldExploreTable";
+import { JobFieldProgressPanels } from "@/components/jobs/JobFieldExplorePanels";
+import { JobLineItemsPanels } from "@/components/jobs/JobLineItemsPanels";
+import {
+  jobConditionToPatch,
+  jobLineToPatch,
+  mapJobConditions,
+  mapJobLineItems,
+  type JobConditionFormRow,
+  type JobLineFormRow,
+} from "@/components/jobs/job-scope-tree";
 import {
   JobStakeholderFields,
   validateJobStakeholderDuplicates,
@@ -46,6 +55,11 @@ import {
   JobDetailPatchSchema,
 } from "@/lib/jobs/descriptors/job-detail";
 import type { JobCostSummary } from "@/lib/jobs/repository/job-cost-summary";
+import type {
+  JobFieldLifecycle,
+  JobFieldProgressCell,
+  JobFieldProgressDto,
+} from "@/lib/jobs/repository/job-field-progress";
 import { routes } from "@/lib/nav-routes";
 import { buildPickerCreateUrl, parseReturnContext } from "@/lib/picker-return-context";
 import { navigateOnCancel } from "@/lib/surface-navigation";
@@ -56,6 +70,20 @@ const JOB_TAB_KEYS = ["overview", "scope", "field", "billing"] as const;
 const STATUS_COLORS: Record<string, string> = {
   planned: "default",
   active: "processing",
+  cancelled: "error",
+};
+
+const LIFECYCLE_LABELS: Record<JobFieldLifecycle, string> = {
+  not_started: "Not started",
+  in_progress: "In progress",
+  completed: "Completed",
+  cancelled: "Cancelled",
+};
+
+const LIFECYCLE_COLORS: Record<JobFieldLifecycle, string> = {
+  not_started: "default",
+  in_progress: "processing",
+  completed: "success",
   cancelled: "error",
 };
 
@@ -94,8 +122,9 @@ type JobDetailFormValues = {
     status?: string;
   };
   stakeholders: JobStakeholderFormRow[];
-  /** Hidden — used for warn-and-clear when Scope editor is still stubbed. */
-  line_items: unknown[];
+  conditions: JobConditionFormRow[];
+  line_items: JobLineFormRow[];
+  field_progress: JobFieldProgressCell[];
 };
 
 const mapStakeholders = (rows: unknown): JobStakeholderFormRow[] => {
@@ -117,8 +146,6 @@ const mapStakeholders = (rows: unknown): JobStakeholderFormRow[] => {
   });
 };
 
-const mapLineItems = (rows: unknown): unknown[] => (Array.isArray(rows) ? rows : []);
-
 const buildDefaultValues = (
   data: Record<string, unknown> | undefined,
   isCreate: boolean,
@@ -130,7 +157,9 @@ const buildDefaultValues = (
         site_id: "",
       },
       stakeholders: [],
+      conditions: [],
       line_items: [],
+      field_progress: [],
     };
   }
 
@@ -151,7 +180,10 @@ const buildDefaultValues = (
       status: profile?.status ?? "planned",
     },
     stakeholders: mapStakeholders(data?.stakeholders),
-    line_items: mapLineItems(data?.line_items),
+    conditions: mapJobConditions(data?.conditions),
+    line_items: mapJobLineItems(data?.line_items),
+    field_progress:
+      (data?.field_progress as JobFieldProgressDto | undefined)?.cells ?? [],
   };
 };
 
@@ -232,6 +264,8 @@ export const JobDetailForm = ({
         status?: string | null;
         estimate_id?: string | null;
         estimate_display_title?: string | null;
+        catalog_scope_item_id?: string | null;
+        catalog_scope_display_name?: string | null;
       }
     | undefined;
 
@@ -259,7 +293,9 @@ export const JobDetailForm = ({
     const narrowed = narrowPatchSchema(baseSchema, activeManifest) as z.ZodObject<z.ZodRawShape>;
     const loosened = narrowed.extend({
       stakeholders: z.array(z.object({}).passthrough()).optional(),
+      conditions: z.array(z.object({}).passthrough()).optional(),
       line_items: z.array(z.object({}).passthrough()).optional(),
+      field_progress: z.array(z.object({}).passthrough()).optional(),
     });
 
     return zodResolver(loosened);
@@ -307,6 +343,20 @@ export const JobDetailForm = ({
   const showAddSite =
     canCreateSite && fieldAllows(activeManifest, "profile", "write") && !siteFrozen;
 
+  const fieldBoard = detail?.data.field_progress as
+    | JobFieldProgressDto
+    | undefined;
+  const progressPct = fieldBoard?.progress_pct ?? 0;
+  const fieldLifecycle = fieldBoard?.lifecycle;
+  const fieldStale = fieldBoard?.stale ?? false;
+
+  const statusOptions = useMemo(() => {
+    if (isCancelled || progressPct <= 0) {
+      return STATUS_OPTIONS;
+    }
+    return STATUS_OPTIONS.filter((option) => option.value !== "cancelled");
+  }, [isCancelled, progressPct]);
+
   const siteOptions = useMemo(() => {
     const options = sitePickerOptions(sitePicker?.data.rows);
     const currentId = siteId || profile?.site_id;
@@ -348,7 +398,9 @@ export const JobDetailForm = ({
     }
 
     const lineItems = form.getValues("line_items") ?? [];
-    if (lineItems.length === 0) {
+    const conditions = form.getValues("conditions") ?? [];
+    const hasStructure = conditions.length > 0 || lineItems.length > 0;
+    if (!hasStructure) {
       prevSiteIdRef.current = siteId;
       return;
     }
@@ -356,9 +408,10 @@ export const JobDetailForm = ({
     siteChangeConfirmOpenRef.current = true;
     modal.confirm({
       title: "Change site?",
-      content: "Changing site clears line items. Save to persist.",
+      content: "Changing site clears conditions and line items. Save to persist.",
       okText: "Change site",
       onOk: () => {
+        setValue("conditions", [], { shouldDirty: true });
         setValue("line_items", [], { shouldDirty: true });
         prevSiteIdRef.current = siteId;
         siteChangeConfirmOpenRef.current = false;
@@ -404,6 +457,23 @@ export const JobDetailForm = ({
         }));
       }
 
+      // Conditions + line items on create and edit (Scope-U1 engineer knobs);
+      // sold_* / sold_quantity are server-owned (Scope-F1 / 47 JLI).
+      if (fieldAllows(activeManifest, "conditions", "write")) {
+        body.conditions = jobConditionToPatch(values.conditions ?? []);
+      }
+
+      if (fieldAllows(activeManifest, "line_items", "write")) {
+        body.line_items = (values.line_items ?? []).map(jobLineToPatch);
+      }
+
+      if (
+        !isCreate &&
+        fieldAllows(activeManifest, "field_progress", "write")
+      ) {
+        body.field_progress = values.field_progress ?? [];
+      }
+
       try {
         if (isCreate) {
           const result = await create.mutateAsync(body);
@@ -425,6 +495,15 @@ export const JobDetailForm = ({
       } catch (saveError) {
         if (saveError instanceof SurfaceApiError) {
           if (saveError.status === 409) {
+            const details = saveError.details as
+              | { code?: string; progress_pct?: number }
+              | undefined;
+            if (details?.code === "cancel_requires_zero_progress") {
+              message.error(
+                "Cannot cancel a job once field progress is greater than 0%",
+              );
+              return;
+            }
             message.error("Cannot modify a cancelled job");
             return;
           }
@@ -510,6 +589,13 @@ export const JobDetailForm = ({
 
   const overviewTab = (
     <>
+      {isCreate ? (
+        <Typography.Paragraph type="secondary" style={{ marginBottom: 16 }}>
+          Use New for service, warranty, or blank project shells. For a sold contract,
+          rebuild the signed amount on an estimate, then Win — do not edit sold $ on the
+          job.
+        </Typography.Paragraph>
+      ) : null}
       {fieldAllows(activeManifest, "profile", "read") ? (
         <FormSection title="Profile">
           <TextInput<JobDetailFormValues>
@@ -563,8 +649,32 @@ export const JobDetailForm = ({
               field="profile"
               name="profile.status"
               label="Status"
-              options={STATUS_OPTIONS}
+              options={statusOptions}
             />
+          ) : null}
+          {!isCreate &&
+          fieldAllows(activeManifest, "field_progress", "read") &&
+          fieldLifecycle ? (
+            <div style={{ marginBottom: 16 }}>
+              <Space wrap>
+                <Typography.Text type="secondary">Field:</Typography.Text>
+                <Tag color={LIFECYCLE_COLORS[fieldLifecycle]}>
+                  {LIFECYCLE_LABELS[fieldLifecycle]}
+                </Tag>
+                {fieldStale ? <Tag color="warning">Stale</Tag> : null}
+                <Typography.Text type="secondary">
+                  {progressPct.toFixed(0)}%
+                </Typography.Text>
+              </Space>
+              {progressPct > 0 ? (
+                <Typography.Paragraph
+                  type="secondary"
+                  style={{ marginTop: 4, marginBottom: 0, fontSize: 12 }}
+                >
+                  Cancel is unavailable once field progress is greater than 0%.
+                </Typography.Paragraph>
+              ) : null}
+            </div>
           ) : null}
           {!isCreate && profile?.estimate_id ? (
             <div style={{ marginBottom: 16 }}>
@@ -582,6 +692,16 @@ export const JobDetailForm = ({
               </Space>
             </div>
           ) : null}
+          {!isCreate && profile?.catalog_scope_item_id ? (
+            <div style={{ marginBottom: 16 }}>
+              <Space>
+                <Typography.Text type="secondary">Catalog scope:</Typography.Text>
+                <Typography.Text>
+                  {profile.catalog_scope_display_name ?? profile.catalog_scope_item_id}
+                </Typography.Text>
+              </Space>
+            </div>
+          ) : null}
         </FormSection>
       ) : null}
       {!isCreate ? (
@@ -595,32 +715,30 @@ export const JobDetailForm = ({
     </>
   );
 
-  const scopeTab = (
+  const scopeTab = !fieldAllows(activeManifest, "line_items", "read") ? (
     <Typography.Paragraph type="secondary">
-      Scope line items ship after the catalog and shared line editor (wave 4d′).
-      {!isCreate && profile?.estimate_id ? (
-        <>
-          {" "}
-          {canNavigateEstimate ? (
-            <Link href={routes.estimates.detail(profile.estimate_id)}>
-              View source estimate
-            </Link>
-          ) : (
-            <Typography.Text type="secondary">
-              Source estimate: {profile.estimate_display_title ?? profile.estimate_id}
-            </Typography.Text>
-          )}
-        </>
-      ) : null}
+      You do not have access to scope line items.
     </Typography.Paragraph>
+  ) : !siteId ? (
+    <Typography.Paragraph type="secondary">
+      Select a site to add conditions and line items.
+    </Typography.Paragraph>
+  ) : (
+    <JobLineItemsPanels manifest={activeManifest} siteId={siteId} />
   );
 
   const fieldTab = isCreate ? (
     <Typography.Paragraph type="secondary">
-      Save the job first to explore field progress.
+      Save the job first to track field progress.
     </Typography.Paragraph>
+  ) : !fieldAllows(activeManifest, "field_progress", "read") ? (
+    <Typography.Paragraph type="secondary">
+      You do not have access to field progress.
+    </Typography.Paragraph>
+  ) : !fieldBoard ? (
+    <Typography.Paragraph type="secondary">Loading…</Typography.Paragraph>
   ) : (
-    <JobFieldExploreTable />
+    <JobFieldProgressPanels board={fieldBoard} readOnly={isCancelled} />
   );
 
   const billingTab = (

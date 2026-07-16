@@ -76,12 +76,12 @@ Every gated request: `getPrincipal` → `resolveContext({ surfaceId, entityId? }
 | `site` | Logical place; optional `parent_site_id` hierarchy; `customer_party_id` and `property_owner_party_id` portfolio FKs — no address link |
 | `address` | Normalized postal address (manual entry v1; verification deferred) |
 | `party_address` | `party_id` + `address_id` + `purpose` |
-| `site_section` | Coarse site geography — Floor 3, wing, … (flat list; site-owned as-built) |
-| `site_location` | Exact work spot — Door A-32, Rm 345 Cam 1; lifecycle `proposed` → `active` |
+| `site_zone` | Unified place tree (roots + nested zones) — Floor 3, Door A-32, … (42a); optional `root_item_id` catalog bind |
+| `site_asset` | Device-level registry under a zone |
 | `site_contact_relation` | Catalog of standing-contact roles at a site |
 | `site_contact` | `site_id` + `party_id` + `relation_id` |
 
-In-building scope on **`site_section` / `site_location`** (site-owned); estimate/job lines FK `site_location_id`. Postal addresses attach to **parties** via `party_address` — not to `site`. Per-job counterparties use `job_party` ([address vs site geography](./decisions/site.md#decision-address-vs-site-geography--rename-and-split-2026-06-17).
+In-building places live on **`site_zone`** (site-owned tree). Estimate/job line places use **`estimate_line_allocation` / `job_line_allocation`** (`site_zone_id` × qty). Postal addresses attach to **parties** via `party_address` — not to `site`. Per-job counterparties use `job_party` ([address vs site geography](./decisions/site.md#decision-address-vs-site-geography--rename-and-split-2026-06-17); [zone unification](./decisions/site.md)).
 
 ### Catalog
 
@@ -98,11 +98,11 @@ In-building scope on **`site_section` / `site_location`** (site-owned); estimate
 | Table | Purpose |
 |-------|---------|
 | `job_party_relation` | Catalog of engagement stakeholder roles (estimate + job) |
-| `estimate`, `estimate_party`, `estimate_section`, `estimate_line` | Quote at `site_id`; sections by `category`; snapshot lines |
-| `job`, `job_party` | Work at a `site`; per-job stakeholders |
-| `job_line`, `job_line_part`, `scope_phase` | Sold scope + engineering buy list; field progress (fractional qty per phase) → billable staging |
+| `estimate`, `estimate_party`, `estimate_condition*`, `estimate_line`, `estimate_line_allocation` | Quote at `site_id`; condition forest + snapshot lines + places |
+| `job`, `job_party` | Work at a `site`; per-job stakeholders; won jobs carry `estimate_id` + `catalog_scope_item_id` (one job per catalog scope — 46 / S2a) |
+| `job_condition*`, `job_line`, `job_line_allocation`, `job_line_part`, `scope_phase` | Job commercial tree + sold lines (`sold_*` + `sold_quantity` frozen; working `quantity` editable) + places + BOM + field progress; `complexity_factor_id_at_win` flags drift (JC5 / 48) |
 | `job_line_cost_revision` | Internal re-budget of `job_line.unit_cost` (not a change order) |
-| `change_order`, `change_order_line` | Job scope deltas; approve reconciles BOM + `scope_phase` |
+| `change_order`, `change_order_line` | Job scope deltas (separate Surfaces — JC3 / 49); approve reconciles BOM + `scope_phase`; progress entries retained |
 | `requested_order`, `requested_order_line` | Requisition — BOM or ad-hoc parts before PO |
 | `purchase_order`, `purchase_order_line`, `purchase_order_line_shipment` | Vendor commitment from job / requisition |
 | `material_receipt`, `material_receipt_line`, `job_material_movement` | Job-site inventory (received vs on hand); `material_receipt_line.unit_cost` = material actual |

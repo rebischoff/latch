@@ -314,6 +314,31 @@ export const fetchEstimatePartPicker = async (params: {
   return parseResponse<EstimatePartPickerData>(response);
 };
 
+export const fetchJobPartPicker = async (params: {
+  itemId: string;
+  jobConditionId: string;
+  conditionDraft?: {
+    specs?: EstimateLinePreviewConditionDraft["specs"];
+    include_discontinued?: boolean;
+  };
+}): Promise<ApiSuccessBody<EstimatePartPickerData>> => {
+  const response = await fetch("/api/jobs/pickers/parts", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      item_id: params.itemId,
+      job_condition_id: params.jobConditionId,
+      condition_draft: params.conditionDraft
+        ? {
+            specs: params.conditionDraft.specs,
+            include_discontinued: params.conditionDraft.include_discontinued,
+          }
+        : undefined,
+    }),
+  });
+  return parseResponse<EstimatePartPickerData>(response);
+};
+
 export type EstimateLinePreviewLineInput = {
   id: string;
   item_id: string | null;
@@ -382,6 +407,51 @@ export const fetchEstimateLinePreview = async (
     body: JSON.stringify(body),
   });
   return parseResponse<EstimateLinePreviewData>(response);
+};
+
+export type EstimateWonJobSummary = {
+  id: string;
+  catalog_scope_item_id: string;
+  title: string;
+};
+
+export type EstimateWinData = {
+  jobs: EstimateWonJobSummary[];
+};
+
+export const postEstimateWin = async (
+  estimateId: string,
+  body?: { proceedDespiteActiveSiteJobs?: boolean },
+): Promise<ApiSuccessBody<EstimateWinData>> => {
+  const response = await fetch(
+    `/api/estimates/${encodeURIComponent(estimateId)}/win`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body ?? {}),
+    },
+  );
+  return parseResponse<EstimateWinData>(response);
+};
+
+export const postEstimateLose = async (
+  estimateId: string,
+): Promise<ApiSuccessBody<{ id: string }>> => {
+  const response = await fetch(
+    `/api/estimates/${encodeURIComponent(estimateId)}/lose`,
+    { method: "POST" },
+  );
+  return parseResponse<{ id: string }>(response);
+};
+
+export const postEstimateCreateJob = async (
+  estimateId: string,
+): Promise<ApiSuccessBody<EstimateWinData>> => {
+  const response = await fetch(
+    `/api/estimates/${encodeURIComponent(estimateId)}/create-job`,
+    { method: "POST" },
+  );
+  return parseResponse<EstimateWinData>(response);
 };
 
 export const fetchEstimateSiteTree = async (

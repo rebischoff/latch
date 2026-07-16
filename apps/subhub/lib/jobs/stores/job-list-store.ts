@@ -2,7 +2,7 @@ import type { StoreAdapter } from "@latch/dal";
 import type { Pool } from "pg";
 
 import type { JobListRow } from "../descriptors/job-list";
-import { loadJobDetail, loadJobList } from "../repository";
+import { loadJobDetail, loadJobFieldProgress, loadJobList } from "../repository";
 
 const notImplemented = (surface: string, operation: string): never => {
   throw new Error(`${surface} ${operation} is not implemented yet`);
@@ -15,10 +15,15 @@ export const createJobListStore = (pool: Pool): StoreAdapter<JobListRow> => ({
       return undefined;
     }
 
+    const field = await loadJobFieldProgress(pool, id);
     return {
       id: row.id,
       site_display_name: row.site_display_name,
       title: row.title,
+      status: row.status,
+      lifecycle: field.lifecycle,
+      progress_pct: field.progress_pct,
+      stale: field.stale,
     };
   },
 

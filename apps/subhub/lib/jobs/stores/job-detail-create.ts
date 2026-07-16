@@ -40,6 +40,8 @@ export const createJobRowFromBody = (
   id: string,
   body: z.infer<typeof JobDetailCreateSchema>,
 ): JobDetailRow => ({
+  catalog_scope_display_name: null,
+  catalog_scope_item_id: null,
   estimate_display_title: null,
   estimate_id: null,
   id,
@@ -50,26 +52,9 @@ export const createJobRowFromBody = (
   title: body.profile.title,
 });
 
-const hasLineItemsPatch = (body: unknown): boolean => {
-  if (typeof body !== "object" || body === null) {
-    return false;
-  }
-
-  return (body as { line_items?: unknown }).line_items !== undefined;
-};
-
-const assertPatchAllowed = (existing: JobDetailRow, body: unknown): void => {
+const assertPatchAllowed = (existing: JobDetailRow, _body: unknown): void => {
   if (existing.status === "cancelled") {
     throw new ConflictError("Cannot modify a cancelled job");
-  }
-
-  if (hasLineItemsPatch(body)) {
-    throw new ValidationError("Validation failed", {
-      formErrors: [],
-      fieldErrors: {
-        line_items: ["Unknown field"],
-      },
-    });
   }
 };
 
@@ -113,11 +98,19 @@ export const extendJobDetailDal = (
     const actorId = await getActorId();
     await insertJob(pool, actorId, writeRow, {
       stakeholders: input.stakeholders,
+      conditions: input.conditions,
+      line_items: input.line_items,
     });
 
     const fieldIds = ["profile"];
     if (input.stakeholders !== undefined) {
       fieldIds.push("stakeholders");
+    }
+    if (input.conditions !== undefined) {
+      fieldIds.push("conditions");
+    }
+    if (input.line_items !== undefined) {
+      fieldIds.push("line_items");
     }
 
     await writeAudit({
