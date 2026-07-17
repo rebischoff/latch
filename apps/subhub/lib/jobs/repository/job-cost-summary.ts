@@ -63,14 +63,9 @@ export const loadJobCostSummary = async (
     (await tableExists(pool, "purchase_order_line")) &&
     (await tableExists(pool, "job_line_part"))
   ) {
-    const committedResult = await pool.query<{ total: string | number }>(
-      `SELECT COALESCE(SUM(pol.unit_cost * pol.quantity), 0) AS total
-       FROM purchase_order_line pol
-       INNER JOIN job_line_part jlp ON jlp.id = pol.job_line_part_id
-       INNER JOIN job_line jl ON jl.id = jlp.job_line_id
-       WHERE jl.job_id = $1
-         AND jl.status = 'active'
-         AND (
+    // purchase_order_line uses unit_price (migration 084); receipt filter only when MRL exists.
+    const receiptFilter = (await tableExists(pool, "material_receipt_line"))
+      ? `AND (
            NOT EXISTS (
              SELECT 1 FROM material_receipt_line mrl
              WHERE mrl.purchase_order_line_id = pol.id
@@ -79,7 +74,16 @@ export const loadJobCostSummary = async (
              SELECT SUM(mrl.quantity) FROM material_receipt_line mrl
              WHERE mrl.purchase_order_line_id = pol.id
            ), 0) < pol.quantity
-         )`,
+         )`
+      : "";
+    const committedResult = await pool.query<{ total: string | number }>(
+      `SELECT COALESCE(SUM(pol.unit_price * pol.quantity), 0) AS total
+       FROM purchase_order_line pol
+       INNER JOIN job_line_part jlp ON jlp.id = pol.job_line_part_id
+       INNER JOIN job_line jl ON jl.id = jlp.job_line_id
+       WHERE jl.job_id = $1
+         AND jl.status = 'active'
+         ${receiptFilter}`,
       [jobId],
     );
     committed = toNumber(committedResult.rows[0]?.total);

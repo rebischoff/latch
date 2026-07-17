@@ -459,6 +459,19 @@ type StrippedZonePatchRow = {
   zones: StrippedZonePatchRow[];
 };
 
+/** Drop unfinished blank leaf zones; keep blank parents that still have children. */
+export const pruneBlankLeafZones = (
+  zones: SiteZoneFormRow[],
+): SiteZoneFormRow[] =>
+  zones
+    .map((zone) => ({
+      ...zone,
+      zones: pruneBlankLeafZones(zone.zones ?? []),
+    }))
+    .filter(
+      (zone) => zone.name.trim().length > 0 || zone.zones.length > 0,
+    );
+
 export const stripScopesForPatch = (
   values: SiteScopesFormValues,
 ): {
@@ -477,7 +490,12 @@ export const stripScopesForPatch = (
     zones: zone.zones.map(stripZone),
   });
 
-  const ordered = orderScopesForPatch(values);
+  const ordered = orderScopesForPatch({
+    scopes: values.scopes.map((scope) => ({
+      ...scope,
+      zones: pruneBlankLeafZones(scope.zones ?? []),
+    })),
+  });
 
   return {
     scopes: ordered.scopes.map((scope) => ({

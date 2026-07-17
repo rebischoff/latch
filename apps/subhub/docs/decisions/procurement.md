@@ -4,6 +4,104 @@
 
 [Index](./README.md) · [All decisions](../decisions/README.md)
 
+**Wave 6a Surfaces (R1–R8):** **Locked** 2026-07-16 — [`planning/19-requisition-surfaces-open.md`](../planning/19-requisition-surfaces-open.md). Layer model below stays locked; do not re-litigate.
+
+### Decision: requisition Surfaces UX (R1–R8) (2026-07-16)
+
+**Status:** **Locked**. **Planning:** [19](../planning/19-requisition-surfaces-open.md).
+
+| # | Choice |
+|---|--------|
+| **R1 / R8** | Both create paths: list → New → pick job **and** Job → **Request parts**; same detail Surface |
+| **R2** | BOM still-needed pool **plus** freeform ad-hoc / TBD |
+| **R3** | BOM qty editable, **capped at job-wide remaining** |
+| **R4** | Many requisition headers per job; remaining / Order rollup **job-wide** |
+| **R5** | PO workbench selects open lines (cross job/req); vendor pick; **one draft PO per job × vendor** |
+| **R6** | Req line shows **PO number + status** (link); shipping on req deferred |
+| **R7** | Ready-pool **UI deferred**; P2 formula unchanged |
+
+**Amends:** “one draft PO per vendor per batch” → **per job × vendor**.
+
+**Rationale:** PM/tech request from the job or list; purchaser batches buys without cross-job PO headers; ship 6a CRUD before scheduling chrome.
+
+### Decision: requisition Surfaces — create entry (R1) (2026-07-16)
+
+**Status:** **Locked** (rolled into [R1–R8](#decision-requisition-surfaces-ux-r1r8-2026-07-16)).
+
+**Choice:** **Both** create paths (R1-C):
+
+1. **Requisitions** list → New → pick `job_id`.
+2. **Job** → **Request parts** → `/requisitions/new?jobId=` (job prefilled).
+
+Same `requested_order_detail` Surface either way. Job chrome is not link-only — **Request parts** is a first-class action (closes R8 with R1).
+
+**Rationale:** PM/tech usually starts from the job; purchaser and admins still need list → New → pick job.
+
+### Decision: requisition Surfaces — line source (R2) (2026-07-16)
+
+**Status:** **Locked** (rolled into [R1–R8](#decision-requisition-surfaces-ux-r1r8-2026-07-16)).
+
+**Choice:** **Both** (R2-C):
+
+- **BOM pool** — pick `job_line_part` rows still needing order (remaining qty from procurement rollup).
+- **Freeform** — add ad-hoc / TBD lines (`part_id` and/or description; null `job_line_part_id`).
+
+**Rationale:** Engineered demand is the default path; field still needs “not on the BOM yet” without forcing a BOM edit first.
+
+### Decision: requisition Surfaces — BOM qty (R3) (2026-07-16)
+
+**Status:** **Locked** (rolled into [R1–R8](#decision-requisition-surfaces-ux-r1r8-2026-07-16)).
+
+**Choice:** **Editable, cap at remaining** (R3-C):
+
+- Default qty = remaining need for that `job_line_part`.
+- Operator may lower (phased pulls).
+- Over-request vs remaining is rejected/capped; need more → freeform line or revise BOM.
+
+**Rationale:** Supports staged material pulls without inventing phantom BOM demand.
+
+### Decision: requisition Surfaces — many headers + job-wide remaining (R4) (2026-07-16)
+
+**Status:** **Locked** (rolled into [R1–R8](#decision-requisition-surfaces-ux-r1r8-2026-07-16)).
+
+**Choice:** **Many requisition headers per job** (R4-B). Optional `phase_id` batch tag.
+
+**Remaining need / Order rollup is job-wide:** for each `job_line_part`, sum requested qty across **all** requisitions on that job (exclude `withdrawn`), plus PO/receipt coverage. A second requisition must not re-offer full BOM qty — pool default/cap uses that remaining.
+
+**Rationale:** Prewire vs trim (and separate requesters) need separate headers; demand accounting stays on the job BOM, not per document.
+
+### Decision: purchaser batch — select on PO workbench → one PO per job×vendor (R5) (2026-07-16)
+
+**Status:** **Locked** (rolled into [R1–R8](#decision-requisition-surfaces-ux-r1r8-2026-07-16)). **Amends:** “one draft PO per vendor per batch” → **one draft PO per job × vendor**.
+
+**Choice:**
+
+1. **Select** open `requested_order_line`s on the **PO Surface / workbench** (across jobs and requisitions). Selection is workbench state — req status stays `open` until POs are created.
+2. **Vendor** — purchaser picks `vendor_part` / vendor when multiple exist for the part; single option defaults (overrideable).
+3. **Batch create** — emit **one draft `purchase_order` per `(job_id, vendor_party_id)`**; attach lines; set req lines to `on_purchase_order` with `purchase_order_line.requested_order_line_id`.
+
+**Rejected v1:** one PO header spanning multiple jobs.
+
+**Rationale:** Purchaser thinks in “what to buy from whom”; costing and job committed stay job-scoped.
+
+### Decision: requisition line shows PO number + status (R6) (2026-07-16)
+
+**Status:** **Locked** (rolled into [R1–R8](#decision-requisition-surfaces-ux-r1r8-2026-07-16)).
+
+**Choice:** Req line UI shows joined **PO number + status**, with link to PO detail (R6-B).
+
+**Deferred:** Vendor shipping / ETA / shipment detail on the requisition — stay on PO / `purchase_order_line_shipment` for now; mirror later if needed.
+
+**Rationale:** “Which PO?” is the first question after order; richer logistics can land later without blocking 6a.
+
+### Decision: ready-pool UI deferred (R7) (2026-07-16)
+
+**Status:** **Locked** (rolled into [R1–R8](#decision-requisition-surfaces-ux-r1r8-2026-07-16)).
+
+**Choice:** **Defer ready filter/highlight UI** in first wave 6a Surfaces (R7-D). P2 formula (`order_by = target_date − lead_time`) remains locked; manual request/order always allowed. Add ready chrome in a follow-on when targets + lead times are routinely filled.
+
+**Rationale:** Ship requisition/PO CRUD without depending on incomplete schedule data.
+
 ---
 
 ### Decision: procurement — lead time and ad-hoc PO lines (2026-06-27)

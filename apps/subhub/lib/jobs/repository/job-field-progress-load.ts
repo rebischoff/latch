@@ -29,6 +29,7 @@ type LineGeoRow = {
   description: string;
   id: string;
   item_name: string | null;
+  part_id: string | null;
   part_mpn: string | null;
   quantity: number;
 };
@@ -217,9 +218,8 @@ const buildWorkRows = (input: {
 
   for (const line of input.lines) {
     const laborIds = laborByLine.get(line.id) ?? [];
-    if (laborIds.length === 0) {
-      continue;
-    }
+    // Lines with no labor phases still appear in the Field items table
+    // (informational — no phase checkboxes / % contribution).
     const allocs = allocsByLine.get(line.id) ?? [];
     let placed = 0;
     for (const alloc of allocs) {
@@ -292,7 +292,22 @@ const buildZoneTree = (input: {
     : null;
 
   const rootTitle = input.catalog_scope_name?.trim() || "Scope";
-  const children = [...pruned, ...(generalNode ? [generalNode] : [])];
+
+  // Avoid Fire Alarm → Fire Alarm when the site category root only exists as an
+  // ancestor of allocated leaves and shares the catalog scope display name.
+  let zoneNodes = pruned;
+  if (pruned.length === 1) {
+    const only = pruned[0]!;
+    const titlesMatch =
+      only.title.trim().toLowerCase() === rootTitle.trim().toLowerCase();
+    const rootAllocated =
+      only.site_zone_id !== null && allocatedIds.has(only.site_zone_id);
+    if (titlesMatch && !rootAllocated) {
+      zoneNodes = only.children ?? [];
+    }
+  }
+
+  const children = [...zoneNodes, ...(generalNode ? [generalNode] : [])];
   if (children.length === 0) {
     return [];
   }
@@ -342,6 +357,7 @@ export const loadJobFieldProgress = async (
        jl.description,
        jl.quantity,
        i.name AS item_name,
+       jl.part_id,
        mp.mpn AS part_mpn
      FROM job_line jl
      LEFT JOIN item i ON i.id = jl.item_id
@@ -463,6 +479,8 @@ export const loadJobFieldProgress = async (
       scope_phase_id: p.id,
     }));
 
+  const work_rows = buildWorkRows({ lines, allocations, phases, slices });
+
   return {
     cells,
     zone_tree: buildZoneTree({
@@ -472,7 +490,7 @@ export const loadJobFieldProgress = async (
       catalog_scope_name: job.catalog_scope_display_name,
     }),
     phases: buildPhaseColumns(phases, slices),
-    work_rows: buildWorkRows({ lines, allocations, phases, slices }),
+    work_rows,
     scope_phase_index,
     progress_pct: summary.progress_pct,
     lifecycle: summary.lifecycle,

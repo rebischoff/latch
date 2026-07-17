@@ -5,11 +5,11 @@
 
 - **Package:** `@latch/subhub` · **Port:** 3003
 - **Docs:** [`docs/README.md`](./docs/README.md) · **Tasks:** [`docs/tasks/01-task-index.md`](./docs/tasks/01-task-index.md)
-- **State:** Migrations **037**–**079** applied on dev. Tasks **29–36**, **37a**–**37z**, **37aa**, **37ac**, **37ad**, **37ae**–**37aj**, **38**, **39**, **40**, **41ak**, **41al**, **41am**, **41an**, **41ao**, **42a**, **42b**, **42c**, **43**, **44**, **45**, **46**, **47**, **48**, **50**, **51** complete; **49** ready; **41ab** superseded/reverted by **37ac**; **37h cancelled** (obsolete).
+- **State:** Migrations **037**–**084** applied on dev. Tasks **29–36**, **37a**–**37z**, **37aa**, **37ac**, **37ad**, **37ae**–**37aj**, **38**, **39**, **40**, **41ak**, **41al**, **41am**, **41an**, **41ao**, **42a**, **42b**, **42c**, **43**, **44**, **45**, **46**, **47**, **48**, **50**, **51**, **52** complete; **49** ready; **41ab** superseded/reverted by **37ac**; **37h cancelled** (obsolete).
 
 ## Right now — do this next
 
-**[49 — Change-order Surfaces (5d)](./docs/tasks/49-change-order-surfaces.md)** — CO Surfaces + Approve on [45](./docs/tasks/45-job-costing-and-change-order-reconciliation.md) DAL.
+**[53 — Purchase order workbench](./docs/tasks/53-purchase-order-workbench.md)** — batch create from open requisition lines, vendor pick, one PO per job×vendor, draft→Send (R5/R6). Or **[49 — Change-order Surfaces (5d)](./docs/tasks/49-change-order-surfaces.md)**.
 
 ## Blockers
 
@@ -23,12 +23,20 @@
 
 | Slice | Focus | State |
 |-------|--------|-------|
-| **03 — Catalog** | Spec participation removal (namespace narrowing + wildcard matching) | **37ai complete** (2026-07-12) |
+| **03 — Catalog** | Spec participation removal (namespace narrowing + wildcard matching) | **37ai complete**; CCTV **081**–**083** applied (2026-07-16) |
 | **04 — Estimates** | Site warn-and-clear (S1–S9) | **44 complete** (2026-07-14) |
 | **05 — Jobs** | **5b + 47–51 complete**; **49** ready (5d) | Field progress shipped (2026-07-16) |
+| **06a — Procurement** | Requisition / PO Surfaces | **52 complete**; **[53](./docs/tasks/53-purchase-order-workbench.md)** stub, ready next |
 
 ## Recently completed
 
+- **52 — Requisition Surfaces** — migration **084** (`requested_order*` + `purchase_order*`/shipments DDL, no PO Surfaces); `requested_order_list`/`_detail` Surfaces; remaining/BOM-pool helper; DAL (create/patch/withdraw/delete guards); `/requisitions` list+detail UI (job LinkedSelect, BOM pool, ad-hoc rows, withdraw); Job **Request parts** entry (2026-07-16).
+- **52 Q1–Q5 locked** — split 52/53; no line geography; no phase UI; edit open lines; line withdraw + delete guards (2026-07-16).
+- **52/53 authored — requisition plan + PO stub** — executable 6a′ task; PO workbench stub; Q1–Q5 gate (2026-07-16).
+- **R1–R8 locked — requisition Surfaces UX** — both create paths; BOM+ad-hoc; job-wide remaining; PO workbench → one PO per job×vendor; ready UI deferred; planning [19](./docs/planning/19-requisition-surfaces-open.md) (2026-07-16).
+- **CCTV camera pack seed 083** — 7 Axis cameras; 2–3 parts/leaf; Resolution/Housing coverage for C-panel smoke (2026-07-16).
+- **CCTV accessories locked + seed 082** — mounts branch; NVR + Server; Channel/Client licenses (part-backed + Program labor); None freight; labor on categories (2026-07-16).
+- **CCTV starter specs locked + seed 081** — Platform / Form Factor / Resolution / Housing; CCTV item tree + Axis parts; applied on dev (2026-07-16).
 - **51 — Field progress (5c)** — `job_field_progress_cell` + `field_progress`; hours-weighted % + lifecycle; Field tab persist; cancel-at-0%; migration **079** (2026-07-16).
 - **51 authored — Field progress (5c)** — Ready; F1–F9 + stale 30d + cancel-at-0%; parallel with 49 (2026-07-16).
 - **5c Field progress — product locked (F1–F9)** — boolean zone×phase; General; hours-weighted derived %; lifecycle; no history / no Complete in-wave; planning [18](./docs/planning/18-job-field-progress.md) (2026-07-16).
@@ -86,7 +94,9 @@
 
 ## Pointers
 
-- [Task 49 — CO Surfaces (5d)](./docs/tasks/49-change-order-surfaces.md) ← **do next**
+- [Task 53 — PO workbench](./docs/tasks/53-purchase-order-workbench.md) ← **do next**
+- [Task 52 — Requisition Surfaces](./docs/tasks/52-requisition-surfaces.md) ✅
+- [Task 49 — CO Surfaces (5d)](./docs/tasks/49-change-order-surfaces.md)
 - [Task 51 — Field progress (5c)](./docs/tasks/51-job-field-progress.md) ✅
 - [Planning 18 — Field progress 5c](./docs/planning/18-job-field-progress.md) ✅
 - [Decision — Field progress F1–F9](./docs/decisions/job.md#decision-job-field-progress--boolean-zone-snapshot-5c-2026-07-16)

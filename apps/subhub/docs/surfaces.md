@@ -548,19 +548,28 @@ Applies to **customer, vendor, manufacturer, property_owner** detail lenses — 
 
 ---
 
-## Wave 6a — Procurement (draft)
+## Wave 6a — Procurement
 
 ### `requested_order_list` · `requested_order_detail`
 
 | | |
 |--|--|
-| **Status** | draft |
+| **Status** | shipped ([task 52](./tasks/52-requisition-surfaces.md), 2026-07-16) |
 | **Wave** | 6a |
 | **Route** | `/requisitions`, `/requisitions/[id]` |
 | **Nav group** | Procurement |
 | **Anchor** | `requested_order` |
 
-**`requested_order_detail` Fields:** `profile` (`job_id`, `status`, …), `line_items` (`requested_order_line` — links `job_line_part_id` or ad-hoc part)
+**`requested_order_list` summary:** `job_id`, job title (joined), `requested_at`, `note`, `open_line_count` (DAL-computed).
+
+**`requested_order_detail` Fields:**
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `profile` | scalar | `job_id` (required, immutable after create), `requested_by` (resolved from current employee or null), `requested_at`, `note`. `phase_id` is DDL-only — no UI v1. |
+| `line_items` | collection (logical) | `requested_order_line` — links `job_line_part_id` (BOM pick, capped at job-wide remaining) or ad-hoc (`part_id`/description); `status` (`open` / `on_purchase_order` / `fulfilled` / `withdrawn`); withdraw requires `withdrawal_note`; frozen once `on_purchase_order`/`fulfilled`. PO #/status join null-safe until [53](./tasks/53-purchase-order-workbench.md). |
+
+**Notes:** No place FKs (`site_area_id`/`site_asset_id` dropped v1, [R2](./decisions/procurement.md#decision-requisition-surfaces-ux-r1r8-2026-07-16)). Delete header only when every line is `open`/`withdrawn` (or no lines). `purchase_order*` + `purchase_order_line_shipment` tables migrated alongside (same migration, for FK readiness) but have **no Surfaces yet** — draft until 53.
 
 ### `purchase_order_list` · `purchase_order_detail`
 

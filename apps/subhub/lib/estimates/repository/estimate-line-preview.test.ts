@@ -30,6 +30,7 @@ vi.mock("./estimate-bucket-specs", () => ({
   loadConditionAncestorIds: vi.fn(async () => ["cond-1"]),
   loadConditionBucketSpecs: vi.fn(async () => []),
   loadLineBucketSpecs: vi.fn(async () => []),
+  loadMergedBucketWithDraft: vi.fn(async () => new Map()),
   mergeBucketSpecs: vi.fn(() => new Map()),
 }));
 
@@ -95,5 +96,31 @@ describe("previewEstimateLines", () => {
         lines: [{ id: "line-1", item_id: "item-1" }],
       }),
     ).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it("allows create-mode preview without persisted estimate", async () => {
+    const result = await previewEstimateLines(makeClient("sent"), "new", {
+      condition_id: "client-cond-1",
+      condition_draft: {
+        labor_phases_explicit: true,
+        included_labor_phases: ["phase-1"],
+        labor_only: false,
+        specs: [],
+      },
+      lines: [{ id: "line-1", item_id: "item-1" }],
+    });
+
+    expect(result.lines).toHaveLength(1);
+    expect(result.lines[0]).toMatchObject({
+      id: "line-1",
+      unit_material: 100,
+      unit_price: 200,
+    });
+    expect(recalcProductLine).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ is_new: true, item_id: "item-1" }),
+      expect.anything(),
+      expect.objectContaining({ laborOnly: false }),
+    );
   });
 });

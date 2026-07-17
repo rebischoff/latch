@@ -20,6 +20,8 @@ import { jobDetailSurfacePolicyDef } from "../modules/job/generated/job_detail.s
 import { jobListSurfacePolicyDef } from "../modules/job/generated/job_list.schema.generated";
 import { partDetailSurfacePolicyDef } from "../modules/part/generated/part_detail.schema.generated";
 import { partListSurfacePolicyDef } from "../modules/part/generated/part_list.schema.generated";
+import { requestedOrderDetailSurfacePolicyDef } from "../modules/requested_order/generated/requested_order_detail.schema.generated";
+import { requestedOrderListSurfacePolicyDef } from "../modules/requested_order/generated/requested_order_list.schema.generated";
 import { itemDetailSurfacePolicyDef } from "../modules/catalog/generated/item_detail.schema.generated";
 import { itemListSurfacePolicyDef } from "../modules/catalog/generated/item_list.schema.generated";
 import { complexityFactorTableSurfacePolicyDef } from "../modules/catalog/generated/complexity_factor_table.schema.generated";
@@ -55,6 +57,8 @@ export const subhubRegistry = definePolicyRegistry(
   jobPartyRelationTableSurfacePolicyDef,
   jobListSurfacePolicyDef,
   jobDetailSurfacePolicyDef,
+  requestedOrderListSurfacePolicyDef,
+  requestedOrderDetailSurfacePolicyDef,
   partListSurfacePolicyDef,
   partDetailSurfacePolicyDef,
   itemListSurfacePolicyDef,

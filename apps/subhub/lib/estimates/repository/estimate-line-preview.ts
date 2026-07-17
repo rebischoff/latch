@@ -217,33 +217,45 @@ const toPreviewResult = (row: RecalcLineOutput): EstimateLinePreviewResultLine =
   unit_price: row.unit_price,
 });
 
+/** Create-form sentinel — no persisted estimate/conditions yet. */
+export const UNSAVED_ESTIMATE_ID = "new";
+
 /**
  * Non-persisting commercial preview for 1..n lines under a condition.
  * Reuses `recalcProductLine`; applies part clear + material_locked clear when labor-only.
+ * `estimateId === "new"` (create form): draft-only — skip status/ownership checks.
  */
 export const previewEstimateLines = async (
   client: Pool | PoolClient,
   estimateId: string,
   request: EstimateLinePreviewRequest,
 ): Promise<{ lines: EstimateLinePreviewResultLine[] }> => {
-  const status = await loadEstimateStatusById(client, estimateId);
-  if (status !== "draft") {
-    throw new ValidationError("Line preview is only available on draft estimates", {
-      field: "status",
-      code: "not_draft",
-    });
+  const isUnsaved = estimateId === UNSAVED_ESTIMATE_ID;
+
+  if (!isUnsaved) {
+    const status = await loadEstimateStatusById(client, estimateId);
+    if (status !== "draft") {
+      throw new ValidationError("Line preview is only available on draft estimates", {
+        field: "status",
+        code: "not_draft",
+      });
+    }
+
+    await assertConditionBelongsToEstimate(client, estimateId, request.condition_id);
   }
 
-  await assertConditionBelongsToEstimate(client, estimateId, request.condition_id);
-
   const draft = request.condition_draft;
-  const draftSpecs: BucketSpecValue[] | undefined = draft?.specs?.map((spec) => ({
+  const mappedDraftSpecs: BucketSpecValue[] | undefined = draft?.specs?.map((spec) => ({
     spec_def_id: spec.spec_def_id,
     spec_option_id: spec.spec_option_id ?? null,
     value_boolean: spec.value_boolean ?? null,
     value_number: spec.value_number ?? null,
     value_number_max: spec.value_number_max ?? null,
   }));
+  // Unsaved conditions are not in DB — always use form draft (empty = no bucket filters).
+  const draftSpecs: BucketSpecValue[] | undefined = isUnsaved
+    ? (mappedDraftSpecs ?? [])
+    : mappedDraftSpecs;
 
   const [catalog, complexity, laborPhases, includeDiscontinued, laborOnly] =
     await Promise.all([
@@ -260,7 +272,7 @@ export const previewEstimateLines = async (
     const bucket = await loadMergedBucketWithDraft(
       client,
       request.condition_id,
-      line.id,
+      isUnsaved ? null : line.id,
       draftSpecs,
     );
 
@@ -291,7 +303,7 @@ export const previewEstimateLines = async (
       vendor_part_id: line.vendor_part_id ?? null,
       sales_locked: line.sales_locked ?? false,
       material_locked: line.material_locked ?? false,
-      is_new: false,
+      is_new: isUnsaved,
     };
 
     const recalculated = await recalcProductLine(

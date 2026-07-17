@@ -78,7 +78,10 @@ export const useEstimateLinePreview = (estimateId: string | undefined) => {
       lines: EstimateLineFormRow[],
       options?: { includeDraft?: boolean },
     ) => {
-      if (!estimateId || estimateId === "new" || lines.length === 0) {
+      // Create form passes undefined — use "new" sentinel for draft-only preview API.
+      const previewEstimateId = !estimateId || estimateId === "new" ? "new" : estimateId;
+
+      if (lines.length === 0) {
         return;
       }
 
@@ -89,12 +92,13 @@ export const useEstimateLinePreview = (estimateId: string | undefined) => {
       try {
         const conditions = getValues("conditions") ?? [];
         // Always prefer form condition state so preview matches Part Select draft filter.
+        // Create-mode preview requires draft (conditions are not persisted yet).
         const condition_draft =
-          options?.includeDraft === false
+          options?.includeDraft === false && previewEstimateId !== "new"
             ? undefined
             : buildConditionDraft(conditions, conditionId);
 
-        const result = await fetchEstimateLinePreview(estimateId, {
+        const result = await fetchEstimateLinePreview(previewEstimateId, {
           condition_id: conditionId,
           condition_draft,
           lines: lines.map(toPreviewLine),

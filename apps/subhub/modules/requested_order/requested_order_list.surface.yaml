@@ -1,0 +1,29 @@
+# Requisitions — list pane for requested_order_detail (task 52)
+id: requested_order_list
+displayName: Requisition list
+anchorTable: requested_order
+
+fieldActions:
+  - read
+  - write
+
+surfaceActions:
+  - read
+
+tables:
+  - requested_order
+  - job
+
+fields:
+  - id: summary
+    columns:
+      - column: requested_order.id
+        type: string
+      - column: requested_order.job_id
+        type: string
+      - column: job.title
+        type: string
+      - column: requested_order.requested_at
+        type: timestamp
+      - column: requested_order.note
+        type: string

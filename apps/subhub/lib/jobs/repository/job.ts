@@ -101,10 +101,21 @@ export const loadJobDetail = async (
 export const loadJobDetailRelated = async (
   pool: Pool,
   jobId: string,
-): Promise<JobDetailRelated> => ({
-  cost_summary: await loadJobCostSummary(pool, jobId),
-  conditions: await loadJobConditions(pool, jobId),
-  field_progress: await loadJobFieldProgress(pool, jobId),
-  line_items: await loadJobLineItems(pool, jobId),
-  stakeholders: await loadJobStakeholders(pool, jobId),
-});
+): Promise<JobDetailRelated> => {
+  const [cost_summary, conditions, field_progress, line_items, stakeholders] =
+    await Promise.all([
+      loadJobCostSummary(pool, jobId),
+      loadJobConditions(pool, jobId),
+      loadJobFieldProgress(pool, jobId),
+      loadJobLineItems(pool, jobId),
+      loadJobStakeholders(pool, jobId),
+    ]);
+
+  return {
+    cost_summary,
+    conditions,
+    field_progress,
+    line_items,
+    stakeholders,
+  };
+};

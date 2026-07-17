@@ -12,7 +12,7 @@ import {
 import type { ColumnsType } from "antd/es/table";
 import type { DataNode } from "antd/es/tree";
 import { useCallback, useMemo, useState } from "react";
-import { useFormContext } from "react-hook-form";
+import { useFormContext, useWatch } from "react-hook-form";
 
 import {
   GENERAL_ZONE_KEY,
@@ -33,7 +33,18 @@ type PhaseTableRow = {
   state: CheckState;
 };
 
-type WorkTableRow = JobFieldProgressWorkRow;
+type WorkTableRow = JobFieldProgressWorkRow & {
+  /** Prefer live Scope form part when draft/autofill differs from server board. */
+  display_part_mpn: string | null;
+};
+
+type FieldProgressFormSlice = {
+  field_progress?: JobFieldProgressCell[];
+  line_items?: Array<{
+    id: string;
+    part_mpn?: string | null;
+  }>;
+};
 
 const findZoneNode = (
   nodes: JobFieldProgressZoneNode[],
@@ -101,6 +112,32 @@ const zoneTitleById = (
   nodes: JobFieldProgressZoneNode[],
   key: string,
 ): string => findZoneNode(nodes, key)?.title ?? key;
+
+/** Parent nodes (has children) roll up place rows by item + part. */
+const rollupWorkRowsByItemPart = (rows: WorkTableRow[]): WorkTableRow[] => {
+  const byKey = new Map<string, WorkTableRow>();
+  for (const row of rows) {
+    const key = `${row.item}\0${row.display_part_mpn ?? ""}`;
+    const existing = byKey.get(key);
+    if (!existing) {
+      byKey.set(key, {
+        ...row,
+        id: `rollup:${key}`,
+        zone_key: row.zone_key,
+        qty: row.qty,
+        labor_phase_ids: [...row.labor_phase_ids],
+      });
+      continue;
+    }
+    existing.qty += row.qty;
+    for (const phaseId of row.labor_phase_ids) {
+      if (!existing.labor_phase_ids.includes(phaseId)) {
+        existing.labor_phase_ids.push(phaseId);
+      }
+    }
+  }
+  return [...byKey.values()];
+};
 
 const leafLaborPhases = (
   workRows: JobFieldProgressWorkRow[],
@@ -263,17 +300,22 @@ type JobFieldProgressPanelsProps = {
   readOnly?: boolean;
 };
 
-type FieldProgressFormSlice = {
-  field_progress?: JobFieldProgressCell[];
-};
-
 export const JobFieldProgressPanels = ({
   board,
   readOnly = false,
 }: JobFieldProgressPanelsProps) => {
-  const { setValue, watch } = useFormContext<FieldProgressFormSlice>();
-  const formCells = watch("field_progress");
+  const { setValue, control } = useFormContext<FieldProgressFormSlice>();
+  const formCells = useWatch({ control, name: "field_progress" });
+  const formLineItems = useWatch({ control, name: "line_items" });
   const cells = formCells ?? board.cells;
+
+  const partMpnByLineId = useMemo(() => {
+    const map = new Map<string, string | null>();
+    for (const line of formLineItems ?? []) {
+      map.set(line.id, line.part_mpn ?? null);
+    }
+    return map;
+  }, [formLineItems]);
 
   const [selectedZoneId, setSelectedZoneId] = useState<string>(() => {
     const root = board.zone_tree[0];
@@ -333,14 +375,31 @@ export const JobFieldProgressPanels = ({
     [board.zone_tree, selectedZoneId],
   );
 
-  const filteredWorkRows = useMemo(() => {
-    return board.work_rows.filter((row) => {
-      if (zoneScopeKeys && !zoneScopeKeys.has(row.zone_key)) {
-        return false;
-      }
-      return true;
-    });
-  }, [board.work_rows, zoneScopeKeys]);
+  const filteredWorkRows = useMemo((): WorkTableRow[] => {
+    const scoped = board.work_rows
+      .filter((row) => {
+        if (zoneScopeKeys && !zoneScopeKeys.has(row.zone_key)) {
+          return false;
+        }
+        return true;
+      })
+      .map((row) => {
+        const fromForm = partMpnByLineId.get(row.job_line_id);
+        const display_part_mpn =
+          fromForm !== undefined ? fromForm : row.part_mpn;
+        return { ...row, display_part_mpn };
+      });
+
+    const selected = findZoneNode(board.zone_tree, selectedZoneId);
+    const isParent = Boolean(selected?.children && selected.children.length > 0);
+    return isParent ? rollupWorkRowsByItemPart(scoped) : scoped;
+  }, [
+    board.work_rows,
+    board.zone_tree,
+    partMpnByLineId,
+    selectedZoneId,
+    zoneScopeKeys,
+  ]);
 
   const phaseRows = useMemo((): PhaseTableRow[] => {
     return phasesForZone(
@@ -456,7 +515,11 @@ export const JobFieldProgressPanels = ({
         key: "part",
         width: 140,
         render: (_, row) =>
-          row.part_mpn ? row.part_mpn : <Tag color="warning">TBD</Tag>,
+          row.display_part_mpn ? (
+            row.display_part_mpn
+          ) : (
+            <Tag color="warning">TBD</Tag>
+          ),
       },
     ];
   }, []);

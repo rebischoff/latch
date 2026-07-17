@@ -64,6 +64,7 @@ import { routes } from "@/lib/nav-routes";
 import { buildPickerCreateUrl, parseReturnContext } from "@/lib/picker-return-context";
 import { navigateOnCancel } from "@/lib/surface-navigation";
 import { SurfaceApiError } from "@/lib/surface-api";
+import type { ToolbarAction } from "@/components/shell/SurfaceToolbar";
 
 const JOB_TAB_KEYS = ["overview", "scope", "field", "billing"] as const;
 
@@ -567,6 +568,25 @@ export const JobDetailForm = ({
     message.info("Reverted to last loaded values");
   }, [defaultValues, form, message]);
 
+  const onRequestParts = useCallback(() => {
+    router.push(routes.requisitions.newForJob(jobId, profile?.title));
+  }, [jobId, profile?.title, router]);
+
+  const extraActions = useMemo<ToolbarAction[]>(() => {
+    if (isCreate) {
+      return [];
+    }
+
+    return [
+      {
+        key: "request-parts",
+        label: "Request parts",
+        priority: "secondary",
+        onClick: onRequestParts,
+      },
+    ];
+  }, [isCreate, onRequestParts]);
+
   useSurfaceFormChrome({
     mode: isCreate ? "create" : "edit",
     manifest: activeManifest,
@@ -578,6 +598,7 @@ export const JobDetailForm = ({
     onRevert: isCreate || isCancelled ? undefined : onRevert,
     onCancel: isCreate ? onCancel : undefined,
     onSaveAndNew,
+    extraActions,
   });
 
   if (!isCreate && error instanceof SurfaceApiError && error.status === 404) {
@@ -700,6 +721,13 @@ export const JobDetailForm = ({
                   {profile.catalog_scope_display_name ?? profile.catalog_scope_item_id}
                 </Typography.Text>
               </Space>
+            </div>
+          ) : null}
+          {!isCreate ? (
+            <div style={{ marginBottom: 16 }}>
+              <Link href={routes.requisitions.newForJob(jobId, profile?.title)}>
+                Request parts for this job
+              </Link>
             </div>
           ) : null}
         </FormSection>

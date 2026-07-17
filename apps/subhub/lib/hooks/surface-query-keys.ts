@@ -24,6 +24,11 @@ export const partSpecDefsPickerKey = (itemIds: string[]) =>
 
 export const jobSitePickerKey = ["job", "site-picker"] as const;
 
+export const requisitionJobPickerKey = ["requisition", "job-picker"] as const;
+
+export const requisitionBomPoolKey = (jobId: string) =>
+  ["requisition", "bom-pool", jobId] as const;
+
 export const manufacturerPickerKey = ["manufacturer", "picker"] as const;
 
 export const vendorPickerKey = ["vendor", "picker"] as const;

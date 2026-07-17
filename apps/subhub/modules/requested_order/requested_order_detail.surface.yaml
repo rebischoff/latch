@@ -1,0 +1,40 @@
+# Requisition header + lines (task 52 — Requisition Surfaces, wave 6a′)
+id: requested_order_detail
+displayName: Requisition detail
+anchorTable: requested_order
+
+fieldActions:
+  - read
+  - write
+
+surfaceActions:
+  - read
+  - write
+  - delete
+
+tables:
+  - requested_order
+  - requested_order_line
+  - job
+  - employee
+  - job_line_part
+  - manufacturer_part
+  - purchase_order_line
+
+fields:
+  - id: profile
+    columns:
+      - column: requested_order.id
+        type: string
+      - column: requested_order.job_id
+        type: string
+      - column: requested_order.requested_by
+        type: string
+        nullable: true
+      - column: requested_order.requested_at
+        type: timestamp
+      - column: requested_order.note
+        type: string
+  - id: line_items
+    # logical — DAL maps to requested_order_line; see docs/child-collections.md
+    columns: []

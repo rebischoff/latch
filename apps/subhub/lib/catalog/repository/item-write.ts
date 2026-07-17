@@ -262,8 +262,10 @@ export const loadItemDeleteBlockers = async (
   if (await tableExists(pool, "estimate_condition")) {
     const countResult = await pool.query<{ count: number }>(
       `SELECT COUNT(*)::int AS count
-       FROM estimate_condition
-       WHERE root_item_id = $1`,
+       FROM estimate_condition ec
+       INNER JOIN site_zone sz ON sz.id = ec.site_zone_id
+       WHERE sz.root_item_id = $1
+         AND ec.parent_condition_id IS NULL`,
       [categoryId],
     );
     const count = countResult.rows[0]?.count ?? 0;

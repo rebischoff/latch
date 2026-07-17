@@ -472,6 +472,9 @@ export const SiteScopesZonesTree = ({ manifest }: SiteScopesZonesTreeProps) => {
           <ScopesNameInput
             rowKey={rowKey}
             value={zone?.name ?? ""}
+            readOnlyLabel={
+              (zone?.name ?? "").trim().length > 0 ? undefined : "(unnamed)"
+            }
             disabled={disabled || !writableScopes}
             placeholder="Zone name"
             editingKey={editingKey}

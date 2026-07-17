@@ -200,6 +200,14 @@ export const SURFACE_NAV_CATALOG: SurfaceNavEntry[] = [
     icon: "job",
   },
   {
+    surfaceId: "requested_order_list",
+    href: "/requisitions",
+    navKey: "/requisitions",
+    label: "Requisitions",
+    group: "Procurement",
+    icon: "job",
+  },
+  {
     surfaceId: "part_list",
     href: "/parts",
     navKey: "/parts",

@@ -6,6 +6,69 @@
 
 ---
 
+### Decision: CCTV starter spec namespace (2026-07-16)
+
+**Status:** **Locked** (2026-07-16). **Seed:** `migrations/081_catalog_cctv_dev_seed.sql`. **Amended** by [CCTV accessories](#decision-cctv-accessories--mounts-recorders-licenses-2026-07-16) (`082`).
+
+**Problem:** CCTV exists as a scope root (from catalog `system` → unified item tree) but has no `spec_def` namespace, item subtree, or part specs — blocking an end-to-end CCTV quote → win → job path that exercises the C panel matcher.
+
+**Choice — starter set only (four enums on the CCTV scope root):**
+
+| # | Spec | `value_type` | Options | Role |
+|---|------|--------------|---------|------|
+| **S1** | **Platform** | enum | ONVIF, Axis, Avigilon, Hikvision | Project ecosystem lock (FA analogue: SLC Protocol) |
+| **S2** | **Form Factor** | enum | Dome, Bullet, Turret, PTZ, Fisheye | Primary camera filter |
+| **S3** | **Resolution** | enum | 2MP, 4MP, 8MP | Common bid assumption |
+| **S4** | **Housing** | enum | Indoor, Outdoor, Vandal | Environmental / rating filter |
+
+| Topic | Choice |
+|-------|--------|
+| Namespace | Flat on **CCTV** scope root (`scope_root_item_id`) — whole namespace on C panel (S7 / V2) |
+| Manufacturer as spec | **No** — technical defs only ([C2](../planning/06-catalog-trade-system.md)) |
+| Mount | **Not a spec** — own **Mounts** branch ([accessories](#decision-cctv-accessories--mounts-recorders-licenses-2026-07-16)) |
+| Deferred | Lens, IR/night, PoE class, recorder channel count (number), codec — add only when a real matcher need appears |
+| Part rows | Cameras carry S1–S4; mounts / licenses / NVR·server carry **Platform only** — absent rows = wildcard (V5) |
+
+**Rationale:** Four enums are enough to prove scope-panel → part narrowing → quote → job without over-authoring. Mirrors Fire Alarm’s platform + family + capability shape.
+
+---
+
+### Decision: CCTV accessories — mounts, recorders, licenses (2026-07-16)
+
+**Status:** **Locked** (2026-07-16). **Seed:** `migrations/082_catalog_cctv_accessories_seed.sql`. **Builds on:** [CCTV starter specs](#decision-cctv-starter-spec-namespace-2026-07-16); [D2 emergent composition](#locked-decisions-review-2026-07-05); [Z5 None rate](#decision-item-commercial-margin-inherit-checkbox-2026-07-09).
+
+**Problem:** Starter CCTV seed had cameras + one NVR only. Quotes need mounts, servers, and software licenses. Licenses are non-physical but still carry a purchasable fee **and** Program labor — there is no `expense`/`license` `item.kind` ([D2](#locked-decisions-review-2026-07-05)).
+
+**Choice:**
+
+| # | Topic | Choice |
+|---|--------|--------|
+| **A1** | License fee | **Part-backed** — `manufacturer_part` + `vendor_part` → `unit_material`; labor via `item_labor_phase`. Non-physical ≠ zero material $. |
+| **A2** | Mounts | **Own branch** — separate quote lines from cameras |
+| **A3** | Specs on parts | Cameras **S1–S4**; mounts / licenses / NVR·server **Platform only** |
+| **A4** | Recorders | Two leaves: **NVR** and **Server / VMS Host** |
+| **A5** | License leaves | **Camera Channel License** + **Viewing Client License** (analytics later) |
+| **A6** | Labor | Cameras: Install + Program + Test; Mounts: Install; NVR/Server: Install + Program + Test; Licenses: **Program only** |
+| **A7** | Freight on licenses | Own **`freight` / `None` (0%)** override on Software & Licenses ancestry so a later root freight rate does not tax license fees. Seed relaxes `cost_add_on_type` CHECK to allow 0%/\$0 (Z5). |
+| **A8** | Mount leaves | Wall Mount, Pendant Mount, Pole Mount, Corner Bracket (+ ROM) |
+
+**Tree (after 082):**
+
+```text
+CCTV
+├── Cameras (+ Fisheye Camera)
+├── Mounts                    ← new
+├── Recorders (+ Server / VMS Host)
+├── Software & Licenses       ← new
+├── Network & Power
+├── Wire & Cable
+└── Test & Commission
+```
+
+**Rationale:** Licenses stay first-class sellable SKUs with real Program hours for Field progress; mounts are BOM lines, not Form Factor options; Platform-only accessory specs keep C-panel filters useful without Form Factor noise on brackets/licenses.
+
+---
+
 ### Decision: spec participation removed — narrow by scope-root namespace, part-row presence is the filter (2026-07-12)
 
 **Status:** **Locked** (2026-07-12). **Task:** [37ai](../tasks/37ai-spec-participation-removal.md). **Amends/supersedes:** [spec definitions scoped to root, flat item participation (S1–S10, 2026-07-07)](#decision-spec-definitions-scoped-to-root-flat-item-participation--no-ownershipinheritance-2026-07-07) — **S3, S6, S8, S9, S10 retired outright** (participation as a concept is gone, not just re-shaped); **S1, S2, S4, S5, S7 unchanged** (definitions still a flat namespace per scope root, edited on the scope's Specs tab; categories still carry no spec Fields; `item_spec_exclude` stays dropped; estimate scope panel stays the whole root namespace).

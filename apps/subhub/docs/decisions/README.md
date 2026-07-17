@@ -7,7 +7,6 @@
 | Fork | Doc | Notes |
 |------|-----|--------|
 | Service / warranty / T&M (SW1–SW5); blank-job Add condition (SW0) | [planning/17-service-warranty-tm-open.md](../planning/17-service-warranty-tm-open.md) | **Parked** 2026-07-15 — needs decision session; JC1–JC2 stay locked |
-| _(none — Y1–Y5 locked)_ | [estimate.md](./estimate.md#decision-condition-only-commercial-tree-2026-07-09) | Implement [37y](../tasks/37y-condition-only-commercial-tree.md). |
 
 _Operations backbone forks **resolved** (2026-06-27). Optional: [J3 phase weights](../planning/07-open-decisions.md#J3)._
 
@@ -52,6 +51,9 @@ _Operations backbone forks **resolved** (2026-06-27). Optional: [J3 phase weight
 
 | Decision | File | Date | Status |
 |----------|------|------|--------|
+| Requisition Surfaces UX (R1–R8) | [procurement.md](./procurement.md#decision-requisition-surfaces-ux-r1r8-2026-07-16) | 2026-07-16 | **locked** ([planning/19](../planning/19-requisition-surfaces-open.md)) |
+| CCTV accessories — mounts, recorders, licenses (A1–A8) | [catalog.md](./catalog.md#decision-cctv-accessories--mounts-recorders-licenses-2026-07-16) | 2026-07-16 | **locked** (seed `082`) |
+| CCTV starter spec namespace — Platform / Form Factor / Resolution / Housing | [catalog.md](./catalog.md#decision-cctv-starter-spec-namespace-2026-07-16) | 2026-07-16 | **locked** (seed `081`; amended by accessories) |
 | Job Field progress — boolean zone snapshot (5c) (F1–F9) | [job.md](./job.md#decision-job-field-progress--boolean-zone-snapshot-5c-2026-07-16) | 2026-07-16 | **locked** ([51](../tasks/51-job-field-progress.md) ready; [planning/18](../planning/18-job-field-progress.md)) |
 | Estimate / job / CO commercial boundaries (JC1–JC7) | [job.md](./job.md#decision-estimate--job--co-commercial-boundaries-2026-07-15) | 2026-07-15 | **locked** ([48](../tasks/48-job-create-front-doors-condition-drift.md), [49](../tasks/49-change-order-surfaces.md); companion [estimate.md](./estimate.md#decision-estimate--job--co-commercial-boundaries-2026-07-15)) |
 | Estimate win → job handoff (W0–W7 + Scope-U1/E1/F1/S1 thick 5b) | [estimate.md](./estimate.md#decision-estimate-win--job-handoff-2026-07-14) | 2026-07-15 | **locked** (5b) |

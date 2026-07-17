@@ -326,6 +326,14 @@ export const SiteDetailForm = ({
             );
             return;
           }
+
+          if (
+            details?.field === "scopes" &&
+            details.code === "blank_zone_name"
+          ) {
+            message.error("Name every zone before saving (or remove unnamed ones)");
+            return;
+          }
         }
 
         message.error(isCreate ? "Unable to create site" : "Unable to save site");

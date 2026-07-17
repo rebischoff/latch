@@ -44,6 +44,15 @@ export const flattenZoneTree = (
 
   zones.forEach((zone, index) => {
     const id = zone.id ?? crypto.randomUUID();
+    const name = zone.name.trim();
+
+    if (!name) {
+      throw new ValidationError("Zone name is required", {
+        field: "scopes",
+        code: "blank_zone_name",
+        id,
+      });
+    }
 
     if (seenIds.has(id)) {
       throw new ValidationError("Duplicate zone id in scopes patch", {
@@ -57,7 +66,7 @@ export const flattenZoneTree = (
     flat.push({
       id,
       parent_zone_id: parentZoneId,
-      name: zone.name,
+      name,
       sort_order: index + 1,
     });
 

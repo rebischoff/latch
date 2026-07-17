@@ -39,6 +39,33 @@ describe("flattenZoneTree", () => {
     });
   });
 
+  it("rejects blank zone names", () => {
+    expect(() =>
+      flattenZoneTree(
+        [
+          {
+            name: "   ",
+            zones: [],
+          },
+        ],
+        "scope-1",
+        0,
+        new Set(),
+      ),
+    ).toThrow(ValidationError);
+
+    try {
+      flattenZoneTree([{ name: "", zones: [] }], "scope-1", 0, new Set());
+    } catch (error) {
+      expect(error).toMatchObject({
+        details: {
+          field: "scopes",
+          code: "blank_zone_name",
+        },
+      });
+    }
+  });
+
   it("rejects zone trees deeper than max depth", () => {
     const deepChild: {
       name: string;

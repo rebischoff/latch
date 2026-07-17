@@ -92,6 +92,11 @@ export const SURFACE_API: Partial<Record<SurfaceId, SurfaceApiConfig>> = {
     detailPath: "/api/jobs",
     listSurfaceId: "job_list",
   },
+  requested_order_list: { listPath: "/api/requisitions" },
+  requested_order_detail: {
+    detailPath: "/api/requisitions",
+    listSurfaceId: "requested_order_list",
+  },
   part_list: { listPath: "/api/parts" },
   part_detail: {
     detailPath: "/api/parts",
@@ -762,4 +767,47 @@ export const deleteSurfaceDetail = async (
 export type SurfaceQueryResult<T> = {
   data: T;
   manifest: Manifest;
+};
+
+export type RequisitionJobPickerRow = {
+  id: string;
+  title: string;
+};
+
+export type RequisitionJobPickerData = {
+  rows: RequisitionJobPickerRow[];
+  total: number;
+};
+
+export const fetchRequisitionJobPicker = async (): Promise<
+  ApiSuccessBody<RequisitionJobPickerData>
+> => {
+  const response = await fetch("/api/requisitions/pickers/jobs");
+  return parseResponse<RequisitionJobPickerData>(response);
+};
+
+export type RequisitionBomPoolRow = {
+  job_line_part_id: string;
+  job_line_id: string;
+  part_id: string | null;
+  part_mpn: string | null;
+  part_description: string | null;
+  description: string;
+  unit: string;
+  demand: number;
+  covered: number;
+  remaining: number;
+};
+
+export type RequisitionBomPoolData = {
+  rows: RequisitionBomPoolRow[];
+};
+
+export const fetchRequisitionBomPool = async (
+  jobId: string,
+): Promise<ApiSuccessBody<RequisitionBomPoolData>> => {
+  const response = await fetch(
+    `/api/requisitions/bom-pool?job_id=${encodeURIComponent(jobId)}`,
+  );
+  return parseResponse<RequisitionBomPoolData>(response);
 };

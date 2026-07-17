@@ -25,6 +25,7 @@
 11. [16-estimate-job-co-boundaries.md](./16-estimate-job-co-boundaries.md) — **locked 2026-07-15** — as-sold via estimate Win; Jobs New kept; CO Surfaces separate; condition drift; mid-job progress ([48](../tasks/48-job-create-front-doors-condition-drift.md), [49](../tasks/49-change-order-surfaces.md))
 12. [17-service-warranty-tm-open.md](./17-service-warranty-tm-open.md) — **open / parked 2026-07-15** — T&M, fixed service, warranty tickets, blank-job Add condition (SW0–SW5); do not implement until locked
 13. [18-job-field-progress.md](./18-job-field-progress.md) — **complete 2026-07-16** — Field tab 5c; task [51](../tasks/51-job-field-progress.md)
+14. [19-requisition-surfaces-open.md](./19-requisition-surfaces-open.md) — **complete 2026-07-16** — wave 6a requisition/PO Surface UX (R1–R8); locked in [procurement.md](../decisions/procurement.md)
 
 ## Locked at a glance (2026-06-27)
 
