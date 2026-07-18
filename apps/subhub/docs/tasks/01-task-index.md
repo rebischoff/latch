@@ -292,7 +292,8 @@ flowchart LR
 | **50** | [50-job-scope-on-create.md](./50-job-scope-on-create.md) | Job Scope editable on create (estimate parity) — **complete** (2026-07-15) |
 | **49** | [49-change-order-surfaces.md](./49-change-order-surfaces.md) | Wave **5d** CO Surfaces + Approve — **ready** (2026-07-15) |
 | **52** | [52-requisition-surfaces.md](./52-requisition-surfaces.md) | Wave **6a′** requisitions (R1–R8 subset) — **complete** (2026-07-16); migration **084** |
-| **53** | [53-purchase-order-workbench.md](./53-purchase-order-workbench.md) | Wave **6a″** PO workbench (R5) — **stub**, ready next |
+| **53** | [53-purchase-order-workbench.md](./53-purchase-order-workbench.md) | Wave **6a″** PO workbench (R5) — **stub**, ready |
+| **55** | [55-field-progress-reports-zone-order.md](./55-field-progress-reports-zone-order.md) | Field progress reports + zone ☐ Order → requisition snapshots — **ready** (2026-07-17); planning [20](../planning/20-field-labor-materials-open.md) |
 
 ### Backbone pass (estimate finish) — tasks 29–32
 
@@ -435,7 +436,8 @@ Field detail: [`surfaces.md`](../surfaces.md). DBML: [`current.dbml`](../schema/
 | **49** | [49-change-order-surfaces.md](./49-change-order-surfaces.md) | Wave **5d** — `change_order_*` Surfaces; shared commercial helpers; Approve on [45](./45-job-costing-and-change-order-reconciliation.md) DAL (**JC3/JC4/JC6**) — **ready** (2026-07-15) |
 | **51** | [51-job-field-progress.md](./51-job-field-progress.md) | Wave **5c** — Field boolean zone×phase snapshot; `field_progress`; hours-weighted derived % + lifecycle (**F1–F9**) — **complete** (2026-07-16) |
 | **52** | [52-requisition-surfaces.md](./52-requisition-surfaces.md) | Wave **6a′** — Requisition Surfaces (R1–R4, R6–R8); BOM+ad-hoc; job-wide remaining — **complete** (2026-07-16); migration **084** |
-| **53** | [53-purchase-order-workbench.md](./53-purchase-order-workbench.md) | Wave **6a″** — PO workbench (R5); one PO per job×vendor — **stub**, ready next |
+| **53** | [53-purchase-order-workbench.md](./53-purchase-order-workbench.md) | Wave **6a″** — PO workbench (R5); one PO per job×vendor — **stub**, ready |
+| **55** | [55-field-progress-reports-zone-order.md](./55-field-progress-reports-zone-order.md) | Field progress reports + zone Order compose — **ready** (2026-07-17) |
 
 ---
 

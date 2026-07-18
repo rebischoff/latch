@@ -6,14 +6,32 @@
 
 **Wave 6a Surfaces (R1–R8):** **Locked** 2026-07-16 — [`planning/19-requisition-surfaces-open.md`](../planning/19-requisition-surfaces-open.md). Layer model below stays locked; do not re-litigate.
 
+**Amended 2026-07-17:** Field zone Order compose — [`planning/20`](../planning/20-field-labor-materials-open.md); task [55](../tasks/55-field-progress-reports-zone-order.md).
+
+### Decision: Field zone Order → requisition snapshots (2026-07-17)
+
+**Status:** **Locked**. **Planning:** [20](../planning/20-field-labor-materials-open.md). **Task:** [55](../tasks/55-field-progress-reports-zone-order.md). **Amends:** R1 primary compose (Field ☐ Order); task 52 “no geography on req lines” → nullable `site_zone_id`. **Keeps:** R3 remaining caps; R4 many headers; R5 PO per job×vendor; R6 PO trail; freeze/withdraw.
+
+| Topic | Choice |
+|-------|--------|
+| Compose | Job → Field ☐ **Order** (leaf all-or-nothing; parent cascade) |
+| Save | Order-changing Job Save → **new** `requested_order` + lines (diff-aware) |
+| Zone | `requested_order_line.site_zone_id` (null = General); Order checkbox **derived** from lines |
+| Qty | BOM remaining attributable to zone (L22); soft-spec description OK (L18); empty TBD blocked |
+| Ad-hoc | Scope add line first |
+| List | `/requisitions` kept for purchaser/history; Field is primary Order path |
+| Re-request | Allowed via new open demand after return/bad part |
+
+**Rationale:** Zone-staged pulls match Field geography; snapshot headers preserve “what we asked when”; purchaser batching unchanged.
+
 ### Decision: requisition Surfaces UX (R1–R8) (2026-07-16)
 
-**Status:** **Locked**. **Planning:** [19](../planning/19-requisition-surfaces-open.md).
+**Status:** **Locked**. **Planning:** [19](../planning/19-requisition-surfaces-open.md). **Amended** by [Field zone Order](#decision-field-zone-order--requisition-snapshots-2026-07-17) for compose entry (Field primary).
 
 | # | Choice |
 |---|--------|
-| **R1 / R8** | Both create paths: list → New → pick job **and** Job → **Request parts**; same detail Surface |
-| **R2** | BOM still-needed pool **plus** freeform ad-hoc / TBD |
+| **R1 / R8** | **Primary:** Job → Field ☐ Order. **Also:** list → New / Job Request parts (secondary). Same `requested_order*` documents |
+| **R2** | BOM still-needed (via Field zone Order) **plus** freeform ad-hoc / soft-spec |
 | **R3** | BOM qty editable, **capped at job-wide remaining** |
 | **R4** | Many requisition headers per job; remaining / Order rollup **job-wide** |
 | **R5** | PO workbench selects open lines (cross job/req); vendor pick; **one draft PO per job × vendor** |

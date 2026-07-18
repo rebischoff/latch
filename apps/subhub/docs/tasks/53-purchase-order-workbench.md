@@ -6,7 +6,7 @@
 
 **Goal (locked intent):** PO Surface / workbench selects open requisition lines across jobs; purchaser picks vendor when multiple; **Create POs** emits **one draft PO per job × vendor**; Send issues PO; req lines → `on_purchase_order`; req UI shows PO # + status.
 
-**Out of scope:** Receipts (**54**); ready UI (R7); cross-job single PO header.
+**Out of scope:** Receipts (later); ready UI (R7); cross-job single PO header. **Related:** Field Order compose [55](./55-field-progress-reports-zone-order.md).
 
 ---
 

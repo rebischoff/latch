@@ -6,9 +6,29 @@
 
 ---
 
+### Decision: Field — progress reports + zone Order compose (2026-07-17)
+
+**Status:** **Locked** (L0–L31). **Planning:** [`planning/20-field-labor-materials-open.md`](../planning/20-field-labor-materials-open.md). **Task:** [55](../tasks/55-field-progress-reports-zone-order.md). **Amends:** **F3** below — living board **plus** append-only progress reports on Save (not `progress_entry*` product path). **Companion:** [procurement — Field zone Order](./procurement.md#decision-field-zone-order--requisition-snapshots-2026-07-17).
+
+**Choice:**
+
+| Topic | Choice |
+|-------|--------|
+| Compose | One Job → **Field** tab for labor **and** materials Order |
+| Save | **Save only** (no Submit). Diff-aware: progress change → progress report; Order change → new requisition |
+| Progress report | Full board copy → `job_progress_report` + `job_progress_report_cell` (new tables; not `progress_entry*`) |
+| Order UI | ☐ **Order** under phases; leaf all-or-nothing (+ General); parent cascade / indeterminate |
+| Order state | **Derived** from `requested_order_line` + `site_zone_id` |
+| This cycle out | Notes UI; report history UI; issues DB/UI; scheduling automation |
+| Follow-on (required) | **Issues** cycle (per-zone, created→resolved); notes; history UI; scheduling |
+
+**Rationale:** Field zone tree is the natural compose surface; domain snapshots serve billing/customer reporting beyond `latch_audit`; issues stay a separate product concern.
+
+---
+
 ### Decision: job Field progress — boolean zone snapshot (5c) (2026-07-16)
 
-**Status:** **Locked** (F1–F9). **Planning:** [`planning/18-job-field-progress.md`](../planning/18-job-field-progress.md). **Task:** [51](../tasks/51-job-field-progress.md) — **Complete** (2026-07-16). **Amends:** [field progress — scope phase + progress entries (2026-06-27)](#decision-field-progress--scope-phase--progress-entries-2026-06-27) and [J2](#decision-progress-entry-workflow--none-in-v1-j2-locked-2026-06-27) **for the v1 Field product path** — visit ledger / `progress_entry*` UI deferred; mutable snapshot instead. **Depends on:** Scope + `scope_phase` seed ([45](../tasks/45-job-costing-and-change-order-reconciliation.md)–[47](../tasks/47-job-line-items-parity.md)). **Orthogonal to:** [49](../tasks/49-change-order-surfaces.md) (5d).
+**Status:** **Locked** (F1–F9). **Planning:** [`planning/18-job-field-progress.md`](../planning/18-job-field-progress.md). **Task:** [51](../tasks/51-job-field-progress.md) — **Complete** (2026-07-16). **Amends:** [field progress — scope phase + progress entries (2026-06-27)](#decision-field-progress--scope-phase--progress-entries-2026-06-27) and [J2](#decision-progress-entry-workflow--none-in-v1-j2-locked-2026-06-27) **for the v1 Field product path**. **Amended 2026-07-17** by [progress reports + zone Order](#decision-field--progress-reports--zone-order-compose-2026-07-17): **F3** — living `job_field_progress_cell` remains current board; **history** = append-only `job_progress_report*` on Save (still not `progress_entry*` UI). **Depends on:** Scope + `scope_phase` seed ([45](../tasks/45-job-costing-and-change-order-reconciliation.md)–[47](../tasks/47-job-line-items-parity.md)). **Orthogonal to:** [49](../tasks/49-change-order-surfaces.md) (5d).
 
 **Problem:** Field tab is fixture-only; ops need persisted “where are we?” for the job and for invoice staging, without a progress approval workflow or auto-billing.
 
@@ -16,7 +36,7 @@
 |---|--------|--------|
 | **F1** | Granularity | **Boolean** complete/not per labor phase (no partial qty in Field UI) |
 | **F2** | Geography | Tag with **`site_zone_id` only** (no `site_area_id` / `site_asset_id` on Field writes) |
-| **F3** | History | **No** `progress_entry*` product path in v1 — mutable snapshot; billing reads current % when creating invoices |
+| **F3** | History | Living board on `job_field_progress_cell`; **append-only progress reports** on Save when progress changed ([2026-07-17](#decision-field--progress-reports--zone-order-compose-2026-07-17)). Not `progress_entry*` product path. Billing may use current % and/or report “as of” |
 | **F4** | Tree | Allocations → zones + pseudo **General** (ex-Unplaced); **no All Zones**; one scope category per job |
 | **F5** | Field id | **`field_progress`** on `job_detail` (drop `work_items` / `job_work_item`) |
 | **F6** | Save | Whole-job Save on `job_detail`; later tech-only Surface reuses same writes |
@@ -25,7 +45,7 @@
 | **F8** | % | **Hours-weighted**, compute on read — **never store** job % or lifecycle (except cancelled) |
 | **F9** | Denominator | Include **General**; active lines only; boolean ⇒ no over-complete |
 
-**Persistence:** complete flags per `(scope_phase_id, site_zone_id | General)` — not `scope_phase` alone when a line has multiple places. `progress_entry*` stays in DBML unused by this UI.
+**Persistence:** complete flags per `(scope_phase_id, site_zone_id | General)` — not `scope_phase` alone when a line has multiple places. `progress_entry*` stays in DBML unused by this UI; reports use `job_progress_report*`.
 
 **Rationale:** Zone×phase done/not matches contractor “room complete” reporting; hours-weighted % matches unequal phase effort; derived lifecycle avoids a second manual status; cancel-at-zero keeps kill-switch simple; publish/as-built stays a separate irreversible step.
 

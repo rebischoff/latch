@@ -7,6 +7,7 @@
 | Fork | Doc | Notes |
 |------|-----|--------|
 | Service / warranty / T&M (SW1–SW5); blank-job Add condition (SW0) | [planning/17-service-warranty-tm-open.md](../planning/17-service-warranty-tm-open.md) | **Parked** 2026-07-15 — needs decision session; JC1–JC2 stay locked |
+| Field zone **issues** (created→resolved) | [planning/20 follow-on](../planning/20-field-labor-materials-open.md#follow-on-cycles-required) | **Required** after [55](../tasks/55-field-progress-reports-zone-order.md); separate discussion |
 
 _Operations backbone forks **resolved** (2026-06-27). Optional: [J3 phase weights](../planning/07-open-decisions.md#J3)._
 
@@ -51,7 +52,8 @@ _Operations backbone forks **resolved** (2026-06-27). Optional: [J3 phase weight
 
 | Decision | File | Date | Status |
 |----------|------|------|--------|
-| Requisition Surfaces UX (R1–R8) | [procurement.md](./procurement.md#decision-requisition-surfaces-ux-r1r8-2026-07-16) | 2026-07-16 | **locked** ([planning/19](../planning/19-requisition-surfaces-open.md)) |
+| Field — progress reports + zone Order compose (L0–L31) | [job.md](./job.md#decision-field--progress-reports--zone-order-compose-2026-07-17) · [procurement.md](./procurement.md#decision-field-zone-order--requisition-snapshots-2026-07-17) | 2026-07-17 | **locked** ([planning/20](../planning/20-field-labor-materials-open.md); task [55](../tasks/55-field-progress-reports-zone-order.md)) |
+| Requisition Surfaces UX (R1–R8) | [procurement.md](./procurement.md#decision-requisition-surfaces-ux-r1r8-2026-07-16) | 2026-07-16 | **locked** ([planning/19](../planning/19-requisition-surfaces-open.md); compose amended by Field zone Order 2026-07-17) |
 | CCTV accessories — mounts, recorders, licenses (A1–A8) | [catalog.md](./catalog.md#decision-cctv-accessories--mounts-recorders-licenses-2026-07-16) | 2026-07-16 | **locked** (seed `082`) |
 | CCTV starter spec namespace — Platform / Form Factor / Resolution / Housing | [catalog.md](./catalog.md#decision-cctv-starter-spec-namespace-2026-07-16) | 2026-07-16 | **locked** (seed `081`; amended by accessories) |
 | Job Field progress — boolean zone snapshot (5c) (F1–F9) | [job.md](./job.md#decision-job-field-progress--boolean-zone-snapshot-5c-2026-07-16) | 2026-07-16 | **locked** ([51](../tasks/51-job-field-progress.md) ready; [planning/18](../planning/18-job-field-progress.md)) |

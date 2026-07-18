@@ -26,6 +26,7 @@
 12. [17-service-warranty-tm-open.md](./17-service-warranty-tm-open.md) — **open / parked 2026-07-15** — T&M, fixed service, warranty tickets, blank-job Add condition (SW0–SW5); do not implement until locked
 13. [18-job-field-progress.md](./18-job-field-progress.md) — **complete 2026-07-16** — Field tab 5c; task [51](../tasks/51-job-field-progress.md)
 14. [19-requisition-surfaces-open.md](./19-requisition-surfaces-open.md) — **complete 2026-07-16** — wave 6a requisition/PO Surface UX (R1–R8); locked in [procurement.md](../decisions/procurement.md)
+15. [20-field-labor-materials-open.md](./20-field-labor-materials-open.md) — **locked 2026-07-17** — Field progress reports + zone Order; task [55](../tasks/55-field-progress-reports-zone-order.md); issues follow-on required
 
 ## Locked at a glance (2026-06-27)
 
