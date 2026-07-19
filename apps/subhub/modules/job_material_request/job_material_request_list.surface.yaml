@@ -1,0 +1,52 @@
+# Material requests — flat filterable list (task 56; replaces requested_order_list + _detail)
+id: job_material_request_list
+displayName: Material requests
+anchorTable: job_material_request
+
+fieldActions:
+  - read
+  - write
+
+surfaceActions:
+  - read
+
+tables:
+  - job_material_request
+  - job
+  - site_zone
+  - manufacturer_part
+
+fields:
+  - id: summary
+    columns:
+      - column: job_material_request.id
+        type: string
+      - column: job_material_request.job_id
+        type: string
+      - column: job.title
+        type: string
+      - column: job_material_request.site_zone_id
+        type: string
+        nullable: true
+      - column: site_zone.name
+        type: string
+        nullable: true
+      - column: job_material_request.job_line_part_id
+        type: string
+        nullable: true
+      - column: job_material_request.part_id
+        type: string
+        nullable: true
+      - column: manufacturer_part.mpn
+        type: string
+        nullable: true
+      - column: job_material_request.description
+        type: string
+      - column: job_material_request.quantity
+        type: number
+      - column: job_material_request.unit
+        type: string
+      - column: job_material_request.status
+        type: string
+      - column: job_material_request.requested_at
+        type: timestamp

@@ -59,11 +59,11 @@ export const loadJobCostSummary = async (
   const rebudgeted = budget;
 
   let committed = 0;
-  if (
-    (await tableExists(pool, "purchase_order_line")) &&
-    (await tableExists(pool, "job_line_part"))
-  ) {
+  if (await tableExists(pool, "purchase_order_line")) {
     // purchase_order_line uses unit_price (migration 084); receipt filter only when MRL exists.
+    // Key off purchase_order.job_id directly (not job_line_part) so ad-hoc / soft-spec PO
+    // lines with no BOM link still count toward committed; exclude cancelled/rejected so a
+    // retracted PO (task 53) doesn't leave stale committed $ on the job.
     const receiptFilter = (await tableExists(pool, "material_receipt_line"))
       ? `AND (
            NOT EXISTS (
@@ -79,10 +79,10 @@ export const loadJobCostSummary = async (
     const committedResult = await pool.query<{ total: string | number }>(
       `SELECT COALESCE(SUM(pol.unit_price * pol.quantity), 0) AS total
        FROM purchase_order_line pol
-       INNER JOIN job_line_part jlp ON jlp.id = pol.job_line_part_id
-       INNER JOIN job_line jl ON jl.id = jlp.job_line_id
-       WHERE jl.job_id = $1
-         AND jl.status = 'active'
+       INNER JOIN purchase_order po ON po.id = pol.purchase_order_id
+       WHERE po.job_id = $1
+         AND po.status <> 'cancelled'
+         AND pol.status NOT IN ('cancelled', 'rejected')
          ${receiptFilter}`,
       [jobId],
     );

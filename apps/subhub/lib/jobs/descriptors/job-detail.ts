@@ -6,6 +6,7 @@ import type { JobCostSummary } from "../repository/job-cost-summary";
 import type {
   JobFieldProgressCellPatch,
   JobFieldProgressDto,
+  JobFieldZoneOrderPatch,
 } from "../repository/job-field-progress";
 
 const JobStakeholderPatchElementSchema = z
@@ -20,6 +21,13 @@ const JobFieldProgressCellPatchElementSchema = z
     scope_phase_id: z.string(),
     site_zone_id: z.string().nullable(),
     complete: z.boolean(),
+  })
+  .strict();
+
+const JobFieldZoneOrderPatchElementSchema = z
+  .object({
+    site_zone_id: z.string().nullable(),
+    ordered: z.boolean(),
   })
   .strict();
 
@@ -152,6 +160,8 @@ export const JobDetailPatchSchema = z
     line_items: z.array(JobLineItemPatchElementSchema).optional(),
     /** Replace-array of zone×phase cells (task 51). */
     field_progress: z.array(JobFieldProgressCellPatchElementSchema).optional(),
+    /** Desired Field ☐ Order state per leaf / General (task 55). */
+    field_zone_orders: z.array(JobFieldZoneOrderPatchElementSchema).optional(),
   })
   .strict();
 
@@ -316,9 +326,12 @@ export type JobDetailWriteRow = Pick<
 
 export type JobFieldProgressPatchRow = JobFieldProgressCellPatch;
 
+export type JobFieldZoneOrderPatchRow = JobFieldZoneOrderPatch;
+
 export type JobDetailRelatedPatch = {
   conditions?: JobConditionPatchRow[];
   field_progress?: JobFieldProgressPatchRow[];
+  field_zone_orders?: JobFieldZoneOrderPatchRow[];
   line_items?: JobLineItemPatchRow[];
   stakeholders?: JobStakeholderPatchRow[];
 };
@@ -343,6 +356,7 @@ const emptyFieldProgress = (): JobFieldProgressDto => ({
   zone_tree: [],
   phases: [],
   work_rows: [],
+  zone_orders: [],
   scope_phase_index: [],
   progress_pct: 0,
   lifecycle: "not_started",
@@ -465,6 +479,10 @@ export const jobDetailDescriptor: SurfaceDescriptor<
     }
     if (typed.field_progress !== undefined) {
       related.field_progress = typed.field_progress as JobFieldProgressPatchRow[];
+    }
+    if (typed.field_zone_orders !== undefined) {
+      related.field_zone_orders =
+        typed.field_zone_orders as JobFieldZoneOrderPatchRow[];
     }
 
     return Object.keys(related).length > 0 ? related : undefined;

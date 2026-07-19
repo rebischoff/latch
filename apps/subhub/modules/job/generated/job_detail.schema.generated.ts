@@ -9,6 +9,7 @@ export const JobDetailFieldIds = {
   conditions: "conditions",
   line_items: "line_items",
   field_progress: "field_progress",
+  field_zone_orders: "field_zone_orders",
 } as const;
 
 export type JobDetailFieldId = (typeof JobDetailFieldIds)[keyof typeof JobDetailFieldIds];
@@ -19,6 +20,7 @@ export const jobDetailColumnMap = {
   conditions: [],
   line_items: [],
   field_progress: [],
+  field_zone_orders: [],
 } as const satisfies Record<JobDetailFieldId, readonly string[]>;
 
 /** Full read DTO keyed by Field id (narrow with `narrowSchema(..., manifest, 'read')`). */
@@ -36,6 +38,7 @@ export const JobDetailSchema = z.object({
   conditions: z.array(z.object({ user_id: z.string() })),
   line_items: z.array(z.object({ user_id: z.string() })),
   field_progress: z.array(z.object({ user_id: z.string() })),
+  field_zone_orders: z.array(z.object({ user_id: z.string() })),
 });
 
 /** PATCH body keyed by Field id (narrow with `narrowSchema(..., manifest, 'write')`). */
@@ -54,6 +57,7 @@ export const JobDetailPatchSchema = z.object({
   conditions: z.array(z.object({ user_id: z.string() })).optional(),
   line_items: z.array(z.object({ user_id: z.string() })).optional(),
   field_progress: z.array(z.object({ user_id: z.string() })).optional(),
+  field_zone_orders: z.array(z.object({ user_id: z.string() })).optional(),
 });
 
 export type JobDetailDto = z.infer<typeof JobDetailSchema>;

@@ -24,6 +24,9 @@ tables:
   - job_line_spec
   - scope_phase
   - job_field_progress_cell
+  - job_progress_report
+  - job_progress_report_cell
+  - job_material_request
   - site
   - site_zone
   - estimate
@@ -55,4 +58,8 @@ fields:
     columns: []
   - id: field_progress
     # logical — DAL maps to job_field_progress_cell + derived board/%/lifecycle (task 51)
+    # + append-only job_progress_report* on Save when progress changed (task 55)
+    columns: []
+  - id: field_zone_orders
+    # logical — desired Field ☐ Order intents; Save → job_material_request + site_zone_id (task 55/56)
     columns: []

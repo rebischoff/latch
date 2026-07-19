@@ -5,115 +5,105 @@ import type { Pool } from "pg";
 import { ensureAuditBootstrap, getPool, getPrincipal } from "../latch";
 
 import {
-  RequestedOrderListListQuerySchema,
-  requestedOrderDetailDescriptor,
-  requestedOrderListDescriptor,
+  JobMaterialRequestListListQuerySchema,
+  jobMaterialRequestListDescriptor,
 } from "./descriptors";
-import { loadRequestedOrderList } from "./repository";
-import { extendRequestedOrderDetailDal } from "./stores/requested-order-detail-create";
-import { createRequestedOrderDetailStore } from "./stores/requested-order-detail-store";
-import { createRequestedOrderListStore } from "./stores/requested-order-list-store";
+import { loadJobMaterialRequestList } from "./repository";
+import { createJobMaterialRequestListStore } from "./stores/job-material-request-list-store";
 
-export type RequestedOrderListDal = SurfaceDal & {
+export type JobMaterialRequestListDal = SurfaceDal & {
   list: (
     ctx: PermissionContext,
     opts?: Record<string, unknown>,
   ) => Promise<{ rows: Record<string, unknown>[]; total: number }>;
 };
 
-export type RequestedOrderDetailDal = SurfaceDal & {
-  create: (
-    ctx: PermissionContext,
-    id: string,
-    body: unknown,
-  ) => Promise<Record<string, unknown>>;
+export type JobMaterialRequestsDal = {
+  jobMaterialRequestList: JobMaterialRequestListDal;
 };
 
-export type RequestedOrdersDal = {
-  requestedOrderDetail: RequestedOrderDetailDal;
-  requestedOrderList: RequestedOrderListDal;
-};
-
-export type CreateRequestedOrdersDalOptions = {
+export type CreateJobMaterialRequestsDalOptions = {
   pool: Pool;
   getActorId: () => Promise<string>;
 };
 
-export const createRequestedOrdersDal = (
-  options: CreateRequestedOrdersDalOptions,
-): RequestedOrdersDal => {
-  const { pool, getActorId } = options;
-  const requestedOrderListStore = createRequestedOrderListStore(pool);
-  const requestedOrderDetailStore = createRequestedOrderDetailStore(pool, getActorId);
+export const createJobMaterialRequestsDal = (
+  options: CreateJobMaterialRequestsDalOptions,
+): JobMaterialRequestsDal => {
+  const { pool } = options;
+  const listStore = createJobMaterialRequestListStore(pool);
 
-  const requestedOrderListBaseDal = createSurfaceDal(
-    requestedOrderListDescriptor,
-    requestedOrderListStore,
-  );
-  const requestedOrderDetailBaseDal = createSurfaceDal(
-    requestedOrderDetailDescriptor,
-    requestedOrderDetailStore,
-  );
+  const listBaseDal = createSurfaceDal(jobMaterialRequestListDescriptor, listStore);
 
-  const requestedOrderDetail = extendRequestedOrderDetailDal(
-    pool,
-    getActorId,
-    requestedOrderDetailBaseDal,
-  );
-
-  const requestedOrderList: RequestedOrderListDal = {
-    ...requestedOrderListBaseDal,
+  const jobMaterialRequestList: JobMaterialRequestListDal = {
+    ...listBaseDal,
     list: async (ctx, opts) => {
-      const parsed = RequestedOrderListListQuerySchema.safeParse(opts ?? {});
+      const parsed = JobMaterialRequestListListQuerySchema.safeParse(opts ?? {});
       if (!parsed.success) {
         throw new ValidationError("Validation failed", parsed.error.flatten());
       }
 
       const query = parsed.data;
-      const result = await loadRequestedOrderList(pool, {
+      const result = await loadJobMaterialRequestList(pool, {
         limit: query.limit ?? 50,
         offset: query.offset ?? 0,
         job_id: query.job_id,
+        status: query.status,
+        site_zone_id: query.site_zone_id,
         rowScope: ctx.manifest.rowScope ?? "all",
       });
 
       return {
         rows: result.rows.map((row) =>
-          requestedOrderListDescriptor.projectRow(row, ctx.manifest, undefined),
+          jobMaterialRequestListDescriptor.projectRow(row, ctx.manifest, undefined),
         ),
         total: result.total,
       };
     },
   };
 
-  return { requestedOrderDetail, requestedOrderList };
+  return { jobMaterialRequestList };
 };
 
-let requestedOrdersDal: RequestedOrdersDal | undefined;
+/** @deprecated Use JobMaterialRequestsDal — kept for call-site migration. */
+export type RequestedOrdersDal = JobMaterialRequestsDal;
 
-export const getRequestedOrdersDal = (): RequestedOrdersDal => {
-  if (!requestedOrdersDal) {
-    throw new Error("Requested orders DAL not initialized — call initRequestedOrdersDal() first");
+let jobMaterialRequestsDal: JobMaterialRequestsDal | undefined;
+
+export const getJobMaterialRequestsDal = (): JobMaterialRequestsDal => {
+  if (!jobMaterialRequestsDal) {
+    throw new Error(
+      "Job material requests DAL not initialized — call initJobMaterialRequestsDal() first",
+    );
   }
-  return requestedOrdersDal;
+  return jobMaterialRequestsDal;
 };
 
-export const initRequestedOrdersDal = (
-  options: CreateRequestedOrdersDalOptions,
-): RequestedOrdersDal => {
-  requestedOrdersDal = createRequestedOrdersDal(options);
-  return requestedOrdersDal;
+/** @deprecated Use getJobMaterialRequestsDal */
+export const getRequestedOrdersDal = getJobMaterialRequestsDal;
+
+export const initJobMaterialRequestsDal = (
+  options: CreateJobMaterialRequestsDalOptions,
+): JobMaterialRequestsDal => {
+  jobMaterialRequestsDal = createJobMaterialRequestsDal(options);
+  return jobMaterialRequestsDal;
 };
 
-export const ensureRequestedOrdersDal = async (): Promise<RequestedOrdersDal> => {
+/** @deprecated Use initJobMaterialRequestsDal */
+export const initRequestedOrdersDal = initJobMaterialRequestsDal;
+
+export const ensureJobMaterialRequestsDal = async (): Promise<JobMaterialRequestsDal> => {
   await ensureAuditBootstrap();
 
-  if (!requestedOrdersDal) {
-    initRequestedOrdersDal({
+  if (!jobMaterialRequestsDal) {
+    initJobMaterialRequestsDal({
       pool: getPool(),
       getActorId: async () => (await getPrincipal()).id,
     });
   }
 
-  return requestedOrdersDal!;
+  return jobMaterialRequestsDal!;
 };
+
+/** @deprecated Use ensureJobMaterialRequestsDal */
+export const ensureRequestedOrdersDal = ensureJobMaterialRequestsDal;

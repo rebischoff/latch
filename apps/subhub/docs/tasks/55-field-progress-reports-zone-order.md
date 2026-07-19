@@ -1,6 +1,6 @@
 # 55 — Field progress reports + zone Order
 
-> **Status:** Ready (2026-07-17). Next after ship: **[53 — PO workbench](./53-purchase-order-workbench.md)** and/or **[49 — CO Surfaces](./49-change-order-surfaces.md)**; schedule **issues** cycle (planning/20 follow-on).
+> **Status:** Complete (2026-07-18). Next: **[53 — PO workbench](./53-purchase-order-workbench.md)** and/or **[49 — CO Surfaces](./49-change-order-surfaces.md)**; schedule **issues** cycle (planning/20 follow-on).
 >
 > **Decision:** [Field — progress reports + zone Order](../decisions/job.md#decision-field--progress-reports--zone-order-compose-2026-07-17) · [Field zone Order → requisition snapshots](../decisions/procurement.md#decision-field-zone-order--requisition-snapshots-2026-07-17). **Planning:** [20](../planning/20-field-labor-materials-open.md). **Depends on:** [51](./51-job-field-progress.md), [52](./52-requisition-surfaces.md).
 
@@ -42,8 +42,8 @@ flowchart TD
 
 ### Verify
 
-- [ ] Tables/columns on dev; FKs + indexes
-- [ ] Living `job_field_progress_cell` unchanged as editable board
+- [x] Tables/columns on dev; FKs + indexes
+- [x] Living `job_field_progress_cell` unchanged as editable board
 
 ---
 
@@ -57,9 +57,9 @@ flowchart TD
 
 ### Verify
 
-- [ ] Save with no progress change → no new report
-- [ ] Check phase + Save → one report with full board
-- [ ] Uncheck + Save → another full-board report
+- [x] Save with no progress change → no new report
+- [x] Check phase + Save → one report with full board
+- [x] Uncheck + Save → another full-board report
 
 ---
 
@@ -75,10 +75,10 @@ flowchart TD
 
 ### Verify
 
-- [ ] Order Floor 2 + Save → req lines only for Floor 2 with `site_zone_id` set
-- [ ] Second Save Order Lobby → **new** requisition header
-- [ ] Checkbox reflects derived state after reload
-- [ ] Cannot uncheck zone once lines on PO
+- [x] Order Floor 2 + Save → req lines only for Floor 2 with `site_zone_id` set
+- [x] Second Save Order Lobby → **new** requisition header
+- [x] Checkbox reflects derived state after reload
+- [x] Cannot uncheck zone once lines on PO
 
 ---
 
@@ -94,8 +94,8 @@ flowchart TD
 
 ### Verify
 
-- [ ] Parent Order cascades to leaves; child mix → indeterminate
-- [ ] PO column blank until 53 writes exist
+- [x] Parent Order cascades to leaves; child mix → indeterminate
+- [x] PO column blank until 53 writes exist
 
 ---
 
@@ -109,7 +109,9 @@ flowchart TD
 
 ### Verify
 
-- [ ] Operator can complete Order flow without `/requisitions/new` as the happy path
+- [x] Operator can complete Order flow without `/requisitions/new` as the happy path
+
+**Choice (2026-07-18):** Toolbar **Order materials** + Overview link open Job `?tab=field`. `/requisitions/new` remains as secondary “new requisition” link on Overview.
 
 ---
 
@@ -123,8 +125,8 @@ flowchart TD
 
 ### Verify
 
-- [ ] Touched tests green
-- [ ] Verify checklist all `[x]`; STATUS updated
+- [x] Touched tests green
+- [x] Verify checklist all `[x]`; STATUS updated
 
 ---
 

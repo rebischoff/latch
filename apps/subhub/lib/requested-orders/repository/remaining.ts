@@ -5,10 +5,10 @@ import { tableExists } from "../../sites/repository/sql-utils";
 const toNumber = (value: unknown): number => Number(value ?? 0);
 
 /**
- * Job-wide remaining need for a single BOM row (task 52 R3/R4).
- * `remaining = max(0, demand − covered)`. `covered` = requisitioned qty
- * (excl. withdrawn) across every requisition on the job, plus PO coverage —
- * PO coverage is a stub `0` until task 53 writes `purchase_order_line`.
+ * Job-wide remaining need for a single BOM row (task 52 R3/R4 → 56).
+ * `remaining = max(0, demand − covered)`. `covered` = requested qty across every
+ * `job_material_request` on the job, plus PO coverage — PO coverage is a stub `0`
+ * until task 53 writes `purchase_order_line` / source links.
  */
 export const computeRemaining = (demand: number, covered: number): number =>
   Math.max(0, demand - covered);
@@ -27,21 +27,22 @@ export type BomPoolRow = {
 };
 
 /**
- * Requisitioned coverage per `job_line_part_id`, job-wide, excluding `withdrawn`
- * lines. PO coverage is not added here — stub `0` until task 53.
+ * Requested coverage per `job_line_part_id`, job-wide (flat `job_material_request`).
  */
 export const loadRequisitionedCoverageForJob = async (
   client: Pool | PoolClient,
   jobId: string,
 ): Promise<Map<string, number>> => {
+  if (!(await tableExists(client, "job_material_request"))) {
+    return new Map();
+  }
+
   const result = await client.query<{ job_line_part_id: string; covered: string | number }>(
-    `SELECT rol.job_line_part_id, SUM(rol.quantity) AS covered
-     FROM requested_order_line rol
-     INNER JOIN requested_order ro ON ro.id = rol.requested_order_id
-     WHERE ro.job_id = $1
-       AND rol.job_line_part_id IS NOT NULL
-       AND rol.status <> 'withdrawn'
-     GROUP BY rol.job_line_part_id`,
+    `SELECT job_line_part_id, SUM(quantity) AS covered
+     FROM job_material_request
+     WHERE job_id = $1
+       AND job_line_part_id IS NOT NULL
+     GROUP BY job_line_part_id`,
     [jobId],
   );
 
@@ -53,8 +54,8 @@ export const loadRequisitionedCoverageForJob = async (
 };
 
 /**
- * PO coverage per `job_line_part_id` — stub `0` until task 53 (`purchase_order_line`
- * writes land). Guarded with `tableExists` so it stays safe if the table is absent.
+ * PO coverage per `job_line_part_id` — stub `0` until task 53 writes
+ * `purchase_order_line` / `purchase_order_line_source`.
  */
 export const loadPurchaseOrderCoverageForJob = async (
   client: Pool | PoolClient,
@@ -63,8 +64,6 @@ export const loadPurchaseOrderCoverageForJob = async (
   if (!(await tableExists(client, "purchase_order_line"))) {
     return new Map();
   }
-  // task 53 writes purchase_order_line against requested_order_line / job_line_part;
-  // no writer exists yet in task 52, so coverage is always empty (0) for now.
   return new Map();
 };
 
@@ -130,7 +129,7 @@ export const loadBomRemainingForJob = async (
   });
 };
 
-/** BOM pool for the requisition line picker — rows still needing order (`remaining > 0`). */
+/** BOM pool — rows still needing order (`remaining > 0`). */
 export const loadBomPoolForJob = async (
   pool: Pool,
   jobId: string,
@@ -141,12 +140,11 @@ export const loadBomPoolForJob = async (
 
 /**
  * Job-wide remaining for one `job_line_part_id`, optionally excluding one
- * requisition line's own current coverage (edit path — cap uses the
- * remaining that would exist if this line's own qty were released first).
+ * request's own current coverage (edit path).
  */
 export const loadRemainingForJobLinePart = async (
   client: Pool | PoolClient,
-  args: { jobId: string; jobLinePartId: string; excludeLineId?: string },
+  args: { jobId: string; jobLinePartId: string; excludeRequestId?: string },
 ): Promise<number> => {
   const demandResult = await client.query<{ quantity: string | number }>(
     `SELECT jlp.quantity
@@ -157,15 +155,17 @@ export const loadRemainingForJobLinePart = async (
   );
   const demand = toNumber(demandResult.rows[0]?.quantity);
 
+  if (!(await tableExists(client, "job_material_request"))) {
+    return computeRemaining(demand, 0);
+  }
+
   const coveredResult = await client.query<{ covered: string | number | null }>(
-    `SELECT SUM(rol.quantity) AS covered
-     FROM requested_order_line rol
-     INNER JOIN requested_order ro ON ro.id = rol.requested_order_id
-     WHERE ro.job_id = $1
-       AND rol.job_line_part_id = $2
-       AND rol.status <> 'withdrawn'
-       AND ($3::text IS NULL OR rol.id <> $3)`,
-    [args.jobId, args.jobLinePartId, args.excludeLineId ?? null],
+    `SELECT SUM(quantity) AS covered
+     FROM job_material_request
+     WHERE job_id = $1
+       AND job_line_part_id = $2
+       AND ($3::text IS NULL OR id <> $3)`,
+    [args.jobId, args.jobLinePartId, args.excludeRequestId ?? null],
   );
   const covered = toNumber(coveredResult.rows[0]?.covered);
 
@@ -173,22 +173,20 @@ export const loadRemainingForJobLinePart = async (
 };
 
 /**
- * Thin rollup enum for a future Job BOM "Order" column — not wired to UI in
- * task 52. Priority: fulfilled > on_purchase_order > requested > withdrawn > open.
+ * Thin rollup enum for a future Job BOM "Order" column.
+ * Priority: fulfilled > on_purchase_order > requested > open.
  */
 export type BomOrderStatus =
   | "open"
   | "requested"
   | "on_purchase_order"
-  | "fulfilled"
-  | "withdrawn";
+  | "fulfilled";
 
 export const computeBomOrderStatus = (args: {
   demand: number;
   openQty: number;
   onPurchaseOrderQty: number;
   fulfilledQty: number;
-  withdrawnQty: number;
 }): BomOrderStatus => {
   if (args.demand > 0 && args.fulfilledQty >= args.demand) {
     return "fulfilled";
@@ -198,9 +196,6 @@ export const computeBomOrderStatus = (args: {
   }
   if (args.openQty > 0) {
     return "requested";
-  }
-  if (args.withdrawnQty > 0) {
-    return "withdrawn";
   }
   return "open";
 };

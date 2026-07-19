@@ -8,7 +8,7 @@ import { ensureEstimatesDal } from "../estimates/dal";
 import { ensureIamDal } from "../iam/dal";
 import { ensureJobsDal } from "../jobs/dal";
 import { ensurePartsDal } from "../parts/dal";
-import { ensureRequestedOrdersDal } from "../requested-orders/dal";
+import { ensureJobMaterialRequestsDal } from "../requested-orders/dal";
 import { resolveContextFresh } from "../latch";
 import { ensureSitesDal } from "../sites/dal";
 import type { SurfaceListRow } from "../surface-api";
@@ -36,7 +36,7 @@ export type SurfaceListId =
   | "spec_unit_table"
   | "estimate_list"
   | "job_list"
-  | "requested_order_list"
+  | "job_material_request_list"
   | "part_list"
   | "item_list";
 
@@ -50,7 +50,6 @@ export type SurfaceDetailId =
   | "role_detail"
   | "estimate_detail"
   | "job_detail"
-  | "requested_order_detail"
   | "part_detail"
   | "item_detail";
 
@@ -295,21 +294,13 @@ const listLoaders: Record<SurfaceListId, ListLoader> = {
       return createViaDetailDal("job_detail", dal.jobDetail.create.bind(dal.jobDetail), body);
     },
   },
-  requested_order_list: {
+  job_material_request_list: {
     ensureDal: async () => {
-      await ensureRequestedOrdersDal();
+      await ensureJobMaterialRequestsDal();
     },
     list: async (ctx, query) => {
-      const dal = await ensureRequestedOrdersDal();
-      return dal.requestedOrderList.list(ctx, query);
-    },
-    create: async (_ctx, body) => {
-      const dal = await ensureRequestedOrdersDal();
-      return createViaDetailDal(
-        "requested_order_detail",
-        dal.requestedOrderDetail.create.bind(dal.requestedOrderDetail),
-        body,
-      );
+      const dal = await ensureJobMaterialRequestsDal();
+      return dal.jobMaterialRequestList.list(ctx, query);
     },
   },
   part_list: {
@@ -415,15 +406,6 @@ const detailLoaders: Record<SurfaceDetailId, DetailLoader> = {
     getDal: async () => {
       const dal = await ensureJobsDal();
       return dal.jobDetail;
-    },
-  },
-  requested_order_detail: {
-    ensureDal: async () => {
-      await ensureRequestedOrdersDal();
-    },
-    getDal: async () => {
-      const dal = await ensureRequestedOrdersDal();
-      return dal.requestedOrderDetail;
     },
   },
   part_detail: {

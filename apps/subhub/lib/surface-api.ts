@@ -92,11 +92,7 @@ export const SURFACE_API: Partial<Record<SurfaceId, SurfaceApiConfig>> = {
     detailPath: "/api/jobs",
     listSurfaceId: "job_list",
   },
-  requested_order_list: { listPath: "/api/requisitions" },
-  requested_order_detail: {
-    detailPath: "/api/requisitions",
-    listSurfaceId: "requested_order_list",
-  },
+  job_material_request_list: { listPath: "/api/requisitions" },
   part_list: { listPath: "/api/parts" },
   part_detail: {
     detailPath: "/api/parts",

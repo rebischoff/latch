@@ -6,12 +6,11 @@ import { loadBomPoolForJob } from "../../../../lib/requested-orders/repository";
 import { assertSurfaceRead } from "../../../../lib/surfaces/assert-surface-read";
 
 /**
- * BOM "still needed" pool for the requisition line picker (task 52 pin) —
- * `job_line_part` rows for `job_id` with job-wide `remaining > 0`.
+ * BOM "still needed" pool — used by Field / PO workbench (task 52/56).
  */
 export const GET = async (request: Request): Promise<Response> =>
   withApiHandler(async () => {
-    const ctx = await resolveContext({ surfaceId: "requested_order_detail" });
+    const ctx = await resolveContext({ surfaceId: "job_material_request_list" });
     assertSurfaceRead(ctx);
 
     const url = new URL(request.url);

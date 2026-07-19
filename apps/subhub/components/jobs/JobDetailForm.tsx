@@ -59,6 +59,7 @@ import type {
   JobFieldLifecycle,
   JobFieldProgressCell,
   JobFieldProgressDto,
+  JobFieldZoneOrderPatch,
 } from "@/lib/jobs/repository/job-field-progress";
 import { routes } from "@/lib/nav-routes";
 import { buildPickerCreateUrl, parseReturnContext } from "@/lib/picker-return-context";
@@ -126,6 +127,7 @@ type JobDetailFormValues = {
   conditions: JobConditionFormRow[];
   line_items: JobLineFormRow[];
   field_progress: JobFieldProgressCell[];
+  field_zone_orders: JobFieldZoneOrderPatch[];
 };
 
 const mapStakeholders = (rows: unknown): JobStakeholderFormRow[] => {
@@ -161,6 +163,7 @@ const buildDefaultValues = (
       conditions: [],
       line_items: [],
       field_progress: [],
+      field_zone_orders: [],
     };
   }
 
@@ -185,6 +188,12 @@ const buildDefaultValues = (
     line_items: mapJobLineItems(data?.line_items),
     field_progress:
       (data?.field_progress as JobFieldProgressDto | undefined)?.cells ?? [],
+    field_zone_orders: (
+      (data?.field_progress as JobFieldProgressDto | undefined)?.zone_orders ?? []
+    ).map((row) => ({
+      site_zone_id: row.site_zone_id,
+      ordered: row.ordered,
+    })),
   };
 };
 
@@ -297,6 +306,7 @@ export const JobDetailForm = ({
       conditions: z.array(z.object({}).passthrough()).optional(),
       line_items: z.array(z.object({}).passthrough()).optional(),
       field_progress: z.array(z.object({}).passthrough()).optional(),
+      field_zone_orders: z.array(z.object({}).passthrough()).optional(),
     });
 
     return zodResolver(loosened);
@@ -470,9 +480,18 @@ export const JobDetailForm = ({
 
       if (
         !isCreate &&
-        fieldAllows(activeManifest, "field_progress", "write")
+        (fieldAllows(activeManifest, "field_progress", "write") ||
+          fieldAllows(activeManifest, "field_zone_orders", "write"))
       ) {
-        body.field_progress = values.field_progress ?? [];
+        if (fieldAllows(activeManifest, "field_progress", "write")) {
+          body.field_progress = values.field_progress ?? [];
+        }
+        if (
+          fieldAllows(activeManifest, "field_zone_orders", "write") ||
+          fieldAllows(activeManifest, "field_progress", "write")
+        ) {
+          body.field_zone_orders = values.field_zone_orders ?? [];
+        }
       }
 
       try {
@@ -569,8 +588,9 @@ export const JobDetailForm = ({
   }, [defaultValues, form, message]);
 
   const onRequestParts = useCallback(() => {
-    router.push(routes.requisitions.newForJob(jobId, profile?.title));
-  }, [jobId, profile?.title, router]);
+    // Primary compose is Field ☐ Order (task 55); list /requisitions/new stays secondary.
+    router.push(`${routes.jobs.detail(jobId)}?tab=field`);
+  }, [jobId, router]);
 
   const extraActions = useMemo<ToolbarAction[]>(() => {
     if (isCreate) {
@@ -580,7 +600,7 @@ export const JobDetailForm = ({
     return [
       {
         key: "request-parts",
-        label: "Request parts",
+        label: "Order materials",
         priority: "secondary",
         onClick: onRequestParts,
       },
@@ -725,8 +745,8 @@ export const JobDetailForm = ({
           ) : null}
           {!isCreate ? (
             <div style={{ marginBottom: 16 }}>
-              <Link href={routes.requisitions.newForJob(jobId, profile?.title)}>
-                Request parts for this job
+              <Link href={`${routes.jobs.detail(jobId)}?tab=field`}>
+                Order materials on Field
               </Link>
             </div>
           ) : null}

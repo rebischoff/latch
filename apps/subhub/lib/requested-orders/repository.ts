@@ -1,10 +1,9 @@
 export { resolveEmployeePartyIdForPrincipal } from "./repository/employee-resolve";
-export { loadRequestedOrderList, type RequestedOrderListQuery } from "./repository/list";
 export {
-  loadRequestedOrderDetail,
-  loadRequestedOrderDetailRelated,
-  loadRequestedOrderLineItems,
-} from "./repository/detail-load";
+  loadJobMaterialRequestById,
+  loadJobMaterialRequestList,
+  type JobMaterialRequestListQuery,
+} from "./repository/list";
 export {
   computeBomOrderStatus,
   computeRemaining,
@@ -17,10 +16,15 @@ export {
   type BomPoolRow,
 } from "./repository/remaining";
 export {
-  deleteRequestedOrder,
-  insertRequestedOrder,
-  loadRequestedOrderDeleteBlockers,
-  replaceRequestedOrderLineItems,
-  replaceRequestedOrderLineItemsTx,
-  updateRequestedOrder,
+  assertFreeformOrEngineered,
+  assertNotFrozen,
+  assertWithinRemaining,
+  deleteJobMaterialRequest,
+  deleteOpenRequestsForZoneTx,
+  insertJobMaterialRequest,
+  insertJobMaterialRequestsTx,
+  loadPriorRequest,
+  updateJobMaterialRequest,
+  type JobMaterialRequestWriteInput,
+  type PriorRequestRow,
 } from "./repository/write";

@@ -1,15 +1,15 @@
 # STATUS — SubHub
 
 > App-local quarterback. Platform pointer: [`../../STATUS.md`](../../STATUS.md).
-> Updated: 2026-07-17.
+> Updated: 2026-07-18.
 
 - **Package:** `@latch/subhub` · **Port:** 3003
 - **Docs:** [`docs/README.md`](./docs/README.md) · **Tasks:** [`docs/tasks/01-task-index.md`](./docs/tasks/01-task-index.md)
-- **State:** Migrations **037**–**084** applied on dev. Tasks **29–36**, **37a**–**37z**, **37aa**, **37ac**, **37ad**, **37ae**–**37aj**, **38**, **39**, **40**, **41ak**, **41al**, **41am**, **41an**, **41ao**, **42a**, **42b**, **42c**, **43**, **44**, **45**, **46**, **47**, **48**, **50**, **51**, **52** complete; **49** ready; **53** stub; **55** ready (Field reports + zone Order); **41ab** superseded/reverted by **37ac**; **37h cancelled** (obsolete).
+- **State:** Migrations **037**–**087** applied on dev. Tasks **29–36**, **37a**–**37z**, **37aa**, **37ac**, **37ad**, **37ae**–**37aj**, **38**, **39**, **40**, **41ak**, **41al**, **41am**, **41an**, **41ao**, **42a**, **42b**, **42c**, **43**, **44**, **45**, **46**, **47**, **48**, **50**, **51**, **52**, **55**, **56** complete; **49** ready; **53**, **57** authored/ready; **41ab** superseded/reverted by **37ac**; **37h cancelled** (obsolete).
 
 ## Right now — do this next
 
-**[55 — Field progress reports + zone Order](./docs/tasks/55-field-progress-reports-zone-order.md)** — `job_progress_report*`; Field ☐ Order → new requisition + `site_zone_id`; diff-aware Save. Or **[53 — PO workbench](./docs/tasks/53-purchase-order-workbench.md)** / **[49 — CO Surfaces](./docs/tasks/49-change-order-surfaces.md)**.
+**[53 — PO workbench + cancel lifecycle](./docs/tasks/53-purchase-order-workbench.md)** — batch create against `job_material_request` / `purchase_order_line_source`, Send, cancel at header/line/shipment. Or **[57 — zone issues + Field ad-hoc](./docs/tasks/57-zone-issues-and-field-adhoc.md)** / **[49 — CO Surfaces](./docs/tasks/49-change-order-surfaces.md)** in parallel.
 
 ## Blockers
 
@@ -18,7 +18,6 @@
 ## Parked (needs product discussion)
 
 - **[17 — Service / warranty / T&M](./docs/planning/17-service-warranty-tm-open.md)** — SW0 blank-job Add condition; SW1–SW5 T&M, fixed service, ticket fields. JC1–JC2 stay locked; do not implement until session.
-- **Follow-on (required):** Field **zone issues** cycle — after 55; see [planning/20](./docs/planning/20-field-labor-materials-open.md#follow-on-cycles-required).
 
 ## Active slice
 
@@ -26,11 +25,14 @@
 |-------|--------|-------|
 | **03 — Catalog** | Spec participation removal (namespace narrowing + wildcard matching) | **37ai complete**; CCTV **081**–**083** applied (2026-07-16) |
 | **04 — Estimates** | Site warn-and-clear (S1–S9) | **44 complete** (2026-07-14) |
-| **05 — Jobs** | **5b + 47–51 complete**; **49** ready (5d); **55** Field reports + Order | Ready |
-| **06a — Procurement** | Requisition / PO Surfaces | **52 complete**; Field Order via **55**; **[53](./docs/tasks/53-purchase-order-workbench.md)** stub |
+| **05 — Jobs** | **5b + 47–51 + 55 complete**; **49** ready (5d); **[57](./docs/tasks/57-zone-issues-and-field-adhoc.md)** (zone issues + Field ad-hoc) authored | Ready |
+| **06a — Procurement** | Requisition / PO Surfaces | **52 + 55 + 56 complete**; **[53](./docs/tasks/53-purchase-order-workbench.md)** authored — do next |
 
 ## Recently completed
 
+- **56 — `job_material_request` migration** — drop `requested_order*`; flat `job_material_request` + `purchase_order_line_source`; list-only Surface; Field ☐ Order hard-delete/insert; `attachSourceTx` (2026-07-18).
+- **21 — all forks locked + authored into tasks 53/56/57** — PR1 (frozen report %) + §5 (committed-cost bug) done; RQ1–RQ4, PO1–PO9, ISS1–ISS7, AH1–AH3, AP1–AP2 all locked; migration **086** (`weight_hours`); task **53** rewritten with full cancel lifecycle, new tasks **56** (`job_material_request` migration) and **57** (zone issues + Field ad-hoc) authored (2026-07-18).
+- **55 — Field progress reports + zone Order** — migration **085** (`job_progress_report*` + `requested_order_line.site_zone_id`); diff-aware Save report; Field ☐ Order → new req; demote Request parts → Field tab (2026-07-18).
 - **20 locked — Field progress reports + zone Order** — L0–L31; F3 amended; R1 compose → Field; `site_zone_id` on req lines; task **55** authored; issues = required follow-on (2026-07-17).
 - **52 — Requisition Surfaces** — migration **084** (`requested_order*` + `purchase_order*`/shipments DDL, no PO Surfaces); `requested_order_list`/`_detail` Surfaces; remaining/BOM-pool helper; DAL; `/requisitions` UI; Job **Request parts** (2026-07-16).
 - **52 Q1–Q5 locked** — split 52/53; no line geography; no phase UI; edit open lines; line withdraw + delete guards (2026-07-16).
@@ -96,7 +98,11 @@
 
 ## Pointers
 
-- [Task 53 — PO workbench](./docs/tasks/53-purchase-order-workbench.md) ← **do next**
+- [Task 53 — PO workbench + cancel lifecycle](./docs/tasks/53-purchase-order-workbench.md) ← **do next**
+- [Task 56 — `job_material_request` migration](./docs/tasks/56-job-material-request-migration.md) ✅
+- [Task 57 — zone issues + Field ad-hoc](./docs/tasks/57-zone-issues-and-field-adhoc.md)
+- [Planning 21 — PO lifecycle / issues / ad-hoc (all locked)](./docs/planning/21-po-lifecycle-issues-field-adhoc-open.md)
+- [Task 55 — Field progress reports + zone Order](./docs/tasks/55-field-progress-reports-zone-order.md) ✅
 - [Task 52 — Requisition Surfaces](./docs/tasks/52-requisition-surfaces.md) ✅
 - [Task 49 — CO Surfaces (5d)](./docs/tasks/49-change-order-surfaces.md)
 - [Task 51 — Field progress (5c)](./docs/tasks/51-job-field-progress.md) ✅

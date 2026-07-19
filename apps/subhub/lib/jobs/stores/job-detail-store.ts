@@ -10,8 +10,8 @@ import type {
 import {
   loadJobDetail,
   loadJobDetailRelated,
+  applyJobFieldSave,
   replaceJobCollections,
-  replaceJobFieldProgress,
   replaceJobStakeholders,
   updateJob,
 } from "../repository";
@@ -67,8 +67,11 @@ export const createJobDetailStore = (
       });
     }
 
-    if (patch.field_progress !== undefined) {
-      await replaceJobFieldProgress(pool, actorId, jobId, patch.field_progress);
+    if (patch.field_progress !== undefined || patch.field_zone_orders !== undefined) {
+      await applyJobFieldSave(pool, actorId, jobId, {
+        cells: patch.field_progress,
+        zoneOrders: patch.field_zone_orders,
+      });
     }
   },
 

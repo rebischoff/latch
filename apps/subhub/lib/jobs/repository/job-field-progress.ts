@@ -47,6 +47,9 @@ export type JobFieldProgressWorkRow = {
   job_line_id: string;
   labor_phase_ids: string[];
   part_mpn: string | null;
+  /** PO trail when a requisition line for this zone×part is on a PO (blank until 53). */
+  purchase_order_number: string | null;
+  purchase_order_status: string | null;
   qty: number;
   zone_key: string;
 };
@@ -59,6 +62,20 @@ export type FieldProgressSlice = {
   scope_phase_id: string;
   site_zone_id: string | null;
   zone_key: string;
+};
+
+/** Derived Order checkbox state per leaf (+ General) — task 55 L27. */
+export type JobFieldZoneOrderState = {
+  locked: boolean;
+  ordered: boolean;
+  site_zone_id: string | null;
+  zone_key: string;
+};
+
+/** Writable Order intent on Job Save (desired checkbox state). */
+export type JobFieldZoneOrderPatch = {
+  ordered: boolean;
+  site_zone_id: string | null;
 };
 
 export type JobFieldProgressDto = {
@@ -74,6 +91,8 @@ export type JobFieldProgressDto = {
   }>;
   stale: boolean;
   work_rows: JobFieldProgressWorkRow[];
+  /** Derived from `job_material_request` + `site_zone_id` (55/56). */
+  zone_orders: JobFieldZoneOrderState[];
   zone_tree: JobFieldProgressZoneNode[];
 };
 
@@ -199,6 +218,7 @@ export const emptyFieldProgressDto = (
     zone_tree: [],
     phases: [],
     work_rows: [],
+    zone_orders: [],
     scope_phase_index: [],
     progress_pct: 0,
     lifecycle,

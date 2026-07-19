@@ -2,27 +2,67 @@ import { ConflictError, ValidationError } from "@latch/contracts";
 import { withPermissionDb } from "@latch/pg-session";
 import type { Pool, PoolClient } from "pg";
 
+import { resolveEmployeePartyIdForPrincipal } from "@/lib/requested-orders/repository/employee-resolve";
 import { tableExists } from "@/lib/sites/repository/sql-utils";
 
-import { zoneKeyFor, type JobFieldProgressCellPatch } from "./job-field-progress";
+import {
+  zoneKeyFor,
+  type JobFieldProgressCellPatch,
+  type JobFieldZoneOrderPatch,
+} from "./job-field-progress";
 import {
   buildFieldProgressSlices,
   loadJobFieldProgress,
 } from "./job-field-progress-load";
+import { applyFieldZoneOrdersTx } from "./job-field-zone-order-write";
+import {
+  appendJobProgressReportIfChangedTx,
+  reportCellWeightKey,
+  type ReportCellWeightMap,
+} from "./job-progress-report";
 
 const cellKey = (scopePhaseId: string, siteZoneId: string | null): string =>
   `${scopePhaseId}:${zoneKeyFor(siteZoneId)}`;
+
+const loadPriorCellsTx = async (
+  client: PoolClient,
+  phaseIds: string[],
+): Promise<JobFieldProgressCellPatch[]> => {
+  if (
+    phaseIds.length === 0 ||
+    !(await tableExists(client, "job_field_progress_cell"))
+  ) {
+    return [];
+  }
+  const result = await client.query<{
+    complete: boolean;
+    scope_phase_id: string;
+    site_zone_id: string | null;
+  }>(
+    `SELECT scope_phase_id, site_zone_id, complete
+     FROM job_field_progress_cell
+     WHERE scope_phase_id = ANY($1::text[])`,
+    [phaseIds],
+  );
+  return result.rows.map((row) => ({
+    scope_phase_id: row.scope_phase_id,
+    site_zone_id: row.site_zone_id,
+    complete: Boolean(row.complete),
+  }));
+};
 
 /**
  * Replace-array semantics for `field_progress`:
  * the PATCH array is the full set of cells to persist (complete true or false).
  * Any prior cell for this job's active scope phases that is omitted is deleted.
+ * When progress changed, appends a full-board `job_progress_report*` (task 55).
  * Does **not** write `progress_entry*`.
  */
 export const replaceJobFieldProgressTx = async (
   client: PoolClient,
   jobId: string,
   cells: JobFieldProgressCellPatch[],
+  options?: { recordedBy?: string | null },
 ): Promise<void> => {
   const jobResult = await client.query<{ status: string }>(
     `SELECT status FROM job WHERE id = $1`,
@@ -83,11 +123,13 @@ export const replaceJobFieldProgressTx = async (
   }
 
   const phaseIds = new Set(phasesResult.rows.map((row) => row.id));
+  const priorCells = await loadPriorCellsTx(client, [...phaseIds]);
 
   const linesResult = await client.query<{
     description: string;
     id: string;
     item_name: string | null;
+    part_id: string | null;
     part_mpn: string | null;
     quantity: number;
   }>(
@@ -96,6 +138,7 @@ export const replaceJobFieldProgressTx = async (
        jl.description,
        jl.quantity,
        NULL::text AS item_name,
+       NULL::text AS part_id,
        NULL::text AS part_mpn
      FROM job_line jl
      WHERE jl.job_id = $1 AND jl.status = 'active'`,
@@ -174,7 +217,6 @@ export const replaceJobFieldProgressTx = async (
     seen.add(key);
   }
 
-  // Delete prior cells for this job's active phases, then insert replace-array.
   await client.query(
     `DELETE FROM job_field_progress_cell
      WHERE scope_phase_id = ANY($1::text[])`,
@@ -190,8 +232,6 @@ export const replaceJobFieldProgressTx = async (
     );
   }
 
-  // Optional denorm: roll completed geography qty into scope_phase.completed_qty.
-  // (% / lifecycle still derived from cells on read — never from this column.)
   const geoQtyBySlice = new Map<string, number>();
   for (const line of linesResult.rows) {
     const lineAllocs = allocResult.rows.filter((a) => a.job_line_id === line.id);
@@ -237,6 +277,20 @@ export const replaceJobFieldProgressTx = async (
     );
   }
 
+  const weightByCellKey: ReportCellWeightMap = new Map();
+  for (const slice of slices) {
+    const key = reportCellWeightKey(slice.scope_phase_id, slice.site_zone_id);
+    weightByCellKey.set(key, (weightByCellKey.get(key) ?? 0) + Number(slice.hours));
+  }
+
+  await appendJobProgressReportIfChangedTx(client, {
+    jobId,
+    priorCells,
+    nextCells: cells,
+    recordedBy: options?.recordedBy ?? null,
+    weightByCellKey,
+  });
+
   await client.query(
     `UPDATE job SET field_progress_updated_at = now(), updated_at = now() WHERE id = $1`,
     [jobId],
@@ -250,7 +304,39 @@ export const replaceJobFieldProgress = async (
   cells: JobFieldProgressCellPatch[],
 ): Promise<void> => {
   await withPermissionDb(pool, actorId, async (client) => {
-    await replaceJobFieldProgressTx(client, jobId, cells);
+    const recordedBy = await resolveEmployeePartyIdForPrincipal(client, actorId);
+    await replaceJobFieldProgressTx(client, jobId, cells, { recordedBy });
+  });
+};
+
+/**
+ * Persist Field progress cells and/or zone Order intents in one transaction (task 55).
+ */
+export const applyJobFieldSave = async (
+  pool: Pool,
+  actorId: string,
+  jobId: string,
+  args: {
+    cells?: JobFieldProgressCellPatch[];
+    zoneOrders?: JobFieldZoneOrderPatch[];
+  },
+): Promise<void> => {
+  await withPermissionDb(pool, actorId, async (client) => {
+    const employeeId = await resolveEmployeePartyIdForPrincipal(client, actorId);
+
+    if (args.cells !== undefined) {
+      await replaceJobFieldProgressTx(client, jobId, args.cells, {
+        recordedBy: employeeId,
+      });
+    }
+
+    if (args.zoneOrders !== undefined && args.zoneOrders.length > 0) {
+      await applyFieldZoneOrdersTx(client, {
+        jobId,
+        desired: args.zoneOrders,
+        requestedBy: employeeId,
+      });
+    }
   });
 };
 

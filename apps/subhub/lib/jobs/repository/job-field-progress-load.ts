@@ -14,6 +14,7 @@ import {
   type JobFieldProgressWorkRow,
   type JobFieldProgressZoneNode,
 } from "./job-field-progress";
+import { loadDerivedZoneOrders } from "./job-field-zone-order-write";
 
 type ScopePhaseRow = {
   hours_per_unit: number;
@@ -232,6 +233,8 @@ const buildWorkRows = (input: {
         part_mpn: line.part_mpn,
         qty: num(alloc.quantity),
         labor_phase_ids: laborIds,
+        purchase_order_number: null,
+        purchase_order_status: null,
       });
     }
     const generalQty = num(line.quantity) - placed;
@@ -244,6 +247,8 @@ const buildWorkRows = (input: {
         part_mpn: line.part_mpn,
         qty: generalQty,
         labor_phase_ids: laborIds,
+        purchase_order_number: null,
+        purchase_order_status: null,
       });
     }
   }
@@ -479,7 +484,13 @@ export const loadJobFieldProgress = async (
       scope_phase_id: p.id,
     }));
 
-  const work_rows = buildWorkRows({ lines, allocations, phases, slices });
+  const work_rows = await attachPoTrailToWorkRows(
+    pool,
+    jobId,
+    buildWorkRows({ lines, allocations, phases, slices }),
+  );
+
+  const zone_orders = await loadDerivedZoneOrders(pool, jobId);
 
   return {
     cells,
@@ -491,11 +502,83 @@ export const loadJobFieldProgress = async (
     }),
     phases: buildPhaseColumns(phases, slices),
     work_rows,
+    zone_orders,
     scope_phase_index,
     progress_pct: summary.progress_pct,
     lifecycle: summary.lifecycle,
     stale: summary.stale,
   };
+};
+
+/**
+ * Attach PO # / status onto work rows when a job_material_request for the
+ * same zone×job_line is linked via purchase_order_line_source (blank until task 53).
+ */
+const attachPoTrailToWorkRows = async (
+  pool: Pool | PoolClient,
+  jobId: string,
+  rows: JobFieldProgressWorkRow[],
+): Promise<JobFieldProgressWorkRow[]> => {
+  if (
+    rows.length === 0 ||
+    !(await tableExists(pool, "job_material_request")) ||
+    !(await tableExists(pool, "purchase_order_line_source")) ||
+    !(await tableExists(pool, "purchase_order_line")) ||
+    !(await tableExists(pool, "purchase_order"))
+  ) {
+    return rows;
+  }
+
+  const result = await pool.query<{
+    job_line_id: string;
+    purchase_order_number: string | null;
+    purchase_order_status: string | null;
+    site_zone_id: string | null;
+  }>(
+    `SELECT
+       jlp.job_line_id,
+       jmr.site_zone_id,
+       po.po_number AS purchase_order_number,
+       po.status AS purchase_order_status
+     FROM job_material_request jmr
+     INNER JOIN job_line_part jlp ON jlp.id = jmr.job_line_part_id
+     INNER JOIN purchase_order_line_source pols
+       ON pols.job_material_request_id = jmr.id
+     INNER JOIN purchase_order_line pol ON pol.id = pols.purchase_order_line_id
+     INNER JOIN purchase_order po ON po.id = pol.purchase_order_id
+     WHERE jmr.job_id = $1`,
+    [jobId],
+  );
+
+  if (result.rows.length === 0) {
+    return rows;
+  }
+
+  const trailByKey = new Map<
+    string,
+    { purchase_order_number: string | null; purchase_order_status: string | null }
+  >();
+  for (const row of result.rows) {
+    const key = `${row.job_line_id}:${zoneKeyFor(row.site_zone_id)}`;
+    if (!trailByKey.has(key)) {
+      trailByKey.set(key, {
+        purchase_order_number: row.purchase_order_number,
+        purchase_order_status: row.purchase_order_status,
+      });
+    }
+  }
+
+  return rows.map((row) => {
+    const trail = trailByKey.get(`${row.job_line_id}:${row.zone_key}`);
+    if (!trail) {
+      return row;
+    }
+    return {
+      ...row,
+      purchase_order_number: trail.purchase_order_number,
+      purchase_order_status: trail.purchase_order_status,
+    };
+  });
 };
 
 /** Lightweight list projection — % + lifecycle only. */

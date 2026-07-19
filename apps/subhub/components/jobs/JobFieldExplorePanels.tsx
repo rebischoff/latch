@@ -16,11 +16,14 @@ import { useFormContext, useWatch } from "react-hook-form";
 
 import {
   GENERAL_ZONE_KEY,
+  siteZoneIdFromKey,
   type JobFieldProgressCell,
   type JobFieldProgressDto,
   type JobFieldProgressPhaseColumn,
   type JobFieldProgressWorkRow,
   type JobFieldProgressZoneNode,
+  type JobFieldZoneOrderPatch,
+  type JobFieldZoneOrderState,
 } from "@/lib/jobs/repository/job-field-progress";
 
 type CheckState = boolean | "indeterminate";
@@ -40,6 +43,7 @@ type WorkTableRow = JobFieldProgressWorkRow & {
 
 type FieldProgressFormSlice = {
   field_progress?: JobFieldProgressCell[];
+  field_zone_orders?: JobFieldZoneOrderPatch[];
   line_items?: Array<{
     id: string;
     part_mpn?: string | null;
@@ -295,6 +299,41 @@ const setLeafPhaseComplete = (
   return [...nextByKey.values()];
 };
 
+const deriveOrderCheckState = (
+  zoneKey: string,
+  zoneTree: JobFieldProgressZoneNode[],
+  zoneOrders: Array<Pick<JobFieldZoneOrderState, "zone_key" | "ordered" | "locked">>,
+): { state: CheckState; locked: boolean; leafCount: number; checkedCount: number } => {
+  const leaves = collectLeafKeys(zoneTree, zoneKey);
+  if (leaves.length === 0) {
+    return { state: false, locked: false, leafCount: 0, checkedCount: 0 };
+  }
+  const byKey = new Map(zoneOrders.map((row) => [row.zone_key, row]));
+  let checkedCount = 0;
+  let locked = false;
+  for (const leaf of leaves) {
+    const row = byKey.get(leaf);
+    if (row?.ordered) {
+      checkedCount += 1;
+    }
+    if (row?.locked) {
+      locked = true;
+    }
+  }
+  if (checkedCount === 0) {
+    return { state: false, locked, leafCount: leaves.length, checkedCount };
+  }
+  if (checkedCount === leaves.length) {
+    return { state: true, locked, leafCount: leaves.length, checkedCount };
+  }
+  return {
+    state: "indeterminate",
+    locked,
+    leafCount: leaves.length,
+    checkedCount,
+  };
+};
+
 type JobFieldProgressPanelsProps = {
   board: JobFieldProgressDto;
   readOnly?: boolean;
@@ -306,8 +345,31 @@ export const JobFieldProgressPanels = ({
 }: JobFieldProgressPanelsProps) => {
   const { setValue, control } = useFormContext<FieldProgressFormSlice>();
   const formCells = useWatch({ control, name: "field_progress" });
+  const formZoneOrders = useWatch({ control, name: "field_zone_orders" });
   const formLineItems = useWatch({ control, name: "line_items" });
   const cells = formCells ?? board.cells;
+  const zoneOrders: JobFieldZoneOrderState[] = useMemo(() => {
+    const byKey = new Map(
+      board.zone_orders.map((row) => [row.zone_key, { ...row }] as const),
+    );
+    for (const row of formZoneOrders ?? []) {
+      const patch = row as JobFieldZoneOrderPatch;
+      const zone_key =
+        "zone_key" in row && typeof (row as JobFieldZoneOrderState).zone_key === "string"
+          ? (row as JobFieldZoneOrderState).zone_key
+          : patch.site_zone_id === null || patch.site_zone_id === undefined
+            ? GENERAL_ZONE_KEY
+            : patch.site_zone_id;
+      const prior = byKey.get(zone_key);
+      byKey.set(zone_key, {
+        zone_key,
+        site_zone_id: siteZoneIdFromKey(zone_key),
+        ordered: patch.ordered,
+        locked: prior?.locked ?? false,
+      });
+    }
+    return [...byKey.values()];
+  }, [board.zone_orders, formZoneOrders]);
 
   const partMpnByLineId = useMemo(() => {
     const map = new Map<string, string | null>();
@@ -368,6 +430,37 @@ export const JobFieldProgressPanels = ({
       scopePhasesByLineLabor,
       setValue,
     ],
+  );
+
+  const setOrderChecked = useCallback(
+    (zoneId: string, checked: boolean) => {
+      if (readOnly) {
+        return;
+      }
+      const leaves = collectLeafKeys(board.zone_tree, zoneId);
+      const byKey = new Map(zoneOrders.map((row) => [row.zone_key, row]));
+      for (const leaf of leaves) {
+        const prior = byKey.get(leaf);
+        if (prior?.locked && !checked) {
+          continue;
+        }
+        byKey.set(leaf, {
+          zone_key: leaf,
+          site_zone_id: siteZoneIdFromKey(leaf),
+          ordered: checked,
+          locked: prior?.locked ?? false,
+        });
+      }
+      setValue(
+        "field_zone_orders",
+        [...byKey.values()].map((row) => ({
+          site_zone_id: row.site_zone_id,
+          ordered: row.ordered,
+        })),
+        { shouldDirty: true },
+      );
+    },
+    [board.zone_tree, readOnly, setValue, zoneOrders],
   );
 
   const zoneScopeKeys = useMemo(
@@ -448,6 +541,11 @@ export const JobFieldProgressPanels = ({
     selectedZoneId,
   ]);
 
+  const orderState = useMemo(
+    () => deriveOrderCheckState(selectedZoneId, board.zone_tree, zoneOrders),
+    [board.zone_tree, selectedZoneId, zoneOrders],
+  );
+
   const treeData = useMemo((): DataNode[] => {
     const decorate = (nodes: JobFieldProgressZoneNode[]): DataNode[] =>
       nodes.map((node) => ({
@@ -521,6 +619,26 @@ export const JobFieldProgressPanels = ({
             <Tag color="warning">TBD</Tag>
           ),
       },
+      {
+        title: "PO",
+        key: "po",
+        width: 120,
+        render: (_, row) => {
+          if (!row.purchase_order_number && !row.purchase_order_status) {
+            return (
+              <Typography.Text type="secondary">—</Typography.Text>
+            );
+          }
+          return (
+            <Typography.Text>
+              {row.purchase_order_number ?? "PO"}
+              {row.purchase_order_status
+                ? ` · ${row.purchase_order_status}`
+                : ""}
+            </Typography.Text>
+          );
+        },
+      },
     ];
   }, []);
 
@@ -566,8 +684,8 @@ export const JobFieldProgressPanels = ({
             Zones
           </Typography.Title>
           <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
-            Allocated places plus General for unplaced qty. Check a phase on a
-            parent to cascade to matching descendant leaves.
+            Allocated places plus General for unplaced qty. Check Done or Order
+            on a parent to cascade to matching descendant leaves.
           </Typography.Paragraph>
           <Tree
             treeData={treeData}
@@ -604,6 +722,32 @@ export const JobFieldProgressPanels = ({
                 emptyText: "No labor phases under this zone.",
               }}
             />
+            <div style={{ marginTop: 12 }}>
+              <Checkbox
+                checked={orderState.state === true}
+                indeterminate={orderState.state === "indeterminate"}
+                disabled={
+                  readOnly || (orderState.locked && orderState.state === true)
+                }
+                onChange={(e) => setOrderChecked(selectedZoneId, e.target.checked)}
+                aria-label={`Order materials for ${selectedLabel}`}
+              >
+                Order
+                {orderState.leafCount > 0 ? (
+                  <Typography.Text type="secondary" style={{ marginLeft: 8 }}>
+                    {orderState.checkedCount}/{orderState.leafCount}
+                  </Typography.Text>
+                ) : null}
+              </Checkbox>
+              {orderState.locked ? (
+                <Typography.Text
+                  type="secondary"
+                  style={{ display: "block", marginTop: 4, fontSize: 12 }}
+                >
+                  Locked — lines on a purchase order or fulfilled
+                </Typography.Text>
+              ) : null}
+            </div>
           </div>
 
           <div>

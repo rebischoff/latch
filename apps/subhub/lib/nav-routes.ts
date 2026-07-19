@@ -62,15 +62,6 @@ export const routes = {
   },
   requisitions: {
     list: "/requisitions",
-    new: "/requisitions/new",
-    newForJob: (jobId: string, jobTitle?: string | null) => {
-      const params = new URLSearchParams({ jobId });
-      if (jobTitle) {
-        params.set("jobTitle", jobTitle);
-      }
-      return `/requisitions/new?${params.toString()}`;
-    },
-    detail: (id: string) => `/requisitions/${id}`,
   },
   parts: {
     list: "/parts",

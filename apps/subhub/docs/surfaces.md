@@ -53,13 +53,14 @@ These tables are accessed only via parent Surfaces or DAL internals — no stand
 | `estimate_party`, `job_party` | `stakeholders` collection on estimate/job detail |
 | `job_line_part` | Nested under `job_line` engineering / BOM — DAL-only or sub-field |
 | `job_field_progress_cell` | `field_progress` nested on `job_detail` (51; replaces obsolete `job_work_item`) |
+| `job_progress_report`, `job_progress_report_cell` | Append-only Field progress history on Job Save (55); no standalone Surface |
 | `billable_line` | `billable_items` on `job_detail` — no `billable_line_list` |
 | `invoice_line` | `line_items` on `invoice_detail` |
 | `sov_line`, `sov_allocation` | `sov_milestones` on `job_detail` Billing tab — no standalone SOV Surface ([decision](./decisions/billing.md#decision-sov-ui--nested-on-job_detail-billing-tab-2026-06-17)) |
 | `item_part_link` | `part_links` on `item_detail` |
 | `vendor_part` | `vendor_pricing` on `part_detail` |
 | `purchase_order_line`, `purchase_order_line_shipment` | Lines on `purchase_order_detail` |
-| `requested_order_line` | Lines on `requested_order_detail` |
+| `job_material_request` | Flat material-request rows on `job_material_request_list` |
 | `material_receipt_line` | Lines on `material_receipt_detail` |
 | `change_order_line` | `line_items` on `change_order_detail` |
 | `job_material_movement` | Inventory ledger — DAL/reporting; no list Surface v1 |
@@ -500,7 +501,7 @@ Applies to **customer, vendor, manufacturer, property_owner** detail lenses — 
 | **Anchor** | `job` |
 | **Route** | `/jobs`, `/jobs/[id]` |
 | **Nav group** | Operations |
-| **Tables** | `job`, `job_party`, `job_condition*`, `job_line`, `job_line_part`, `scope_phase`, `job_field_progress_cell` |
+| **Tables** | `job`, `job_party`, `job_condition*`, `job_line`, `job_line_part`, `scope_phase`, `job_field_progress_cell`, `job_progress_report*` |
 
 **Layout (O4):** Tabbed UI on one Surface — [decision](./decisions/job.md#decision-job_detail-layout--tabbed-2026-06-17).
 
@@ -508,7 +509,7 @@ Applies to **customer, vendor, manufacturer, property_owner** detail lenses — 
 |-----|---------|
 | **Overview** | `profile`, `stakeholders`, derived Field lifecycle/%, `billing_settings` (6b) |
 | **Scope** | `conditions`, `line_items`; links to change orders + procurement Surfaces |
-| **Field** | `field_progress` (zone×phase boolean; 51) |
+| **Field** | `field_progress` (zone×phase boolean; 51) + ☐ Order via `field_zone_orders` (55) |
 | **Billing** | `billable_items`, `sov_milestones` (wave 6b); links to invoices |
 
 **`job_list` columns:** `title`, `site` name, derived Field lifecycle + %
@@ -522,7 +523,8 @@ Applies to **customer, vendor, manufacturer, property_owner** detail lenses — 
 | `stakeholders` | collection | `job_party` |
 | `conditions` | collection | `job_condition*` — commercial forest |
 | `line_items` | collection | `job_line` — sold scope; **same flat vs site-geography grouping** as estimate ([decision](./decisions/estimate.md#decision-estimate--job-line-grouping--site-geography-2026-06-17)) |
-| `field_progress` | collection | `job_field_progress_cell` — zone×phase boolean; derived % / lifecycle (51 F1–F9) |
+| `field_progress` | collection | `job_field_progress_cell` — zone×phase boolean; derived % / lifecycle (51 F1–F9); Save appends `job_progress_report*` when changed (55) |
+| `field_zone_orders` | collection | Desired Field ☐ Order intents; Save → `job_material_request` rows with `site_zone_id` (55/56) |
 | `billable_items` | collection | `billable_line` — **wave 6b**; shown when billing section granted |
 | `sov_milestones` | collection | `schedule_of_value` + `sov_line` + `sov_allocation` — when `billing_model = progress_sov` ([decision](./decisions/billing.md#decision-sov-ui--nested-on-job_detail-billing-tab-2026-06-17)) |
 
@@ -550,26 +552,19 @@ Applies to **customer, vendor, manufacturer, property_owner** detail lenses — 
 
 ## Wave 6a — Procurement
 
-### `requested_order_list` · `requested_order_detail`
+### `job_material_request_list`
 
 | | |
 |--|--|
-| **Status** | shipped ([task 52](./tasks/52-requisition-surfaces.md), 2026-07-16) |
+| **Status** | shipped ([task 56](./tasks/56-job-material-request-migration.md), 2026-07-18) — replaces `requested_order_list` / `_detail` |
 | **Wave** | 6a |
-| **Route** | `/requisitions`, `/requisitions/[id]` |
+| **Route** | `/requisitions` (list-only; no detail route) |
 | **Nav group** | Procurement |
-| **Anchor** | `requested_order` |
+| **Anchor** | `job_material_request` |
 
-**`requested_order_list` summary:** `job_id`, job title (joined), `requested_at`, `note`, `open_line_count` (DAL-computed).
+**`job_material_request_list` summary:** flat rows — `job_id` + job title, `site_zone_id` / zone name (null = General), `part_id` / MPN, `description`, `quantity`, `unit`, `status` (`open` / `on_purchase_order` / `fulfilled`), `requested_at`. Filters: `job_id`, `status`, `site_zone_id`.
 
-**`requested_order_detail` Fields:**
-
-| Field | Type | Notes |
-|-------|------|-------|
-| `profile` | scalar | `job_id` (required, immutable after create), `requested_by` (resolved from current employee or null), `requested_at`, `note`. `phase_id` is DDL-only — no UI v1. |
-| `line_items` | collection (logical) | `requested_order_line` — links `job_line_part_id` (BOM pick, capped at job-wide remaining) or ad-hoc (`part_id`/description); `status` (`open` / `on_purchase_order` / `fulfilled` / `withdrawn`); withdraw requires `withdrawal_note`; frozen once `on_purchase_order`/`fulfilled`. PO #/status join null-safe until [53](./tasks/53-purchase-order-workbench.md). |
-
-**Notes:** No place FKs (`site_area_id`/`site_asset_id` dropped v1, [R2](./decisions/procurement.md#decision-requisition-surfaces-ux-r1r8-2026-07-16)). Delete header only when every line is `open`/`withdrawn` (or no lines). `purchase_order*` + `purchase_order_line_shipment` tables migrated alongside (same migration, for FK readiness) but have **no Surfaces yet** — draft until 53.
+**Notes:** Created only from Job → Field ☐ Order (and Field ad-hoc in [57](./tasks/57-zone-issues-and-field-adhoc.md)). No manual create UI (RQ3). Uncheck-while-open = hard delete (RQ2). PO linkage via `purchase_order_line_source` ([53](./tasks/53-purchase-order-workbench.md)). `purchase_order*` tables remain DDL-only until 53.
 
 ### `purchase_order_list` · `purchase_order_detail`
 
@@ -647,7 +642,7 @@ Custom SQL / read-only pages — **not** Latch Surfaces initially. May later pro
 | Catalog | `part_*`, `item_*`, `category_table`, `labor_class_table` |
 | Sales | `estimate_*`, `job_party_relation_table` |
 | Operations | `job_*`, `change_order_*` |
-| Procurement | `requested_order_*`, `purchase_order_*`, `material_receipt_*` |
+| Procurement | `job_material_request`, `purchase_order_*`, `material_receipt_*` |
 | Accounting | `invoice_*` |
 | Reports | custom pages |
 

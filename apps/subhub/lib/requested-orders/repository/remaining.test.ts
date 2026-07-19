@@ -17,7 +17,7 @@ describe("computeRemaining", () => {
     expect(computeRemaining(5, 8)).toBe(0);
   });
 
-  it("second requisition on the same BOM row only sees the leftover", () => {
+  it("second request on the same BOM row only sees the leftover", () => {
     const demand = 10;
     const firstRequestCovers = 6;
     const remainingAfterFirst = computeRemaining(demand, firstRequestCovers);
@@ -25,15 +25,6 @@ describe("computeRemaining", () => {
 
     const secondRequestCovers = firstRequestCovers + remainingAfterFirst;
     expect(computeRemaining(demand, secondRequestCovers)).toBe(0);
-  });
-
-  it("withdrawn qty does not count as covered", () => {
-    // Withdrawn lines are excluded before `covered` is summed (see
-    // loadRequisitionedCoverageForJob's `status <> 'withdrawn'` filter) —
-    // so a fully withdrawn requisition leaves full demand remaining.
-    const demand = 10;
-    const covered = 0; // withdrawn line's qty excluded upstream
-    expect(computeRemaining(demand, covered)).toBe(10);
   });
 });
 
@@ -45,19 +36,17 @@ describe("computeBomOrderStatus", () => {
         openQty: 0,
         onPurchaseOrderQty: 0,
         fulfilledQty: 0,
-        withdrawnQty: 0,
       }),
     ).toBe("open");
   });
 
-  it("is requested when an open requisition line exists", () => {
+  it("is requested when an open material request exists", () => {
     expect(
       computeBomOrderStatus({
         demand: 10,
         openQty: 4,
         onPurchaseOrderQty: 0,
         fulfilledQty: 0,
-        withdrawnQty: 0,
       }),
     ).toBe("requested");
   });
@@ -69,7 +58,6 @@ describe("computeBomOrderStatus", () => {
         openQty: 4,
         onPurchaseOrderQty: 6,
         fulfilledQty: 0,
-        withdrawnQty: 0,
       }),
     ).toBe("on_purchase_order");
   });
@@ -81,26 +69,13 @@ describe("computeBomOrderStatus", () => {
         openQty: 0,
         onPurchaseOrderQty: 0,
         fulfilledQty: 10,
-        withdrawnQty: 0,
       }),
     ).toBe("fulfilled");
-  });
-
-  it("is withdrawn when only withdrawn lines exist", () => {
-    expect(
-      computeBomOrderStatus({
-        demand: 10,
-        openQty: 0,
-        onPurchaseOrderQty: 0,
-        fulfilledQty: 0,
-        withdrawnQty: 10,
-      }),
-    ).toBe("withdrawn");
   });
 });
 
 describe("loadRemainingForJobLinePart", () => {
-  it("excludes the given line's own current coverage from covered", async () => {
+  it("excludes the given request's own current coverage from covered", async () => {
     const queries: string[] = [];
     const pool = {
       query: async (sql: string, params?: unknown[]) => {
@@ -108,7 +83,10 @@ describe("loadRemainingForJobLinePart", () => {
         if (sql.includes("FROM job_line_part")) {
           return { rows: [{ quantity: 10 }] };
         }
-        expect(params?.[2]).toBe("line-1");
+        if (sql.includes("to_regclass")) {
+          return { rows: [{ exists: true }] };
+        }
+        expect(params?.[2]).toBe("jmr-1");
         return { rows: [{ covered: 3 }] };
       },
     } as unknown as Pool;
@@ -116,18 +94,23 @@ describe("loadRemainingForJobLinePart", () => {
     const remaining = await loadRemainingForJobLinePart(pool, {
       jobId: "job-1",
       jobLinePartId: "jlp-1",
-      excludeLineId: "line-1",
+      excludeRequestId: "jmr-1",
     });
 
     expect(remaining).toBe(7);
-    expect(queries).toHaveLength(2);
+    expect(queries.some((sql) => sql.includes("FROM job_material_request"))).toBe(
+      true,
+    );
   });
 
-  it("uses full covered qty when no line is excluded", async () => {
+  it("uses full covered qty when no request is excluded", async () => {
     const pool = {
       query: async (sql: string) => {
         if (sql.includes("FROM job_line_part")) {
           return { rows: [{ quantity: 10 }] };
+        }
+        if (sql.includes("to_regclass")) {
+          return { rows: [{ exists: true }] };
         }
         return { rows: [{ covered: 10 }] };
       },
@@ -173,9 +156,9 @@ describe("loadBomPoolForJob", () => {
           };
         }
         if (sql.includes("to_regclass")) {
-          return { rows: [{ exists: false }] };
+          return { rows: [{ exists: true }] };
         }
-        if (sql.includes("FROM requested_order_line")) {
+        if (sql.includes("FROM job_material_request")) {
           return {
             rows: [{ job_line_part_id: "jlp-2", covered: 4 }],
           };

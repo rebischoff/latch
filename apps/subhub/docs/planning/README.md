@@ -27,6 +27,7 @@
 13. [18-job-field-progress.md](./18-job-field-progress.md) — **complete 2026-07-16** — Field tab 5c; task [51](../tasks/51-job-field-progress.md)
 14. [19-requisition-surfaces-open.md](./19-requisition-surfaces-open.md) — **complete 2026-07-16** — wave 6a requisition/PO Surface UX (R1–R8); locked in [procurement.md](../decisions/procurement.md)
 15. [20-field-labor-materials-open.md](./20-field-labor-materials-open.md) — **locked 2026-07-17** — Field progress reports + zone Order; task [55](../tasks/55-field-progress-reports-zone-order.md); issues follow-on required
+16. [21-po-lifecycle-issues-field-adhoc-open.md](./21-po-lifecycle-issues-field-adhoc-open.md) — **open / parked 2026-07-18** — PO cancel/retract lifecycle (task 53), zone issues (ISS1–ISS6), Field-direct ad-hoc (AH1–AH3), progress-report % freeze (PR1); found committed-cost rollup bug (§5)
 
 ## Locked at a glance (2026-06-27)
 

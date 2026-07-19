@@ -1,14 +1,8 @@
-import { randomUUID } from "node:crypto";
-
 import { ConflictError, ValidationError } from "@latch/contracts";
 import { withPermissionDb } from "@latch/pg-session";
 import type { Pool, PoolClient } from "pg";
 
-import { isUniqueViolation, tableExists } from "../../sites/repository/sql-utils";
-import type {
-  RequestedOrderDetailWriteRow,
-  RequestedOrderLineItemPatchRow,
-} from "../descriptors/requested-order-detail";
+import { isUniqueViolation } from "../../sites/repository/sql-utils";
 import {
   loadPurchaseOrderCoverageForJob,
   loadRequisitionedCoverageForJob,
@@ -16,47 +10,38 @@ import {
 
 const toNumber = (value: unknown): number => Number(value ?? 0);
 
-/** Statuses beyond app control once a purchase order has picked up the line (task 52 pin). */
+/** Statuses beyond app control once a purchase order has picked up the request (task 56). */
 const FROZEN_STATUSES = new Set(["on_purchase_order", "fulfilled"]);
 
-export type PriorLineRow = {
+export type JobMaterialRequestStatus = "open" | "on_purchase_order" | "fulfilled";
+
+export type JobMaterialRequestWriteInput = {
   id: string;
-  line_number: number;
+  job_id: string;
+  site_zone_id?: string | null;
+  job_line_part_id?: string | null;
+  part_id?: string | null;
+  description?: string;
+  quantity: number;
+  unit?: string;
+  status?: JobMaterialRequestStatus;
+  requested_by?: string | null;
+};
+
+export type PriorRequestRow = {
+  id: string;
+  job_id: string;
+  site_zone_id: string | null;
   job_line_part_id: string | null;
   part_id: string | null;
   description: string;
   quantity: number;
   unit: string;
   status: string;
-  withdrawal_note: string;
-};
-
-const loadPriorLines = async (
-  client: PoolClient,
-  requestedOrderId: string,
-): Promise<PriorLineRow[]> => {
-  const result = await client.query<{
-    id: string;
-    line_number: number;
-    job_line_part_id: string | null;
-    part_id: string | null;
-    description: string;
-    quantity: string | number;
-    unit: string;
-    status: string;
-    withdrawal_note: string;
-  }>(
-    `SELECT id, line_number, job_line_part_id, part_id, description, quantity, unit, status, withdrawal_note
-     FROM requested_order_line
-     WHERE requested_order_id = $1`,
-    [requestedOrderId],
-  );
-
-  return result.rows.map((row) => ({ ...row, quantity: toNumber(row.quantity) }));
 };
 
 export const assertFreeformOrEngineered = (
-  row: RequestedOrderLineItemPatchRow & { id: string },
+  row: Pick<JobMaterialRequestWriteInput, "id" | "job_line_part_id" | "part_id" | "description">,
 ): void => {
   if (row.job_line_part_id) {
     return;
@@ -66,27 +51,16 @@ export const assertFreeformOrEngineered = (
   const hasPart = Boolean(row.part_id);
   if (!hasDescription && !hasPart) {
     throw new ValidationError(
-      "Ad-hoc lines require a description and/or a part",
-      { field: "line_items", code: "missing_freeform_detail", id: row.id },
+      "Ad-hoc requests require a description and/or a part",
+      { field: "profile", code: "missing_freeform_detail", id: row.id },
     );
   }
 };
 
-export const assertWithdrawalNote = (
-  row: RequestedOrderLineItemPatchRow & { id: string },
-): void => {
-  if (row.status === "withdrawn" && !(row.withdrawal_note ?? "").trim()) {
-    throw new ValidationError(
-      "withdrawal_note is required when withdrawing a line",
-      { field: "line_items", code: "withdrawal_note_required", id: row.id },
-    );
-  }
-};
-
-/** Edit while open; freeze once a line is on a purchase order or fulfilled (task 52 pin). */
+/** Edit while open; freeze once on a purchase order or fulfilled (task 56 RQ2). */
 export const assertNotFrozen = (
-  prior: PriorLineRow | undefined,
-  row: RequestedOrderLineItemPatchRow & { id: string },
+  prior: PriorRequestRow | undefined,
+  row: JobMaterialRequestWriteInput,
 ): void => {
   if (!prior || !FROZEN_STATUSES.has(prior.status)) {
     return;
@@ -100,45 +74,31 @@ export const assertNotFrozen = (
     row.quantity !== prior.quantity ||
     (row.unit !== undefined && row.unit !== prior.unit) ||
     (row.status !== undefined && row.status !== prior.status) ||
-    (row.withdrawal_note !== undefined &&
-      row.withdrawal_note !== prior.withdrawal_note);
+    (row.site_zone_id !== undefined &&
+      (row.site_zone_id ?? null) !== prior.site_zone_id);
 
   if (changed) {
     throw new ConflictError(
-      `Cannot edit line ${prior.id}: status ${prior.status} is frozen`,
-      { field: "line_items", code: "line_frozen", id: prior.id, status: prior.status },
+      `Cannot edit request ${prior.id}: status ${prior.status} is frozen`,
+      { field: "profile", code: "request_frozen", id: prior.id, status: prior.status },
     );
   }
 };
 
-export const assertFrozenLinesNotRemoved = (
-  prior: PriorLineRow[],
-  incomingIds: Set<string>,
-): void => {
-  for (const line of prior) {
-    if (FROZEN_STATUSES.has(line.status) && !incomingIds.has(line.id)) {
-      throw new ConflictError(
-        `Cannot remove line ${line.id}: status ${line.status} is frozen`,
-        { field: "line_items", code: "line_frozen", id: line.id, status: line.status },
-      );
-    }
-  }
-};
-
 /**
- * Cap qty <= job-wide remaining (task 52 R3/R4). Computed per `job_line_part_id`
- * across the whole incoming payload, netting out this header's own prior
- * (pre-edit) contribution so edits to an existing pick don't self-block.
+ * Cap qty <= job-wide remaining (task 52 R3/R4 → 56). Computed per `job_line_part_id`
+ * across the whole incoming payload, netting out prior rows' own contribution so
+ * edits don't self-block.
  */
 export const assertWithinRemaining = async (
   client: PoolClient,
   jobId: string,
-  prior: PriorLineRow[],
-  normalized: Array<RequestedOrderLineItemPatchRow & { id: string }>,
+  prior: PriorRequestRow[],
+  normalized: JobMaterialRequestWriteInput[],
 ): Promise<void> => {
   const incomingSums = new Map<string, number>();
   for (const row of normalized) {
-    if (row.job_line_part_id && row.status !== "withdrawn") {
+    if (row.job_line_part_id && (row.status ?? "open") !== "fulfilled") {
       incomingSums.set(
         row.job_line_part_id,
         (incomingSums.get(row.job_line_part_id) ?? 0) + row.quantity,
@@ -152,7 +112,7 @@ export const assertWithinRemaining = async (
 
   const ownCoverage = new Map<string, number>();
   for (const line of prior) {
-    if (line.job_line_part_id && line.status !== "withdrawn") {
+    if (line.job_line_part_id) {
       ownCoverage.set(
         line.job_line_part_id,
         (ownCoverage.get(line.job_line_part_id) ?? 0) + line.quantity,
@@ -181,22 +141,22 @@ export const assertWithinRemaining = async (
     const demand = demandMap.get(partId);
     if (demand === undefined) {
       throw new ValidationError("job_line_part_id does not belong to this job", {
-        field: "line_items",
+        field: "profile",
         code: "unknown_job_line_part",
         job_line_part_id: partId,
       });
     }
 
-    const otherHeadersCovered =
+    const otherCovered =
       (jobWideCoverage.get(partId) ?? 0) - (ownCoverage.get(partId) ?? 0);
     const poCovered = poCoverage.get(partId) ?? 0;
-    const allowed = Math.max(0, demand - otherHeadersCovered - poCovered);
+    const allowed = Math.max(0, demand - otherCovered - poCovered);
 
     if (incomingQty > allowed + 1e-9) {
       throw new ValidationError(
         "Quantity exceeds job-wide remaining need for this part",
         {
-          field: "line_items",
+          field: "profile",
           code: "over_remaining",
           job_line_part_id: partId,
           remaining: allowed,
@@ -207,109 +167,31 @@ export const assertWithinRemaining = async (
   }
 };
 
-export const replaceRequestedOrderLineItemsTx = async (
+export const loadPriorRequest = async (
   client: PoolClient,
-  jobId: string,
-  requestedOrderId: string,
-  rows: RequestedOrderLineItemPatchRow[],
-): Promise<void> => {
-  const prior = await loadPriorLines(client, requestedOrderId);
-  const priorById = new Map(prior.map((row) => [row.id, row]));
-
-  const normalized = rows.map((row) => ({ ...row, id: row.id ?? randomUUID() }));
-  const incomingIds = new Set(normalized.map((row) => row.id));
-
-  assertFrozenLinesNotRemoved(prior, incomingIds);
-
-  for (const row of normalized) {
-    assertFreeformOrEngineered(row);
-    assertWithdrawalNote(row);
-    assertNotFrozen(priorById.get(row.id), row);
+  id: string,
+): Promise<PriorRequestRow | undefined> => {
+  const result = await client.query<{
+    id: string;
+    job_id: string;
+    site_zone_id: string | null;
+    job_line_part_id: string | null;
+    part_id: string | null;
+    description: string;
+    quantity: string | number;
+    unit: string;
+    status: string;
+  }>(
+    `SELECT id, job_id, site_zone_id, job_line_part_id, part_id, description, quantity, unit, status
+     FROM job_material_request
+     WHERE id = $1`,
+    [id],
+  );
+  const row = result.rows[0];
+  if (!row) {
+    return undefined;
   }
-
-  await assertWithinRemaining(client, jobId, prior, normalized);
-
-  const toDelete = prior
-    .map((row) => row.id)
-    .filter((id) => !incomingIds.has(id));
-  if (toDelete.length > 0) {
-    await client.query(`DELETE FROM requested_order_line WHERE id = ANY($1::text[])`, [
-      toDelete,
-    ]);
-  }
-
-  let nextLineNumber =
-    prior.reduce((max, row) => Math.max(max, row.line_number), 0) + 1;
-
-  for (const [index, row] of normalized.entries()) {
-    const existing = priorById.get(row.id);
-    const status = row.status ?? existing?.status ?? "open";
-    const description = row.description ?? existing?.description ?? "";
-    const unit = row.unit ?? existing?.unit ?? "ea";
-    const withdrawalNote = row.withdrawal_note ?? existing?.withdrawal_note ?? "";
-    const jobLinePartId = row.job_line_part_id ?? existing?.job_line_part_id ?? null;
-    const partId = row.part_id ?? existing?.part_id ?? null;
-
-    if (existing) {
-      await client.query(
-        `UPDATE requested_order_line
-         SET job_line_part_id = $2,
-             part_id = $3,
-             description = $4,
-             quantity = $5,
-             unit = $6,
-             status = $7,
-             withdrawal_note = $8,
-             sort_order = $9
-         WHERE id = $1`,
-        [
-          row.id,
-          jobLinePartId,
-          partId,
-          description,
-          row.quantity,
-          unit,
-          status,
-          withdrawalNote,
-          index,
-        ],
-      );
-    } else {
-      const lineNumber = nextLineNumber;
-      nextLineNumber += 1;
-      await client.query(
-        `INSERT INTO requested_order_line (
-           id, requested_order_id, line_number, job_line_part_id, part_id,
-           description, quantity, unit, status, withdrawal_note, sort_order
-         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-        [
-          row.id,
-          requestedOrderId,
-          lineNumber,
-          jobLinePartId,
-          partId,
-          description,
-          row.quantity,
-          unit,
-          status,
-          withdrawalNote,
-          index,
-        ],
-      );
-    }
-  }
-};
-
-export const replaceRequestedOrderLineItems = async (
-  pool: Pool,
-  actorId: string,
-  jobId: string,
-  requestedOrderId: string,
-  rows: RequestedOrderLineItemPatchRow[],
-): Promise<void> => {
-  await withPermissionDb(pool, actorId, async (client) => {
-    await replaceRequestedOrderLineItemsTx(client, jobId, requestedOrderId, rows);
-  });
+  return { ...row, quantity: toNumber(row.quantity) };
 };
 
 const assertJobExists = async (client: Pool | PoolClient, jobId: string): Promise<void> => {
@@ -321,85 +203,164 @@ const assertJobExists = async (client: Pool | PoolClient, jobId: string): Promis
   }
 };
 
-export const insertRequestedOrder = async (
+export const insertJobMaterialRequestsTx = async (
+  client: PoolClient,
+  rows: JobMaterialRequestWriteInput[],
+): Promise<void> => {
+  if (rows.length === 0) {
+    return;
+  }
+
+  const jobId = rows[0]!.job_id;
+  for (const row of rows) {
+    if (row.job_id !== jobId) {
+      throw new ValidationError("All requests in a batch must share the same job_id", {
+        field: "profile",
+        code: "mixed_job",
+      });
+    }
+    assertFreeformOrEngineered(row);
+  }
+
+  await assertJobExists(client, jobId);
+  await assertWithinRemaining(client, jobId, [], rows);
+
+  for (const row of rows) {
+    await client.query(
+      `INSERT INTO job_material_request (
+         id, job_id, site_zone_id, job_line_part_id, part_id,
+         description, quantity, unit, status, requested_by
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+      [
+        row.id,
+        row.job_id,
+        row.site_zone_id ?? null,
+        row.job_line_part_id ?? null,
+        row.part_id ?? null,
+        row.description ?? "",
+        row.quantity,
+        row.unit ?? "ea",
+        row.status ?? "open",
+        row.requested_by ?? null,
+      ],
+    );
+  }
+};
+
+export const insertJobMaterialRequest = async (
   pool: Pool,
   actorId: string,
-  row: RequestedOrderDetailWriteRow,
-  requestedBy: string | null,
-  related?: { line_items?: RequestedOrderLineItemPatchRow[] },
+  row: JobMaterialRequestWriteInput,
 ): Promise<void> => {
   try {
     await withPermissionDb(pool, actorId, async (client) => {
-      await assertJobExists(client, row.job_id);
-
-      await client.query(
-        `INSERT INTO requested_order (id, job_id, requested_by, note)
-         VALUES ($1, $2, $3, $4)`,
-        [row.id, row.job_id, requestedBy, row.note],
-      );
-
-      if (related?.line_items !== undefined) {
-        await replaceRequestedOrderLineItemsTx(client, row.job_id, row.id, related.line_items);
-      }
+      await insertJobMaterialRequestsTx(client, [row]);
     });
   } catch (error) {
     if (isUniqueViolation(error)) {
-      throw new ConflictError("Requisition already exists");
+      throw new ConflictError("Material request already exists");
     }
     throw error;
   }
 };
 
-export const updateRequestedOrder = async (
+export const updateJobMaterialRequest = async (
   pool: Pool,
   actorId: string,
-  row: RequestedOrderDetailWriteRow,
+  row: JobMaterialRequestWriteInput,
 ): Promise<void> => {
   await withPermissionDb(pool, actorId, async (client) => {
+    const prior = await loadPriorRequest(client, row.id);
+    if (!prior) {
+      throw new ValidationError("Unknown material request", {
+        field: "profile",
+        code: "unknown_request",
+        id: row.id,
+      });
+    }
+    if (prior.job_id !== row.job_id) {
+      throw new ValidationError("job_id is immutable", {
+        field: "profile",
+        code: "job_immutable",
+      });
+    }
+
+    assertFreeformOrEngineered({
+      id: row.id,
+      job_line_part_id:
+        row.job_line_part_id !== undefined
+          ? row.job_line_part_id
+          : prior.job_line_part_id,
+      part_id: row.part_id !== undefined ? row.part_id : prior.part_id,
+      description:
+        row.description !== undefined ? row.description : prior.description,
+    });
+    assertNotFrozen(prior, row);
+    await assertWithinRemaining(client, row.job_id, [prior], [row]);
+
     await client.query(
-      `UPDATE requested_order
-       SET note = $2, updated_at = now()
-       WHERE id = $1 AND job_id = $3`,
-      [row.id, row.note, row.job_id],
+      `UPDATE job_material_request
+       SET site_zone_id = $2,
+           job_line_part_id = $3,
+           part_id = $4,
+           description = $5,
+           quantity = $6,
+           unit = $7,
+           status = $8,
+           updated_at = now()
+       WHERE id = $1`,
+      [
+        row.id,
+        row.site_zone_id !== undefined ? row.site_zone_id : prior.site_zone_id,
+        row.job_line_part_id !== undefined
+          ? row.job_line_part_id
+          : prior.job_line_part_id,
+        row.part_id !== undefined ? row.part_id : prior.part_id,
+        row.description !== undefined ? row.description : prior.description,
+        row.quantity,
+        row.unit !== undefined ? row.unit : prior.unit,
+        row.status !== undefined ? row.status : prior.status,
+      ],
     );
   });
 };
 
-/** Delete guard — every line must be `open`/`withdrawn` (or no lines) — task 52 pin. */
-export const loadRequestedOrderDeleteBlockers = async (
-  pool: Pool,
-  requestedOrderId: string,
-): Promise<Array<{ status: string; count: number }>> => {
-  if (!(await tableExists(pool, "requested_order_line"))) {
-    return [];
-  }
-
-  const result = await pool.query<{ status: string; count: number }>(
-    `SELECT status, COUNT(*)::int AS count
-     FROM requested_order_line
-     WHERE requested_order_id = $1
-       AND status IN ('on_purchase_order', 'fulfilled')
-     GROUP BY status`,
-    [requestedOrderId],
-  );
-
-  return result.rows;
-};
-
-export const deleteRequestedOrder = async (
+/** Hard-delete while open; reject when frozen (task 56 RQ2). */
+export const deleteJobMaterialRequest = async (
   pool: Pool,
   actorId: string,
   id: string,
 ): Promise<void> => {
-  const blockers = await loadRequestedOrderDeleteBlockers(pool, id);
-  if (blockers.length > 0) {
-    throw new ConflictError(
-      "Cannot delete requisition: one or more lines are on a purchase order or fulfilled",
-      { field: "profile", code: "line_frozen", blockers },
-    );
-  }
-
   await withPermissionDb(pool, actorId, async (client) => {
-    await client.query(`DELETE FROM requested_order WHERE id = $1`, [id]);
+    const prior = await loadPriorRequest(client, id);
+    if (!prior) {
+      return;
+    }
+    if (FROZEN_STATUSES.has(prior.status)) {
+      throw new ConflictError(
+        `Cannot delete request ${id}: status ${prior.status} is frozen`,
+        { field: "profile", code: "request_frozen", id, status: prior.status },
+      );
+    }
+    await client.query(`DELETE FROM job_material_request WHERE id = $1`, [id]);
   });
+};
+
+/** Hard-delete open requests for a zone (Field ☐ Order uncheck). */
+export const deleteOpenRequestsForZoneTx = async (
+  client: PoolClient,
+  jobId: string,
+  siteZoneId: string | null,
+): Promise<number> => {
+  const result = await client.query(
+    `DELETE FROM job_material_request
+     WHERE job_id = $1
+       AND status = 'open'
+       AND (
+         ($2::text IS NULL AND site_zone_id IS NULL)
+         OR site_zone_id = $2
+       )`,
+    [jobId, siteZoneId],
+  );
+  return result.rowCount ?? 0;
 };

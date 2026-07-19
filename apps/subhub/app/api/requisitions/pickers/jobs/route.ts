@@ -4,10 +4,10 @@ import { getPool, resolveContext } from "../../../../../lib/latch";
 import { loadJobList } from "../../../../../lib/jobs/repository";
 import { assertSurfaceRead } from "../../../../../lib/surfaces/assert-surface-read";
 
-/** Job picker for the requisition header (List → New → pick job) — task 52 pin. */
+/** Job picker for material-request filters (task 56). */
 export const GET = async (request: Request): Promise<Response> =>
   withApiHandler(async () => {
-    const ctx = await resolveContext({ surfaceId: "requested_order_detail" });
+    const ctx = await resolveContext({ surfaceId: "job_material_request_list" });
     assertSurfaceRead(ctx);
 
     const parsed = parseOffsetLimitQuery(request);
