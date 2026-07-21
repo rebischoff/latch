@@ -6,6 +6,33 @@
 
 ---
 
+### Decision: Field Issues — signal-only + revert Field ad-hoc (FI1–FI12) (2026-07-20)
+
+**Status:** **Locked**. **Task:** [60](../tasks/60-field-issues-table-revert-adhoc.md). **Amends:** [planning/21 §3 ISS3 UI](../planning/21-po-lifecycle-issues-field-adhoc-open.md#§3--locked-zone-issues-required-follow-on-l4l31) (table chrome); **supersedes** [§4 AH1–AH3](../planning/21-po-lifecycle-issues-field-adhoc-open.md#§4--locked-field-direct-ad-hoc-amends-l9) (Field-direct ad-hoc). **Restores** [L9](../planning/20-field-labor-materials-open.md) spirit: planned material enters via **Scope → Line Items**. **Keeps:** ISS1/2/4/5/6 (`job_issue` shape, terminal resolve/cancel, decoupled from progress, batched Save, no reopen); Field ☐ Order; Work table informational.
+
+**Problem:** Task [57](../tasks/57-zone-issues-and-field-adhoc.md) shipped Issues as a freeform list plus Field “+ Add material” creating freeform `job_material_request` rows. Product intent is: Issues = per-zone **communication log** (including material *asks* to the PM); material **enters the plan** only on Scope; Field must not create demand outside ☐ Order.
+
+| Id | Choice |
+|----|--------|
+| **FI1** | Issue = **signal only**. Never creates `job_material_request`, `job_line`, or `job_line_part`. PM may respond by editing Scope (or resolve/cancel). |
+| **FI2** | **Revert AH1** — remove Field Work “+ Add material” and `field_adhoc_materials` write path. |
+| **FI3** | **Publish = Job Save.** Pending (never saved) → **Delete** OK. After Save → **never hard-delete**; only Resolve / Cancel (terminal). |
+| **FI4** | Description **editable while `open`**; locked after Resolve/Cancel. |
+| **FI5** | **Resolve** and **Cancel** both exist. Resolve note **required**. Cancel note **optional**. |
+| **FI6** | Keep product name **Issues** / table `job_issue` (rename deferred). |
+| **FI7** | Material ask = **free text** in description only (no kind / qty / part columns on the issue). |
+| **FI8** | **Defer** `external` / stakeholder-visible flag (no column this pass). Design lifecycle as if rows may later appear on reports. |
+| **FI9** | Issues UI = **table** (Stakeholders-like `FieldArrayTable`): columns **Description** · **Status** · actions. **Add issue** under table. **No** “No data” / empty-state paragraph when zero rows. Pending → Delete; persisted open → Resolve / Cancel icons. |
+| **FI10** | **Open by default**; **Show closed** reveals Resolved/Cancelled. |
+| **FI11** | Anyone with Field **write** may create, edit (while open), resolve, and cancel — no PM-only close this pass. |
+| **FI12** | Field **Work** stays informational (qty / item / part / PO trail). ☐ **Order** unchanged. New planned material → **Scope → Line Items → Add line** only. |
+
+**Out / deferred:** Stakeholder job reports; `external` column; structured material fields on issues; PM-only close; rename Issues → Notes/Log; ISS7 blocking flag.
+
+**Rationale:** Append-only after publish matches site-diary / RFI practice once rows may hit reports. Scope remains the budget/BOM entry; Issues carry the tech→PM ask without short-circuiting procurement or costing.
+
+---
+
 ### Decision: Field — progress reports + zone Order compose (2026-07-17)
 
 **Status:** **Locked** (L0–L31). **Planning:** [`planning/20-field-labor-materials-open.md`](../planning/20-field-labor-materials-open.md). **Task:** [55](../tasks/55-field-progress-reports-zone-order.md). **Amends:** **F3** below — living board **plus** append-only progress reports on Save (not `progress_entry*` product path). **Companion:** [procurement — Field zone Order](./procurement.md#decision-field-zone-order--requisition-snapshots-2026-07-17).
@@ -20,7 +47,7 @@
 | Order UI | ☐ **Order** under phases; leaf all-or-nothing (+ General); parent cascade / indeterminate |
 | Order state | **Derived** from `requested_order_line` + `site_zone_id` |
 | This cycle out | Notes UI; report history UI; issues DB/UI; scheduling automation |
-| Follow-on (required) | **Issues** cycle (per-zone, created→resolved); notes; history UI; scheduling |
+| Follow-on (required) | **Issues** cycle — shipped [57](../tasks/57-zone-issues-and-field-adhoc.md); amended [FI1–FI12](./job.md#decision-field-issues--signal-only--revert-field-ad-hoc-fi1fi12-2026-07-20) / [60](../tasks/60-field-issues-table-revert-adhoc.md). Also: notes; history UI; scheduling |
 
 **Rationale:** Field zone tree is the natural compose surface; domain snapshots serve billing/customer reporting beyond `latch_audit`; issues stay a separate product concern.
 

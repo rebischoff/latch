@@ -25,6 +25,7 @@ const isSurfaceListId = (surfaceId: SurfaceId): surfaceId is SurfaceListId =>
   surfaceId === "estimate_list" ||
   surfaceId === "job_list" ||
   surfaceId === "job_material_request_list" ||
+  surfaceId === "purchase_order_list" ||
   surfaceId === "part_list" ||
   surfaceId === "item_list";
 

@@ -1,11 +1,16 @@
 "use client";
 
+import { CheckOutlined, CloseOutlined, DeleteOutlined } from "@ant-design/icons";
 import {
   Alert,
+  App,
+  Button,
   Checkbox,
+  Input,
   Space,
   Table,
   Tag,
+  Tooltip,
   Tree,
   Typography,
 } from "antd";
@@ -25,6 +30,10 @@ import {
   type JobFieldZoneOrderPatch,
   type JobFieldZoneOrderState,
 } from "@/lib/jobs/repository/job-field-progress";
+import type {
+  JobFieldIssuePatch,
+  JobIssueRow,
+} from "@/lib/jobs/repository/job-issue";
 
 type CheckState = boolean | "indeterminate";
 
@@ -42,12 +51,72 @@ type WorkTableRow = JobFieldProgressWorkRow & {
 };
 
 type FieldProgressFormSlice = {
+  field_issues?: JobFieldIssuePatch[];
   field_progress?: JobFieldProgressCell[];
   field_zone_orders?: JobFieldZoneOrderPatch[];
   line_items?: Array<{
     id: string;
     part_mpn?: string | null;
   }>;
+};
+
+const newTempId = (): string =>
+  `tmp_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+
+const isPendingIssueId = (id: string): boolean => id.startsWith("tmp_");
+
+const mergeDisplayIssues = (
+  persisted: JobIssueRow[],
+  patches: JobFieldIssuePatch[] | undefined,
+): JobIssueRow[] => {
+  const byId = new Map(persisted.map((row) => [row.id, { ...row }] as const));
+  const pendingCreates: JobIssueRow[] = [];
+
+  for (const patch of patches ?? []) {
+    if (patch.op === "create") {
+      pendingCreates.push({
+        id: patch.temp_id,
+        site_zone_id: patch.site_zone_id,
+        description: patch.description,
+        status: "open",
+        reported_by: null,
+        reported_at: new Date().toISOString(),
+        resolved_by: null,
+        resolved_at: null,
+        resolution_note: "",
+      });
+      continue;
+    }
+    if (patch.op === "delete") {
+      continue;
+    }
+    const row = byId.get(patch.id);
+    if (!row) {
+      continue;
+    }
+    if (patch.op === "update") {
+      byId.set(patch.id, {
+        ...row,
+        description: patch.description,
+      });
+    } else if (patch.op === "resolve") {
+      byId.set(patch.id, {
+        ...row,
+        status: "resolved",
+        resolution_note: patch.resolution_note,
+        resolved_at: new Date().toISOString(),
+      });
+    } else if (patch.op === "cancel") {
+      byId.set(patch.id, {
+        ...row,
+        status: "cancelled",
+        resolution_note: patch.resolution_note ?? "",
+        resolved_at: new Date().toISOString(),
+      });
+    }
+  }
+
+  return [...pendingCreates, ...byId.values()];
 };
 
 const findZoneNode = (
@@ -343,11 +412,15 @@ export const JobFieldProgressPanels = ({
   board,
   readOnly = false,
 }: JobFieldProgressPanelsProps) => {
+  const { modal } = App.useApp();
   const { setValue, control } = useFormContext<FieldProgressFormSlice>();
   const formCells = useWatch({ control, name: "field_progress" });
   const formZoneOrders = useWatch({ control, name: "field_zone_orders" });
+  const formIssues = useWatch({ control, name: "field_issues" });
   const formLineItems = useWatch({ control, name: "line_items" });
   const cells = formCells ?? board.cells;
+  const [showClosedIssues, setShowClosedIssues] = useState(false);
+
   const zoneOrders: JobFieldZoneOrderState[] = useMemo(() => {
     const byKey = new Map(
       board.zone_orders.map((row) => [row.zone_key, { ...row }] as const),
@@ -370,6 +443,11 @@ export const JobFieldProgressPanels = ({
     }
     return [...byKey.values()];
   }, [board.zone_orders, formZoneOrders]);
+
+  const displayIssues = useMemo(
+    () => mergeDisplayIssues(board.issues ?? [], formIssues),
+    [board.issues, formIssues],
+  );
 
   const partMpnByLineId = useMemo(() => {
     const map = new Map<string, string | null>();
@@ -463,6 +541,143 @@ export const JobFieldProgressPanels = ({
     [board.zone_tree, readOnly, setValue, zoneOrders],
   );
 
+  const appendIssuePatch = useCallback(
+    (patch: JobFieldIssuePatch) => {
+      const next = [...(formIssues ?? []), patch];
+      setValue("field_issues", next, { shouldDirty: true });
+    },
+    [formIssues, setValue],
+  );
+
+  const replaceIssuePatches = useCallback(
+    (next: JobFieldIssuePatch[]) => {
+      setValue("field_issues", next, { shouldDirty: true });
+    },
+    [setValue],
+  );
+
+  const reportIssue = useCallback(() => {
+    if (readOnly) {
+      return;
+    }
+    appendIssuePatch({
+      op: "create",
+      temp_id: newTempId(),
+      site_zone_id: siteZoneIdFromKey(selectedZoneId),
+      description: "",
+    });
+  }, [appendIssuePatch, readOnly, selectedZoneId]);
+
+  const deletePendingIssue = useCallback(
+    (issueId: string) => {
+      if (readOnly || !isPendingIssueId(issueId)) {
+        return;
+      }
+      replaceIssuePatches(
+        (formIssues ?? []).filter(
+          (p) => !(p.op === "create" && p.temp_id === issueId),
+        ),
+      );
+    },
+    [formIssues, readOnly, replaceIssuePatches],
+  );
+
+  const setIssueDescription = useCallback(
+    (issueId: string, description: string) => {
+      if (readOnly) {
+        return;
+      }
+      if (isPendingIssueId(issueId)) {
+        replaceIssuePatches(
+          (formIssues ?? []).map((patch) =>
+            patch.op === "create" && patch.temp_id === issueId
+              ? { ...patch, description }
+              : patch,
+          ),
+        );
+        return;
+      }
+
+      const withoutPriorUpdate = (formIssues ?? []).filter(
+        (patch) => !(patch.op === "update" && patch.id === issueId),
+      );
+      replaceIssuePatches([
+        ...withoutPriorUpdate,
+        { op: "update", id: issueId, description },
+      ]);
+    },
+    [formIssues, readOnly, replaceIssuePatches],
+  );
+
+  const queueCancelIssue = useCallback(
+    (issueId: string) => {
+      if (readOnly || isPendingIssueId(issueId)) {
+        return;
+      }
+      let note = "";
+      modal.confirm({
+        title: "Cancel issue",
+        content: (
+          <Input.TextArea
+            rows={3}
+            placeholder="Cancel note (optional)"
+            onChange={(e) => {
+              note = e.target.value;
+            }}
+          />
+        ),
+        okText: "Cancel issue",
+        okButtonProps: { danger: true },
+        onOk: () => {
+          const trimmed = note.trim();
+          appendIssuePatch({
+            op: "cancel",
+            id: issueId,
+            ...(trimmed ? { resolution_note: trimmed } : {}),
+          });
+        },
+      });
+    },
+    [appendIssuePatch, modal, readOnly],
+  );
+
+  const queueResolveIssue = useCallback(
+    (issueId: string) => {
+      if (readOnly) {
+        return;
+      }
+      if (isPendingIssueId(issueId)) {
+        return;
+      }
+      let note = "";
+      modal.confirm({
+        title: "Resolve issue",
+        content: (
+          <Input.TextArea
+            rows={3}
+            placeholder="Resolution note (required)"
+            onChange={(e) => {
+              note = e.target.value;
+            }}
+          />
+        ),
+        okText: "Resolve",
+        onOk: () => {
+          const trimmed = note.trim();
+          if (!trimmed) {
+            return Promise.reject(new Error("Resolution note is required"));
+          }
+          appendIssuePatch({
+            op: "resolve",
+            id: issueId,
+            resolution_note: trimmed,
+          });
+        },
+      });
+    },
+    [appendIssuePatch, modal, readOnly],
+  );
+
   const zoneScopeKeys = useMemo(
     () => collectSubtreeKeys(board.zone_tree, selectedZoneId),
     [board.zone_tree, selectedZoneId],
@@ -545,6 +760,150 @@ export const JobFieldProgressPanels = ({
     () => deriveOrderCheckState(selectedZoneId, board.zone_tree, zoneOrders),
     [board.zone_tree, selectedZoneId, zoneOrders],
   );
+
+  const selectedZoneSiteId = siteZoneIdFromKey(selectedZoneId);
+
+  const zoneOpenIssues = useMemo(
+    () =>
+      displayIssues.filter(
+        (row) =>
+          row.status === "open" &&
+          (row.site_zone_id ?? null) === selectedZoneSiteId,
+      ),
+    [displayIssues, selectedZoneSiteId],
+  );
+
+  const zoneClosedIssues = useMemo(
+    () =>
+      displayIssues.filter(
+        (row) =>
+          row.status !== "open" &&
+          (row.site_zone_id ?? null) === selectedZoneSiteId,
+      ),
+    [displayIssues, selectedZoneSiteId],
+  );
+
+  const zoneIssueRows = useMemo(
+    () =>
+      showClosedIssues
+        ? [...zoneOpenIssues, ...zoneClosedIssues]
+        : zoneOpenIssues,
+    [showClosedIssues, zoneClosedIssues, zoneOpenIssues],
+  );
+
+  const issueColumns = useMemo((): ColumnsType<JobIssueRow> => {
+    return [
+      {
+        title: "Description",
+        dataIndex: "description",
+        key: "description",
+        render: (_value, row) => {
+          const editable = !readOnly && row.status === "open";
+          if (!editable) {
+            return (
+              <Typography.Text
+                type={row.status === "open" ? undefined : "secondary"}
+                style={{
+                  textDecoration:
+                    row.status === "cancelled" ? "line-through" : undefined,
+                }}
+              >
+                {row.description}
+                {row.resolution_note ? ` — ${row.resolution_note}` : ""}
+              </Typography.Text>
+            );
+          }
+          return (
+            <Input.TextArea
+              autoSize={{ minRows: 1, maxRows: 4 }}
+              value={row.description}
+              placeholder="Describe the issue…"
+              style={{ width: "100%" }}
+              onChange={(e) => setIssueDescription(row.id, e.target.value)}
+            />
+          );
+        },
+      },
+      {
+        title: "Status",
+        dataIndex: "status",
+        key: "status",
+        width: 88,
+        render: (status: JobIssueRow["status"], row) => {
+          if (isPendingIssueId(row.id) && status === "open") {
+            return <Tag>unsaved</Tag>;
+          }
+          return (
+            <Tag
+              color={
+                status === "open"
+                  ? "processing"
+                  : status === "resolved"
+                    ? "success"
+                    : undefined
+              }
+            >
+              {status}
+            </Tag>
+          );
+        },
+      },
+      {
+        title: "",
+        key: "actions",
+        width: 72,
+        align: "center" as const,
+        render: (_value, row) => {
+          if (readOnly || row.status !== "open") {
+            return null;
+          }
+          if (isPendingIssueId(row.id)) {
+            return (
+              <Tooltip title="Delete">
+                <Button
+                  type="text"
+                  size="small"
+                  danger
+                  icon={<DeleteOutlined />}
+                  aria-label="Delete issue"
+                  onClick={() => deletePendingIssue(row.id)}
+                />
+              </Tooltip>
+            );
+          }
+          return (
+            <Space size={0}>
+              <Tooltip title="Resolve">
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<CheckOutlined />}
+                  aria-label="Resolve issue"
+                  onClick={() => queueResolveIssue(row.id)}
+                />
+              </Tooltip>
+              <Tooltip title="Cancel">
+                <Button
+                  type="text"
+                  size="small"
+                  danger
+                  icon={<CloseOutlined />}
+                  aria-label="Cancel issue"
+                  onClick={() => queueCancelIssue(row.id)}
+                />
+              </Tooltip>
+            </Space>
+          );
+        },
+      },
+    ];
+  }, [
+    deletePendingIssue,
+    queueCancelIssue,
+    queueResolveIssue,
+    readOnly,
+    setIssueDescription,
+  ]);
 
   const treeData = useMemo((): DataNode[] => {
     const decorate = (nodes: JobFieldProgressZoneNode[]): DataNode[] =>
@@ -654,7 +1013,7 @@ export const JobFieldProgressPanels = ({
   }
 
   return (
-    <Space direction="vertical" size="middle" style={{ width: "100%" }}>
+    <Space orientation="vertical" size="middle" style={{ width: "100%" }}>
       {readOnly ? (
         <Alert
           type="warning"
@@ -722,32 +1081,79 @@ export const JobFieldProgressPanels = ({
                 emptyText: "No labor phases under this zone.",
               }}
             />
-            <div style={{ marginTop: 12 }}>
-              <Checkbox
-                checked={orderState.state === true}
-                indeterminate={orderState.state === "indeterminate"}
-                disabled={
-                  readOnly || (orderState.locked && orderState.state === true)
-                }
-                onChange={(e) => setOrderChecked(selectedZoneId, e.target.checked)}
-                aria-label={`Order materials for ${selectedLabel}`}
-              >
-                Order
-                {orderState.leafCount > 0 ? (
-                  <Typography.Text type="secondary" style={{ marginLeft: 8 }}>
-                    {orderState.checkedCount}/{orderState.leafCount}
-                  </Typography.Text>
-                ) : null}
-              </Checkbox>
-              {orderState.locked ? (
-                <Typography.Text
-                  type="secondary"
-                  style={{ display: "block", marginTop: 4, fontSize: 12 }}
+          </div>
+
+          <div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 8,
+                marginBottom: 8,
+              }}
+            >
+              <Typography.Title level={5} style={{ margin: 0 }}>
+                Issues — {selectedLabel}
+              </Typography.Title>
+              {zoneClosedIssues.length > 0 ? (
+                <Button
+                  type="link"
+                  size="small"
+                  style={{ paddingInline: 0 }}
+                  onClick={() => setShowClosedIssues((v) => !v)}
                 >
-                  Locked — lines on a purchase order or fulfilled
-                </Typography.Text>
+                  {showClosedIssues ? "Hide closed" : "Show closed"} (
+                  {zoneClosedIssues.length})
+                </Button>
               ) : null}
             </div>
+            <Table<JobIssueRow>
+              size="small"
+              rowKey="id"
+              columns={issueColumns}
+              dataSource={zoneIssueRows}
+              pagination={false}
+              locale={{ emptyText: " " }}
+            />
+            {!readOnly ? (
+              <Button
+                style={{ marginTop: 8 }}
+                size="small"
+                type="dashed"
+                block
+                onClick={reportIssue}
+              >
+                Add issue
+              </Button>
+            ) : null}
+          </div>
+
+          <div>
+            <Checkbox
+              checked={orderState.state === true}
+              indeterminate={orderState.state === "indeterminate"}
+              disabled={
+                readOnly || (orderState.locked && orderState.state === true)
+              }
+              onChange={(e) => setOrderChecked(selectedZoneId, e.target.checked)}
+              aria-label={`Order materials for ${selectedLabel}`}
+            >
+              Order
+              {orderState.leafCount > 0 ? (
+                <Typography.Text type="secondary" style={{ marginLeft: 8 }}>
+                  {orderState.checkedCount}/{orderState.leafCount}
+                </Typography.Text>
+              ) : null}
+            </Checkbox>
+            {orderState.locked ? (
+              <Typography.Text
+                type="secondary"
+                style={{ display: "block", marginTop: 4, fontSize: 12 }}
+              >
+                Locked — lines on a purchase order or fulfilled
+              </Typography.Text>
+            ) : null}
           </div>
 
           <div>

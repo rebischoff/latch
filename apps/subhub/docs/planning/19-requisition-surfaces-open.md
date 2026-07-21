@@ -4,6 +4,7 @@
 > **Keeps (layer model):** three-layer chain + line lifecycle — [`procurement.md`](../decisions/procurement.md#decision-procurement--requisition-layer-and-job-site-inventory-2026-06-17).  
 > **Companion:** [`04-procurement.md`](./04-procurement.md) (lead time / ready formula), [`surfaces.md`](../surfaces.md) wave 6a draft.  
 > **Next:** [52 — Requisition Surfaces](../tasks/52-requisition-surfaces.md) (confirm Q1–Q5); then [53 — PO workbench](../tasks/53-purchase-order-workbench.md).  
+> **Amended 2026-07-20:** R5 selection chrome → `/requisitions` open pool ([RQ-UI1–RQ-UI8](../decisions/procurement.md#decision-requisitions--po-pool-ux-fold-workbench-rq-ui1rq-ui8-2026-07-20); task [58](../tasks/58-requisitions-po-pool-ux.md)). Grouping rule unchanged (one draft PO per job × vendor).  
 > **Out of this lock:** receipt UI detail, ready-pool **UI** (R7-D), org WMS, vendor EDI, auto-send PO, shipping mirrored on req (R6 deferred).
 
 ## Why
@@ -21,7 +22,7 @@ Wave **6a** had schema + layer rules but no Surface UX locks. R1–R8 lock creat
 | **R2** | Line source | **Both** — BOM still-needed pool **plus** freeform ad-hoc / TBD |
 | **R3** | BOM qty | **Editable, cap at remaining** — default remaining; lower only |
 | **R4** | Many headers | **Allowed** per job; optional `phase_id`. **Remaining / Order rollup is job-wide** across all reqs |
-| **R5** | Purchaser batch | Select open lines on **PO workbench** (cross job/req); **vendor pick**; **one draft PO per job × vendor** |
+| **R5** | Purchaser batch | Select open lines on **`/requisitions` pool** (per job; was “PO workbench”); **vendor pick**; **one draft PO per job × vendor** — [RQ-UI](../decisions/procurement.md#decision-requisitions--po-pool-ux-fold-workbench-rq-ui1rq-ui8-2026-07-20) |
 | **R6** | Req → PO display | Line shows **PO number + status** (link). Shipping/ETA on req **deferred** |
 | **R7** | Ready pool UI | **Defer** — P2 formula stays; no ready filter/highlight in first 6a ship |
 
@@ -72,7 +73,7 @@ Job BOM (job_line_part)
 
 ### R5 — Purchaser batch ✅
 
-1. Select on PO workbench (not a mark-on-req status).
+1. Select on `/requisitions` open pool (not a mark-on-req status). *(Was “PO workbench”; chrome folded 2026-07-20 — [RQ-UI](../decisions/procurement.md#decision-requisitions--po-pool-ux-fold-workbench-rq-ui1rq-ui8-2026-07-20).)*
 2. Vendor per line when multiple `vendor_part`s.
 3. One draft PO per `(job_id, vendor_party_id)`.
 

@@ -61,6 +61,9 @@ import type {
   JobFieldProgressDto,
   JobFieldZoneOrderPatch,
 } from "@/lib/jobs/repository/job-field-progress";
+import type {
+  JobFieldIssuePatch,
+} from "@/lib/jobs/repository/job-issue";
 import { routes } from "@/lib/nav-routes";
 import { buildPickerCreateUrl, parseReturnContext } from "@/lib/picker-return-context";
 import { navigateOnCancel } from "@/lib/surface-navigation";
@@ -128,6 +131,7 @@ type JobDetailFormValues = {
   line_items: JobLineFormRow[];
   field_progress: JobFieldProgressCell[];
   field_zone_orders: JobFieldZoneOrderPatch[];
+  field_issues: JobFieldIssuePatch[];
 };
 
 const mapStakeholders = (rows: unknown): JobStakeholderFormRow[] => {
@@ -164,6 +168,7 @@ const buildDefaultValues = (
       line_items: [],
       field_progress: [],
       field_zone_orders: [],
+      field_issues: [],
     };
   }
 
@@ -194,6 +199,7 @@ const buildDefaultValues = (
       site_zone_id: row.site_zone_id,
       ordered: row.ordered,
     })),
+    field_issues: [],
   };
 };
 
@@ -307,6 +313,7 @@ export const JobDetailForm = ({
       line_items: z.array(z.object({}).passthrough()).optional(),
       field_progress: z.array(z.object({}).passthrough()).optional(),
       field_zone_orders: z.array(z.object({}).passthrough()).optional(),
+      field_issues: z.array(z.object({}).passthrough()).optional(),
     });
 
     return zodResolver(loosened);
@@ -481,7 +488,8 @@ export const JobDetailForm = ({
       if (
         !isCreate &&
         (fieldAllows(activeManifest, "field_progress", "write") ||
-          fieldAllows(activeManifest, "field_zone_orders", "write"))
+          fieldAllows(activeManifest, "field_zone_orders", "write") ||
+          fieldAllows(activeManifest, "field_issues", "write"))
       ) {
         if (fieldAllows(activeManifest, "field_progress", "write")) {
           body.field_progress = values.field_progress ?? [];
@@ -491,6 +499,17 @@ export const JobDetailForm = ({
           fieldAllows(activeManifest, "field_progress", "write")
         ) {
           body.field_zone_orders = values.field_zone_orders ?? [];
+        }
+        if (
+          fieldAllows(activeManifest, "field_issues", "write") ||
+          fieldAllows(activeManifest, "field_progress", "write")
+        ) {
+          body.field_issues = (values.field_issues ?? []).filter((patch) => {
+            if (patch.op !== "create") {
+              return true;
+            }
+            return typeof patch.description === "string" && patch.description.trim().length > 0;
+          });
         }
       }
 

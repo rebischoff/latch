@@ -7,7 +7,6 @@
 | Fork | Doc | Notes |
 |------|-----|--------|
 | Service / warranty / T&M (SW1–SW5); blank-job Add condition (SW0) | [planning/17-service-warranty-tm-open.md](../planning/17-service-warranty-tm-open.md) | **Parked** 2026-07-15 — needs decision session; JC1–JC2 stay locked |
-| Field zone **issues** (created→resolved) | [planning/20 follow-on](../planning/20-field-labor-materials-open.md#follow-on-cycles-required) | **Required** after [55](../tasks/55-field-progress-reports-zone-order.md); separate discussion |
 
 _Operations backbone forks **resolved** (2026-06-27). Optional: [J3 phase weights](../planning/07-open-decisions.md#J3)._
 
@@ -52,8 +51,11 @@ _Operations backbone forks **resolved** (2026-06-27). Optional: [J3 phase weight
 
 | Decision | File | Date | Status |
 |----------|------|------|--------|
+| Field Issues — signal-only + revert Field ad-hoc (FI1–FI12) | [job.md](./job.md#decision-field-issues--signal-only--revert-field-ad-hoc-fi1fi12-2026-07-20) | 2026-07-20 | **locked** + **implemented** (task [60](../tasks/60-field-issues-table-revert-adhoc.md); amends ISS3 UI; supersedes AH1–AH3) |
+| Material request `item_id` + pool/PO descriptions (IT1–IT8) | [procurement.md](./procurement.md#decision-material-request-item_id--poolpo-descriptions-it1it8-2026-07-20) | 2026-07-20 | **locked** + **implemented** (task [59](../tasks/59-material-request-item-id-and-descriptions.md)) |
+| Requisitions = PO pool UX (fold workbench) (RQ-UI1–RQ-UI8) | [procurement.md](./procurement.md#decision-requisitions--po-pool-ux-fold-workbench-rq-ui1rq-ui8-2026-07-20) | 2026-07-20 | **locked** + **implemented** (task [58](../tasks/58-requisitions-po-pool-ux.md); RQ-UI2 = job-required, no All jobs) |
 | Field — progress reports + zone Order compose (L0–L31) | [job.md](./job.md#decision-field--progress-reports--zone-order-compose-2026-07-17) · [procurement.md](./procurement.md#decision-field-zone-order--requisition-snapshots-2026-07-17) | 2026-07-17 | **locked** ([planning/20](../planning/20-field-labor-materials-open.md); task [55](../tasks/55-field-progress-reports-zone-order.md)) |
-| Requisition Surfaces UX (R1–R8) | [procurement.md](./procurement.md#decision-requisition-surfaces-ux-r1r8-2026-07-16) | 2026-07-16 | **locked** ([planning/19](../planning/19-requisition-surfaces-open.md); compose amended by Field zone Order 2026-07-17) |
+| Requisition Surfaces UX (R1–R8) | [procurement.md](./procurement.md#decision-requisition-surfaces-ux-r1r8-2026-07-16) | 2026-07-16 | **locked** ([planning/19](../planning/19-requisition-surfaces-open.md); compose amended by Field zone Order 2026-07-17; R5 chrome amended by RQ-UI 2026-07-20) |
 | CCTV accessories — mounts, recorders, licenses (A1–A8) | [catalog.md](./catalog.md#decision-cctv-accessories--mounts-recorders-licenses-2026-07-16) | 2026-07-16 | **locked** (seed `082`) |
 | CCTV starter spec namespace — Platform / Form Factor / Resolution / Housing | [catalog.md](./catalog.md#decision-cctv-starter-spec-namespace-2026-07-16) | 2026-07-16 | **locked** (seed `081`; amended by accessories) |
 | Job Field progress — boolean zone snapshot (5c) (F1–F9) | [job.md](./job.md#decision-job-field-progress--boolean-zone-snapshot-5c-2026-07-16) | 2026-07-16 | **locked** ([51](../tasks/51-job-field-progress.md) ready; [planning/18](../planning/18-job-field-progress.md)) |

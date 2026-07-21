@@ -53,6 +53,7 @@ These tables are accessed only via parent Surfaces or DAL internals — no stand
 | `estimate_party`, `job_party` | `stakeholders` collection on estimate/job detail |
 | `job_line_part` | Nested under `job_line` engineering / BOM — DAL-only or sub-field |
 | `job_field_progress_cell` | `field_progress` nested on `job_detail` (51; replaces obsolete `job_work_item`) |
+| `job_issue` | `field_issues` nested on `job_detail` Field tab (57) |
 | `job_progress_report`, `job_progress_report_cell` | Append-only Field progress history on Job Save (55); no standalone Surface |
 | `billable_line` | `billable_items` on `job_detail` — no `billable_line_list` |
 | `invoice_line` | `line_items` on `invoice_detail` |
@@ -501,7 +502,7 @@ Applies to **customer, vendor, manufacturer, property_owner** detail lenses — 
 | **Anchor** | `job` |
 | **Route** | `/jobs`, `/jobs/[id]` |
 | **Nav group** | Operations |
-| **Tables** | `job`, `job_party`, `job_condition*`, `job_line`, `job_line_part`, `scope_phase`, `job_field_progress_cell`, `job_progress_report*` |
+| **Tables** | `job`, `job_party`, `job_condition*`, `job_line`, `job_line_part`, `scope_phase`, `job_field_progress_cell`, `job_progress_report*`, `job_issue`, `job_material_request` |
 
 **Layout (O4):** Tabbed UI on one Surface — [decision](./decisions/job.md#decision-job_detail-layout--tabbed-2026-06-17).
 
@@ -509,7 +510,7 @@ Applies to **customer, vendor, manufacturer, property_owner** detail lenses — 
 |-----|---------|
 | **Overview** | `profile`, `stakeholders`, derived Field lifecycle/%, `billing_settings` (6b) |
 | **Scope** | `conditions`, `line_items`; links to change orders + procurement Surfaces |
-| **Field** | `field_progress` (zone×phase boolean; 51) + ☐ Order via `field_zone_orders` (55) |
+| **Field** | `field_progress` (zone×phase boolean; 51) + ☐ Order via `field_zone_orders` (55) + **Issues** table via `field_issues` (57/60 FI1–FI12). Planned material enters via **Scope → Line Items → Add line** only (FI12; Field-direct ad-hoc removed). |
 | **Billing** | `billable_items`, `sov_milestones` (wave 6b); links to invoices |
 
 **`job_list` columns:** `title`, `site` name, derived Field lifecycle + %
@@ -525,6 +526,7 @@ Applies to **customer, vendor, manufacturer, property_owner** detail lenses — 
 | `line_items` | collection | `job_line` — sold scope; **same flat vs site-geography grouping** as estimate ([decision](./decisions/estimate.md#decision-estimate--job-line-grouping--site-geography-2026-06-17)) |
 | `field_progress` | collection | `job_field_progress_cell` — zone×phase boolean; derived % / lifecycle (51 F1–F9); Save appends `job_progress_report*` when changed (55) |
 | `field_zone_orders` | collection | Desired Field ☐ Order intents; Save → `job_material_request` rows with `site_zone_id` (55/56) |
+| `field_issues` | collection | Pending create/update/resolve/cancel for `job_issue`; Stakeholders-like table on Field (57/60 FI1–FI12); batched into whole-job Save |
 | `billable_items` | collection | `billable_line` — **wave 6b**; shown when billing section granted |
 | `sov_milestones` | collection | `schedule_of_value` + `sov_line` + `sov_allocation` — when `billing_model = progress_sov` ([decision](./decisions/billing.md#decision-sov-ui--nested-on-job_detail-billing-tab-2026-06-17)) |
 
@@ -556,28 +558,31 @@ Applies to **customer, vendor, manufacturer, property_owner** detail lenses — 
 
 | | |
 |--|--|
-| **Status** | shipped ([task 56](./tasks/56-job-material-request-migration.md), 2026-07-18) — replaces `requested_order_list` / `_detail` |
+| **Status** | shipped ([task 56](./tasks/56-job-material-request-migration.md), 2026-07-18); pool UX ([task 58](./tasks/58-requisitions-po-pool-ux.md), 2026-07-20) |
 | **Wave** | 6a |
 | **Route** | `/requisitions` (list-only; no detail route) |
 | **Nav group** | Procurement |
+| **Nav label** | **Requisitions** ([RQ-UI1](./decisions/procurement.md#decision-requisitions--po-pool-ux-fold-workbench-rq-ui1rq-ui8-2026-07-20)) |
 | **Anchor** | `job_material_request` |
 
-**`job_material_request_list` summary:** flat rows — `job_id` + job title, `site_zone_id` / zone name (null = General), `part_id` / MPN, `description`, `quantity`, `unit`, `status` (`open` / `on_purchase_order` / `fulfilled`), `requested_at`. Filters: `job_id`, `status`, `site_zone_id`.
+**UX (task 58):** open-demand **PO pool** — required job dropdown (jobs with ≥1 open request; **no All jobs**); table rolled up by **`job × part`** for the selected job; zone **icon** → popover of contributing zones; editable PN (blank = TBD) + decrease-only qty; vendor default/override; row selection → **Create POs** (one draft PO per job × vendor). Stay on `/requisitions` after create. Flat all-status history list **deferred**. API: `GET /api/requisitions/pool`.
 
-**Notes:** Created only from Job → Field ☐ Order (and Field ad-hoc in [57](./tasks/57-zone-issues-and-field-adhoc.md)). No manual create UI (RQ3). Uncheck-while-open = hard delete (RQ2). PO linkage via `purchase_order_line_source` ([53](./tasks/53-purchase-order-workbench.md)). `purchase_order*` tables remain DDL-only until 53.
+**UX (task 59 / [IT1–IT8](./decisions/procurement.md#decision-material-request-item_id--poolpo-descriptions-it1it8-2026-07-20)):** snapshot `item_id` from Field ☐ Order onto `job_material_request` (+ `purchase_order_line`); pool columns Qty · **Item** (RO; **Multiple** if mixed) · Part # (narrowed by item / union) · **Description** (manufacturer PN desc; soft-spec = request text) · Vendor. PO line seed description = `vendor_description || manufacturer_description || jmr.description`, overridable on the PO. **Complete** (migration **088**).
+
+**Notes:** Created only from Job → Field ☐ Order (or purchaser PO9 ad-hoc on a draft PO). No Field “+ Add material”; planned extras enter via Scope → Line Items ([FI2/FI12](./decisions/job.md#decision-field-issues--signal-only--revert-field-ad-hoc-fi1fi12-2026-07-20)). No manual create UI (RQ3). Uncheck-while-open = hard delete (RQ2). PO linkage via `purchase_order_line_source` ([53](./tasks/53-purchase-order-workbench.md)).
 
 ### `purchase_order_list` · `purchase_order_detail`
 
 | | |
 |--|--|
-| **Status** | draft |
+| **Status** | shipped ([task 53](./tasks/53-purchase-order-workbench.md), 2026-07-20); workbench route removed ([task 58](./tasks/58-requisitions-po-pool-ux.md), 2026-07-20) |
 | **Wave** | 6a |
-| **Route** | `/purchase-orders`, `/purchase-orders/[id]` |
+| **Route** | `/purchase-orders`, `/purchase-orders/[id]` — **not** `/purchase-orders/workbench` |
 | **Anchor** | `purchase_order` |
 
-**`purchase_order_detail` Fields:** `profile` (vendor, job, status), `line_items` (`purchase_order_line`), shipments nested per line (`purchase_order_line_shipment`)
+**`purchase_order_detail` Fields:** `profile` (vendor, job, status, PO #), `line_items` (`purchase_order_line` + nested shipments + sources)
 
-**Notes:** PO creation picks open requisition lines; one draft PO per vendor per batch ([decision](./decisions/README.md)).
+**Notes:** Batch-create selection chrome lives on `/requisitions` ([RQ-UI1–RQ-UI8](./decisions/procurement.md#decision-requisitions--po-pool-ux-fold-workbench-rq-ui1rq-ui8-2026-07-20)). Send issues; cancel at header/line/shipment (PO1–PO6); ad-hoc add creates backing request (PO9). **Draft-only delete** discards the PO and reopens pending sources; sent/received POs use cancel. **Task 59 (IT6):** `purchase_order_line.item_id` copied from the source `job_material_request`; seed `description` = `vendor_description || manufacturer_description || jmr.description`, editable in place while draft via `PATCH /api/purchase-orders/:id/lines/:lineId` (dedicated write path — `line_items` stays a logical read-only Field, not a generic related-collection patch).
 
 ### `material_receipt_list` · `material_receipt_detail`
 

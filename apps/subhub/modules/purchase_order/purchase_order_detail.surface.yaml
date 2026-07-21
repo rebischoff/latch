@@ -1,0 +1,59 @@
+# Purchase order detail — profile + lines/shipments (task 53)
+id: purchase_order_detail
+displayName: Purchase order detail
+anchorTable: purchase_order
+
+fieldActions:
+  - read
+  - write
+
+surfaceActions:
+  - read
+  - write
+  - send
+  - cancel
+  - delete
+
+tables:
+  - purchase_order
+  - purchase_order_line
+  - purchase_order_line_shipment
+  - purchase_order_line_source
+  - job_material_request
+  - job
+  - party
+  - manufacturer_part
+
+fields:
+  - id: profile
+    columns:
+      - column: purchase_order.id
+        type: string
+      - column: purchase_order.po_number
+        type: string
+        nullable: true
+      - column: purchase_order.status
+        type: string
+      - column: purchase_order.job_id
+        type: string
+      - column: job.title
+        type: string
+      - column: purchase_order.vendor_party_id
+        type: string
+      - column: party.display_name
+        type: string
+      - column: purchase_order.delivery_method
+        type: string
+        nullable: true
+      - column: purchase_order.ship_to_note
+        type: string
+      - column: purchase_order.order_date
+        type: string
+        nullable: true
+      - column: purchase_order.created_at
+        type: timestamp
+      - column: purchase_order.updated_at
+        type: timestamp
+  - id: line_items
+    # logical — purchase_order_line + nested shipments + sources (task 53)
+    columns: []

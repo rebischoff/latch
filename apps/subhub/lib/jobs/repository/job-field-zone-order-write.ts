@@ -40,6 +40,7 @@ type GeoShare = {
 type BomPartRow = {
   description: string;
   id: string;
+  item_id: string | null;
   job_line_id: string;
   part_id: string | null;
   quantity: number;
@@ -112,12 +113,13 @@ const loadBomParts = async (client: Db, jobId: string): Promise<BomPartRow[]> =>
   const result = await client.query<{
     id: string;
     job_line_id: string;
+    item_id: string | null;
     part_id: string | null;
     description: string;
     quantity: string | number;
     unit: string;
   }>(
-    `SELECT jlp.id, jlp.job_line_id, jlp.part_id, jlp.description, jlp.quantity, jlp.unit
+    `SELECT jlp.id, jlp.job_line_id, jl.item_id, jlp.part_id, jlp.description, jlp.quantity, jlp.unit
      FROM job_line_part jlp
      INNER JOIN job_line jl ON jl.id = jlp.job_line_id
      WHERE jl.job_id = $1 AND jl.status = 'active'
@@ -187,6 +189,7 @@ const buildLinesForZone = async (
 ): Promise<
   Array<{
     description: string;
+    item_id: string | null;
     job_line_part_id: string;
     part_id: string | null;
     quantity: number;
@@ -211,6 +214,7 @@ const buildLinesForZone = async (
 
   const out: Array<{
     description: string;
+    item_id: string | null;
     job_line_part_id: string;
     part_id: string | null;
     quantity: number;
@@ -236,6 +240,7 @@ const buildLinesForZone = async (
       remainingByPart.set(part.id, Math.max(0, remaining - quantity));
       out.push({
         job_line_part_id: part.id,
+        item_id: part.item_id,
         part_id: part.part_id,
         description: part.description,
         quantity,
@@ -327,6 +332,7 @@ export const applyFieldZoneOrdersTx = async (
 
   const newRows: Array<{
     description: string;
+    item_id: string | null;
     job_line_part_id: string;
     part_id: string | null;
     quantity: number;
@@ -355,6 +361,7 @@ export const applyFieldZoneOrdersTx = async (
       job_id: args.jobId,
       site_zone_id: row.site_zone_id,
       job_line_part_id: row.job_line_part_id,
+      item_id: row.item_id,
       part_id: row.part_id,
       description: row.description,
       quantity: row.quantity,

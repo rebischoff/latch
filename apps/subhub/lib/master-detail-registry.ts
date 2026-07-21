@@ -20,6 +20,12 @@ export const MASTER_DETAIL_SURFACES = {
     detailSurfaceId: "job_detail",
     createGate: "write",
   },
+  purchaseOrders: {
+    listRoute: routes.purchaseOrders.list,
+    newPath: routes.requisitions.list,
+    detailSurfaceId: "purchase_order_detail",
+    createGate: "write",
+  },
   estimates: {
     listRoute: routes.estimates.list,
     newPath: routes.estimates.new,

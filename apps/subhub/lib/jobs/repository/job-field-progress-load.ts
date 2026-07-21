@@ -15,6 +15,7 @@ import {
   type JobFieldProgressZoneNode,
 } from "./job-field-progress";
 import { loadDerivedZoneOrders } from "./job-field-zone-order-write";
+import { listIssuesForJob } from "./job-issue";
 
 type ScopePhaseRow = {
   hours_per_unit: number;
@@ -491,6 +492,7 @@ export const loadJobFieldProgress = async (
   );
 
   const zone_orders = await loadDerivedZoneOrders(pool, jobId);
+  const issues = await listIssuesForJob(pool, jobId);
 
   return {
     cells,
@@ -503,6 +505,7 @@ export const loadJobFieldProgress = async (
     phases: buildPhaseColumns(phases, slices),
     work_rows,
     zone_orders,
+    issues,
     scope_phase_index,
     progress_pct: summary.progress_pct,
     lifecycle: summary.lifecycle,

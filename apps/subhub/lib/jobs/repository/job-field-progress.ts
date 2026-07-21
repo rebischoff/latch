@@ -1,3 +1,5 @@
+import type { JobIssueRow } from "./job-issue";
+
 /**
  * Job Field progress — zone×phase boolean snapshot (task 51 / F1–F9).
  *
@@ -80,6 +82,8 @@ export type JobFieldZoneOrderPatch = {
 
 export type JobFieldProgressDto = {
   cells: JobFieldProgressCell[];
+  /** Persisted issues for the job (open prioritized) — task 57. */
+  issues: JobIssueRow[];
   lifecycle: JobFieldLifecycle;
   phases: JobFieldProgressPhaseColumn[];
   progress_pct: number;
@@ -219,6 +223,7 @@ export const emptyFieldProgressDto = (
     phases: [],
     work_rows: [],
     zone_orders: [],
+    issues: [],
     scope_phase_index: [],
     progress_pct: 0,
     lifecycle,

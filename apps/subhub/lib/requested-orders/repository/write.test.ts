@@ -14,6 +14,7 @@ const priorRequest = (overrides: Partial<PriorRequestRow> = {}): PriorRequestRow
   job_id: "job-1",
   site_zone_id: null,
   job_line_part_id: null,
+  item_id: null,
   part_id: null,
   description: "Existing request",
   quantity: 1,

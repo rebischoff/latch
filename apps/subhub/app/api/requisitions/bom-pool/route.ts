@@ -6,7 +6,7 @@ import { loadBomPoolForJob } from "../../../../lib/requested-orders/repository";
 import { assertSurfaceRead } from "../../../../lib/surfaces/assert-surface-read";
 
 /**
- * BOM "still needed" pool — used by Field / PO workbench (task 52/56).
+ * BOM "still needed" pool — used by Field Order (task 52/56).
  */
 export const GET = async (request: Request): Promise<Response> =>
   withApiHandler(async () => {

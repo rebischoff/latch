@@ -292,10 +292,13 @@ flowchart LR
 | **50** | [50-job-scope-on-create.md](./50-job-scope-on-create.md) | Job Scope editable on create (estimate parity) — **complete** (2026-07-15) |
 | **49** | [49-change-order-surfaces.md](./49-change-order-surfaces.md) | Wave **5d** CO Surfaces + Approve — **ready** (2026-07-15) |
 | **52** | [52-requisition-surfaces.md](./52-requisition-surfaces.md) | Wave **6a′** requisitions (R1–R8 subset) — **complete** (2026-07-16); migration **084** |
-| **53** | [53-purchase-order-workbench.md](./53-purchase-order-workbench.md) | Wave **6a″** PO workbench (R5) + cancel lifecycle (PO1–PO9) — authored, **ready**; depends on **56** |
+| **53** | [53-purchase-order-workbench.md](./53-purchase-order-workbench.md) | Wave **6a″** PO workbench (R5) + cancel lifecycle (PO1–PO9) — **complete** (2026-07-20); chrome fold → [58](./58-requisitions-po-pool-ux.md) |
 | **55** | [55-field-progress-reports-zone-order.md](./55-field-progress-reports-zone-order.md) | Field progress reports + zone ☐ Order → requisition snapshots — **complete** (2026-07-18); migration **085** |
 | **56** | [56-job-material-request-migration.md](./56-job-material-request-migration.md) | Collapse requisition header → flat `job_material_request` + `purchase_order_line_source` — **complete** (2026-07-18) |
-| **57** | [57-zone-issues-and-field-adhoc.md](./57-zone-issues-and-field-adhoc.md) | Zone issues + Field-direct ad-hoc material, batched Save — authored, **ready** |
+| **57** | [57-zone-issues-and-field-adhoc.md](./57-zone-issues-and-field-adhoc.md) | Zone issues + Field-direct ad-hoc material, batched Save — **complete** (2026-07-20); AH1 + ISS3 UI superseded by [60](./60-field-issues-table-revert-adhoc.md) |
+| **58** | [58-requisitions-po-pool-ux.md](./58-requisitions-po-pool-ux.md) | Fold PO workbench into `/requisitions` open pool (RQ-UI1–RQ-UI8) — **complete** (2026-07-20); no All-jobs view |
+| **59** | [59-material-request-item-id-and-descriptions.md](./59-material-request-item-id-and-descriptions.md) | Snapshot `item_id` on JMR + PO line; pool Item + mfr Description; PO description seed + override (IT1–IT8) — **complete** (2026-07-20); migration **088** |
+| **60** | [60-field-issues-table-revert-adhoc.md](./60-field-issues-table-revert-adhoc.md) | Field Issues table (FI1–FI12) + revert Field-direct ad-hoc; Scope Line Items for plan entry — **complete** (2026-07-20) |
 
 ### Backbone pass (estimate finish) — tasks 29–32
 
@@ -438,10 +441,13 @@ Field detail: [`surfaces.md`](../surfaces.md). DBML: [`current.dbml`](../schema/
 | **49** | [49-change-order-surfaces.md](./49-change-order-surfaces.md) | Wave **5d** — `change_order_*` Surfaces; shared commercial helpers; Approve on [45](./45-job-costing-and-change-order-reconciliation.md) DAL (**JC3/JC4/JC6**) — **ready** (2026-07-15) |
 | **51** | [51-job-field-progress.md](./51-job-field-progress.md) | Wave **5c** — Field boolean zone×phase snapshot; `field_progress`; hours-weighted derived % + lifecycle (**F1–F9**) — **complete** (2026-07-16) |
 | **52** | [52-requisition-surfaces.md](./52-requisition-surfaces.md) | Wave **6a′** — Requisition Surfaces (R1–R4, R6–R8); BOM+ad-hoc; job-wide remaining — **complete** (2026-07-16); migration **084** |
-| **53** | [53-purchase-order-workbench.md](./53-purchase-order-workbench.md) | Wave **6a″** — PO workbench (R5) + full cancel lifecycle (PO1–PO9) — authored, **ready** (2026-07-18); depends on **56** |
+| **53** | [53-purchase-order-workbench.md](./53-purchase-order-workbench.md) | Wave **6a″** — PO workbench (R5) + full cancel lifecycle (PO1–PO9) — **complete** (2026-07-20); chrome fold → [58](./58-requisitions-po-pool-ux.md) |
 | **55** | [55-field-progress-reports-zone-order.md](./55-field-progress-reports-zone-order.md) | Field progress reports + zone Order compose — **complete** (2026-07-18) |
 | **56** | [56-job-material-request-migration.md](./56-job-material-request-migration.md) | Collapse `requested_order`/`requested_order_line` → flat `job_material_request`; `purchase_order_line_source` join table (RQ1–RQ4, PO7–PO9) — **complete** (2026-07-18) |
-| **57** | [57-zone-issues-and-field-adhoc.md](./57-zone-issues-and-field-adhoc.md) | Zone issues (`job_issue`, ISS1–ISS7) + Field-direct ad-hoc material (AH1–AH3); both batched into whole-job Save — authored, **ready** (2026-07-18) |
+| **57** | [57-zone-issues-and-field-adhoc.md](./57-zone-issues-and-field-adhoc.md) | Zone issues (`job_issue`, ISS1–ISS7) + Field-direct ad-hoc (AH1–AH3) — **complete** (2026-07-20); migration **089**; **partial supersede** → [60](./60-field-issues-table-revert-adhoc.md) |
+| **58** | [58-requisitions-po-pool-ux.md](./58-requisitions-po-pool-ux.md) | `/requisitions` = open PO pool; delete `/purchase-orders/workbench` (RQ-UI1–RQ-UI8) — **complete** (2026-07-20) |
+| **59** | [59-material-request-item-id-and-descriptions.md](./59-material-request-item-id-and-descriptions.md) | `item_id` snapshot + pool/PO descriptions (IT1–IT8) — **complete** (2026-07-20); migration **088** |
+| **60** | [60-field-issues-table-revert-adhoc.md](./60-field-issues-table-revert-adhoc.md) | Field Issues table + revert AH1 (FI1–FI12) — **complete** (2026-07-20) |
 
 ---
 

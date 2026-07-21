@@ -20,6 +20,8 @@ export type JobMaterialRequestWriteInput = {
   job_id: string;
   site_zone_id?: string | null;
   job_line_part_id?: string | null;
+  /** Catalog snapshot from job_line.item_id at Field ☐ Order (task 59 IT1) — not user-editable. */
+  item_id?: string | null;
   part_id?: string | null;
   description?: string;
   quantity: number;
@@ -33,6 +35,7 @@ export type PriorRequestRow = {
   job_id: string;
   site_zone_id: string | null;
   job_line_part_id: string | null;
+  item_id: string | null;
   part_id: string | null;
   description: string;
   quantity: number;
@@ -176,13 +179,14 @@ export const loadPriorRequest = async (
     job_id: string;
     site_zone_id: string | null;
     job_line_part_id: string | null;
+    item_id: string | null;
     part_id: string | null;
     description: string;
     quantity: string | number;
     unit: string;
     status: string;
   }>(
-    `SELECT id, job_id, site_zone_id, job_line_part_id, part_id, description, quantity, unit, status
+    `SELECT id, job_id, site_zone_id, job_line_part_id, item_id, part_id, description, quantity, unit, status
      FROM job_material_request
      WHERE id = $1`,
     [id],
@@ -228,14 +232,15 @@ export const insertJobMaterialRequestsTx = async (
   for (const row of rows) {
     await client.query(
       `INSERT INTO job_material_request (
-         id, job_id, site_zone_id, job_line_part_id, part_id,
+         id, job_id, site_zone_id, job_line_part_id, item_id, part_id,
          description, quantity, unit, status, requested_by
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
       [
         row.id,
         row.job_id,
         row.site_zone_id ?? null,
         row.job_line_part_id ?? null,
+        row.item_id ?? null,
         row.part_id ?? null,
         row.description ?? "",
         row.quantity,

@@ -1,12 +1,12 @@
 "use client";
 
+import { PlusOutlined } from "@ant-design/icons";
 import { fieldAllows, type Manifest } from "@latch/contracts";
 import {
   App,
   Button,
   InputNumber,
   Select,
-  Space,
   Table,
   Tree,
   Typography,
@@ -293,20 +293,6 @@ export const JobLineItemsPanels = ({
       ),
     },
     {
-      title: "Part",
-      dataIndex: "part_id",
-      width: 140,
-      render: (_value, line) => (
-        <JobPartSelect
-          conditions={conditions}
-          disabled={disabled}
-          line={line}
-          writable={writableLines}
-          onChange={(patch) => updateLine(line.id, patch)}
-        />
-      ),
-    },
-    {
       title: "",
       key: "zones",
       width: 44,
@@ -351,6 +337,20 @@ export const JobLineItemsPanels = ({
           />
         );
       },
+    },
+    {
+      title: "Part",
+      dataIndex: "part_id",
+      width: 140,
+      render: (_value, line) => (
+        <JobPartSelect
+          conditions={conditions}
+          disabled={disabled}
+          line={line}
+          writable={writableLines}
+          onChange={(patch) => updateLine(line.id, patch)}
+        />
+      ),
     },
     {
       title: "Sold unit $",
@@ -436,16 +436,9 @@ export const JobLineItemsPanels = ({
       </div>
 
       <div style={{ flex: 1, minWidth: 0 }}>
-        <Space style={{ marginBottom: 8 }} align="center">
-          <Typography.Title level={5} style={{ margin: 0 }}>
-            Line items
-          </Typography.Title>
-          {writableLines ? (
-            <Button size="small" onClick={onAddLine} disabled={!selectedConditionId}>
-              Add line
-            </Button>
-          ) : null}
-        </Space>
+        <Typography.Title level={5} style={{ marginBottom: 8 }}>
+          Line items
+        </Typography.Title>
         <Table<JobLineFormRow>
           rowKey="id"
           size="small"
@@ -454,6 +447,21 @@ export const JobLineItemsPanels = ({
           pagination={false}
           scroll={{ x: 1200 }}
           locale={{ emptyText: "No line items for this condition." }}
+          footer={
+            writableLines
+              ? () => (
+                  <Button
+                    type="dashed"
+                    block
+                    icon={<PlusOutlined />}
+                    disabled={!selectedConditionId}
+                    onClick={onAddLine}
+                  >
+                    Add line
+                  </Button>
+                )
+              : undefined
+          }
         />
       </div>
     </div>

@@ -1,9 +1,9 @@
 # 21 — PO cancel/retract lifecycle + zone issues + Field ad-hoc — decisions locked
 
-> **Status:** **Locked (2026-07-18).** All forks in this doc are now resolved — see the agenda at the bottom for the full list. This is a decision record, not an implementation task; the follow-on work (task 53 rewrite, `job_material_request` migration, zone-issues task, Field ad-hoc UI) is authored separately, per each section's "Lock" line.
+> **Status:** **Locked (2026-07-18).** **Amended 2026-07-20:** §4 **AH1–AH3 superseded** and §3 **ISS3 UI amended** by [FI1–FI12](../decisions/job.md#decision-field-issues--signal-only--revert-field-ad-hoc-fi1fi12-2026-07-20) / task [60](../tasks/60-field-issues-table-revert-adhoc.md). PO lifecycle (§2, §7) and ISS1/2/4/5/6 keep. This is a decision record, not an implementation task.
 >
-> **Keeps (validated, do not re-litigate):** [L0–L31](./20-field-labor-materials-open.md), [F1–F9](../decisions/job.md#decision-job-field-progress--boolean-zone-snapshot-5c-2026-07-16), [R1–R8](../decisions/procurement.md#decision-requisition-surfaces-ux-r1r8-2026-07-16).
-> **Companion:** [53 — PO workbench (stub)](../tasks/53-purchase-order-workbench.md), [20 — follow-on cycles](./20-field-labor-materials-open.md#follow-on-cycles-required).
+> **Keeps (validated, do not re-litigate):** [L0–L31](./20-field-labor-materials-open.md) (**L9 restored** for plan entry — Scope Line Items), [F1–F9](../decisions/job.md#decision-job-field-progress--boolean-zone-snapshot-5c-2026-07-16), [R1–R8](../decisions/procurement.md#decision-requisition-surfaces-ux-r1r8-2026-07-16).
+> **Companion:** [53](../tasks/53-purchase-order-workbench.md), [57](../tasks/57-zone-issues-and-field-adhoc.md) (shipped; partial supersede), [60](../tasks/60-field-issues-table-revert-adhoc.md).
 
 ## Why this doc exists
 
@@ -74,7 +74,7 @@ Your ask: issues reported by zone, resolvable/cancellable, separate from materia
 |---|---|---|
 | **ISS1** | Table shape | New `job_issue`: `id`, `job_id`, `site_zone_id` (nullable = General, same convention as progress/req lines), `description`, `status`, `reported_by`, `reported_at`, `resolved_by`, `resolved_at`, `resolution_note`. No line-item children — issues are a flat per-zone log, not a document. **No uniqueness constraint on `(job_id, site_zone_id)`** — a zone can have any number of issue rows open simultaneously, each tracked independently (e.g. "no power" and "door locked" both open at once). |
 | **ISS2** | Lifecycle | `open → resolved` (with `resolution_note`) or `open → cancelled`. **Both terminal — no reopen path.** A recurrence of the same problem gets a fresh row, not a reopen of the old one (keeps each row an honest point-in-time record, consistent with ISS6). |
-| **ISS3** | Field UI placement | Same zone-detail panel as Phases/Order, as a third stacked block: **Issues** — list (open rows prioritized, resolved/cancelled shown collapsed/greyed) + "Report issue" (description) + per-row Resolve/Cancel. Matches your ask (4) that Field unifies progress + materials + issues in one place. |
+| **ISS3** | Field UI placement | Same zone-detail panel as Phases/Order, as a third stacked block: **Issues**. **Amended 2026-07-20 ([FI9–FI10](../decisions/job.md#decision-field-issues--signal-only--revert-field-ad-hoc-fi1fi12-2026-07-20)):** Stakeholders-like **table** (Description · Status · actions) + Add under table; open-by-default + Show closed — not the original list + “Report issue” form. |
 | **ISS4** | Relation to progress | **Decouple** — do **not** block marking a phase complete because a zone has an open issue (explicitly scoped as "related but separate"). An open-issue badge on the zone in the tree (visual only) is enough signal for a PM without adding a hard gate. |
 | **ISS5** | Save semantics | **Batched into the whole-job Save**, same as progress/Order — one consistent Save button, not a separate immediate-write path. The Field page's local pending-changes state also holds drafted issue actions (new reports, queued resolve/cancel) alongside pending progress ticks and zone-order checkboxes; all commit together on Save. Trade-off accepted: an unsaved issue report is lost if the tech navigates away before hitting Save, same as an unsaved progress tick today. |
 | **ISS6** | History | The row itself *is* the history (create/resolve/cancel timestamps + actor on each) — no separate snapshot table needed, unlike progress (which needs snapshots because a cell's % is overwritten in place; an issue row's own lifecycle timestamps never get overwritten since ISS2 forbids reopen). A live filtered/grouped query (`WHERE status = 'open' GROUP BY site_zone_id`, or grouped by job for a PM) is a direct, always-current report — no `job_issue_report` needed. |
@@ -84,11 +84,11 @@ Your ask: issues reported by zone, resolvable/cancellable, separate from materia
 
 ---
 
-## §4 — Locked: Field-direct ad-hoc (amends L9)
+## §4 — Locked: Field-direct ad-hoc (amends L9) — **SUPERSEDED 2026-07-20**
 
-**Status: Locked (2026-07-18).**
+**Status: Superseded (2026-07-20)** by [FI1–FI2 / FI12](../decisions/job.md#decision-field-issues--signal-only--revert-field-ad-hoc-fi1fi12-2026-07-20). Field “+ Add material” is removed; tech material *asks* go on **Issues** (signal only); plan entry is **Scope → Line Items**. Historical lock text below kept for audit.
 
-**L9** currently pins "ad-hoc via Scope first" for the Field compose path — a tech who needs an unplanned part must go add it to Scope's line items before it can be zone-Ordered from Field. Your ask (5) is to let ad-hoc requests happen directly from the Field per-zone list instead, since that's where the tech already is.
+**Was locked (2026-07-18):**
 
 | # | Question | Locked answer |
 |---|---|---|
@@ -96,7 +96,7 @@ Your ask: issues reported by zone, resolvable/cancellable, separate from materia
 | **AH2** | Does it need to touch the BOM (`job_line_part`)? | **No.** Stays a costless freeform `job_material_request`, same shape as today's ad-hoc requisition lines. Its cost lands in **committed/actual** only (job-cost-summary, §5), never in budget — that's a *feature*, not a gap: an unplanned field pickup showing as a committed/actual variance correctly signals "this wasn't in the plan," rather than silently blending into the BOM as if it always was. Forcing a `job_line_part` write from Field would also reintroduce exactly the scope-attribution friction AH1 is removing (tech would have to pick/create a scope line on the spot). |
 | **AH3** | Keep Scope as a path too? | **Yes, both stay.** Scope-first ad-hoc (PM adds a `job_line`/`job_line_part` row pre-emptively) is right for *planned* extras that should affect budget. Field-direct ad-hoc is right for *in-the-moment* unplanned pickups. Different intents, same underlying freeform `job_material_request` shape underneath either entry point — no schema fork. |
 
-**Lock:** AH1–AH3 as above; small addition to the Field zone panel (own follow-on task or folded into the issues task's UI pass, since both add a new affordance to the same panel, and both now share the same batched-Save mechanics).
+**Lock (historical):** AH1–AH3 as above. **Superseded 2026-07-20** — see [FI1–FI12](../decisions/job.md#decision-field-issues--signal-only--revert-field-ad-hoc-fi1fi12-2026-07-20) / task [60](../tasks/60-field-issues-table-revert-adhoc.md).
 
 ---
 

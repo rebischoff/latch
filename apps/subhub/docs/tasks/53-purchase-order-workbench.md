@@ -1,10 +1,12 @@
 # 53 — Purchase-order workbench (wave 6a″)
 
-> **Status:** Ready to author/implement (2026-07-18). **Depends on:** [56](./56-job-material-request-migration.md) (`job_material_request` + `purchase_order_line_source`), [52](./52-requisition-surfaces.md) (`purchase_order*` DDL, migration 084).
+> **Status:** Complete (2026-07-20). Next: [58-requisitions-po-pool-ux.md](./58-requisitions-po-pool-ux.md) (fold workbench into `/requisitions`) or [57-zone-issues-and-field-adhoc.md](./57-zone-issues-and-field-adhoc.md) / [49-change-order-surfaces.md](./49-change-order-surfaces.md).
 >
-> **Decision:** [R5 / R6](../decisions/procurement.md#decision-requisition-surfaces-ux-r1r8-2026-07-16) · [planning/21 §2](../planning/21-po-lifecycle-issues-field-adhoc-open.md#§2--locked-po-cancel--retract-lifecycle-task-53) (PO1–PO6) · [§7](../planning/21-po-lifecycle-issues-field-adhoc-open.md#§7--locked-po-line-rollup-vs-zone-traceability-for-receiving) (PO7–PO9).
+> **Depends on:** [56](./56-job-material-request-migration.md) (`job_material_request` + `purchase_order_line_source`), [52](./52-requisition-surfaces.md) (`purchase_order*` DDL, migration 084).
+>
+> **Decision:** [R5 / R6](../decisions/procurement.md#decision-requisition-surfaces-ux-r1r8-2026-07-16) · [planning/21 §2](../planning/21-po-lifecycle-issues-field-adhoc-open.md#§2--locked-po-cancel--retract-lifecycle-task-53) (PO1–PO6) · [§7](../planning/21-po-lifecycle-issues-field-adhoc-open.md#§7--locked-po-line-rollup-vs-zone-traceability-for-receiving) (PO7–PO9). **Chrome amend:** [RQ-UI1–RQ-UI8](../decisions/procurement.md#decision-requisitions--po-pool-ux-fold-workbench-rq-ui1rq-ui8-2026-07-20) / task [58](./58-requisitions-po-pool-ux.md) — selection UI moves to `/requisitions`; delete `/purchase-orders/workbench`.
 
-**Goal (locked intent):** PO Surface / workbench selects open `job_material_request` rows across jobs; purchaser picks vendor when multiple; **Create POs** emits **one draft PO per job × vendor**, rolling multiple zone-tagged requests for the same part into one PO line via `purchase_order_line_source`; Send issues the PO; sourced requests → `on_purchase_order`; requisition list shows PO # + status. Full **cancel/retract lifecycle** at header/line/shipment granularity, plus purchaser-initiated ad-hoc adds.
+**Goal (locked intent):** Purchaser selects open `job_material_request` rows across jobs; picks vendor when multiple; **Create POs** emits **one draft PO per job × vendor**, rolling multiple zone-tagged requests for the same part into one PO line via `purchase_order_line_source`; Send issues the PO; sourced requests → `on_purchase_order`. Full **cancel/retract lifecycle** at header/line/shipment granularity, plus purchaser-initiated ad-hoc adds. *(Shipped 53 used a separate `/purchase-orders/workbench`; task 58 folds that chrome into `/requisitions`.)*
 
 **Out of scope:** Receipts (`material_receipt*` — separate task); ready UI (R7); cross-job single PO header; PM approval gate (AP1–AP2, v2).
 
@@ -35,9 +37,9 @@ flowchart TD
 
 ### Verify
 
-- [ ] Selecting requests across 2 zones for the same part/vendor produces **one** PO line with **two** source rows, qty split matching each zone's ask
-- [ ] Selecting requests across 2 vendors (or 2 jobs) produces separate draft POs
-- [ ] Sourced requests flip to `on_purchase_order` on batch-create
+- [x] Selecting requests across 2 zones for the same part/vendor produces **one** PO line with **two** source rows, qty split matching each zone's ask
+- [x] Selecting requests across 2 vendors (or 2 jobs) produces separate draft POs
+- [x] Sourced requests flip to `on_purchase_order` on batch-create
 
 ---
 
@@ -50,8 +52,8 @@ flowchart TD
 
 ### Verify
 
-- [ ] Send stamps `ordered_at`; line status `ordered`
-- [ ] Default single-shipment row created per line
+- [x] Send stamps `ordered_at`; line status `ordered`
+- [x] Default single-shipment row created per line
 
 ---
 
@@ -64,9 +66,9 @@ flowchart TD
 
 ### Verify
 
-- [ ] Ad-hoc add on a PO with no zone picked lands the backing request in General
-- [ ] Ad-hoc add on a PO with a zone picked lands the backing request in that zone
-- [ ] No PO line ever exists with zero source rows
+- [x] Ad-hoc add on a PO with no zone picked lands the backing request in General
+- [x] Ad-hoc add on a PO with a zone picked lands the backing request in that zone
+- [x] No PO line ever exists with zero source rows
 
 ---
 
@@ -83,10 +85,10 @@ flowchart TD
 
 ### Verify
 
-- [ ] Cancel a line with a `shipped` shipment → strong-warning confirm, not a block
-- [ ] Cancel a line → its still-`on_purchase_order` sources revert to `open`; `fulfilled` sources untouched
-- [ ] Header cancel cascades the line rule to every open line
-- [ ] `latch_audit` row on every cancel
+- [x] Cancel a line with a `shipped` shipment → strong-warning confirm, not a block
+- [x] Cancel a line → its still-`on_purchase_order` sources revert to `open`; `fulfilled` sources untouched
+- [x] Header cancel cascades the line rule to every open line
+- [x] `latch_audit` row on every cancel
 
 ---
 
@@ -99,8 +101,8 @@ flowchart TD
 
 ### Verify
 
-- [ ] Shipment-level cancel on a 2-shipment line leaves the other shipment's status/sources untouched
-- [ ] Reverted sources from a shipment-level cancel are selectable again in the Step 1 workbench
+- [x] Shipment-level cancel on a 2-shipment line leaves the other shipment's status/sources untouched
+- [x] Reverted sources from a shipment-level cancel are selectable again in the Step 1 workbench
 
 ---
 
@@ -113,8 +115,8 @@ flowchart TD
 
 ### Verify
 
-- [ ] All touched tests green
-- [ ] Verify checklist all `[x]`; STATUS updated
+- [x] All touched tests green
+- [x] Verify checklist all `[x]`; STATUS updated
 
 ---
 

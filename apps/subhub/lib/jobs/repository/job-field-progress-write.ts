@@ -16,6 +16,10 @@ import {
 } from "./job-field-progress-load";
 import { applyFieldZoneOrdersTx } from "./job-field-zone-order-write";
 import {
+  applyFieldIssuesTx,
+  type JobFieldIssuePatch,
+} from "./job-issue";
+import {
   appendJobProgressReportIfChangedTx,
   reportCellWeightKey,
   type ReportCellWeightMap,
@@ -310,7 +314,8 @@ export const replaceJobFieldProgress = async (
 };
 
 /**
- * Persist Field progress cells and/or zone Order intents in one transaction (task 55).
+ * Persist Field progress, zone Order, and issues in one transaction
+ * (tasks 55 + 57 + 60 — Field-direct ad-hoc removed by FI2).
  */
 export const applyJobFieldSave = async (
   pool: Pool,
@@ -318,6 +323,7 @@ export const applyJobFieldSave = async (
   jobId: string,
   args: {
     cells?: JobFieldProgressCellPatch[];
+    issues?: JobFieldIssuePatch[];
     zoneOrders?: JobFieldZoneOrderPatch[];
   },
 ): Promise<void> => {
@@ -335,6 +341,15 @@ export const applyJobFieldSave = async (
         jobId,
         desired: args.zoneOrders,
         requestedBy: employeeId,
+      });
+    }
+
+    if (args.issues !== undefined && args.issues.length > 0) {
+      await applyFieldIssuesTx(client, {
+        actorId,
+        jobId,
+        employeeId,
+        patches: args.issues,
       });
     }
   });

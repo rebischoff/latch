@@ -7,8 +7,8 @@ const toNumber = (value: unknown): number => Number(value ?? 0);
 /**
  * Job-wide remaining need for a single BOM row (task 52 R3/R4 → 56).
  * `remaining = max(0, demand − covered)`. `covered` = requested qty across every
- * `job_material_request` on the job, plus PO coverage — PO coverage is a stub `0`
- * until task 53 writes `purchase_order_line` / source links.
+ * `job_material_request` on the job (includes on-PO via PO9 backing requests).
+ * `loadPurchaseOrderCoverageForJob` stays empty to avoid double-counting.
  */
 export const computeRemaining = (demand: number, covered: number): number =>
   Math.max(0, demand - covered);
@@ -54,8 +54,13 @@ export const loadRequisitionedCoverageForJob = async (
 };
 
 /**
- * PO coverage per `job_line_part_id` — stub `0` until task 53 writes
- * `purchase_order_line` / `purchase_order_line_source`.
+ * PO coverage per `job_line_part_id`.
+ *
+ * With PO9 every PO line has a backing `job_material_request` (via
+ * `purchase_order_line_source`), and those requests already appear in
+ * `loadRequisitionedCoverageForJob`. Returning additional PO qty here would
+ * double-count. Kept as a named hook for any future PO-only coverage that is
+ * not represented by a material request.
  */
 export const loadPurchaseOrderCoverageForJob = async (
   client: Pool | PoolClient,

@@ -9,6 +9,7 @@ import { ensureIamDal } from "../iam/dal";
 import { ensureJobsDal } from "../jobs/dal";
 import { ensurePartsDal } from "../parts/dal";
 import { ensureJobMaterialRequestsDal } from "../requested-orders/dal";
+import { ensurePurchaseOrdersDal } from "../purchase-orders/dal";
 import { resolveContextFresh } from "../latch";
 import { ensureSitesDal } from "../sites/dal";
 import type { SurfaceListRow } from "../surface-api";
@@ -37,6 +38,7 @@ export type SurfaceListId =
   | "estimate_list"
   | "job_list"
   | "job_material_request_list"
+  | "purchase_order_list"
   | "part_list"
   | "item_list";
 
@@ -50,6 +52,7 @@ export type SurfaceDetailId =
   | "role_detail"
   | "estimate_detail"
   | "job_detail"
+  | "purchase_order_detail"
   | "part_detail"
   | "item_detail";
 
@@ -303,6 +306,15 @@ const listLoaders: Record<SurfaceListId, ListLoader> = {
       return dal.jobMaterialRequestList.list(ctx, query);
     },
   },
+  purchase_order_list: {
+    ensureDal: async () => {
+      await ensurePurchaseOrdersDal();
+    },
+    list: async (ctx, query) => {
+      const dal = await ensurePurchaseOrdersDal();
+      return dal.purchaseOrderList.list(ctx, query);
+    },
+  },
   part_list: {
     ensureDal: async () => {
       await ensurePartsDal();
@@ -406,6 +418,15 @@ const detailLoaders: Record<SurfaceDetailId, DetailLoader> = {
     getDal: async () => {
       const dal = await ensureJobsDal();
       return dal.jobDetail;
+    },
+  },
+  purchase_order_detail: {
+    ensureDal: async () => {
+      await ensurePurchaseOrdersDal();
+    },
+    getDal: async () => {
+      const dal = await ensurePurchaseOrdersDal();
+      return dal.purchaseOrderDetail;
     },
   },
   part_detail: {

@@ -1,8 +1,10 @@
 # 57 — Zone issues + Field-direct ad-hoc material
 
-> **Status:** Ready to author/implement (2026-07-18). **Depends on:** [51](./51-job-field-progress.md), [55](./55-field-progress-reports-zone-order.md) (Field zone panel + batched-Save pattern); the ad-hoc portion (AH1–AH3) additionally depends on [56](./56-job-material-request-migration.md) (`job_material_request`).
+> **Status:** Complete (2026-07-20). Next: [60-field-issues-table-revert-adhoc.md](./60-field-issues-table-revert-adhoc.md) (FI1–FI12 amends Issues UI + **reverts AH1**).
 >
-> **Decision:** [planning/21 §3](../planning/21-po-lifecycle-issues-field-adhoc-open.md#§3--locked-zone-issues-required-follow-on-l4l31) (ISS1–ISS7) · [§4](../planning/21-po-lifecycle-issues-field-adhoc-open.md#§4--locked-field-direct-ad-hoc-amends-l9) (AH1–AH3).
+> **Decision:** [planning/21 §3](../planning/21-po-lifecycle-issues-field-adhoc-open.md#§3--locked-zone-issues-required-follow-on-l4l31) (ISS1–ISS7) · [§4](../planning/21-po-lifecycle-issues-field-adhoc-open.md#§4--locked-field-direct-ad-hoc-amends-l9) (AH1–AH3 — **superseded 2026-07-20** by [FI1–FI12](../decisions/job.md#decision-field-issues--signal-only--revert-field-ad-hoc-fi1fi12-2026-07-20)).
+>
+> **Partial supersede:** Task [60](./60-field-issues-table-revert-adhoc.md) replaces Issues list chrome with a table (ISS3 UI) and removes Field-direct ad-hoc. `job_issue` DDL + batched Save + ISS1/2/4/5/6 keep.
 
 **Goal:** Add a third Field zone-panel block, **Issues**, for reporting/resolving/cancelling per-zone problems (flat log, no snapshot table, decoupled from progress). Amend **L9** to let ad-hoc material requests happen directly from the Field zone panel instead of requiring a Scope detour first. Both are batched into the same whole-job Save as progress/Order (**not** immediate writes).
 
@@ -34,8 +36,8 @@ flowchart TD
 
 ### Verify
 
-- [ ] Table/columns on dev; FKs + indexes
-- [ ] No unique constraint on `(job_id, site_zone_id)` — multiple open issues per zone insert cleanly
+- [x] Table/columns on dev; FKs + indexes
+- [x] No unique constraint on `(job_id, site_zone_id)` — multiple open issues per zone insert cleanly
 
 ---
 
@@ -49,9 +51,9 @@ flowchart TD
 
 ### Verify
 
-- [ ] Create/resolve/cancel each produce a `latch_audit` row (actor, timestamp, before/after status)
-- [ ] Resolve without `resolution_note` rejected
-- [ ] Grouped-by-zone / grouped-by-job read helpers return correct live counts
+- [x] Create/resolve/cancel each produce a `latch_audit` row (actor, timestamp, before/after status)
+- [x] Resolve without `resolution_note` rejected
+- [x] Grouped-by-zone / grouped-by-job read helpers return correct live counts
 
 ---
 
@@ -65,9 +67,9 @@ flowchart TD
 
 ### Verify
 
-- [ ] A zone can show 2+ open issues simultaneously, each with independent Resolve/Cancel
-- [ ] Open-issue badge shows on the zone tree; phase-complete checkbox is unaffected by it
-- [ ] Resolved/cancelled issues render collapsed, not mixed into the open list
+- [x] A zone can show 2+ open issues simultaneously, each with independent Resolve/Cancel
+- [x] Open-issue badge shows on the zone tree; phase-complete checkbox is unaffected by it
+- [x] Resolved/cancelled issues render collapsed, not mixed into the open list
 
 ---
 
@@ -81,8 +83,8 @@ flowchart TD
 
 ### Verify
 
-- [ ] "+ Add material" on a zone creates a pending freeform request tagged to that zone, no `job_line_part` row created
-- [ ] Scope's existing ad-hoc line-item path still works unchanged
+- [x] "+ Add material" on a zone creates a pending freeform request tagged to that zone, no `job_line_part` row created
+- [x] Scope's existing ad-hoc line-item path still works unchanged
 
 ---
 
@@ -95,8 +97,8 @@ flowchart TD
 
 ### Verify
 
-- [ ] Save with pending issue + ad-hoc-material + progress changes commits all three in one transaction
-- [ ] Navigating away before Save discards all three consistently (no partial persistence)
+- [x] Save with pending issue + ad-hoc-material + progress changes commits all three in one transaction
+- [x] Navigating away before Save discards all three consistently (no partial persistence)
 
 ---
 
@@ -109,8 +111,8 @@ flowchart TD
 
 ### Verify
 
-- [ ] All touched tests green
-- [ ] Verify checklist all `[x]`; STATUS updated
+- [x] All touched tests green
+- [x] Verify checklist all `[x]`; STATUS updated
 
 ---
 

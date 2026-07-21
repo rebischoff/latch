@@ -26,6 +26,7 @@ tables:
   - job_field_progress_cell
   - job_progress_report
   - job_progress_report_cell
+  - job_issue
   - job_material_request
   - site
   - site_zone
@@ -62,4 +63,7 @@ fields:
     columns: []
   - id: field_zone_orders
     # logical — desired Field ☐ Order intents; Save → job_material_request + site_zone_id (task 55/56)
+    columns: []
+  - id: field_issues
+    # logical — pending create/update/resolve/cancel for job_issue; batched Field Save (57/60)
     columns: []

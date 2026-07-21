@@ -1,15 +1,15 @@
 # STATUS — SubHub
 
 > App-local quarterback. Platform pointer: [`../../STATUS.md`](../../STATUS.md).
-> Updated: 2026-07-18.
+> Updated: 2026-07-20.
 
 - **Package:** `@latch/subhub` · **Port:** 3003
 - **Docs:** [`docs/README.md`](./docs/README.md) · **Tasks:** [`docs/tasks/01-task-index.md`](./docs/tasks/01-task-index.md)
-- **State:** Migrations **037**–**087** applied on dev. Tasks **29–36**, **37a**–**37z**, **37aa**, **37ac**, **37ad**, **37ae**–**37aj**, **38**, **39**, **40**, **41ak**, **41al**, **41am**, **41an**, **41ao**, **42a**, **42b**, **42c**, **43**, **44**, **45**, **46**, **47**, **48**, **50**, **51**, **52**, **55**, **56** complete; **49** ready; **53**, **57** authored/ready; **41ab** superseded/reverted by **37ac**; **37h cancelled** (obsolete).
+- **State:** Migrations **037**–**089** applied on dev. Tasks **29–36**, **37a**–**37z**, **37aa**, **37ac**, **37ad**, **37ae**–**37aj**, **38**, **39**, **40**, **41ak**, **41al**, **41am**, **41an**, **41ao**, **42a**, **42b**, **42c**, **43**, **44**, **45**, **46**, **47**, **48**, **50**, **51**, **52**, **53**, **55**, **56**, **57**, **58**, **59**, **60** complete; **49** ready; **41ab** superseded/reverted by **37ac**; **37h cancelled** (obsolete).
 
 ## Right now — do this next
 
-**[53 — PO workbench + cancel lifecycle](./docs/tasks/53-purchase-order-workbench.md)** — batch create against `job_material_request` / `purchase_order_line_source`, Send, cancel at header/line/shipment. Or **[57 — zone issues + Field ad-hoc](./docs/tasks/57-zone-issues-and-field-adhoc.md)** / **[49 — CO Surfaces](./docs/tasks/49-change-order-surfaces.md)** in parallel.
+**[49 — Change-order Surfaces](./docs/tasks/49-change-order-surfaces.md)** — wave 5d CO Surfaces + Approve. Or **receipts** (procurement receiving).
 
 ## Blockers
 
@@ -25,11 +25,19 @@
 |-------|--------|-------|
 | **03 — Catalog** | Spec participation removal (namespace narrowing + wildcard matching) | **37ai complete**; CCTV **081**–**083** applied (2026-07-16) |
 | **04 — Estimates** | Site warn-and-clear (S1–S9) | **44 complete** (2026-07-14) |
-| **05 — Jobs** | **5b + 47–51 + 55 complete**; **49** ready (5d); **[57](./docs/tasks/57-zone-issues-and-field-adhoc.md)** (zone issues + Field ad-hoc) authored | Ready |
-| **06a — Procurement** | Requisition / PO Surfaces | **52 + 55 + 56 complete**; **[53](./docs/tasks/53-purchase-order-workbench.md)** authored — do next |
+| **05 — Jobs** | **5b + 47–51 + 55 + 57 + 60 complete**; **49** ready (5d) | Ready |
+| **06a — Procurement** | Requisition / PO Surfaces | **52 + 53 + 55 + 56 + 57 + 58 + 59 complete**; receipts next |
 
 ## Recently completed
 
+- **60 — Field Issues table + revert Field ad-hoc (FI1–FI12)** — Issues Stakeholders-like table (Description · Status · actions); pending Delete vs Resolve/Cancel; edit while open; remove Field “+ Add material” / `field_adhoc_materials`; Scope Line Items for plan entry; JMR create = ☐ Order + PO9 only (2026-07-20).
+- **60 authored — Field Issues table + revert Field ad-hoc (FI1–FI12)** — signal-only Issues; Stakeholders-like table; remove Field “+ Add material”; Scope Line Items for plan entry; task ready, no code yet (2026-07-20).
+- **57 — Zone issues + Field-direct ad-hoc (ISS1–ISS7, AH1–AH3)** — migration **089** (`job_issue`); Issues Field block + zone-tree open badge; Field "+ Add material" freeform JMR (no BOM); `field_issues` / `field_adhoc_materials` batched into whole-job Save with progress/Order (2026-07-20). **Partial supersede:** AH1 + ISS3 UI → task **60**.
+- **59 — Material request `item_id` + pool/PO descriptions (IT1–IT8)** — migration **088** (nullable `item_id` FK on `job_material_request` + `purchase_order_line`, backfill); Field ☐ Order snapshots `item_id` from `job_line.item_id`; `/requisitions` pool Item column (single/Multiple) + narrowed Part # union + mfr-description-aware Description; batch-create + PO9 ad-hoc copy `item_id` and seed description `vendor \|\| mfr \|\| request text`; PO detail description editable while draft (2026-07-20).
+- **59 authored — Material request `item_id` + pool/PO descriptions (IT1–IT8)** — snapshot item from Field Order onto JMR + PO line; pool Item + mfr Description; PO `vendor \|\| mfr \|\| request` seed with override; task ready, no code yet (2026-07-20).
+- **58 — Requisitions = PO pool UX** — fold workbench into `/requisitions`; job-required dropdown + job×part rollup; decrease-only qty + staged PN; delete `/purchase-orders/workbench` (no redirect); RQ-UI2 = no All jobs (2026-07-20).
+- **58 authored — Requisitions = PO pool UX (RQ-UI1–RQ-UI8)** — lock fold workbench into `/requisitions`; job×part rollup; decrease-only qty; delete `/purchase-orders/workbench` (no redirect); task ready, no code yet (2026-07-20).
+- **53 — PO workbench + cancel lifecycle** — `purchase_order_list`/`_detail`; batch-create from open JMRs (job×vendor rollup + sources); Send; ad-hoc line (PO9); cancel header/line/shipment + audit; shipment split/backorder; R6 PO trail on material-request list (2026-07-20).
 - **56 — `job_material_request` migration** — drop `requested_order*`; flat `job_material_request` + `purchase_order_line_source`; list-only Surface; Field ☐ Order hard-delete/insert; `attachSourceTx` (2026-07-18).
 - **21 — all forks locked + authored into tasks 53/56/57** — PR1 (frozen report %) + §5 (committed-cost bug) done; RQ1–RQ4, PO1–PO9, ISS1–ISS7, AH1–AH3, AP1–AP2 all locked; migration **086** (`weight_hours`); task **53** rewritten with full cancel lifecycle, new tasks **56** (`job_material_request` migration) and **57** (zone issues + Field ad-hoc) authored (2026-07-18).
 - **55 — Field progress reports + zone Order** — migration **085** (`job_progress_report*` + `requested_order_line.site_zone_id`); diff-aware Save report; Field ☐ Order → new req; demote Request parts → Field tab (2026-07-18).
@@ -98,13 +106,17 @@
 
 ## Pointers
 
-- [Task 53 — PO workbench + cancel lifecycle](./docs/tasks/53-purchase-order-workbench.md) ← **do next**
+- [Task 49 — CO Surfaces (5d)](./docs/tasks/49-change-order-surfaces.md) ← **do next**
+- [Task 60 — Field Issues table + revert ad-hoc (FI1–FI12)](./docs/tasks/60-field-issues-table-revert-adhoc.md) ✅
+- [Decision — FI1–FI12](./docs/decisions/job.md#decision-field-issues--signal-only--revert-field-ad-hoc-fi1fi12-2026-07-20)
+- [Task 57 — zone issues + Field ad-hoc](./docs/tasks/57-zone-issues-and-field-adhoc.md) ✅ (partial → 60)
+- [Task 59 — material request `item_id` + pool/PO descriptions](./docs/tasks/59-material-request-item-id-and-descriptions.md) ✅
+- [Task 58 — Requisitions = PO pool UX](./docs/tasks/58-requisitions-po-pool-ux.md) ✅
+- [Task 53 — PO workbench + cancel lifecycle](./docs/tasks/53-purchase-order-workbench.md) ✅
 - [Task 56 — `job_material_request` migration](./docs/tasks/56-job-material-request-migration.md) ✅
-- [Task 57 — zone issues + Field ad-hoc](./docs/tasks/57-zone-issues-and-field-adhoc.md)
-- [Planning 21 — PO lifecycle / issues / ad-hoc (all locked)](./docs/planning/21-po-lifecycle-issues-field-adhoc-open.md)
+- [Planning 21 — PO lifecycle / issues / ad-hoc (amended)](./docs/planning/21-po-lifecycle-issues-field-adhoc-open.md)
 - [Task 55 — Field progress reports + zone Order](./docs/tasks/55-field-progress-reports-zone-order.md) ✅
 - [Task 52 — Requisition Surfaces](./docs/tasks/52-requisition-surfaces.md) ✅
-- [Task 49 — CO Surfaces (5d)](./docs/tasks/49-change-order-surfaces.md)
 - [Task 51 — Field progress (5c)](./docs/tasks/51-job-field-progress.md) ✅
 - [Planning 18 — Field progress 5c](./docs/planning/18-job-field-progress.md) ✅
 - [Decision — Field progress F1–F9](./docs/decisions/job.md#decision-job-field-progress--boolean-zone-snapshot-5c-2026-07-16)

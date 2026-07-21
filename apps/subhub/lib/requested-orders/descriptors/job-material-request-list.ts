@@ -27,6 +27,10 @@ export type JobMaterialRequestListRow = {
   status: string;
   requested_at: string;
   requested_by_display_name: string | null;
+  /** R6 trail — set when linked via purchase_order_line_source (task 53). */
+  purchase_order_id: string | null;
+  purchase_order_number: string | null;
+  purchase_order_status: string | null;
 };
 
 const formatJobMaterialRequestListRow = (
@@ -46,6 +50,9 @@ const formatJobMaterialRequestListRow = (
   status: row.status,
   requested_at: row.requested_at,
   requested_by_display_name: row.requested_by_display_name,
+  purchase_order_id: row.purchase_order_id,
+  purchase_order_number: row.purchase_order_number,
+  purchase_order_status: row.purchase_order_status,
 });
 
 export const projectJobMaterialRequestListRow = (
@@ -69,6 +76,9 @@ export const projectJobMaterialRequestListRow = (
       unit: row.unit,
       status: row.status,
       requested_at: row.requested_at,
+      purchase_order_id: row.purchase_order_id,
+      purchase_order_number: row.purchase_order_number,
+      purchase_order_status: row.purchase_order_status,
     };
   }
 

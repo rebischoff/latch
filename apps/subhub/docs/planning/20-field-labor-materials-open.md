@@ -20,7 +20,7 @@
 | **L4** | Issues separate (created→resolved) — **separate required cycle (L31)** |
 | **L5–L7** | ☐ **Order** under phases; leaf all-or-nothing; work table informational + PO trail |
 | **L8 / L29 / L30** | Order-changing Save → **new** `requested_order` + lines (diff-aware) |
-| **L9** | Ad-hoc via **Scope** first |
+| **L9** | Ad-hoc via **Scope** first — **restored 2026-07-20** ([FI1–FI12](../decisions/job.md#decision-field-issues--signal-only--revert-field-ad-hoc-fi1fi12-2026-07-20); AH1 Field-direct ad-hoc superseded) |
 | **L10–L12** | Open editable until PO; re-request OK; keep remaining/withdraw/PO rules |
 | **L13** | Domain snapshots **and** `latch_audit` (not redundant) |
 | **L15** | No special redact — uncheck + Save |
@@ -50,7 +50,7 @@
 
 | Cycle | Scope |
 |-------|--------|
-| **Issues** | Per-zone issues + DB; created→resolved (**L4**, **L31**) |
+| **Issues** | Per-zone issues + DB; created→resolved (**L4**, **L31**) — **shipped 57**; UI/signal rules amended by [FI1–FI12](../decisions/job.md#decision-field-issues--signal-only--revert-field-ad-hoc-fi1fi12-2026-07-20) / [60](../tasks/60-field-issues-table-revert-adhoc.md) |
 | **Progress notes** | Report / per-zone notes (**L3**, **L24**) |
 | **Progress report history UI** | List/viewer (**L17**, **L25**) |
 | **Report scheduling** | Daily/weekly/dated (**L2**) |

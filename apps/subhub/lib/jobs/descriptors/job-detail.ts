@@ -8,6 +8,9 @@ import type {
   JobFieldProgressDto,
   JobFieldZoneOrderPatch,
 } from "../repository/job-field-progress";
+import type {
+  JobFieldIssuePatch,
+} from "../repository/job-issue";
 
 const JobStakeholderPatchElementSchema = z
   .object({
@@ -30,6 +33,44 @@ const JobFieldZoneOrderPatchElementSchema = z
     ordered: z.boolean(),
   })
   .strict();
+
+const JobFieldIssuePatchElementSchema = z.discriminatedUnion("op", [
+  z
+    .object({
+      op: z.literal("create"),
+      temp_id: z.string(),
+      site_zone_id: z.string().nullable(),
+      description: z.string(),
+    })
+    .strict(),
+  z
+    .object({
+      op: z.literal("update"),
+      id: z.string(),
+      description: z.string(),
+    })
+    .strict(),
+  z
+    .object({
+      op: z.literal("resolve"),
+      id: z.string(),
+      resolution_note: z.string(),
+    })
+    .strict(),
+  z
+    .object({
+      op: z.literal("cancel"),
+      id: z.string(),
+      resolution_note: z.string().optional(),
+    })
+    .strict(),
+  z
+    .object({
+      op: z.literal("delete"),
+      id: z.string(),
+    })
+    .strict(),
+]);
 
 const JobConditionLaborPhasePatchElementSchema = z
   .object({
@@ -162,6 +203,8 @@ export const JobDetailPatchSchema = z
     field_progress: z.array(JobFieldProgressCellPatchElementSchema).optional(),
     /** Desired Field ☐ Order state per leaf / General (task 55). */
     field_zone_orders: z.array(JobFieldZoneOrderPatchElementSchema).optional(),
+    /** Pending issue create/update/resolve/cancel (tasks 57 / 60). */
+    field_issues: z.array(JobFieldIssuePatchElementSchema).optional(),
   })
   .strict();
 
@@ -328,8 +371,11 @@ export type JobFieldProgressPatchRow = JobFieldProgressCellPatch;
 
 export type JobFieldZoneOrderPatchRow = JobFieldZoneOrderPatch;
 
+export type JobFieldIssuePatchRow = JobFieldIssuePatch;
+
 export type JobDetailRelatedPatch = {
   conditions?: JobConditionPatchRow[];
+  field_issues?: JobFieldIssuePatchRow[];
   field_progress?: JobFieldProgressPatchRow[];
   field_zone_orders?: JobFieldZoneOrderPatchRow[];
   line_items?: JobLineItemPatchRow[];
@@ -357,6 +403,7 @@ const emptyFieldProgress = (): JobFieldProgressDto => ({
   phases: [],
   work_rows: [],
   zone_orders: [],
+  issues: [],
   scope_phase_index: [],
   progress_pct: 0,
   lifecycle: "not_started",
@@ -483,6 +530,9 @@ export const jobDetailDescriptor: SurfaceDescriptor<
     if (typed.field_zone_orders !== undefined) {
       related.field_zone_orders =
         typed.field_zone_orders as JobFieldZoneOrderPatchRow[];
+    }
+    if (typed.field_issues !== undefined) {
+      related.field_issues = typed.field_issues as JobFieldIssuePatchRow[];
     }
 
     return Object.keys(related).length > 0 ? related : undefined;

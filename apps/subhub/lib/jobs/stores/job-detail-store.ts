@@ -67,10 +67,15 @@ export const createJobDetailStore = (
       });
     }
 
-    if (patch.field_progress !== undefined || patch.field_zone_orders !== undefined) {
+    if (
+      patch.field_progress !== undefined ||
+      patch.field_zone_orders !== undefined ||
+      patch.field_issues !== undefined
+    ) {
       await applyJobFieldSave(pool, actorId, jobId, {
         cells: patch.field_progress,
         zoneOrders: patch.field_zone_orders,
+        issues: patch.field_issues,
       });
     }
   },

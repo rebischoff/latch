@@ -93,6 +93,11 @@ export const SURFACE_API: Partial<Record<SurfaceId, SurfaceApiConfig>> = {
     listSurfaceId: "job_list",
   },
   job_material_request_list: { listPath: "/api/requisitions" },
+  purchase_order_list: { listPath: "/api/purchase-orders" },
+  purchase_order_detail: {
+    detailPath: "/api/purchase-orders",
+    listSurfaceId: "purchase_order_list",
+  },
   part_list: { listPath: "/api/parts" },
   part_detail: {
     detailPath: "/api/parts",
@@ -806,4 +811,194 @@ export const fetchRequisitionBomPool = async (
     `/api/requisitions/bom-pool?job_id=${encodeURIComponent(jobId)}`,
   );
   return parseResponse<RequisitionBomPoolData>(response);
+};
+
+// ─── Requisitions PO pool (task 58) ──────────────────────────────────────────
+
+export type PoolVendorCandidate = {
+  vendor_party_id: string;
+  vendor_display_name: string;
+  vendor_part_id: string;
+  unit_price: number;
+  is_preferred: boolean;
+};
+
+export type PoolZoneRequest = {
+  id: string;
+  quantity: number;
+};
+
+export type PoolZoneContribution = {
+  site_zone_id: string | null;
+  site_zone_name: string | null;
+  quantity: number;
+  requests: PoolZoneRequest[];
+};
+
+export type PoolPartOption = {
+  part_id: string;
+  part_mpn: string;
+  part_description: string;
+};
+
+export type PoolRollupRow = {
+  key: string;
+  job_id: string;
+  job_title: string;
+  part_id: string | null;
+  part_mpn: string | null;
+  part_description: string | null;
+  item_ids: string[];
+  item_label: string | null;
+  description: string;
+  quantity: number;
+  unit: string;
+  vendors: PoolVendorCandidate[];
+  zones: PoolZoneContribution[];
+  part_options: PoolPartOption[];
+};
+
+export type RequisitionPoolData = {
+  jobs: Array<{ id: string; title: string }>;
+  vendors: Array<{ id: string; display_name: string }>;
+  rows: PoolRollupRow[];
+  canCreatePos: boolean;
+};
+
+export const fetchRequisitionPool = async (opts?: {
+  jobId?: string;
+}): Promise<ApiSuccessBody<RequisitionPoolData>> => {
+  const params = new URLSearchParams();
+  if (opts?.jobId) params.set("job_id", opts.jobId);
+  const qs = params.toString();
+  const response = await fetch(
+    `/api/requisitions/pool${qs ? `?${qs}` : ""}`,
+  );
+  return parseResponse<RequisitionPoolData>(response);
+};
+
+export type PurchaseOrderBatchCreateData = {
+  purchaseOrderIds: string[];
+};
+
+export const postPurchaseOrderBatch = async (body: {
+  purchaseOrderId?: string;
+  selections: Array<{
+    jobMaterialRequestId: string;
+    vendorPartyId: string;
+    quantity?: number;
+    partId?: string | null;
+  }>;
+}): Promise<ApiSuccessBody<PurchaseOrderBatchCreateData>> => {
+  const response = await fetch("/api/purchase-orders/batch", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  return parseResponse<PurchaseOrderBatchCreateData>(response);
+};
+
+export const postPurchaseOrderSend = async (
+  purchaseOrderId: string,
+): Promise<ApiSuccessBody<{ id: string; status: string }>> => {
+  const response = await fetch(
+    `/api/purchase-orders/${encodeURIComponent(purchaseOrderId)}/send`,
+    { method: "POST" },
+  );
+  return parseResponse<{ id: string; status: string }>(response);
+};
+
+export type PurchaseOrderCancelData = {
+  warningLevel: "plain" | "strong" | "blocked";
+  openedRequestIds?: string[];
+};
+
+export const postPurchaseOrderCancel = async (
+  purchaseOrderId: string,
+  body: {
+    level: "header" | "line" | "shipment";
+    purchaseOrderLineId?: string;
+    purchaseOrderLineShipmentId?: string;
+    previewOnly?: boolean;
+  },
+): Promise<ApiSuccessBody<PurchaseOrderCancelData>> => {
+  const response = await fetch(
+    `/api/purchase-orders/${encodeURIComponent(purchaseOrderId)}/cancel`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    },
+  );
+  return parseResponse<PurchaseOrderCancelData>(response);
+};
+
+export const postPurchaseOrderAdhocLine = async (
+  purchaseOrderId: string,
+  body: {
+    description?: string;
+    partId?: string | null;
+    quantity: number;
+    unit?: string;
+    unitPrice?: number;
+    siteZoneId?: string | null;
+    jobLinePartId?: string | null;
+  },
+): Promise<
+  ApiSuccessBody<{ purchaseOrderLineId: string; jobMaterialRequestId: string }>
+> => {
+  const response = await fetch(
+    `/api/purchase-orders/${encodeURIComponent(purchaseOrderId)}/adhoc-line`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    },
+  );
+  return parseResponse<{
+    purchaseOrderLineId: string;
+    jobMaterialRequestId: string;
+  }>(response);
+};
+
+export const postPurchaseOrderSplit = async (
+  purchaseOrderId: string,
+  lineId: string,
+  body: {
+    nearQuantity: number;
+    nearEtaDate?: string | null;
+    backorderEtaDate?: string | null;
+  },
+): Promise<
+  ApiSuccessBody<{ nearShipmentId: string; backorderShipmentId: string }>
+> => {
+  const response = await fetch(
+    `/api/purchase-orders/${encodeURIComponent(purchaseOrderId)}/lines/${encodeURIComponent(lineId)}/split`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    },
+  );
+  return parseResponse<{
+    nearShipmentId: string;
+    backorderShipmentId: string;
+  }>(response);
+};
+
+/** IT6 override: purchaser edits the seeded PO line description while draft. */
+export const patchPurchaseOrderLineDescription = async (
+  purchaseOrderId: string,
+  lineId: string,
+  description: string,
+): Promise<ApiSuccessBody<{ ok: boolean }>> => {
+  const response = await fetch(
+    `/api/purchase-orders/${encodeURIComponent(purchaseOrderId)}/lines/${encodeURIComponent(lineId)}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ description }),
+    },
+  );
+  return parseResponse<{ ok: boolean }>(response);
 };

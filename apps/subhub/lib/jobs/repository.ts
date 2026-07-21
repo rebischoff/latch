@@ -14,5 +14,6 @@ export * from "./repository/job-field-progress-load";
 export * from "./repository/job-field-progress-write";
 export * from "./repository/job-field-zone-order";
 export * from "./repository/job-field-zone-order-write";
+export * from "./repository/job-issue";
 export * from "./repository/job-progress-report";
 export * from "./repository/change-order-write";

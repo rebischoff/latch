@@ -1,0 +1,40 @@
+# Purchase orders — list pane for purchase_order_detail (task 53)
+id: purchase_order_list
+displayName: Purchase orders
+anchorTable: purchase_order
+
+fieldActions:
+  - read
+  - write
+
+surfaceActions:
+  - read
+
+tables:
+  - purchase_order
+  - job
+  - party
+
+fields:
+  - id: summary
+    columns:
+      - column: purchase_order.id
+        type: string
+      - column: purchase_order.po_number
+        type: string
+        nullable: true
+      - column: purchase_order.status
+        type: string
+      - column: purchase_order.job_id
+        type: string
+      - column: job.title
+        type: string
+      - column: purchase_order.vendor_party_id
+        type: string
+      - column: party.display_name
+        type: string
+      - column: purchase_order.order_date
+        type: string
+        nullable: true
+      - column: purchase_order.created_at
+        type: timestamp

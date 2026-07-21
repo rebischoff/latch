@@ -16,6 +16,8 @@ export type FieldAction =
   | "win"
   | "lose"
   | "complete"
+  | "send"
+  | "cancel"
   | "add_role"
   | "remove_role"
   | "add_as_db_user";

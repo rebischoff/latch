@@ -65,6 +65,9 @@ export const loadJobMaterialRequestList = async (
     status: string;
     requested_at: string;
     requested_by_display_name: string | null;
+    purchase_order_id: string | null;
+    purchase_order_number: string | null;
+    purchase_order_status: string | null;
   }>(
     `SELECT
        jmr.id,
@@ -80,12 +83,26 @@ export const loadJobMaterialRequestList = async (
        jmr.unit,
        jmr.status,
        jmr.requested_at,
-       p.display_name AS requested_by_display_name
+       p.display_name AS requested_by_display_name,
+       po.id AS purchase_order_id,
+       po.po_number AS purchase_order_number,
+       po.status AS purchase_order_status
      FROM job_material_request jmr
      INNER JOIN job j ON j.id = jmr.job_id
      LEFT JOIN site_zone sz ON sz.id = jmr.site_zone_id
      LEFT JOIN manufacturer_part mp ON mp.id = jmr.part_id
      LEFT JOIN party p ON p.id = jmr.requested_by
+     LEFT JOIN LATERAL (
+       SELECT po2.id, po2.po_number, po2.status
+       FROM purchase_order_line_source pols
+       INNER JOIN purchase_order_line pol ON pol.id = pols.purchase_order_line_id
+       INNER JOIN purchase_order po2 ON po2.id = pol.purchase_order_id
+       WHERE pols.job_material_request_id = jmr.id
+         AND po2.status <> 'cancelled'
+         AND pol.status NOT IN ('cancelled', 'rejected')
+       ORDER BY po2.created_at DESC
+       LIMIT 1
+     ) po ON TRUE
      WHERE ${whereSql}
      ORDER BY jmr.requested_at DESC, jmr.id ASC
      LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
@@ -120,6 +137,9 @@ export const loadJobMaterialRequestById = async (
     status: string;
     requested_at: string;
     requested_by_display_name: string | null;
+    purchase_order_id: string | null;
+    purchase_order_number: string | null;
+    purchase_order_status: string | null;
   }>(
     `SELECT
        jmr.id,
@@ -135,12 +155,26 @@ export const loadJobMaterialRequestById = async (
        jmr.unit,
        jmr.status,
        jmr.requested_at,
-       p.display_name AS requested_by_display_name
+       p.display_name AS requested_by_display_name,
+       po.id AS purchase_order_id,
+       po.po_number AS purchase_order_number,
+       po.status AS purchase_order_status
      FROM job_material_request jmr
      INNER JOIN job j ON j.id = jmr.job_id
      LEFT JOIN site_zone sz ON sz.id = jmr.site_zone_id
      LEFT JOIN manufacturer_part mp ON mp.id = jmr.part_id
      LEFT JOIN party p ON p.id = jmr.requested_by
+     LEFT JOIN LATERAL (
+       SELECT po2.id, po2.po_number, po2.status
+       FROM purchase_order_line_source pols
+       INNER JOIN purchase_order_line pol ON pol.id = pols.purchase_order_line_id
+       INNER JOIN purchase_order po2 ON po2.id = pol.purchase_order_id
+       WHERE pols.job_material_request_id = jmr.id
+         AND po2.status <> 'cancelled'
+         AND pol.status NOT IN ('cancelled', 'rejected')
+       ORDER BY po2.created_at DESC
+       LIMIT 1
+     ) po ON TRUE
      WHERE jmr.id = $1`,
     [id],
   );

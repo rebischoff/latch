@@ -1035,6 +1035,9 @@ TableGroup job [color: #e74c3c] {
   job_line_spec
   scope_phase
   job_field_progress_cell
+  job_progress_report
+  job_progress_report_cell
+  job_issue
   progress_entry
   progress_entry_line
   job_system_spec
@@ -1351,6 +1354,31 @@ Table job_progress_report_cell {
   Note: 'Full board cell copy for a progress report (55). Living board remains job_field_progress_cell.'
 }
 
+Table job_issue {
+  id text [pk, default: `gen_random_uuid()::text`]
+  job_id text [not null]
+  site_zone_id text [note: 'nullable FK → site_zone — null = General; no uniqueness — multiple open issues per zone (57 ISS1)']
+  description text [not null]
+  status text [not null, default: 'open', note: 'CHECK: open | resolved | cancelled — resolved/cancelled terminal, no reopen (57 ISS2)']
+  reported_by text [note: 'nullable FK → employee.party_id']
+  reported_at timestamptz [not null, default: `now()`]
+  resolved_by text [note: 'nullable FK → employee.party_id — set on resolve or cancel']
+  resolved_at timestamptz [note: 'nullable — set on resolve or cancel']
+  resolution_note text [not null, default: '', note: 'required (non-empty) when status → resolved']
+
+  indexes {
+    job_id [name: 'job_issue_job_id_idx']
+    status [name: 'job_issue_status_idx']
+    (job_id, status) [name: 'job_issue_job_status_idx']
+    site_zone_id [name: 'job_issue_site_zone_id_idx', note: 'partial WHERE site_zone_id IS NOT NULL']
+  }
+
+  Note: '''
+    Flat per-zone issue log (57 ISS1–ISS7). History = the row itself (create/resolve/cancel
+    timestamps + actors). No snapshot table (ISS6). Batched into whole-job Field Save (ISS5).
+  '''
+}
+
 Table progress_entry {
   id text [pk, default: `gen_random_uuid()::text`]
   job_id text [not null]
@@ -1469,6 +1497,7 @@ Table job_material_request {
   job_id text [not null]
   site_zone_id text [note: 'nullable FK → site_zone — Field zone Order; null = General']
   job_line_part_id text [note: 'nullable FK → job_line_part — engineered BOM row; null = ad-hoc']
+  item_id text [note: 'nullable FK → item — catalog snapshot from job_line.item_id at Field ☐ Order (task 59 IT1); null = ad-hoc or no job-line item; not user-editable after create']
   part_id text [note: 'nullable FK → manufacturer_part — ad-hoc or snapshot PN']
   description text [not null, default: '']
   quantity numeric [not null, default: 1]
@@ -1482,6 +1511,7 @@ Table job_material_request {
     job_id [name: 'job_material_request_job_id_idx']
     site_zone_id [name: 'job_material_request_site_zone_id_idx', note: 'partial WHERE site_zone_id IS NOT NULL']
     job_line_part_id [name: 'job_material_request_job_line_part_id_idx', note: 'partial WHERE job_line_part_id IS NOT NULL']
+    item_id [name: 'job_material_request_item_id_idx', note: 'partial WHERE item_id IS NOT NULL (task 59)']
     status [name: 'job_material_request_status_idx']
   }
 
@@ -1491,6 +1521,8 @@ Table job_material_request {
     `withdrawn` status — uncheck-while-open is a hard delete. Frozen once `on_purchase_order`
     / `fulfilled` until PO cancel reverts to `open`. Purchasers have no delete authority.
     PO linkage via `purchase_order_line_source` (many requests → one rolled-up PO line).
+    `item_id` (task 59 IT1) is a Field-Order-time snapshot — display + PN-narrowing context on
+    the `/requisitions` pool, never a rollup key.
   '''
 }
 
@@ -1529,6 +1561,7 @@ Table purchase_order_line {
   vendor_part_id text [note: 'nullable FK → vendor_part']
   job_line_id text [note: 'nullable FK → job_line']
   job_line_part_id text [note: 'nullable FK → job_line_part']
+  item_id text [note: 'nullable FK → item — copied from the source job_material_request.item_id at Create POs / PO9 (task 59 IT2)']
   status text [not null, default: 'draft', note: 'CHECK: draft | ordered | acknowledged | partial | received | cancelled | rejected — rollup from shipments when split']
   ordered_at timestamptz [note: 'nullable — set when purchase order sent']
   rejection_note text [not null, default: '']
@@ -1536,6 +1569,7 @@ Table purchase_order_line {
 
   indexes {
     (purchase_order_id, line_number) [unique, name: 'purchase_order_line_number_unique']
+    item_id [name: 'purchase_order_line_item_id_idx', note: 'partial WHERE item_id IS NOT NULL (task 59)']
   }
 
   Note: '''
@@ -1543,7 +1577,9 @@ Table purchase_order_line {
     dates live on **`purchase_order_line_shipment`** child rows (5 ETA Jul 3, 5 ETA Aug 10).
     Single delivery = one shipment row with full qty. Line `status` rolls up from shipments
     (`partial` when some received). Originating requests via `purchase_order_line_source`
-    (task 56 PO7–PO9); BOM via `job_line_part_id`.
+    (task 56 PO7–PO9); BOM via `job_line_part_id`. `description` seeded
+    `vendor_description || manufacturer_part.description || jmr.description`, overridable
+    (task 59 IT6).
   '''
 }
 
@@ -1940,6 +1976,10 @@ Ref: job_progress_report.recorded_by > employee.party_id [delete: set null]
 Ref: job_progress_report_cell.report_id > job_progress_report.id [delete: cascade]
 Ref: job_progress_report_cell.scope_phase_id > scope_phase.id [delete: restrict]
 Ref: job_progress_report_cell.site_zone_id > site_zone.id [delete: restrict]
+Ref: job_issue.job_id > job.id [delete: cascade]
+Ref: job_issue.site_zone_id > site_zone.id [delete: restrict]
+Ref: job_issue.reported_by > employee.party_id [delete: set null]
+Ref: job_issue.resolved_by > employee.party_id [delete: set null]
 Ref: progress_entry.job_id > job.id [delete: cascade]
 Ref: progress_entry.entered_by > employee.party_id [delete: set null]
 Ref: progress_entry_line.progress_entry_id > progress_entry.id [delete: cascade]
@@ -1965,6 +2005,7 @@ Ref: change_order_line.target_job_line_id > job_line.id [delete: set null]
 Ref: job_material_request.job_id > job.id [delete: cascade]
 Ref: job_material_request.site_zone_id > site_zone.id [delete: restrict]
 Ref: job_material_request.job_line_part_id > job_line_part.id [delete: set null]
+Ref: job_material_request.item_id > item.id [delete: set null]
 Ref: job_material_request.part_id > manufacturer_part.id [delete: set null]
 Ref: job_material_request.requested_by > employee.party_id [delete: set null]
 Ref: purchase_order.job_id > job.id [delete: restrict]
@@ -1974,6 +2015,7 @@ Ref: purchase_order_line.part_id > manufacturer_part.id [delete: set null]
 Ref: purchase_order_line.vendor_part_id > vendor_part.id [delete: set null]
 Ref: purchase_order_line.job_line_id > job_line.id [delete: set null]
 Ref: purchase_order_line.job_line_part_id > job_line_part.id [delete: set null]
+Ref: purchase_order_line.item_id > item.id [delete: set null]
 Ref: purchase_order_line_source.purchase_order_line_id > purchase_order_line.id [delete: cascade]
 Ref: purchase_order_line_source.job_material_request_id > job_material_request.id [delete: restrict]
 Ref: purchase_order_line_shipment.purchase_order_line_id > purchase_order_line.id [delete: cascade]
