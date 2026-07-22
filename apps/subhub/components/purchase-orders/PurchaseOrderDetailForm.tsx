@@ -234,7 +234,11 @@ export const PurchaseOrderDetailForm = ({
 
   useSurfaceFormChrome({
     mode: "edit",
-    manifest: activeManifest ?? { fields: {}, actions: [] },
+    manifest: activeManifest ?? {
+      surface: "purchase_order_detail",
+      fields: {},
+      actions: [],
+    },
     canSave: false,
     saving: false,
     onSave: () => undefined,
