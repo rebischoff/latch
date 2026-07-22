@@ -6,6 +6,23 @@
 
 ---
 
+### Decision: material phase — item default + job line override (MP1–MP4) (2026-07-21)
+
+**Status:** **Locked** · **amended 2026-07-21 (UI inherit)**. **Task:** [61](../tasks/61-job-material-lock-and-phase.md). **Companion:** [job.md — job material lock, phase-aware zone Order, live requisition pool](./job.md#decision-job-material-lock-phase-aware-zone-order-and-live-requisition-pool-jml1jml12-2026-07-21); [procurement.md — requisitions live pool + PO rules](./procurement.md#decision-requisitions-live-pool-per-line-rollup-and-po-job-lock-rp1rp10-2026-07-21).
+
+**Problem:** Field zone × phase readiness (progress) needs a matching **material** readiness signal, but `job_line_part` (the buy list) has no phase. Parts are consumed at a specific labor phase (prewire needs wire, trim needs devices, programming needs licenses) — that phase must be knowable per line without tagging every individual part row.
+
+| Id | Choice |
+|----|--------|
+| **MP1** | New **`item.material_phase_id`** — nullable FK → `labor_phase`. Catalog default: which labor phase consumes this item's material. Authored on **category or leaf** (same commercial scalar pattern as freight/incidental/markup); optional — leave null to inherit or for pure-labor. |
+| **MP2** | New **`job_line.material_phase_id`** — nullable FK → `labor_phase`. Per-line override when a specific job needs material earlier/later than the catalog default (e.g. licenses ordered at Install instead of Program). |
+| **MP3** | **Effective material phase** resolution: `job_line.material_phase_id` (if set) → else walk `item` ancestry for first non-null `material_phase_id` → else the line's own earliest `scope_phase` by `sequence`. Always resolves to one of *that line's own* seeded `scope_phase` rows (via matching `labor_phase_id`) when used for Field/pool. |
+| **MP4** | **Amended:** catalog value **inherits** category → child like commercial rates (`null` = inherit). Not a per-row labor-phase override set — still one scalar FK per item node. UI: radio on the labor-phase table row (not a separate Select). Guard: stored id must be in that node's **resolved** labor-phase set. |
+
+**Rationale:** Keeps parts phase-free (a line's BOM stays homogeneous — one commercial identity, one phase). Category default + child override matches how estimators already think about Phase/Labor rates. Feeds Field's zone × phase **Order** column ([job.md JML6–JML9](./job.md#decision-job-material-lock-phase-aware-zone-order-and-live-requisition-pool-jml1jml12-2026-07-21)) and the live requisitions pool ([procurement.md RP1–RP3](./procurement.md#decision-requisitions-live-pool-per-line-rollup-and-po-job-lock-rp1rp10-2026-07-21)).
+
+---
+
 ### Decision: CCTV starter spec namespace (2026-07-16)
 
 **Status:** **Locked** (2026-07-16). **Seed:** `migrations/081_catalog_cctv_dev_seed.sql`. **Amended** by [CCTV accessories](#decision-cctv-accessories--mounts-recorders-licenses-2026-07-16) (`082`).

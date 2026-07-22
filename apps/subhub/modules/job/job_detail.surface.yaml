@@ -24,6 +24,7 @@ tables:
   - job_line_spec
   - scope_phase
   - job_field_progress_cell
+  - job_field_order_cell
   - job_progress_report
   - job_progress_report_cell
   - job_issue
@@ -62,7 +63,8 @@ fields:
     # + append-only job_progress_report* on Save when progress changed (task 55)
     columns: []
   - id: field_zone_orders
-    # logical — desired Field ☐ Order intents; Save → job_material_request + site_zone_id (task 55/56)
+    # logical — replace-array of job_field_order_cell (task 62 JML6–JML9);
+    # no longer Save→JMR snapshot (retired; live pool in task 63)
     columns: []
   - id: field_issues
     # logical — pending create/update/resolve/cancel for job_issue; batched Field Save (57/60)

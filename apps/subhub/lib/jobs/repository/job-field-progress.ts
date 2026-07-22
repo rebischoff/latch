@@ -1,3 +1,4 @@
+import type { JobFieldOrderCell, JobFieldOrderRow } from "./job-field-order";
 import type { JobIssueRow } from "./job-issue";
 
 /**
@@ -5,6 +6,7 @@ import type { JobIssueRow } from "./job-issue";
  *
  * % and lifecycle (except cancelled) are derived on read — never stored on `job`.
  * Writable Surface Field `field_progress` is a replace-array of cells.
+ * Order cells (`order_cells`) are an independent axis (task 62).
  */
 
 export const FIELD_PROGRESS_STALE_DAYS = 30;
@@ -66,7 +68,7 @@ export type FieldProgressSlice = {
   zone_key: string;
 };
 
-/** Derived Order checkbox state per leaf (+ General) — task 55 L27. */
+/** @deprecated Task 55 zone-level Order — superseded by `order_cells` (task 62). */
 export type JobFieldZoneOrderState = {
   locked: boolean;
   ordered: boolean;
@@ -74,7 +76,7 @@ export type JobFieldZoneOrderState = {
   zone_key: string;
 };
 
-/** Writable Order intent on Job Save (desired checkbox state). */
+/** @deprecated Task 55 zone-level Order patch — superseded by order cell patches (task 62). */
 export type JobFieldZoneOrderPatch = {
   ordered: boolean;
   site_zone_id: string | null;
@@ -85,6 +87,16 @@ export type JobFieldProgressDto = {
   /** Persisted issues for the job (open prioritized) — task 57. */
   issues: JobIssueRow[];
   lifecycle: JobFieldLifecycle;
+  /**
+   * Zone × material-phase Order cells (task 62). Includes derived
+   * `unlocked_excluded_count` per cell.
+   */
+  order_cells: JobFieldOrderCell[];
+  /**
+   * BOM geography rows for Order cascade (material phase only).
+   * Internal to Field UI — not displayed as a Work list (JML8).
+   */
+  order_rows: JobFieldOrderRow[];
   phases: JobFieldProgressPhaseColumn[];
   progress_pct: number;
   /** Maps job_line × labor_phase → scope_phase ids for Field cascade writes. */
@@ -94,8 +106,12 @@ export type JobFieldProgressDto = {
     scope_phase_id: string;
   }>;
   stale: boolean;
+  /**
+   * Geography × labor-phase rows for Done cascade. No longer rendered as a
+   * Field Work/parts table (JML8 / task 62).
+   */
   work_rows: JobFieldProgressWorkRow[];
-  /** Derived from `job_material_request` + `site_zone_id` (55/56). */
+  /** @deprecated Empty after task 62 — use `order_cells`. */
   zone_orders: JobFieldZoneOrderState[];
   zone_tree: JobFieldProgressZoneNode[];
 };
@@ -222,6 +238,8 @@ export const emptyFieldProgressDto = (
     zone_tree: [],
     phases: [],
     work_rows: [],
+    order_cells: [],
+    order_rows: [],
     zone_orders: [],
     issues: [],
     scope_phase_index: [],

@@ -1,8 +1,8 @@
 import type { Pool } from "pg";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const applyFieldZoneOrdersTx = vi.fn(
-  async (_client: unknown, _args: unknown) => ({ createdRequestCount: 0 }),
+const replaceJobFieldOrderTx = vi.fn(
+  async (_client: unknown, _jobId: string, _cells: unknown) => undefined,
 );
 const applyFieldIssuesTx = vi.fn(
   async (_client: unknown, _args: unknown) => ({
@@ -48,11 +48,12 @@ vi.mock("./job-progress-report", () => ({
   reportCellWeightKey: vi.fn(),
 }));
 
-vi.mock("./job-field-zone-order-write", () => ({
-  applyFieldZoneOrdersTx: (
+vi.mock("./job-field-order-write", () => ({
+  replaceJobFieldOrderTx: (
     client: unknown,
-    args: unknown,
-  ) => applyFieldZoneOrdersTx(client, args),
+    jobId: string,
+    cells: unknown,
+  ) => replaceJobFieldOrderTx(client, jobId, cells),
 }));
 
 vi.mock("./job-issue", async (importOriginal) => {
@@ -64,7 +65,7 @@ vi.mock("./job-issue", async (importOriginal) => {
   };
 });
 
-describe("applyJobFieldSave batched slices (task 60)", () => {
+describe("applyJobFieldSave batched slices (task 60/62)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     resolveEmployeePartyIdForPrincipal.mockResolvedValue("emp-1");
@@ -77,11 +78,17 @@ describe("applyJobFieldSave batched slices (task 60)", () => {
     );
   });
 
-  it("commits issues + zone orders in one withPermissionDb session", async () => {
+  it("commits issues + order cells in one withPermissionDb session", async () => {
     const { applyJobFieldSave } = await import("./job-field-progress-write");
 
     await applyJobFieldSave({} as Pool, "user-1", "job-1", {
-      zoneOrders: [{ site_zone_id: "zone-a", ordered: true }],
+      orderCells: [
+        {
+          scope_phase_id: "sp-1",
+          site_zone_id: "zone-a",
+          requested: true,
+        },
+      ],
       issues: [
         {
           op: "create",
@@ -93,7 +100,7 @@ describe("applyJobFieldSave batched slices (task 60)", () => {
     });
 
     expect(withPermissionDb).toHaveBeenCalledTimes(1);
-    expect(applyFieldZoneOrdersTx).toHaveBeenCalledTimes(1);
+    expect(replaceJobFieldOrderTx).toHaveBeenCalledTimes(1);
     expect(applyFieldIssuesTx).toHaveBeenCalledTimes(1);
     expect(applyFieldIssuesTx).toHaveBeenCalledWith(
       expect.anything(),

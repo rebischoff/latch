@@ -6,17 +6,32 @@ import type {
   JobLineAllocationRow,
   JobLineItemRow,
 } from "../descriptors/job-detail";
+import { resolveJobLineMaterialPhaseOptions } from "./scope-phase-seed";
 
-type LineQueryRow = Omit<JobLineItemRow, "allocations">;
+type LineQueryRow = Omit<
+  JobLineItemRow,
+  | "allocations"
+  | "material_phase_options"
+  | "has_open_material_demand"
+  | "item_name"
+  | "part_mpn"
+> & {
+  item_name: string | null;
+  part_mpn: string | null;
+};
 
 const num = (value: unknown): number => Number(value ?? 0);
 
 const mapLineItemRow = (
   row: LineQueryRow,
   allocations: JobLineAllocationRow[],
+  materialPhaseOptions: JobLineItemRow["material_phase_options"],
+  hasOpenMaterialDemand: boolean,
 ): JobLineItemRow => ({
   ...row,
   allocations,
+  material_phase_options: materialPhaseOptions,
+  has_open_material_demand: hasOpenMaterialDemand,
   quantity: num(row.quantity),
   sold_quantity: num(row.sold_quantity),
   qty_manual: Boolean(row.qty_manual),
@@ -38,6 +53,7 @@ const mapLineItemRow = (
   sold_unit_incidental: num(row.sold_unit_incidental),
   sales_locked: Boolean(row.sales_locked),
   material_locked: Boolean(row.material_locked),
+  material_phase_id: row.material_phase_id ?? null,
   item_name: row.item_name ?? null,
   part_mpn: row.part_mpn ?? null,
 });
@@ -73,6 +89,7 @@ export const loadJobLineItems = async (
        jl.sold_unit_incidental,
        jl.sales_locked,
        jl.material_locked,
+       jl.material_phase_id,
        jl.job_condition_id,
        jl.site_zone_id,
        jl.site_asset_id,
@@ -100,9 +117,15 @@ export const loadJobLineItems = async (
     return [];
   }
 
+  const lineIds = result.rows.map((row) => row.id);
   const allocationsByLineId = new Map<string, JobLineAllocationRow[]>();
+  const phasesByLineId = new Map<
+    string,
+    JobLineItemRow["material_phase_options"]
+  >();
+  const openDemandLineIds = new Set<string>();
+
   if (await tableExists(pool, "job_line_allocation")) {
-    const lineIds = result.rows.map((row) => row.id);
     const allocResult = await pool.query<{
       job_line_id: string;
       quantity: number;
@@ -132,7 +155,81 @@ export const loadJobLineItems = async (
     }
   }
 
+  if (await tableExists(pool, "scope_phase")) {
+    const phaseResult = await pool.query<{
+      job_line_id: string;
+      labor_phase_id: string;
+      labor_phase_name: string;
+    }>(
+      `SELECT
+         sp.job_line_id,
+         sp.labor_phase_id,
+         lp.name AS labor_phase_name
+       FROM scope_phase sp
+       INNER JOIN labor_phase lp ON lp.id = sp.labor_phase_id
+       WHERE sp.job_line_id = ANY($1::text[])
+       ORDER BY sp.sequence ASC, lp.name ASC`,
+      [lineIds],
+    );
+
+    for (const row of phaseResult.rows) {
+      const rows = phasesByLineId.get(row.job_line_id) ?? [];
+      if (!rows.some((phase) => phase.labor_phase_id === row.labor_phase_id)) {
+        rows.push({
+          labor_phase_id: row.labor_phase_id,
+          labor_phase_name: row.labor_phase_name,
+        });
+      }
+      phasesByLineId.set(row.job_line_id, rows);
+    }
+  }
+
+  if (await tableExists(pool, "job_material_request")) {
+    const demandResult = await pool.query<{ job_line_id: string }>(
+      `SELECT DISTINCT jlp.job_line_id
+       FROM job_material_request jmr
+       INNER JOIN job_line_part jlp ON jlp.id = jmr.job_line_part_id
+       WHERE jlp.job_line_id = ANY($1::text[])
+         AND jmr.status <> 'fulfilled'`,
+      [lineIds],
+    );
+    for (const row of demandResult.rows) {
+      openDemandLineIds.add(row.job_line_id);
+    }
+  }
+
+  // Catalog labor added after win leaves scope_phase empty — fall back to the
+  // same item×condition resolution seed would use so Mat. phase stays editable.
+  for (const row of result.rows) {
+    if ((phasesByLineId.get(row.id) ?? []).length > 0) {
+      continue;
+    }
+    if (!row.item_id) {
+      continue;
+    }
+    const fallback = await resolveJobLineMaterialPhaseOptions(pool, {
+      item_id: row.item_id,
+      job_condition_id: row.job_condition_id,
+      estimate_condition_id: null,
+    });
+    if (fallback.length === 0) {
+      continue;
+    }
+    phasesByLineId.set(
+      row.id,
+      fallback.map((phase) => ({
+        labor_phase_id: phase.labor_phase_id,
+        labor_phase_name: phase.labor_phase_name,
+      })),
+    );
+  }
+
   return result.rows.map((row) =>
-    mapLineItemRow(row, allocationsByLineId.get(row.id) ?? []),
+    mapLineItemRow(
+      row,
+      allocationsByLineId.get(row.id) ?? [],
+      phasesByLineId.get(row.id) ?? [],
+      openDemandLineIds.has(row.id),
+    ),
   );
 };

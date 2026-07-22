@@ -21,6 +21,7 @@ const flatItem = (
   freight_rate_type_id: null,
   incidental_rate_type_id: null,
   markup_type_id: null,
+  material_phase_id: null,
 });
 
 describe("nestItemTree", () => {

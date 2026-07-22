@@ -3,7 +3,7 @@
 import { DeleteOutlined } from "@ant-design/icons";
 import { fieldAllows, type Manifest } from "@latch/contracts";
 import { FieldControl } from "@latch/react";
-import { Button, Checkbox, InputNumber, Skeleton, Table, Typography } from "antd";
+import { Button, Checkbox, InputNumber, Radio, Skeleton, Table, Typography } from "antd";
 import { useEffect, useMemo, useState } from "react";
 import {
   Controller,
@@ -25,10 +25,14 @@ import {
   displayCommercialRateTypeId,
   flattenItemTreeCommercial,
   hasCommercialRateOverride,
+  resolveAncestryMaterialPhaseId,
+  resolveAncestryMaterialPhaseSourceId,
   resolveAncestryRateTypeId,
+  resolveEffectiveMaterialPhaseId,
   summarizeAddOnCatalogRow,
   summarizeMarkupCatalogRow,
   type CommercialFamily,
+  type ItemCommercialIndexRow,
 } from "@/lib/catalog/item-commercial-display";
 import {
   buildItemLaborPhaseDisplayRows,
@@ -105,6 +109,11 @@ type ItemLaborPhaseSectionProps = {
   laborRateOptions: SelectOption[];
   pickerLoading: boolean;
   writable: boolean;
+  commercialWritable: boolean;
+  isChild: boolean;
+  ancestorChain: string[];
+  commercialIndex: Map<string, ItemCommercialIndexRow>;
+  itemNameById: Map<string, string>;
 };
 
 const ItemLaborPhaseSection = ({
@@ -112,13 +121,20 @@ const ItemLaborPhaseSection = ({
   laborRateOptions,
   pickerLoading,
   writable,
+  commercialWritable,
+  isChild,
+  ancestorChain,
+  commercialIndex,
+  itemNameById,
 }: ItemLaborPhaseSectionProps) => {
-  const { control } = useFormContext<ItemDetailFormValues>();
+  const { control, setValue } = useFormContext<ItemDetailFormValues>();
   const { disabled, loading: formLoading } = useFormUi();
   const fieldArray = useFieldArray({ control, name: "item_labor_phase" });
   const { fields, append, remove } = fieldArray;
   const ownRows = useWatch({ control, name: "item_labor_phase" }) ?? [];
   const resolvedRows = useWatch({ control, name: "resolved_labor_phase" }) ?? [];
+  const ownMaterialPhaseId =
+    useWatch({ control, name: "commercial.material_phase_id" }) ?? null;
 
   const displayRows = useMemo(
     () =>
@@ -129,8 +145,39 @@ const ItemLaborPhaseSection = ({
     [ownRows, resolvedRows],
   );
 
+  const ancestryMaterialPhaseId = useMemo(
+    () => resolveAncestryMaterialPhaseId(commercialIndex, ancestorChain),
+    [ancestorChain, commercialIndex],
+  );
+  const effectiveMaterialPhaseId = useMemo(
+    () =>
+      resolveEffectiveMaterialPhaseId(
+        commercialIndex,
+        ancestorChain,
+        ownMaterialPhaseId,
+      ),
+    [ancestorChain, commercialIndex, ownMaterialPhaseId],
+  );
+  const inheritedFromName = useMemo(() => {
+    if (ownMaterialPhaseId || !isChild) {
+      return null;
+    }
+    const sourceId = resolveAncestryMaterialPhaseSourceId(
+      commercialIndex,
+      ancestorChain,
+    );
+    return sourceId ? (itemNameById.get(sourceId) ?? null) : null;
+  }, [
+    ancestorChain,
+    commercialIndex,
+    isChild,
+    itemNameById,
+    ownMaterialPhaseId,
+  ]);
+
   const loading = formLoading || pickerLoading;
   const canWrite = writable && !disabled;
+  const canWriteMaterial = commercialWritable && !disabled;
 
   const beginOverride = (row: Extract<ItemLaborPhaseDisplayRow, { kind: "inherited" }>) => {
     append(createOwnRowFromInherited(row, fields.length + 1));
@@ -138,6 +185,14 @@ const ItemLaborPhaseSection = ({
 
   const addLaborPhase = () => {
     append(createEmptyLaborPhaseRow(fields.length + 1));
+  };
+
+  const onSelectMaterialPhase = (phaseId: string) => {
+    setValue("commercial.material_phase_id", phaseId, { shouldDirty: true });
+  };
+
+  const onClearMaterialPhase = () => {
+    setValue("commercial.material_phase_id", null, { shouldDirty: true });
   };
 
   if (displayRows.length === 0) {
@@ -155,6 +210,39 @@ const ItemLaborPhaseSection = ({
 
   return (
     <div style={{ width: "100%", maxWidth: TABLE_WIDTH_LG }}>
+      {isChild && !ownMaterialPhaseId && ancestryMaterialPhaseId ? (
+        <Typography.Paragraph type="secondary" style={{ marginBottom: 8, fontSize: 12 }}>
+          Material phase inherited
+          {inheritedFromName ? <> from &ldquo;{inheritedFromName}&rdquo;</> : null}.
+          Pick a row to override, or clear after overriding to inherit again.
+        </Typography.Paragraph>
+      ) : null}
+      {isChild && ownMaterialPhaseId ? (
+        <div style={{ marginBottom: 8 }}>
+          <Button
+            type="link"
+            size="small"
+            disabled={!canWriteMaterial}
+            onClick={onClearMaterialPhase}
+            style={{ paddingInline: 0 }}
+          >
+            Clear material override (inherit)
+          </Button>
+        </div>
+      ) : null}
+      {!isChild && ownMaterialPhaseId ? (
+        <div style={{ marginBottom: 8 }}>
+          <Button
+            type="link"
+            size="small"
+            disabled={!canWriteMaterial}
+            onClick={onClearMaterialPhase}
+            style={{ paddingInline: 0 }}
+          >
+            Clear material phase
+          </Button>
+        </div>
+      ) : null}
       <Table<ItemLaborPhaseDisplayRow>
         size="small"
         pagination={false}
@@ -166,9 +254,30 @@ const ItemLaborPhaseSection = ({
         dataSource={displayRows}
         columns={[
           {
+            title: "Material",
+            key: "material",
+            width: 88,
+            align: "center",
+            render: (_value, row) => {
+              if (!row.labor_phase_id) {
+                return null;
+              }
+              const checked = effectiveMaterialPhaseId === row.labor_phase_id;
+              return (
+                <Radio
+                  checked={checked}
+                  disabled={!canWriteMaterial}
+                  aria-label={`Material tasked to ${row.labor_phase_name || "phase"}`}
+                  title="Phase that consumes this item's material"
+                  onChange={() => onSelectMaterialPhase(row.labor_phase_id)}
+                />
+              );
+            },
+          },
+          {
             title: "Phase",
             key: "phase",
-            width: "32%",
+            width: "30%",
             render: (_value, row) => {
               if (row.kind === "inherited") {
                 return (
@@ -199,7 +308,7 @@ const ItemLaborPhaseSection = ({
           {
             title: "Labor rate",
             key: "rate",
-            width: "32%",
+            width: "28%",
             render: (_value, row) => {
               if (row.kind === "inherited") {
                 return <Typography.Text>{row.labor_rate_type_name || "—"}</Typography.Text>;
@@ -677,6 +786,18 @@ export const ItemCommercialFields = ({
     [itemTree],
   );
 
+  const itemNameById = useMemo(() => {
+    const names = new Map<string, string>();
+    const walk = (nodes: ItemTreeNode[]) => {
+      for (const node of nodes) {
+        names.set(node.id, node.name);
+        walk(node.children);
+      }
+    };
+    walk(itemTree);
+    return names;
+  }, [itemTree]);
+
   const ancestorChain = useMemo(
     () =>
       buildAncestorChain(
@@ -784,6 +905,11 @@ export const ItemCommercialFields = ({
             laborRateOptions={laborRateOptions}
             pickerLoading={pickerLoading}
             writable={laborPhaseWritable}
+            commercialWritable={commercialWritable}
+            isChild={isChild}
+            ancestorChain={ancestorChain}
+            commercialIndex={commercialIndex}
+            itemNameById={itemNameById}
           />
         </FieldControl>
       ) : null}

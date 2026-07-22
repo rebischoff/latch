@@ -73,15 +73,17 @@ const hasConditionsPatch = (body: unknown): boolean => {
 };
 
 const assertCollectionsPatchAllowed = (status: string, body: unknown): void => {
-  if (status !== "won" && status !== "sent") {
+  if (status === "draft") {
     return;
   }
 
   if (hasLineItemsPatch(body) || hasConditionsPatch(body)) {
     throw new ConflictError(
-      status === "sent"
-        ? "Cannot modify line items or conditions on a sent estimate"
-        : "Cannot modify line items or conditions on a won estimate",
+      status === "submitted"
+        ? "Cannot modify line items or conditions on a submitted estimate"
+        : status === "accepted"
+          ? "Cannot modify line items or conditions on an accepted estimate"
+          : "Cannot modify line items or conditions on a frozen estimate",
     );
   }
 };

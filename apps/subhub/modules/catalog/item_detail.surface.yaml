@@ -47,6 +47,9 @@ fields:
         nullable: true
       - column: item.fallback_unit_cost
         type: number
+      - column: item.material_phase_id
+        type: string
+        nullable: true
   - id: item_labor_phase
     # logical — DAL maps item_labor_phase junction rows (own / writable)
     columns: []

@@ -91,7 +91,7 @@ describe("previewEstimateLines", () => {
 
   it("rejects non-draft estimates", async () => {
     await expect(
-      previewEstimateLines(makeClient("sent"), "est-1", {
+      previewEstimateLines(makeClient("submitted"), "est-1", {
         condition_id: "cond-1",
         lines: [{ id: "line-1", item_id: "item-1" }],
       }),
@@ -99,7 +99,7 @@ describe("previewEstimateLines", () => {
   });
 
   it("allows create-mode preview without persisted estimate", async () => {
-    const result = await previewEstimateLines(makeClient("sent"), "new", {
+    const result = await previewEstimateLines(makeClient("submitted"), "new", {
       condition_id: "client-cond-1",
       condition_draft: {
         labor_phases_explicit: true,

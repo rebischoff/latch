@@ -1,3 +1,4 @@
+import { ConflictError, NotFoundError, ValidationError } from "@latch/contracts";
 import type { PoolClient } from "pg";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -22,7 +23,34 @@ describe("addAdHocPurchaseOrderLineTx", () => {
     calls = [];
   });
 
-  it("creates backing request in General when no zone is picked", async () => {
+  it("rejects direct add on a job-assigned PO (RP8)", async () => {
+    const client = createClient(async (sql) => {
+      if (sql.includes("FROM purchase_order WHERE id")) {
+        return {
+          rows: [
+            {
+              id: "po-1",
+              job_id: "job-1",
+              vendor_party_id: "vendor-1",
+              status: "draft",
+            },
+          ],
+        };
+      }
+      return { rows: [] };
+    });
+
+    await expect(
+      addAdHocPurchaseOrderLineTx(client, "po-1", {
+        description: "Extra fittings",
+        quantity: 4,
+      }),
+    ).rejects.toMatchObject({
+      details: { code: "job_assigned_po_no_direct_lines" },
+    });
+  });
+
+  it("adds a freeform line on a general-bucket PO with no JMR (RP10)", async () => {
     const client = createClient(async (sql, params) => {
       calls.push({ sql, params });
       if (sql.includes("FROM purchase_order WHERE id")) {
@@ -30,7 +58,7 @@ describe("addAdHocPurchaseOrderLineTx", () => {
           rows: [
             {
               id: "po-1",
-              job_id: "job-1",
+              job_id: null,
               vendor_party_id: "vendor-1",
               status: "draft",
             },
@@ -40,163 +68,74 @@ describe("addAdHocPurchaseOrderLineTx", () => {
       if (sql.includes("MAX(line_number)")) {
         return { rows: [{ max: 2 }] };
       }
-      if (sql.includes("FROM purchase_order_line WHERE id")) {
-        return { rows: [{ quantity: 4 }] };
-      }
-      if (sql.includes("FROM job_material_request WHERE id = ANY")) {
-        const ids = (params?.[0] as string[] | undefined) ?? [];
-        return {
-          rows: ids.map((id) => ({ id, status: "on_purchase_order" })),
-        };
-      }
       return { rows: [], rowCount: 1 };
     });
 
     const result = await addAdHocPurchaseOrderLineTx(client, "po-1", {
-      description: "Extra fittings",
+      description: "Shop stock screws",
       quantity: 4,
     });
 
     expect(result.purchaseOrderLineId).toBeTruthy();
-    expect(result.jobMaterialRequestId).toBeTruthy();
 
     const jmrInsert = calls.find((c) =>
       c.sql.includes("INSERT INTO job_material_request"),
     );
-    expect(jmrInsert?.params?.[2]).toBeNull(); // site_zone_id = General
-    expect(jmrInsert?.sql).toContain("'on_purchase_order'");
+    expect(jmrInsert).toBeUndefined();
 
     const sourceInsert = calls.find((c) =>
       c.sql.includes("INSERT INTO purchase_order_line_source"),
     );
-    expect(sourceInsert).toBeTruthy();
-  });
-
-  it("lands the backing request in the picked zone", async () => {
-    const client = createClient(async (sql, params) => {
-      calls.push({ sql, params });
-      if (sql.includes("FROM purchase_order WHERE id")) {
-        return {
-          rows: [
-            {
-              id: "po-1",
-              job_id: "job-1",
-              vendor_party_id: "vendor-1",
-              status: "draft",
-            },
-          ],
-        };
-      }
-      if (sql.includes("MAX(line_number)")) {
-        return { rows: [{ max: null }] };
-      }
-      if (sql.includes("FROM purchase_order_line WHERE id")) {
-        return { rows: [{ quantity: 1 }] };
-      }
-      if (sql.includes("FROM job_material_request WHERE id = ANY")) {
-        return { rows: [{ id: "x", status: "on_purchase_order" }] };
-      }
-      return { rows: [], rowCount: 1 };
-    });
-
-    await addAdHocPurchaseOrderLineTx(client, "po-1", {
-      description: "Zone part",
-      quantity: 1,
-      siteZoneId: "zone-lobby",
-    });
-
-    const jmrInsert = calls.find((c) =>
-      c.sql.includes("INSERT INTO job_material_request"),
-    );
-    expect(jmrInsert?.params?.[2]).toBe("zone-lobby");
-  });
-
-  it("derives item_id from jobLinePartId and copies it onto both rows (IT2/Step5)", async () => {
-    const client = createClient(async (sql, params) => {
-      calls.push({ sql, params });
-      if (sql.includes("FROM purchase_order WHERE id")) {
-        return {
-          rows: [
-            {
-              id: "po-1",
-              job_id: "job-1",
-              vendor_party_id: "vendor-1",
-              status: "draft",
-            },
-          ],
-        };
-      }
-      if (sql.includes("FROM job_line_part jlp")) {
-        return { rows: [{ item_id: "item-99" }] };
-      }
-      if (sql.includes("MAX(line_number)")) {
-        return { rows: [{ max: 0 }] };
-      }
-      if (sql.includes("FROM purchase_order_line WHERE id")) {
-        return { rows: [{ quantity: 2 }] };
-      }
-      if (sql.includes("FROM job_material_request WHERE id = ANY")) {
-        return { rows: [{ id: "x", status: "on_purchase_order" }] };
-      }
-      return { rows: [], rowCount: 1 };
-    });
-
-    await addAdHocPurchaseOrderLineTx(client, "po-1", {
-      description: "Tied to line",
-      quantity: 2,
-      jobLinePartId: "jlp-1",
-    });
-
-    const jmrInsert = calls.find((c) =>
-      c.sql.includes("INSERT INTO job_material_request"),
-    );
-    expect(jmrInsert?.params?.[4]).toBe("item-99");
+    expect(sourceInsert).toBeUndefined();
 
     const lineInsert = calls.find((c) =>
       c.sql.includes("INSERT INTO purchase_order_line ("),
     );
-    expect(lineInsert?.params?.[10]).toBe("item-99");
+    expect(lineInsert?.params?.[3]).toBe("Shop stock screws");
+    expect(lineInsert?.params?.[4]).toBe(4);
+    expect(lineInsert?.sql).toContain("NULL, NULL, 'draft'");
   });
 
-  it("leaves item_id null with no jobLinePartId (IT3 — no invented item)", async () => {
-    const client = createClient(async (sql, params) => {
-      calls.push({ sql, params });
+  it("requires description and/or part", async () => {
+    const client = createClient(async () => ({ rows: [] }));
+    await expect(
+      addAdHocPurchaseOrderLineTx(client, "po-1", { quantity: 1 }),
+    ).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it("rejects when the PO is not draft", async () => {
+    const client = createClient(async (sql) => {
       if (sql.includes("FROM purchase_order WHERE id")) {
         return {
           rows: [
             {
               id: "po-1",
-              job_id: "job-1",
+              job_id: null,
               vendor_party_id: "vendor-1",
-              status: "draft",
+              status: "sent",
             },
           ],
         };
       }
-      if (sql.includes("MAX(line_number)")) {
-        return { rows: [{ max: 0 }] };
-      }
-      if (sql.includes("FROM purchase_order_line WHERE id")) {
-        return { rows: [{ quantity: 1 }] };
-      }
-      if (sql.includes("FROM job_material_request WHERE id = ANY")) {
-        return { rows: [{ id: "x", status: "on_purchase_order" }] };
-      }
-      return { rows: [], rowCount: 1 };
+      return { rows: [] };
     });
 
-    await addAdHocPurchaseOrderLineTx(client, "po-1", {
-      description: "Freeform only",
-      quantity: 1,
-    });
+    await expect(
+      addAdHocPurchaseOrderLineTx(client, "po-1", {
+        description: "Late",
+        quantity: 1,
+      }),
+    ).rejects.toBeInstanceOf(ConflictError);
+  });
 
-    const jmrInsert = calls.find((c) =>
-      c.sql.includes("INSERT INTO job_material_request"),
-    );
-    expect(jmrInsert?.params?.[4]).toBeNull();
-
-    const itemLookup = calls.find((c) => c.sql.includes("FROM job_line_part jlp"));
-    expect(itemLookup).toBeUndefined();
+  it("rejects when the PO is missing", async () => {
+    const client = createClient(async () => ({ rows: [] }));
+    await expect(
+      addAdHocPurchaseOrderLineTx(client, "po-x", {
+        description: "Nope",
+        quantity: 1,
+      }),
+    ).rejects.toBeInstanceOf(NotFoundError);
   });
 
   it("seeds description from vendor/manufacturer over request text (IT6)", async () => {
@@ -207,7 +146,7 @@ describe("addAdHocPurchaseOrderLineTx", () => {
           rows: [
             {
               id: "po-1",
-              job_id: "job-1",
+              job_id: null,
               vendor_party_id: "vendor-1",
               status: "draft",
             },
@@ -229,12 +168,6 @@ describe("addAdHocPurchaseOrderLineTx", () => {
       if (sql.includes("MAX(line_number)")) {
         return { rows: [{ max: 0 }] };
       }
-      if (sql.includes("FROM purchase_order_line WHERE id")) {
-        return { rows: [{ quantity: 1 }] };
-      }
-      if (sql.includes("FROM job_material_request WHERE id = ANY")) {
-        return { rows: [{ id: "x", status: "on_purchase_order" }] };
-      }
       return { rows: [], rowCount: 1 };
     });
 
@@ -248,10 +181,5 @@ describe("addAdHocPurchaseOrderLineTx", () => {
       c.sql.includes("INSERT INTO purchase_order_line ("),
     );
     expect(lineInsert?.params?.[3]).toBe("Vendor-preferred text");
-
-    const jmrInsert = calls.find((c) =>
-      c.sql.includes("INSERT INTO job_material_request"),
-    );
-    expect(jmrInsert?.params?.[6]).toBe("Request text");
   });
 });

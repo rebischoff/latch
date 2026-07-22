@@ -20,6 +20,12 @@ import { useCallback, useMemo, useState } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 
 import {
+  countUnlockedExcludedForPhase,
+  type JobFieldOrderCell,
+  type JobFieldOrderCellPatch,
+  type JobFieldOrderRow,
+} from "@/lib/jobs/repository/job-field-order";
+import {
   GENERAL_ZONE_KEY,
   siteZoneIdFromKey,
   type JobFieldProgressCell,
@@ -27,37 +33,39 @@ import {
   type JobFieldProgressPhaseColumn,
   type JobFieldProgressWorkRow,
   type JobFieldProgressZoneNode,
-  type JobFieldZoneOrderPatch,
-  type JobFieldZoneOrderState,
 } from "@/lib/jobs/repository/job-field-progress";
+import {
+  collectLeafKeys,
+  derivePhaseCheckState,
+  findZoneNode,
+  leavesWithPhase,
+  leafPhaseValue,
+  setPhaseCheckedAcrossLeaves,
+  type CascadeCell,
+  type CascadeWorkRow,
+  type CheckState,
+} from "@/lib/jobs/repository/job-field-zone-cascade";
 import type {
   JobFieldIssuePatch,
   JobIssueRow,
 } from "@/lib/jobs/repository/job-issue";
-
-type CheckState = boolean | "indeterminate";
 
 type PhaseTableRow = {
   checkedCount: number;
   key: string;
   label: string;
   leafCount: number;
+  orderCheckedCount: number;
+  orderLeafCount: number;
+  orderState: CheckState;
+  orderUnlockedExcluded: number;
   state: CheckState;
-};
-
-type WorkTableRow = JobFieldProgressWorkRow & {
-  /** Prefer live Scope form part when draft/autofill differs from server board. */
-  display_part_mpn: string | null;
 };
 
 type FieldProgressFormSlice = {
   field_issues?: JobFieldIssuePatch[];
   field_progress?: JobFieldProgressCell[];
-  field_zone_orders?: JobFieldZoneOrderPatch[];
-  line_items?: Array<{
-    id: string;
-    part_mpn?: string | null;
-  }>;
+  field_zone_orders?: JobFieldOrderCellPatch[];
 };
 
 const newTempId = (): string =>
@@ -119,113 +127,10 @@ const mergeDisplayIssues = (
   return [...pendingCreates, ...byId.values()];
 };
 
-const findZoneNode = (
-  nodes: JobFieldProgressZoneNode[],
-  key: string,
-): JobFieldProgressZoneNode | null => {
-  for (const node of nodes) {
-    if (node.key === key) {
-      return node;
-    }
-    if (node.children) {
-      const found = findZoneNode(node.children, key);
-      if (found) {
-        return found;
-      }
-    }
-  }
-  return null;
-};
-
-const collectLeafKeys = (
-  nodes: JobFieldProgressZoneNode[],
-  rootKey: string,
-): string[] => {
-  const node = findZoneNode(nodes, rootKey);
-  if (!node) {
-    return [];
-  }
-  if (!node.children || node.children.length === 0) {
-    return [node.key];
-  }
-  const leaves: string[] = [];
-  const walk = (n: JobFieldProgressZoneNode) => {
-    if (!n.children || n.children.length === 0) {
-      leaves.push(n.key);
-      return;
-    }
-    for (const child of n.children) {
-      walk(child);
-    }
-  };
-  walk(node);
-  return leaves;
-};
-
-const collectSubtreeKeys = (
-  nodes: JobFieldProgressZoneNode[],
-  rootKey: string,
-): Set<string> | null => {
-  const node = findZoneNode(nodes, rootKey);
-  if (!node) {
-    return null;
-  }
-  const keys = new Set<string>([node.key]);
-  const addChildren = (children?: JobFieldProgressZoneNode[]) => {
-    for (const child of children ?? []) {
-      keys.add(child.key);
-      addChildren(child.children);
-    }
-  };
-  addChildren(node.children);
-  return keys;
-};
-
 const zoneTitleById = (
   nodes: JobFieldProgressZoneNode[],
   key: string,
 ): string => findZoneNode(nodes, key)?.title ?? key;
-
-/** Parent nodes (has children) roll up place rows by item + part. */
-const rollupWorkRowsByItemPart = (rows: WorkTableRow[]): WorkTableRow[] => {
-  const byKey = new Map<string, WorkTableRow>();
-  for (const row of rows) {
-    const key = `${row.item}\0${row.display_part_mpn ?? ""}`;
-    const existing = byKey.get(key);
-    if (!existing) {
-      byKey.set(key, {
-        ...row,
-        id: `rollup:${key}`,
-        zone_key: row.zone_key,
-        qty: row.qty,
-        labor_phase_ids: [...row.labor_phase_ids],
-      });
-      continue;
-    }
-    existing.qty += row.qty;
-    for (const phaseId of row.labor_phase_ids) {
-      if (!existing.labor_phase_ids.includes(phaseId)) {
-        existing.labor_phase_ids.push(phaseId);
-      }
-    }
-  }
-  return [...byKey.values()];
-};
-
-const leafLaborPhases = (
-  workRows: JobFieldProgressWorkRow[],
-  leafZoneKey: string,
-): Set<string> => {
-  const set = new Set<string>();
-  for (const row of workRows) {
-    if (row.zone_key === leafZoneKey) {
-      for (const id of row.labor_phase_ids) {
-        set.add(id);
-      }
-    }
-  }
-  return set;
-};
 
 const phasesForZone = (
   zoneKey: string,
@@ -235,172 +140,78 @@ const phasesForZone = (
 ): JobFieldProgressPhaseColumn[] => {
   const set = new Set<string>();
   for (const leaf of collectLeafKeys(zoneTree, zoneKey)) {
-    for (const id of leafLaborPhases(workRows, leaf)) {
-      set.add(id);
+    for (const row of workRows) {
+      if (row.zone_key === leaf) {
+        for (const id of row.labor_phase_ids) {
+          set.add(id);
+        }
+      }
     }
   }
   return phases.filter((p) => set.has(p.labor_phase_id));
 };
 
-const leavesWithPhase = (
-  zoneKey: string,
-  laborPhaseId: string,
-  zoneTree: JobFieldProgressZoneNode[],
-  workRows: JobFieldProgressWorkRow[],
-): string[] => {
-  const leaves: string[] = [];
-  for (const leaf of collectLeafKeys(zoneTree, zoneKey)) {
-    if (leafLaborPhases(workRows, leaf).has(laborPhaseId)) {
-      leaves.push(leaf);
-    }
-  }
-  return leaves;
-};
+const toCascadeWorkRows = (
+  rows: JobFieldProgressWorkRow[],
+): CascadeWorkRow[] =>
+  rows.map((row) => ({
+    job_line_id: row.job_line_id,
+    zone_key: row.zone_key,
+    labor_phase_ids: row.labor_phase_ids,
+  }));
 
-const leafPhaseComplete = (
-  leafZoneKey: string,
-  laborPhaseId: string,
-  workRows: JobFieldProgressWorkRow[],
+const orderRowsAsCascade = (rows: JobFieldOrderRow[]): CascadeWorkRow[] =>
+  rows.map((row) => ({
+    job_line_id: row.job_line_id,
+    zone_key: row.zone_key,
+    labor_phase_ids: [row.labor_phase_id],
+  }));
+
+const progressCellsToCascade = (
   cells: JobFieldProgressCell[],
-  scopePhasesByLineLabor: Map<string, string[]>,
-): boolean => {
-  const scopePhaseIds = new Set<string>();
-  for (const row of workRows) {
-    if (row.zone_key !== leafZoneKey) {
-      continue;
-    }
-    if (!row.labor_phase_ids.includes(laborPhaseId)) {
-      continue;
-    }
-    for (const spId of scopePhasesByLineLabor.get(
-      `${row.job_line_id}:${laborPhaseId}`,
-    ) ?? []) {
-      scopePhaseIds.add(spId);
-    }
-  }
-  if (scopePhaseIds.size === 0) {
-    return false;
-  }
-  const siteZoneId = leafZoneKey === GENERAL_ZONE_KEY ? null : leafZoneKey;
-  for (const scopePhaseId of scopePhaseIds) {
-    const cell = cells.find(
-      (c) =>
-        c.scope_phase_id === scopePhaseId &&
-        (c.site_zone_id ?? null) === siteZoneId,
-    );
-    if (!cell?.complete) {
-      return false;
-    }
-  }
-  return true;
-};
+): CascadeCell[] =>
+  cells.map((c) => ({
+    scope_phase_id: c.scope_phase_id,
+    site_zone_id: c.site_zone_id,
+    value: c.complete,
+  }));
 
-const deriveCheckState = (
-  zoneKey: string,
-  laborPhaseId: string,
-  zoneTree: JobFieldProgressZoneNode[],
-  workRows: JobFieldProgressWorkRow[],
-  cells: JobFieldProgressCell[],
-  scopePhasesByLineLabor: Map<string, string[]>,
-): CheckState => {
-  const leaves = leavesWithPhase(zoneKey, laborPhaseId, zoneTree, workRows);
-  if (leaves.length === 0) {
-    return false;
-  }
-  let checkedCount = 0;
-  for (const leaf of leaves) {
-    if (
-      leafPhaseComplete(
-        leaf,
-        laborPhaseId,
-        workRows,
-        cells,
-        scopePhasesByLineLabor,
-      )
-    ) {
-      checkedCount += 1;
-    }
-  }
-  if (checkedCount === 0) {
-    return false;
-  }
-  if (checkedCount === leaves.length) {
-    return true;
-  }
-  return "indeterminate";
-};
+const orderCellsToCascade = (cells: JobFieldOrderCell[]): CascadeCell[] =>
+  cells.map((c) => ({
+    scope_phase_id: c.scope_phase_id,
+    site_zone_id: c.site_zone_id,
+    value: c.requested,
+  }));
 
-const setLeafPhaseComplete = (
-  leafZoneKey: string,
-  laborPhaseId: string,
-  checked: boolean,
-  workRows: JobFieldProgressWorkRow[],
-  cells: JobFieldProgressCell[],
-  scopePhasesByLineLabor: Map<string, string[]>,
-): JobFieldProgressCell[] => {
-  const siteZoneId = leafZoneKey === GENERAL_ZONE_KEY ? null : leafZoneKey;
-  const nextByKey = new Map(
-    cells.map((c) => [
-      `${c.scope_phase_id}:${c.site_zone_id ?? GENERAL_ZONE_KEY}`,
-      { ...c },
-    ]),
-  );
+const cascadeToProgressCells = (cells: CascadeCell[]): JobFieldProgressCell[] =>
+  cells.map((c) => ({
+    scope_phase_id: c.scope_phase_id,
+    site_zone_id: c.site_zone_id,
+    complete: c.value,
+  }));
 
-  for (const row of workRows) {
-    if (row.zone_key !== leafZoneKey) {
-      continue;
-    }
-    if (!row.labor_phase_ids.includes(laborPhaseId)) {
-      continue;
-    }
-    for (const scopePhaseId of scopePhasesByLineLabor.get(
-      `${row.job_line_id}:${laborPhaseId}`,
-    ) ?? []) {
-      const key = `${scopePhaseId}:${leafZoneKey}`;
-      nextByKey.set(key, {
-        scope_phase_id: scopePhaseId,
-        site_zone_id: siteZoneId,
-        complete: checked,
-      });
-    }
-  }
+const cascadeToOrderPatches = (
+  cells: CascadeCell[],
+): JobFieldOrderCellPatch[] =>
+  cells.map((c) => ({
+    scope_phase_id: c.scope_phase_id,
+    site_zone_id: c.site_zone_id,
+    requested: c.value,
+  }));
 
-  return [...nextByKey.values()];
-};
-
-const deriveOrderCheckState = (
-  zoneKey: string,
-  zoneTree: JobFieldProgressZoneNode[],
-  zoneOrders: Array<Pick<JobFieldZoneOrderState, "zone_key" | "ordered" | "locked">>,
-): { state: CheckState; locked: boolean; leafCount: number; checkedCount: number } => {
-  const leaves = collectLeafKeys(zoneTree, zoneKey);
-  if (leaves.length === 0) {
-    return { state: false, locked: false, leafCount: 0, checkedCount: 0 };
-  }
-  const byKey = new Map(zoneOrders.map((row) => [row.zone_key, row]));
-  let checkedCount = 0;
-  let locked = false;
-  for (const leaf of leaves) {
-    const row = byKey.get(leaf);
-    if (row?.ordered) {
-      checkedCount += 1;
+const buildOrderScopeIndex = (
+  orderRows: JobFieldOrderRow[],
+): Map<string, string[]> => {
+  const map = new Map<string, string[]>();
+  for (const row of orderRows) {
+    const key = `${row.job_line_id}:${row.labor_phase_id}`;
+    const list = map.get(key) ?? [];
+    if (!list.includes(row.scope_phase_id)) {
+      list.push(row.scope_phase_id);
     }
-    if (row?.locked) {
-      locked = true;
-    }
+    map.set(key, list);
   }
-  if (checkedCount === 0) {
-    return { state: false, locked, leafCount: leaves.length, checkedCount };
-  }
-  if (checkedCount === leaves.length) {
-    return { state: true, locked, leafCount: leaves.length, checkedCount };
-  }
-  return {
-    state: "indeterminate",
-    locked,
-    leafCount: leaves.length,
-    checkedCount,
-  };
+  return map;
 };
 
 type JobFieldProgressPanelsProps = {
@@ -415,47 +226,38 @@ export const JobFieldProgressPanels = ({
   const { modal } = App.useApp();
   const { setValue, control } = useFormContext<FieldProgressFormSlice>();
   const formCells = useWatch({ control, name: "field_progress" });
-  const formZoneOrders = useWatch({ control, name: "field_zone_orders" });
+  const formOrderCells = useWatch({ control, name: "field_zone_orders" });
   const formIssues = useWatch({ control, name: "field_issues" });
-  const formLineItems = useWatch({ control, name: "line_items" });
   const cells = formCells ?? board.cells;
   const [showClosedIssues, setShowClosedIssues] = useState(false);
 
-  const zoneOrders: JobFieldZoneOrderState[] = useMemo(() => {
-    const byKey = new Map(
-      board.zone_orders.map((row) => [row.zone_key, { ...row }] as const),
+  const orderCells: JobFieldOrderCell[] = useMemo(() => {
+    if (!formOrderCells) {
+      return board.order_cells;
+    }
+    const byKey = new Map<string, JobFieldOrderCell>(
+      board.order_cells.map((c) => [
+        `${c.scope_phase_id}:${c.site_zone_id ?? GENERAL_ZONE_KEY}`,
+        { ...c },
+      ]),
     );
-    for (const row of formZoneOrders ?? []) {
-      const patch = row as JobFieldZoneOrderPatch;
-      const zone_key =
-        "zone_key" in row && typeof (row as JobFieldZoneOrderState).zone_key === "string"
-          ? (row as JobFieldZoneOrderState).zone_key
-          : patch.site_zone_id === null || patch.site_zone_id === undefined
-            ? GENERAL_ZONE_KEY
-            : patch.site_zone_id;
-      const prior = byKey.get(zone_key);
-      byKey.set(zone_key, {
-        zone_key,
-        site_zone_id: siteZoneIdFromKey(zone_key),
-        ordered: patch.ordered,
-        locked: prior?.locked ?? false,
+    for (const patch of formOrderCells) {
+      const key = `${patch.scope_phase_id}:${patch.site_zone_id ?? GENERAL_ZONE_KEY}`;
+      const prior = byKey.get(key);
+      byKey.set(key, {
+        scope_phase_id: patch.scope_phase_id,
+        site_zone_id: patch.site_zone_id,
+        requested: patch.requested,
+        unlocked_excluded_count: prior?.unlocked_excluded_count ?? 0,
       });
     }
     return [...byKey.values()];
-  }, [board.zone_orders, formZoneOrders]);
+  }, [board.order_cells, formOrderCells]);
 
   const displayIssues = useMemo(
     () => mergeDisplayIssues(board.issues ?? [], formIssues),
     [board.issues, formIssues],
   );
-
-  const partMpnByLineId = useMemo(() => {
-    const map = new Map<string, string | null>();
-    for (const line of formLineItems ?? []) {
-      map.set(line.id, line.part_mpn ?? null);
-    }
-    return map;
-  }, [formLineItems]);
 
   const [selectedZoneId, setSelectedZoneId] = useState<string>(() => {
     const root = board.zone_tree[0];
@@ -476,33 +278,41 @@ export const JobFieldProgressPanels = ({
     return map;
   }, [board.scope_phase_index]);
 
+  const orderScopeIndex = useMemo(
+    () => buildOrderScopeIndex(board.order_rows),
+    [board.order_rows],
+  );
+
+  const cascadeWorkRows = useMemo(
+    () => toCascadeWorkRows(board.work_rows),
+    [board.work_rows],
+  );
+  const cascadeOrderRows = useMemo(
+    () => orderRowsAsCascade(board.order_rows),
+    [board.order_rows],
+  );
+
   const setPhaseChecked = useCallback(
     (zoneId: string, laborPhaseId: string, checked: boolean) => {
       if (readOnly) {
         return;
       }
-      const leaves = leavesWithPhase(
+      const next = setPhaseCheckedAcrossLeaves(
         zoneId,
         laborPhaseId,
+        checked,
         board.zone_tree,
-        board.work_rows,
+        cascadeWorkRows,
+        progressCellsToCascade(cells),
+        scopePhasesByLineLabor,
       );
-      let next = [...cells];
-      for (const leaf of leaves) {
-        next = setLeafPhaseComplete(
-          leaf,
-          laborPhaseId,
-          checked,
-          board.work_rows,
-          next,
-          scopePhasesByLineLabor,
-        );
-      }
-      setValue("field_progress", next, { shouldDirty: true });
+      setValue("field_progress", cascadeToProgressCells(next), {
+        shouldDirty: true,
+      });
     },
     [
-      board.work_rows,
       board.zone_tree,
+      cascadeWorkRows,
       cells,
       readOnly,
       scopePhasesByLineLabor,
@@ -511,34 +321,31 @@ export const JobFieldProgressPanels = ({
   );
 
   const setOrderChecked = useCallback(
-    (zoneId: string, checked: boolean) => {
+    (zoneId: string, laborPhaseId: string, checked: boolean) => {
       if (readOnly) {
         return;
       }
-      const leaves = collectLeafKeys(board.zone_tree, zoneId);
-      const byKey = new Map(zoneOrders.map((row) => [row.zone_key, row]));
-      for (const leaf of leaves) {
-        const prior = byKey.get(leaf);
-        if (prior?.locked && !checked) {
-          continue;
-        }
-        byKey.set(leaf, {
-          zone_key: leaf,
-          site_zone_id: siteZoneIdFromKey(leaf),
-          ordered: checked,
-          locked: prior?.locked ?? false,
-        });
-      }
-      setValue(
-        "field_zone_orders",
-        [...byKey.values()].map((row) => ({
-          site_zone_id: row.site_zone_id,
-          ordered: row.ordered,
-        })),
-        { shouldDirty: true },
+      const next = setPhaseCheckedAcrossLeaves(
+        zoneId,
+        laborPhaseId,
+        checked,
+        board.zone_tree,
+        cascadeOrderRows,
+        orderCellsToCascade(orderCells),
+        orderScopeIndex,
       );
+      setValue("field_zone_orders", cascadeToOrderPatches(next), {
+        shouldDirty: true,
+      });
     },
-    [board.zone_tree, readOnly, setValue, zoneOrders],
+    [
+      board.zone_tree,
+      cascadeOrderRows,
+      orderCells,
+      orderScopeIndex,
+      readOnly,
+      setValue,
+    ],
   );
 
   const appendIssuePatch = useCallback(
@@ -678,38 +485,9 @@ export const JobFieldProgressPanels = ({
     [appendIssuePatch, modal, readOnly],
   );
 
-  const zoneScopeKeys = useMemo(
-    () => collectSubtreeKeys(board.zone_tree, selectedZoneId),
-    [board.zone_tree, selectedZoneId],
-  );
-
-  const filteredWorkRows = useMemo((): WorkTableRow[] => {
-    const scoped = board.work_rows
-      .filter((row) => {
-        if (zoneScopeKeys && !zoneScopeKeys.has(row.zone_key)) {
-          return false;
-        }
-        return true;
-      })
-      .map((row) => {
-        const fromForm = partMpnByLineId.get(row.job_line_id);
-        const display_part_mpn =
-          fromForm !== undefined ? fromForm : row.part_mpn;
-        return { ...row, display_part_mpn };
-      });
-
-    const selected = findZoneNode(board.zone_tree, selectedZoneId);
-    const isParent = Boolean(selected?.children && selected.children.length > 0);
-    return isParent ? rollupWorkRowsByItemPart(scoped) : scoped;
-  }, [
-    board.work_rows,
-    board.zone_tree,
-    partMpnByLineId,
-    selectedZoneId,
-    zoneScopeKeys,
-  ]);
-
   const phaseRows = useMemo((): PhaseTableRow[] => {
+    const cascadeCells = progressCellsToCascade(cells);
+    const cascadeOrders = orderCellsToCascade(orderCells);
     return phasesForZone(
       selectedZoneId,
       board.zone_tree,
@@ -720,46 +498,80 @@ export const JobFieldProgressPanels = ({
         selectedZoneId,
         phase.labor_phase_id,
         board.zone_tree,
-        board.work_rows,
+        cascadeWorkRows,
       );
-      const state = deriveCheckState(
+      const state = derivePhaseCheckState(
         selectedZoneId,
         phase.labor_phase_id,
         board.zone_tree,
-        board.work_rows,
-        cells,
+        cascadeWorkRows,
+        cascadeCells,
         scopePhasesByLineLabor,
       );
       const checkedCount = leaves.filter((leaf) =>
-        leafPhaseComplete(
+        leafPhaseValue(
           leaf,
           phase.labor_phase_id,
-          board.work_rows,
-          cells,
+          cascadeWorkRows,
+          cascadeCells,
           scopePhasesByLineLabor,
         ),
       ).length;
+
+      const orderLeaves = leavesWithPhase(
+        selectedZoneId,
+        phase.labor_phase_id,
+        board.zone_tree,
+        cascadeOrderRows,
+      );
+      const orderState = derivePhaseCheckState(
+        selectedZoneId,
+        phase.labor_phase_id,
+        board.zone_tree,
+        cascadeOrderRows,
+        cascadeOrders,
+        orderScopeIndex,
+      );
+      const orderCheckedCount = orderLeaves.filter((leaf) =>
+        leafPhaseValue(
+          leaf,
+          phase.labor_phase_id,
+          cascadeOrderRows,
+          cascadeOrders,
+          orderScopeIndex,
+        ),
+      ).length;
+      const orderUnlockedExcluded = countUnlockedExcludedForPhase(
+        board.order_rows,
+        collectLeafKeys(board.zone_tree, selectedZoneId),
+        phase.labor_phase_id,
+      );
+
       return {
         key: phase.labor_phase_id,
         label: phase.name,
         state,
         leafCount: leaves.length,
         checkedCount,
+        orderState,
+        orderLeafCount: orderLeaves.length,
+        orderCheckedCount,
+        orderUnlockedExcluded,
       };
     });
   }, [
+    board.order_rows,
     board.phases,
     board.work_rows,
     board.zone_tree,
+    cascadeOrderRows,
+    cascadeWorkRows,
     cells,
+    orderCells,
+    orderScopeIndex,
     scopePhasesByLineLabor,
     selectedZoneId,
   ]);
-
-  const orderState = useMemo(
-    () => deriveOrderCheckState(selectedZoneId, board.zone_tree, zoneOrders),
-    [board.zone_tree, selectedZoneId, zoneOrders],
-  );
 
   const selectedZoneSiteId = siteZoneIdFromKey(selectedZoneId);
 
@@ -918,6 +730,40 @@ export const JobFieldProgressPanels = ({
   const phaseColumns = useMemo((): ColumnsType<PhaseTableRow> => {
     return [
       {
+        title: "Order",
+        key: "order",
+        width: 72,
+        align: "center",
+        render: (_, row) => {
+          const checkbox = (
+            <Checkbox
+              checked={row.orderState === true}
+              indeterminate={row.orderState === "indeterminate"}
+              disabled={readOnly || row.orderLeafCount === 0}
+              onChange={(e) =>
+                setOrderChecked(selectedZoneId, row.key, e.target.checked)
+              }
+              aria-label={`Order ${row.label} for ${zoneTitleById(board.zone_tree, selectedZoneId)}`}
+            />
+          );
+          if (row.orderUnlockedExcluded <= 0) {
+            return checkbox;
+          }
+          return (
+            <Tooltip
+              title={`${row.orderUnlockedExcluded} unlocked line${row.orderUnlockedExcluded === 1 ? "" : "s"} excluded`}
+            >
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                {checkbox}
+                <Tag style={{ marginInlineEnd: 0, lineHeight: "18px", paddingInline: 4 }}>
+                  {row.orderUnlockedExcluded}
+                </Tag>
+              </span>
+            </Tooltip>
+          );
+        },
+      },
+      {
         title: "Done",
         key: "done",
         width: 64,
@@ -950,56 +796,13 @@ export const JobFieldProgressPanels = ({
         ),
       },
     ];
-  }, [board.zone_tree, readOnly, selectedZoneId, setPhaseChecked]);
-
-  const workColumns = useMemo((): ColumnsType<WorkTableRow> => {
-    return [
-      {
-        title: "Qty",
-        dataIndex: "qty",
-        key: "qty",
-        width: 56,
-        align: "right",
-      },
-      {
-        title: "Item",
-        dataIndex: "item",
-        key: "item",
-        ellipsis: true,
-      },
-      {
-        title: "Part",
-        key: "part",
-        width: 140,
-        render: (_, row) =>
-          row.display_part_mpn ? (
-            row.display_part_mpn
-          ) : (
-            <Tag color="warning">TBD</Tag>
-          ),
-      },
-      {
-        title: "PO",
-        key: "po",
-        width: 120,
-        render: (_, row) => {
-          if (!row.purchase_order_number && !row.purchase_order_status) {
-            return (
-              <Typography.Text type="secondary">—</Typography.Text>
-            );
-          }
-          return (
-            <Typography.Text>
-              {row.purchase_order_number ?? "PO"}
-              {row.purchase_order_status
-                ? ` · ${row.purchase_order_status}`
-                : ""}
-            </Typography.Text>
-          );
-        },
-      },
-    ];
-  }, []);
+  }, [
+    board.zone_tree,
+    readOnly,
+    selectedZoneId,
+    setOrderChecked,
+    setPhaseChecked,
+  ]);
 
   const selectedLabel = zoneTitleById(board.zone_tree, selectedZoneId);
 
@@ -1043,7 +846,7 @@ export const JobFieldProgressPanels = ({
             Zones
           </Typography.Title>
           <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
-            Allocated places plus General for unplaced qty. Check Done or Order
+            Allocated places plus General for unplaced qty. Check Order or Done
             on a parent to cascade to matching descendant leaves.
           </Typography.Paragraph>
           <Tree
@@ -1127,46 +930,6 @@ export const JobFieldProgressPanels = ({
                 Add issue
               </Button>
             ) : null}
-          </div>
-
-          <div>
-            <Checkbox
-              checked={orderState.state === true}
-              indeterminate={orderState.state === "indeterminate"}
-              disabled={
-                readOnly || (orderState.locked && orderState.state === true)
-              }
-              onChange={(e) => setOrderChecked(selectedZoneId, e.target.checked)}
-              aria-label={`Order materials for ${selectedLabel}`}
-            >
-              Order
-              {orderState.leafCount > 0 ? (
-                <Typography.Text type="secondary" style={{ marginLeft: 8 }}>
-                  {orderState.checkedCount}/{orderState.leafCount}
-                </Typography.Text>
-              ) : null}
-            </Checkbox>
-            {orderState.locked ? (
-              <Typography.Text
-                type="secondary"
-                style={{ display: "block", marginTop: 4, fontSize: 12 }}
-              >
-                Locked — lines on a purchase order or fulfilled
-              </Typography.Text>
-            ) : null}
-          </div>
-
-          <div>
-            <Table<WorkTableRow>
-              size="small"
-              rowKey="id"
-              columns={workColumns}
-              dataSource={filteredWorkRows}
-              pagination={false}
-              locale={{
-                emptyText: "No work under this zone.",
-              }}
-            />
           </div>
         </div>
       </div>

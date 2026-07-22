@@ -3,17 +3,26 @@ import { ForbiddenError, surfaceAllows, ValidationError } from "@latch/contracts
 import { z } from "zod";
 
 import { getPool, resolveContextFresh } from "@/lib/latch";
-import { updatePurchaseOrderLineDescription } from "@/lib/purchase-orders/repository";
+import { updatePurchaseOrderLine } from "@/lib/purchase-orders/repository";
 
 type RouteContext = { params: Promise<{ id: string; lineId: string }> };
 
 const PatchSchema = z
   .object({
-    description: z.string(),
+    description: z.string().optional(),
+    quantity: z.number().positive().optional(),
+    partId: z.string().nullable().optional(),
   })
-  .strict();
+  .strict()
+  .refine(
+    (body) =>
+      body.description !== undefined ||
+      body.quantity !== undefined ||
+      body.partId !== undefined,
+    { message: "At least one field required" },
+  );
 
-/** IT6 override: purchaser edits the seeded PO line description while draft. */
+/** Draft line patch — description (IT6), qty (RP7), part (general bucket only, RP10). */
 export const PATCH = async (
   request: Request,
   routeContext: RouteContext,
@@ -44,12 +53,12 @@ export const PATCH = async (
       });
     }
 
-    await updatePurchaseOrderLineDescription(
+    await updatePurchaseOrderLine(
       getPool(),
       ctx.principal.id,
       id,
       lineId,
-      parsed.data.description,
+      parsed.data,
     );
     return jsonSuccess({ ok: true }, ctx.manifest);
   });

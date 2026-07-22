@@ -15,6 +15,7 @@ export type ItemDetailRow = {
   id: string;
   incidental_rate_type_id: string | null;
   markup_type_id: string | null;
+  material_phase_id: string | null;
   name: string;
   node_type: string;
   parent_id: string | null;
@@ -28,6 +29,7 @@ const formatItemDetailRow = (row: ItemDetailRow): Record<string, unknown> => ({
   id: row.id,
   incidental_rate_type_id: row.incidental_rate_type_id,
   markup_type_id: row.markup_type_id,
+  material_phase_id: row.material_phase_id,
   name: row.name,
   node_type: row.node_type,
   parent_id: row.parent_id,
@@ -46,7 +48,7 @@ export const projectItemDetailRow = (
     dto.profile = { id: row.id, name: row.name, parent_id: row.parent_id, node_type: row.node_type, sort_order: row.sort_order, csi_code: row.csi_code };
   }
   if (manifest.fields.commercial?.includes("read")) {
-    dto.commercial = { freight_rate_type_id: row.freight_rate_type_id, incidental_rate_type_id: row.incidental_rate_type_id, markup_type_id: row.markup_type_id, fallback_unit_cost: row.fallback_unit_cost };
+    dto.commercial = { freight_rate_type_id: row.freight_rate_type_id, incidental_rate_type_id: row.incidental_rate_type_id, markup_type_id: row.markup_type_id, fallback_unit_cost: row.fallback_unit_cost, material_phase_id: row.material_phase_id };
   }
   return dto;
 };
@@ -87,6 +89,9 @@ export const applyItemDetailPatch = (
   }
   if (typed.commercial?.fallback_unit_cost !== undefined) {
     next.fallback_unit_cost = typed.commercial.fallback_unit_cost;
+  }
+  if (typed.commercial?.material_phase_id !== undefined) {
+    next.material_phase_id = typed.commercial.material_phase_id;
   }
   return next;
 };

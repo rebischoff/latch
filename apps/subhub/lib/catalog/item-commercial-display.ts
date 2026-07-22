@@ -7,6 +7,7 @@ export type ItemCommercialIndexRow = {
   id: string;
   incidental_rate_type_id: string | null;
   markup_type_id: string | null;
+  material_phase_id: string | null;
   parent_id: string | null;
 };
 
@@ -88,6 +89,7 @@ export const flattenItemTreeCommercial = (
       freight_rate_type_id: node.freight_rate_type_id ?? null,
       incidental_rate_type_id: node.incidental_rate_type_id ?? null,
       markup_type_id: node.markup_type_id ?? null,
+      material_phase_id: node.material_phase_id ?? null,
     });
     node.children.forEach(walk);
   };
@@ -153,6 +155,47 @@ export const resolveAncestryRateTypeId = (
     }
   }
 
+  return null;
+};
+
+/** Own `material_phase_id` if set; else first ancestor with a value (MP3/MP4 inherit). */
+export const resolveEffectiveMaterialPhaseId = (
+  index: Map<string, ItemCommercialIndexRow>,
+  chain: string[],
+  ownMaterialPhaseId: string | null | undefined,
+): string | null => {
+  if (ownMaterialPhaseId) {
+    return ownMaterialPhaseId;
+  }
+  return resolveAncestryMaterialPhaseId(index, chain);
+};
+
+/** Walk ancestors only (skip chain[0] = self). */
+export const resolveAncestryMaterialPhaseId = (
+  index: Map<string, ItemCommercialIndexRow>,
+  chain: string[],
+): string | null => {
+  for (let indexOffset = 1; indexOffset < chain.length; indexOffset += 1) {
+    const id = chain[indexOffset]!;
+    const value = index.get(id)?.material_phase_id;
+    if (value) {
+      return value;
+    }
+  }
+  return null;
+};
+
+/** Ancestor item id that supplies the inherited material phase (for captions). */
+export const resolveAncestryMaterialPhaseSourceId = (
+  index: Map<string, ItemCommercialIndexRow>,
+  chain: string[],
+): string | null => {
+  for (let indexOffset = 1; indexOffset < chain.length; indexOffset += 1) {
+    const id = chain[indexOffset]!;
+    if (index.get(id)?.material_phase_id) {
+      return id;
+    }
+  }
   return null;
 };
 

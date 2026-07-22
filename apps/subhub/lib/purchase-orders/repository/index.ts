@@ -33,9 +33,18 @@ export {
   type SplitShipmentResult,
 } from "./shipment-split";
 export {
+  updatePurchaseOrderLine,
+  updatePurchaseOrderLineTx,
   updatePurchaseOrderLineDescription,
   updatePurchaseOrderLineDescriptionTx,
-} from "./line-description";
+  type UpdatePurchaseOrderLineInput,
+} from "./line-write";
+export {
+  createGeneralBucketPurchaseOrder,
+  createGeneralBucketPurchaseOrderTx,
+  type CreateGeneralBucketPurchaseOrderInput,
+  type CreateGeneralBucketPurchaseOrderResult,
+} from "./create-general";
 export {
   loadPurchaseOrderList,
   loadPurchaseOrderById,
@@ -46,11 +55,14 @@ export {
   type PurchaseOrderLineDto,
 } from "./load";
 export {
+  isPoolRowPoEligible,
   loadJobsWithOpenDemand,
   loadPoolRollupForJob,
+  loadPoolRollupForJobUnlocked,
   loadVendorParties,
   poolRollupKey,
   type PoolJobOption,
+  type PoolPartOption,
   type PoolRollupRow,
   type PoolVendorCandidate,
   type PoolZoneContribution,

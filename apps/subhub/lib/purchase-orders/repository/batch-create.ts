@@ -148,6 +148,28 @@ const applyStagingTx = async (
       row.part_id = sel.partId;
     }
 
+    // RP6: both part # and vendor must be resolved before Create POs.
+    if (!row.part_id) {
+      throw new ValidationError(
+        "Resolve part # before creating a purchase order",
+        {
+          field: "selections",
+          code: "part_unresolved",
+          job_material_request_id: row.id,
+        },
+      );
+    }
+    if (!sel.vendorPartyId) {
+      throw new ValidationError(
+        "Resolve vendor before creating a purchase order",
+        {
+          field: "selections",
+          code: "vendor_unresolved",
+          job_material_request_id: row.id,
+        },
+      );
+    }
+
     if (orderQty < openQty - 1e-9) {
       const remainder = openQty - orderQty;
       const remainderId = randomUUID();

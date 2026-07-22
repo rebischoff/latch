@@ -65,6 +65,12 @@ export type JobLineFormRow = {
   allocations: JobLineAllocationRow[];
   sales_locked: boolean;
   material_locked: boolean;
+  material_phase_id: string | null;
+  material_phase_options: Array<{
+    labor_phase_id: string;
+    labor_phase_name: string;
+  }>;
+  has_open_material_demand: boolean;
   item_id: string | null;
   item_name: string | null;
   part_id: string | null;
@@ -310,6 +316,14 @@ export const mapJobLineItems = (rows: unknown): JobLineFormRow[] => {
         : [],
       sales_locked: item.sales_locked === true,
       material_locked: item.material_locked === true,
+      material_phase_id: asString(item.material_phase_id),
+      material_phase_options: Array.isArray(item.material_phase_options)
+        ? item.material_phase_options.map((phase) => ({
+            labor_phase_id: phase.labor_phase_id,
+            labor_phase_name: phase.labor_phase_name,
+          }))
+        : [],
+      has_open_material_demand: item.has_open_material_demand === true,
       item_id: asString(item.item_id),
       item_name: asString(item.item_name),
       part_id: asString(item.part_id),
@@ -346,6 +360,7 @@ export const jobLineToPatch = (line: JobLineFormRow): Record<string, unknown> =>
   })),
   sales_locked: line.sales_locked,
   material_locked: line.material_locked,
+  material_phase_id: line.material_phase_id,
   item_id: line.item_id,
   part_id: line.part_id,
   vendor_part_id: line.vendor_part_id,

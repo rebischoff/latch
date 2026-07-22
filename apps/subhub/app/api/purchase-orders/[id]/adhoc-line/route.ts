@@ -14,11 +14,10 @@ const AdHocSchema = z
     quantity: z.number().positive(),
     unit: z.string().optional(),
     unitPrice: z.number().optional(),
-    siteZoneId: z.string().nullable().optional(),
-    jobLinePartId: z.string().nullable().optional(),
   })
   .strict();
 
+/** RP10: freeform line on general-bucket POs only (RP8 rejects job-assigned). */
 export const POST = async (
   request: Request,
   routeContext: RouteContext,

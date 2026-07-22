@@ -45,6 +45,7 @@ export const createItemDetailStore = (
       incidental_rate_type_id: row.incidental_rate_type_id,
       markup_type_id: row.markup_type_id,
       fallback_unit_cost: row.fallback_unit_cost,
+      material_phase_id: row.material_phase_id,
     };
     await updateItem(pool, actorId, writeRow);
   },

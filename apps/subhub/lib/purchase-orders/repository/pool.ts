@@ -1,4 +1,9 @@
-import type { Pool } from "pg";
+import type { Pool, PoolClient } from "pg";
+
+import {
+  syncOpenJobMaterialRequestsAffected,
+  syncOpenJobMaterialRequestsForJob,
+} from "@/lib/requested-orders/repository/job-material-request-derive";
 
 const toNumber = (value: unknown): number => Number(value ?? 0);
 
@@ -22,6 +27,7 @@ export type PoolZoneContribution = {
   requests: PoolZoneRequest[];
 };
 
+/** @deprecated Task 63 — Part # options come from Scope resolver on the client. */
 export type PoolPartOption = {
   part_id: string;
   part_mpn: string;
@@ -29,17 +35,23 @@ export type PoolPartOption = {
 };
 
 export type PoolRollupRow = {
-  /** Stable rollup key within a job (`part:…` or `soft:…`). */
+  /**
+   * Stable rollup key within a job — `jlp:…` (one row per job_line_part / job_line)
+   * or `req:…` for legacy ad-hoc rows without a BOM link (RP4).
+   */
   key: string;
   job_id: string;
   job_title: string;
+  /** Contributing Scope line — for Part # resolver (RP5). */
+  job_line_id: string | null;
+  /** Condition on that line — for Part # resolver (RP5). */
+  job_condition_id: string | null;
   part_id: string | null;
   part_mpn: string | null;
   /** manufacturer_part.description for part_id — null until a PN exists (IT5). */
   part_description: string | null;
-  /** Distinct item_ids contributing to this rollup (task 59 IT1/IT4) — display + PN-narrowing only. */
-  item_ids: string[];
-  /** null = no item (ad-hoc); one name = single item; 'Multiple' when item_ids.length > 1 (IT4). */
+  /** Catalog item on the line (single — never merged across lines; RP4). */
+  item_id: string | null;
   item_label: string | null;
   /** Soft-spec / TBD text until a PN narrows Description (IT5). */
   description: string;
@@ -47,8 +59,16 @@ export type PoolRollupRow = {
   unit: string;
   vendors: PoolVendorCandidate[];
   zones: PoolZoneContribution[];
-  /** Parts linked to item_ids via part_item — union when Multiple (IT4). Empty when no item context. */
+  /**
+   * Empty — Part # Select uses `fetchJobPartPicker` with job_line/condition (RP5).
+   * Kept for API compatibility with older clients.
+   */
   part_options: PoolPartOption[];
+  /**
+   * RP6 hint: part is resolved on the row. Create POs also requires a staged
+   * vendor (checked in UI / batch gate).
+   */
+  po_eligible: boolean;
 };
 
 export type PoolJobOption = {
@@ -63,6 +83,8 @@ type OpenRequestRow = {
   site_zone_id: string | null;
   site_zone_name: string | null;
   job_line_part_id: string | null;
+  job_line_id: string | null;
+  job_condition_id: string | null;
   item_id: string | null;
   item_name: string | null;
   part_id: string | null;
@@ -73,23 +95,38 @@ type OpenRequestRow = {
   unit: string;
 };
 
-/** Soft-spec / unnarrowed: group by description so unrelated TBDs do not merge. */
+/** One pool row per job_line_part (RP4). Legacy ad-hoc → per-request key. */
 export const poolRollupKey = (row: {
-  part_id: string | null;
-  description: string;
+  id: string;
+  job_line_part_id: string | null;
+  part_id?: string | null;
+  description?: string;
 }): string => {
-  if (row.part_id) {
-    return `part:${row.part_id}`;
+  if (row.job_line_part_id) {
+    return `jlp:${row.job_line_part_id}`;
   }
-  return `soft:${row.description.trim().toLowerCase()}`;
+  return `req:${row.id}`;
 };
 
 const zoneKey = (siteZoneId: string | null): string => siteZoneId ?? "__general__";
 
-/** Distinct jobs that have ≥1 open material request. */
+/** Distinct jobs that have ≥1 open material request (after live sync). */
 export const loadJobsWithOpenDemand = async (
   pool: Pool,
 ): Promise<PoolJobOption[]> => {
+  // Sync-on-read so newly Ordered locked lines appear without a Save snapshot.
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await syncOpenJobMaterialRequestsAffected(client);
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+
   const result = await pool.query<PoolJobOption>(
     `SELECT DISTINCT j.id, j.title
      FROM job_material_request jmr
@@ -101,11 +138,31 @@ export const loadJobsWithOpenDemand = async (
 };
 
 /**
- * Open demand rolled up by `job × part` (soft-spec keyed by description).
+ * Open demand rolled up by `job × job_line_part` (RP4 — never merge across lines).
  * `jobId` is required — no cross-job all-rows view.
  */
 export const loadPoolRollupForJob = async (
   pool: Pool,
+  jobId: string,
+): Promise<PoolRollupRow[]> => {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await syncOpenJobMaterialRequestsForJob(client, jobId);
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+
+  return loadPoolRollupForJobUnlocked(pool, jobId);
+};
+
+/** Pool assembly without sync — used by tests and after an outer sync. */
+export const loadPoolRollupForJobUnlocked = async (
+  pool: Pool | PoolClient,
   jobId: string,
 ): Promise<PoolRollupRow[]> => {
   const requests = await pool.query<OpenRequestRow>(
@@ -116,6 +173,8 @@ export const loadPoolRollupForJob = async (
        jmr.site_zone_id,
        sz.name AS site_zone_name,
        jmr.job_line_part_id,
+       jlp.job_line_id,
+       jl.job_condition_id,
        jmr.item_id,
        i.name AS item_name,
        jmr.part_id,
@@ -127,6 +186,8 @@ export const loadPoolRollupForJob = async (
      FROM job_material_request jmr
      INNER JOIN job j ON j.id = jmr.job_id
      LEFT JOIN site_zone sz ON sz.id = jmr.site_zone_id
+     LEFT JOIN job_line_part jlp ON jlp.id = jmr.job_line_part_id
+     LEFT JOIN job_line jl ON jl.id = jlp.job_line_id
      LEFT JOIN item i ON i.id = jmr.item_id
      LEFT JOIN manufacturer_part mp ON mp.id = jmr.part_id
      WHERE jmr.status = 'open' AND jmr.job_id = $1
@@ -179,34 +240,30 @@ export const loadPoolRollupForJob = async (
   }
 
   const rollups = new Map<string, PoolRollupRow>();
-  const itemNamesByKey = new Map<string, Map<string, string | null>>();
 
   for (const row of requests.rows) {
     const key = poolRollupKey(row);
     const qty = toNumber(row.quantity);
     const existing = rollups.get(key);
     const zKey = zoneKey(row.site_zone_id);
-
-    if (row.item_id) {
-      const names = itemNamesByKey.get(key) ?? new Map<string, string | null>();
-      names.set(row.item_id, row.item_name);
-      itemNamesByKey.set(key, names);
-    }
+    const vendors = row.part_id ? (vendorsByPart.get(row.part_id) ?? []) : [];
 
     if (!existing) {
       rollups.set(key, {
         key,
         job_id: row.job_id,
         job_title: row.job_title,
+        job_line_id: row.job_line_id,
+        job_condition_id: row.job_condition_id,
         part_id: row.part_id,
         part_mpn: row.part_mpn,
         part_description: row.part_description,
-        item_ids: [],
-        item_label: null,
+        item_id: row.item_id,
+        item_label: row.item_name,
         description: row.description,
         quantity: qty,
         unit: row.unit || "ea",
-        vendors: row.part_id ? (vendorsByPart.get(row.part_id) ?? []) : [],
+        vendors,
         zones: [
           {
             site_zone_id: row.site_zone_id,
@@ -216,6 +273,7 @@ export const loadPoolRollupForJob = async (
           },
         ],
         part_options: [],
+        po_eligible: Boolean(row.part_id),
       });
       continue;
     }
@@ -224,9 +282,19 @@ export const loadPoolRollupForJob = async (
     if (!existing.part_mpn && row.part_mpn) {
       existing.part_mpn = row.part_mpn;
       existing.part_description = row.part_description;
+      existing.part_id = row.part_id;
+      existing.vendors = vendors;
     }
     if (!existing.description && row.description) {
       existing.description = row.description;
+    }
+    if (!existing.item_id && row.item_id) {
+      existing.item_id = row.item_id;
+      existing.item_label = row.item_name;
+    }
+    if (!existing.job_line_id && row.job_line_id) {
+      existing.job_line_id = row.job_line_id;
+      existing.job_condition_id = row.job_condition_id;
     }
 
     const zone = existing.zones.find((z) => zoneKey(z.site_zone_id) === zKey);
@@ -241,71 +309,11 @@ export const loadPoolRollupForJob = async (
         requests: [{ id: row.id, quantity: qty }],
       });
     }
+
+    existing.po_eligible = Boolean(existing.part_id);
   }
 
-  const rows = [...rollups.values()];
-
-  // IT4: finalize Item label (null | name | 'Multiple') from the distinct item_ids collected per rollup.
-  const allItemIds = new Set<string>();
-  for (const row of rows) {
-    const names = itemNamesByKey.get(row.key);
-    if (!names || names.size === 0) {
-      continue;
-    }
-    row.item_ids = [...names.keys()];
-    for (const id of row.item_ids) {
-      allItemIds.add(id);
-    }
-    row.item_label =
-      row.item_ids.length === 1 ? (names.get(row.item_ids[0]!) ?? null) : "Multiple";
-  }
-
-  // IT4: Part # Select narrowing — union of parts linked (via part_item) to a rollup's item_ids.
-  if (allItemIds.size > 0) {
-    const linkedParts = await pool.query<{
-      item_id: string;
-      part_id: string;
-      mpn: string;
-      description: string;
-    }>(
-      `SELECT pi.item_id, pi.part_id, mp.mpn, mp.description
-       FROM part_item pi
-       INNER JOIN manufacturer_part mp ON mp.id = pi.part_id
-       WHERE pi.item_id = ANY($1::text[])
-       ORDER BY mp.mpn ASC, mp.id ASC`,
-      [[...allItemIds]],
-    );
-    const partsByItem = new Map<string, PoolPartOption[]>();
-    for (const row of linkedParts.rows) {
-      const list = partsByItem.get(row.item_id) ?? [];
-      list.push({
-        part_id: row.part_id,
-        part_mpn: row.mpn,
-        part_description: row.description,
-      });
-      partsByItem.set(row.item_id, list);
-    }
-
-    for (const row of rows) {
-      if (row.item_ids.length === 0) {
-        continue;
-      }
-      const seen = new Set<string>();
-      const options: PoolPartOption[] = [];
-      for (const itemId of row.item_ids) {
-        for (const option of partsByItem.get(itemId) ?? []) {
-          if (seen.has(option.part_id)) {
-            continue;
-          }
-          seen.add(option.part_id);
-          options.push(option);
-        }
-      }
-      row.part_options = options;
-    }
-  }
-
-  return rows;
+  return [...rollups.values()];
 };
 
 /** All vendor parties (for soft-spec / no-part vendor pick). */
@@ -320,3 +328,9 @@ export const loadVendorParties = async (
   );
   return result.rows;
 };
+
+/** RP6 helper — both part and vendor must be resolved. */
+export const isPoolRowPoEligible = (args: {
+  partId: string | null | undefined;
+  vendorPartyId: string | null | undefined;
+}): boolean => Boolean(args.partId && args.vendorPartyId);

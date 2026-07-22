@@ -36,8 +36,10 @@ fields:
         type: string
       - column: purchase_order.job_id
         type: string
+        nullable: true
       - column: job.title
         type: string
+        nullable: true
       - column: purchase_order.vendor_party_id
         type: string
       - column: party.display_name

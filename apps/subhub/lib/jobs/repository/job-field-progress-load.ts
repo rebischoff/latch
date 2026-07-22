@@ -14,7 +14,12 @@ import {
   type JobFieldProgressWorkRow,
   type JobFieldProgressZoneNode,
 } from "./job-field-progress";
-import { loadDerivedZoneOrders } from "./job-field-zone-order-write";
+import {
+  buildOrderRows,
+  unlockedExcludedCountByCell,
+  type JobFieldOrderCell,
+  type OrderEligibilityLine,
+} from "./job-field-order";
 import { listIssuesForJob } from "./job-issue";
 
 type ScopePhaseRow = {
@@ -357,14 +362,23 @@ export const loadJobFieldProgress = async (
     return emptyFieldProgressDto(job.status);
   }
 
-  const linesResult = await pool.query<LineGeoRow>(
+  const linesResult = await pool.query<
+    LineGeoRow & {
+      item_id: string | null;
+      material_locked: boolean;
+      material_phase_id: string | null;
+    }
+  >(
     `SELECT
        jl.id,
        jl.description,
        jl.quantity,
        i.name AS item_name,
        jl.part_id,
-       mp.mpn AS part_mpn
+       mp.mpn AS part_mpn,
+       jl.item_id,
+       jl.material_locked,
+       jl.material_phase_id
      FROM job_line jl
      LEFT JOIN item i ON i.id = jl.item_id
      LEFT JOIN manufacturer_part mp ON mp.id = jl.part_id
@@ -376,6 +390,7 @@ export const loadJobFieldProgress = async (
   const lines = linesResult.rows.map((row) => ({
     ...row,
     quantity: num(row.quantity),
+    material_locked: Boolean(row.material_locked),
   }));
 
   if (lines.length === 0) {
@@ -485,13 +500,13 @@ export const loadJobFieldProgress = async (
       scope_phase_id: p.id,
     }));
 
-  const work_rows = await attachPoTrailToWorkRows(
-    pool,
-    jobId,
-    buildWorkRows({ lines, allocations, phases, slices }),
-  );
+  const work_rows = buildWorkRows({ lines, allocations, phases, slices });
 
-  const zone_orders = await loadDerivedZoneOrders(pool, jobId);
+  const { order_cells, order_rows } = await loadOrderBoard(pool, {
+    lines,
+    allocations,
+    phases,
+  });
   const issues = await listIssuesForJob(pool, jobId);
 
   return {
@@ -504,7 +519,9 @@ export const loadJobFieldProgress = async (
     }),
     phases: buildPhaseColumns(phases, slices),
     work_rows,
-    zone_orders,
+    order_cells,
+    order_rows,
+    zone_orders: [],
     issues,
     scope_phase_index,
     progress_pct: summary.progress_pct,
@@ -513,75 +530,185 @@ export const loadJobFieldProgress = async (
   };
 };
 
-/**
- * Attach PO # / status onto work rows when a job_material_request for the
- * same zone×job_line is linked via purchase_order_line_source (blank until task 53).
- */
-const attachPoTrailToWorkRows = async (
+type LineWithMaterial = LineGeoRow & {
+  item_id: string | null;
+  material_locked: boolean;
+  material_phase_id: string | null;
+};
+
+const loadOrderBoard = async (
   pool: Pool | PoolClient,
-  jobId: string,
-  rows: JobFieldProgressWorkRow[],
-): Promise<JobFieldProgressWorkRow[]> => {
-  if (
-    rows.length === 0 ||
-    !(await tableExists(pool, "job_material_request")) ||
-    !(await tableExists(pool, "purchase_order_line_source")) ||
-    !(await tableExists(pool, "purchase_order_line")) ||
-    !(await tableExists(pool, "purchase_order"))
-  ) {
-    return rows;
+  input: {
+    allocations: AllocRow[];
+    lines: LineWithMaterial[];
+    phases: ScopePhaseRow[];
+  },
+): Promise<{
+  order_cells: JobFieldOrderCell[];
+  order_rows: ReturnType<typeof buildOrderRows>;
+}> => {
+  const { lines, allocations, phases } = input;
+  if (lines.length === 0) {
+    return { order_cells: [], order_rows: [] };
   }
 
-  const result = await pool.query<{
-    job_line_id: string;
-    purchase_order_number: string | null;
-    purchase_order_status: string | null;
+  const lineIds = lines.map((row) => row.id);
+  const itemIds = [
+    ...new Set(
+      lines
+        .map((row) => row.item_id)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+
+  let bomLineIds = new Set<string>();
+  if (await tableExists(pool, "job_line_part")) {
+    const bomResult = await pool.query<{ job_line_id: string }>(
+      `SELECT DISTINCT job_line_id
+       FROM job_line_part
+       WHERE job_line_id = ANY($1::text[])`,
+      [lineIds],
+    );
+    bomLineIds = new Set(bomResult.rows.map((row) => row.job_line_id));
+  }
+
+  const itemMaterialById = new Map<string, string | null>();
+  const itemParentById = new Map<string, string | null>();
+  if (itemIds.length > 0) {
+    const itemResult = await pool.query<{
+      id: string;
+      material_phase_id: string | null;
+      parent_id: string | null;
+    }>(
+      `WITH RECURSIVE chain AS (
+         SELECT id, parent_id, material_phase_id
+         FROM item
+         WHERE id = ANY($1::text[])
+         UNION ALL
+         SELECT i.id, i.parent_id, i.material_phase_id
+         FROM item i
+         INNER JOIN chain c ON i.id = c.parent_id
+       )
+       SELECT DISTINCT id, parent_id, material_phase_id FROM chain`,
+      [itemIds],
+    );
+    for (const row of itemResult.rows) {
+      itemMaterialById.set(row.id, row.material_phase_id);
+      itemParentById.set(row.id, row.parent_id);
+    }
+  }
+
+  const ancestryForItem = (itemId: string | null): Array<string | null> => {
+    if (!itemId) {
+      return [];
+    }
+    const chain: Array<string | null> = [];
+    let current: string | null = itemId;
+    const guard = new Set<string>();
+    while (current && !guard.has(current)) {
+      guard.add(current);
+      chain.push(itemMaterialById.get(current) ?? null);
+      current = itemParentById.get(current) ?? null;
+    }
+    return chain;
+  };
+
+  const phasesByLine = new Map<string, ScopePhaseRow[]>();
+  for (const phase of phases) {
+    const list = phasesByLine.get(phase.job_line_id) ?? [];
+    list.push(phase);
+    phasesByLine.set(phase.job_line_id, list);
+  }
+
+  const allocsByLine = new Map<string, AllocRow[]>();
+  for (const alloc of allocations) {
+    const list = allocsByLine.get(alloc.job_line_id) ?? [];
+    list.push(alloc);
+    allocsByLine.set(alloc.job_line_id, list);
+  }
+
+  const eligibility: OrderEligibilityLine[] = lines.map((line) => ({
+    id: line.id,
+    quantity: line.quantity,
+    material_locked: line.material_locked,
+    lineMaterialPhaseId: line.material_phase_id,
+    ancestryMaterialPhaseIds: ancestryForItem(line.item_id),
+    has_bom: bomLineIds.has(line.id),
+    scopePhases: (phasesByLine.get(line.id) ?? []).map((p) => ({
+      id: p.id,
+      labor_phase_id: p.labor_phase_id,
+      sequence: p.sequence,
+    })),
+    allocations: (allocsByLine.get(line.id) ?? []).map((a) => ({
+      site_zone_id: a.site_zone_id,
+      quantity: a.quantity,
+    })),
+  }));
+
+  const order_rows = buildOrderRows(eligibility);
+  const unlockedByCell = unlockedExcludedCountByCell(order_rows);
+
+  let rawCells: Array<{
+    requested: boolean;
+    scope_phase_id: string;
     site_zone_id: string | null;
-  }>(
-    `SELECT
-       jlp.job_line_id,
-       jmr.site_zone_id,
-       po.po_number AS purchase_order_number,
-       po.status AS purchase_order_status
-     FROM job_material_request jmr
-     INNER JOIN job_line_part jlp ON jlp.id = jmr.job_line_part_id
-     INNER JOIN purchase_order_line_source pols
-       ON pols.job_material_request_id = jmr.id
-     INNER JOIN purchase_order_line pol ON pol.id = pols.purchase_order_line_id
-     INNER JOIN purchase_order po ON po.id = pol.purchase_order_id
-     WHERE jmr.job_id = $1`,
-    [jobId],
+  }> = [];
+
+  if (await tableExists(pool, "job_field_order_cell")) {
+    const phaseIds = [...new Set(order_rows.map((r) => r.scope_phase_id))];
+    if (phaseIds.length > 0) {
+      const cellResult = await pool.query<{
+        requested: boolean;
+        scope_phase_id: string;
+        site_zone_id: string | null;
+      }>(
+        `SELECT scope_phase_id, site_zone_id, requested
+         FROM job_field_order_cell
+         WHERE scope_phase_id = ANY($1::text[])`,
+        [phaseIds],
+      );
+      rawCells = cellResult.rows.map((row) => ({
+        scope_phase_id: row.scope_phase_id,
+        site_zone_id: row.site_zone_id,
+        requested: Boolean(row.requested),
+      }));
+    }
+  }
+
+  const sliceKeys = new Set(
+    order_rows.map((r) =>
+      cellKey(r.scope_phase_id, r.zone_key === GENERAL_ZONE_KEY ? null : r.zone_key),
+    ),
   );
 
-  if (result.rows.length === 0) {
-    return rows;
+  const order_cells: JobFieldOrderCell[] = rawCells
+    .filter((c) => sliceKeys.has(cellKey(c.scope_phase_id, c.site_zone_id)))
+    .map((c) => ({
+      ...c,
+      unlocked_excluded_count:
+        unlockedByCell.get(cellKey(c.scope_phase_id, c.site_zone_id)) ?? 0,
+    }));
+
+  // Ensure every orderable slice has a cell entry (requested false) so UI can
+  // show unlocked badges even before first check.
+  for (const row of order_rows) {
+    const key = cellKey(
+      row.scope_phase_id,
+      row.zone_key === GENERAL_ZONE_KEY ? null : row.zone_key,
+    );
+    if (order_cells.some((c) => cellKey(c.scope_phase_id, c.site_zone_id) === key)) {
+      continue;
+    }
+    order_cells.push({
+      scope_phase_id: row.scope_phase_id,
+      site_zone_id:
+        row.zone_key === GENERAL_ZONE_KEY ? null : row.zone_key,
+      requested: false,
+      unlocked_excluded_count: unlockedByCell.get(key) ?? 0,
+    });
   }
 
-  const trailByKey = new Map<
-    string,
-    { purchase_order_number: string | null; purchase_order_status: string | null }
-  >();
-  for (const row of result.rows) {
-    const key = `${row.job_line_id}:${zoneKeyFor(row.site_zone_id)}`;
-    if (!trailByKey.has(key)) {
-      trailByKey.set(key, {
-        purchase_order_number: row.purchase_order_number,
-        purchase_order_status: row.purchase_order_status,
-      });
-    }
-  }
-
-  return rows.map((row) => {
-    const trail = trailByKey.get(`${row.job_line_id}:${row.zone_key}`);
-    if (!trail) {
-      return row;
-    }
-    return {
-      ...row,
-      purchase_order_number: trail.purchase_order_number,
-      purchase_order_status: trail.purchase_order_status,
-    };
-  });
+  return { order_cells, order_rows };
 };
 
 /** Lightweight list projection — % + lifecycle only. */

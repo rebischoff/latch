@@ -20,7 +20,7 @@ describe("assertSiteIdChangeAllowed", () => {
   });
 
   it("rejects site_id change when estimate is frozen", () => {
-    for (const status of ["won", "lost", "expired"] as const) {
+    for (const status of ["submitted", "accepted", "rejected"] as const) {
       expect(() =>
         assertSiteIdChangeAllowed({ site_id: "site-a", status }, "site-b"),
       ).toThrow(ConflictError);
@@ -119,7 +119,7 @@ describe("assertSiteChangeClearsStructure", () => {
     expect(() =>
       assertSiteChangeClearsStructure({
         ...base,
-        status: "won",
+        status: "accepted",
         body: { conditions: [], line_items: [] },
       }),
     ).toThrow(ConflictError);

@@ -223,7 +223,7 @@ describe("recalcProductLine", () => {
       unit_price: 65,
     };
 
-    const result = await recalcProductLine(makeClient("sent"), frozen, buildCatalog());
+    const result = await recalcProductLine(makeClient("submitted"), frozen, buildCatalog());
 
     expect(result.unit_material).toBe(40);
     expect(result.unit_labor).toBe(10);

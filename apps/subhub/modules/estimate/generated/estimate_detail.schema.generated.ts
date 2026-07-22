@@ -64,5 +64,5 @@ export const estimateDetailSurfacePolicyDef = defineSurfacePolicy({
   surface: "estimate_detail",
   fieldIds: Object.values(EstimateDetailFieldIds),
   fieldActions: ["read", "write"],
-  surfaceActions: ["read", "write", "delete", "win", "lose"],
+  surfaceActions: ["read", "write", "delete", "submit", "accept", "reject", "recall", "create_job"],
 });

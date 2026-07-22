@@ -16,18 +16,25 @@ import {
   Select,
   Space,
   Table,
+  Tooltip,
   Typography,
 } from "antd";
 import { useEffect, useMemo, useState } from "react";
 
 import { useDebouncedValue } from "@/lib/hooks/use-debounced-value";
+import { useJobPartPicker } from "@/lib/hooks/use-job-part-picker";
 import {
   fetchRequisitionPool,
   fetchSurfaceList,
   postPurchaseOrderBatch,
-  type PoolPartOption,
   type PoolRollupRow,
 } from "@/lib/surface-api";
+
+/** RP6: Create POs requires both part # and vendor. */
+const isRowPoEligible = (args: {
+  partId: string | null | undefined;
+  vendorPartyId: string | null | undefined;
+}): boolean => Boolean(args.partId && args.vendorPartyId);
 
 type RowStaging = {
   vendorPartyId?: string;
@@ -116,24 +123,31 @@ const setZoneQtyFifo = (
 type PartOption = { value: string; label: string; description?: string | null };
 
 /**
- * IT4: when `narrowedOptions` is supplied (row has item context), Part # choices are
- * limited to that item's (or, when Multiple, the union of items') linked parts — no live
- * search. Ad-hoc / no-item rows fall back to a full live search across all parts.
+ * RP5: Part # Select reuses Scope's `fetchJobPartPicker` when the row carries
+ * item + job_condition. Legacy ad-hoc rows fall back to a live part_list search.
  */
 const PartNumberSelect = ({
   value,
   label,
-  narrowedOptions,
+  itemId,
+  jobConditionId,
   onChange,
 }: {
   value: string | null;
   label: string | null;
-  narrowedOptions?: PoolPartOption[];
+  itemId: string | null;
+  jobConditionId: string | null;
   onChange: (partId: string | null, mpn: string | null, description: string | null) => void;
 }) => {
+  const useScopeResolver = Boolean(itemId && jobConditionId);
   const [search, setSearch] = useState("");
   const debounced = useDebouncedValue(search.trim(), 250);
-  const narrowed = narrowedOptions !== undefined && narrowedOptions.length > 0;
+
+  const { data: scopeParts, isLoading: scopeLoading } = useJobPartPicker(
+    itemId,
+    jobConditionId,
+    useScopeResolver,
+  );
 
   const { data, isFetching } = useQuery({
     queryKey: ["part-picker-pool", debounced],
@@ -142,17 +156,21 @@ const PartNumberSelect = ({
         q: debounced || undefined,
         limit: 30,
       }),
-    enabled: !narrowed && (debounced.length >= 1 || Boolean(value)),
+    enabled: !useScopeResolver && (debounced.length >= 1 || Boolean(value)),
     staleTime: 15_000,
   });
 
   const options: PartOption[] = useMemo(() => {
-    if (narrowed) {
-      return narrowedOptions!.map((opt) => ({
-        value: opt.part_id,
-        label: opt.part_mpn,
-        description: opt.part_description,
+    if (useScopeResolver) {
+      const mapped = (scopeParts ?? []).map((part) => ({
+        value: part.id,
+        label: part.mpn,
+        description: part.description ?? null,
       }));
+      if (value && label && !mapped.some((o) => o.value === value)) {
+        return [{ value, label }, ...mapped];
+      }
+      return mapped;
     }
     const rows = data?.data.rows ?? [];
     const mapped = rows.map((row) => {
@@ -166,14 +184,14 @@ const PartNumberSelect = ({
       return [{ value, label }, ...mapped];
     }
     return mapped;
-  }, [narrowed, narrowedOptions, data?.data.rows, label, value]);
+  }, [useScopeResolver, scopeParts, data?.data.rows, label, value]);
 
   return (
     <Select
       allowClear
       showSearch
       filterOption={
-        narrowed
+        useScopeResolver
           ? (input, option) =>
               (option?.label ?? "").toLowerCase().includes(input.toLowerCase())
           : false
@@ -182,8 +200,8 @@ const PartNumberSelect = ({
       style={{ width: "100%", minWidth: 140 }}
       value={value ?? undefined}
       options={options}
-      loading={!narrowed && isFetching}
-      onSearch={narrowed ? undefined : setSearch}
+      loading={useScopeResolver ? scopeLoading : isFetching}
+      onSearch={useScopeResolver ? undefined : setSearch}
       onClear={() => onChange(null, null, null)}
       onChange={(next, option) => {
         if (!next) {
@@ -356,6 +374,28 @@ export const RequisitionList = () => {
     setStagingByKey({});
   }, [jobId]);
 
+  // Drop selection when a row becomes ineligible (cleared PN / vendor).
+  useEffect(() => {
+    setSelected((prev) => {
+      const next = prev.filter((key) => {
+        const row = rows.find((r) => r.key === key);
+        if (!row) return false;
+        const staging = stagingByKey[key];
+        const partId = staging?.partId ?? row.part_id;
+        const vendorPartyId =
+          staging?.vendorPartyId ?? resolveDefaultVendor(row);
+        return isRowPoEligible({ partId, vendorPartyId });
+      });
+      if (
+        next.length === prev.length &&
+        next.every((key, i) => key === prev[i])
+      ) {
+        return prev;
+      }
+      return next;
+    });
+  }, [rows, stagingByKey]);
+
   const ensureStaging = (row: PoolRollupRow): RowStaging => {
     const existing = stagingByKey[row.key];
     if (existing) return existing;
@@ -446,11 +486,26 @@ export const RequisitionList = () => {
       const row = rows.find((r) => r.key === key);
       if (!row) return false;
       const staging = stagingByKey[key] ?? ensureStaging(row);
-      if (!staging.vendorPartyId) return false;
+      if (
+        !isRowPoEligible({
+          partId: staging.partId,
+          vendorPartyId: staging.vendorPartyId,
+        })
+      ) {
+        return false;
+      }
       return stagedTotal(staging, row) > 0;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- ensureStaging closes over stagingByKey
   }, [canCreatePos, selected, rows, stagingByKey]);
+
+  const rowSelectable = (row: PoolRollupRow): boolean => {
+    const staging = stagingByKey[row.key] ?? ensureStaging(row);
+    return isRowPoEligible({
+      partId: staging.partId,
+      vendorPartyId: staging.vendorPartyId,
+    });
+  };
 
   if (error) {
     return (
@@ -471,7 +526,7 @@ export const RequisitionList = () => {
             Requisitions
           </Typography.Title>
           <Typography.Text type="secondary">
-            Open demand by job × part. Create POs groups by vendor.
+            Open demand by job × line. Create POs groups by vendor.
           </Typography.Text>
         </div>
         <Space wrap>
@@ -507,8 +562,31 @@ export const RequisitionList = () => {
           pagination={false}
           rowSelection={{
             selectedRowKeys: selected,
+            getCheckboxProps: (row) => {
+              const staging = stagingByKey[row.key] ?? {
+                vendorPartyId: resolveDefaultVendor(row),
+                partId: row.part_id,
+                partMpn: row.part_mpn,
+                partDescription: row.part_description,
+                qtyByRequest: openQtyByRequest(row),
+              };
+              const eligible = isRowPoEligible({
+                partId: staging.partId,
+                vendorPartyId: staging.vendorPartyId,
+              });
+              return {
+                disabled: !eligible,
+                title: eligible
+                  ? undefined
+                  : "Resolve part # and vendor first",
+              };
+            },
             onChange: (keys) => {
-              const ids = keys as string[];
+              const ids = (keys as string[]).filter((key) => {
+                const row = rows.find((r) => r.key === key);
+                if (!row) return false;
+                return rowSelectable(row);
+              });
               setSelected(ids);
               setStagingByKey((prev) => {
                 const next = { ...prev };
@@ -528,6 +606,27 @@ export const RequisitionList = () => {
                 }
                 return next;
               });
+            },
+            renderCell: (_checked, row, _index, originNode) => {
+              const staging = stagingByKey[row.key] ?? {
+                vendorPartyId: resolveDefaultVendor(row),
+                partId: row.part_id,
+                partMpn: row.part_mpn,
+                partDescription: row.part_description,
+                qtyByRequest: openQtyByRequest(row),
+              };
+              const eligible = isRowPoEligible({
+                partId: staging.partId,
+                vendorPartyId: staging.vendorPartyId,
+              });
+              if (eligible) {
+                return originNode;
+              }
+              return (
+                <Tooltip title="Resolve part # and vendor first">
+                  <span>{originNode}</span>
+                </Tooltip>
+              );
             },
           }}
           columns={[
@@ -592,12 +691,15 @@ export const RequisitionList = () => {
                   <PartNumberSelect
                     value={staging.partId}
                     label={staging.partMpn}
-                    narrowedOptions={row.part_options}
+                    itemId={row.item_id}
+                    jobConditionId={row.job_condition_id}
                     onChange={(partId, mpn, description) =>
                       updateStaging(row, {
                         partId,
                         partMpn: mpn,
                         partDescription: description,
+                        // Clear vendor when PN changes — must re-resolve (RP6).
+                        vendorPartyId: undefined,
                       })
                     }
                   />
@@ -616,8 +718,10 @@ export const RequisitionList = () => {
               width: 220,
               render: (_, row) => {
                 const staging = stagingByKey[row.key] ?? ensureStaging(row);
+                const partChanged =
+                  (staging.partId ?? null) !== (row.part_id ?? null);
                 const options =
-                  row.vendors.length > 0
+                  !partChanged && row.vendors.length > 0
                     ? row.vendors.map((v) => ({
                         value: v.vendor_party_id,
                         label: `${v.vendor_display_name}${v.is_preferred ? " ★" : ""}`,

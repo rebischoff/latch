@@ -13,7 +13,7 @@ export * from "./repository/job-field-progress";
 export * from "./repository/job-field-progress-load";
 export * from "./repository/job-field-progress-write";
 export * from "./repository/job-field-zone-order";
-export * from "./repository/job-field-zone-order-write";
+// job-field-zone-order-write Save→JMR snapshot retired (task 63 / RP1)
 export * from "./repository/job-issue";
 export * from "./repository/job-progress-report";
 export * from "./repository/change-order-write";

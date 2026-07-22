@@ -1,3 +1,11 @@
+export {
+  computeDerivedOpenDemand,
+  ensureBomFromJobLineTx,
+  loadDerivedOpenDemandForJob,
+  syncOpenJobMaterialRequestsAffected,
+  syncOpenJobMaterialRequestsForJob,
+  type DerivedOpenDemand,
+} from "./repository/job-material-request-derive";
 export { resolveEmployeePartyIdForPrincipal } from "./repository/employee-resolve";
 export {
   loadJobMaterialRequestById,

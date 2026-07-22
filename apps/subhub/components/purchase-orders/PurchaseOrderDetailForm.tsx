@@ -23,7 +23,7 @@ import { useSurfaceDetail } from "@/lib/hooks/use-surface-detail";
 import { useSurfaceDelete } from "@/lib/hooks/use-surface-patch";
 import { routes } from "@/lib/nav-routes";
 import {
-  patchPurchaseOrderLineDescription,
+  patchPurchaseOrderLine,
   postPurchaseOrderAdhocLine,
   postPurchaseOrderCancel,
   postPurchaseOrderSend,
@@ -33,6 +33,7 @@ import {
 type Profile = {
   po_number?: string | null;
   status?: string | null;
+  job_id?: string | null;
   title?: string | null;
   display_name?: string | null;
   ship_to_note?: string | null;
@@ -115,6 +116,7 @@ export const PurchaseOrderDetailForm = ({
   const lineItems = (data?.data?.line_items as LineItem[] | undefined) ?? [];
   const status = profile?.status ?? "draft";
   const isDraft = status === "draft";
+  const isGeneralBucket = !profile?.job_id;
   const isCancellable =
     status !== "draft" && status !== "cancelled" && status !== "received";
   const canDelete =
@@ -153,11 +155,8 @@ export const PurchaseOrderDetailForm = ({
   });
 
   const adhocMutation = useMutation({
-    mutationFn: (values: {
-      description?: string;
-      quantity: number;
-      siteZoneId?: string | null;
-    }) => postPurchaseOrderAdhocLine(purchaseOrderId, values),
+    mutationFn: (values: { description?: string; quantity: number }) =>
+      postPurchaseOrderAdhocLine(purchaseOrderId, values),
     onSuccess: async () => {
       message.success("Line added");
       setAdhocOpen(false);
@@ -167,13 +166,12 @@ export const PurchaseOrderDetailForm = ({
     onError: (err: Error) => message.error(err.message),
   });
 
-  const descriptionMutation = useMutation({
-    mutationFn: (args: { lineId: string; description: string }) =>
-      patchPurchaseOrderLineDescription(
-        purchaseOrderId,
-        args.lineId,
-        args.description,
-      ),
+  const linePatchMutation = useMutation({
+    mutationFn: (args: {
+      lineId: string;
+      description?: string;
+      quantity?: number;
+    }) => patchPurchaseOrderLine(purchaseOrderId, args.lineId, args),
     onSuccess: async () => {
       await invalidate();
     },
@@ -199,7 +197,9 @@ export const PurchaseOrderDetailForm = ({
       title: strong ? "Vendor may have already shipped" : `Cancel ${args.label}?`,
       content: strong
         ? "Confirm you've contacted the vendor. This records cancel intent and reopens still-pending material requests."
-        : `This will cancel ${args.label} and reopen still-pending material requests.`,
+        : isGeneralBucket
+          ? `This will cancel ${args.label}.`
+          : `This will cancel ${args.label} and reopen still-pending material requests.`,
       okText: strong ? "Confirm cancel" : "OK",
       okButtonProps: strong ? { danger: true } : undefined,
       onOk: () =>
@@ -214,7 +214,9 @@ export const PurchaseOrderDetailForm = ({
   const onDelete = useCallback(() => {
     modal.confirm({
       title: "Delete draft PO?",
-      content: "Material requests return to the open pool.",
+      content: isGeneralBucket
+        ? "This draft purchase order will be removed."
+        : "Material requests return to the open pool.",
       okText: "Delete",
       okButtonProps: { danger: true },
       onOk: async () => {
@@ -228,7 +230,7 @@ export const PurchaseOrderDetailForm = ({
         }
       },
     });
-  }, [message, modal, remove, router]);
+  }, [isGeneralBucket, message, modal, remove, router]);
 
   useSurfaceFormChrome({
     mode: "edit",
@@ -252,6 +254,10 @@ export const PurchaseOrderDetailForm = ({
     return <div style={{ padding: 16 }}>Loading…</div>;
   }
 
+  const subtitle = isGeneralBucket
+    ? `General · ${profile?.display_name ?? "—"}`
+    : `${profile?.title ?? "—"} · ${profile?.display_name ?? "—"}`;
+
   return (
     <div style={{ padding: 16 }}>
       <Space
@@ -263,26 +269,25 @@ export const PurchaseOrderDetailForm = ({
           </Typography.Title>
           <Space size="small">
             <Tag color={statusColor(status)}>{status}</Tag>
-            <Typography.Text type="secondary">
-              {profile?.title} · {profile?.display_name}
-            </Typography.Text>
+            {isGeneralBucket ? <Tag>General</Tag> : null}
+            <Typography.Text type="secondary">{subtitle}</Typography.Text>
           </Space>
         </div>
         <Space>
           <Link href={routes.purchaseOrders.list}>
             <Button>List</Button>
           </Link>
+          {isDraft && isGeneralBucket ? (
+            <Button onClick={() => setAdhocOpen(true)}>Add line</Button>
+          ) : null}
           {isDraft ? (
-            <>
-              <Button onClick={() => setAdhocOpen(true)}>Add ad-hoc line</Button>
-              <Button
-                type="primary"
-                loading={sendMutation.isPending}
-                onClick={() => sendMutation.mutate()}
-              >
-                Send
-              </Button>
-            </>
+            <Button
+              type="primary"
+              loading={sendMutation.isPending}
+              onClick={() => sendMutation.mutate()}
+            >
+              Send
+            </Button>
           ) : null}
           {isCancellable ? (
             <Button
@@ -383,29 +388,33 @@ export const PurchaseOrderDetailForm = ({
                   },
                 ]}
               />
-              <Typography.Text strong>Sources</Typography.Text>
-              <Table
-                size="small"
-                style={{ marginTop: 8 }}
-                rowKey="id"
-                pagination={false}
-                dataSource={line.sources}
-                columns={[
-                  {
-                    title: "Zone",
-                    render: (_, src) =>
-                      src.site_zone_id
-                        ? (src.site_zone_name ?? src.site_zone_id)
-                        : "General",
-                  },
-                  { title: "Qty", dataIndex: "quantity", width: 80 },
-                  {
-                    title: "Request status",
-                    dataIndex: "request_status",
-                    width: 140,
-                  },
-                ]}
-              />
+              {!isGeneralBucket && line.sources.length > 0 ? (
+                <>
+                  <Typography.Text strong>Sources</Typography.Text>
+                  <Table
+                    size="small"
+                    style={{ marginTop: 8 }}
+                    rowKey="id"
+                    pagination={false}
+                    dataSource={line.sources}
+                    columns={[
+                      {
+                        title: "Zone",
+                        render: (_, src) =>
+                          src.site_zone_id
+                            ? (src.site_zone_name ?? src.site_zone_id)
+                            : "General",
+                      },
+                      { title: "Qty", dataIndex: "quantity", width: 80 },
+                      {
+                        title: "Request status",
+                        dataIndex: "request_status",
+                        width: 140,
+                      },
+                    ]}
+                  />
+                </>
+              ) : null}
             </div>
           ),
         }}
@@ -428,7 +437,7 @@ export const PurchaseOrderDetailForm = ({
                         if (!next || next === line.description) {
                           return;
                         }
-                        descriptionMutation.mutate({
+                        linePatchMutation.mutate({
                           lineId: line.id,
                           description: next,
                         });
@@ -443,8 +452,33 @@ export const PurchaseOrderDetailForm = ({
           },
           {
             title: "Qty",
-            width: 90,
-            render: (_, line) => `${line.quantity} ${line.unit}`,
+            width: 100,
+            render: (_, line) => {
+              if (line.status !== "draft") {
+                return `${line.quantity} ${line.unit}`;
+              }
+              return (
+                <Space size={4}>
+                  <Typography.Text
+                    editable={{
+                      onChange: (value) => {
+                        const next = Number(value);
+                        if (!(next > 0) || next === line.quantity) {
+                          return;
+                        }
+                        linePatchMutation.mutate({
+                          lineId: line.id,
+                          quantity: next,
+                        });
+                      },
+                    }}
+                  >
+                    {String(line.quantity)}
+                  </Typography.Text>
+                  <span>{line.unit}</span>
+                </Space>
+              );
+            },
           },
           {
             title: "Price",
@@ -484,7 +518,7 @@ export const PurchaseOrderDetailForm = ({
       />
 
       <Modal
-        title="Add ad-hoc line"
+        title="Add line"
         open={adhocOpen}
         onCancel={() => setAdhocOpen(false)}
         onOk={() => adhocForm.submit()}
@@ -506,9 +540,6 @@ export const PurchaseOrderDetailForm = ({
           <Form.Item name="quantity" label="Quantity" rules={[{ required: true }]}>
             <InputNumber min={0.0001} style={{ width: "100%" }} />
           </Form.Item>
-          <Typography.Text type="secondary">
-            Zone defaults to General when unspecified (PO9).
-          </Typography.Text>
         </Form>
       </Modal>
     </div>

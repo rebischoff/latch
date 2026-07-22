@@ -82,6 +82,7 @@ export type ItemDetailFormValues = {
     incidental_rate_type_id: string | null;
     markup_type_id: string | null;
     fallback_unit_cost?: number;
+    material_phase_id: string | null;
   };
   item_labor_phase: Array<{
     labor_phase_id: string;
@@ -148,6 +149,7 @@ const buildDefaultValues = (
         incidental_rate_type_id: null,
         markup_type_id: null,
         fallback_unit_cost: 0,
+        material_phase_id: null,
       },
       item_labor_phase: [],
       resolved_labor_phase: buildCreateInheritedLaborRows(data, parentId),
@@ -187,6 +189,7 @@ const buildDefaultValues = (
       incidental_rate_type_id: commercial?.incidental_rate_type_id ?? null,
       markup_type_id: commercial?.markup_type_id ?? null,
       fallback_unit_cost: commercial?.fallback_unit_cost ?? 0,
+      material_phase_id: commercial?.material_phase_id ?? null,
     },
     item_labor_phase: ownRows,
     resolved_labor_phase: resolvedRows,
@@ -221,6 +224,9 @@ const toPatchBody = (
       freight_rate_type_id: values.commercial.freight_rate_type_id,
       incidental_rate_type_id: values.commercial.incidental_rate_type_id,
       markup_type_id: values.commercial.markup_type_id,
+      ...(values.profile.node_type !== "scope"
+        ? { material_phase_id: values.commercial.material_phase_id }
+        : {}),
       ...(values.profile.node_type === "item"
         ? { fallback_unit_cost: values.commercial.fallback_unit_cost ?? 0 }
         : {}),

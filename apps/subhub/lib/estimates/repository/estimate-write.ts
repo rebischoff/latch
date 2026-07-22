@@ -20,8 +20,8 @@ import {
 import { replaceEstimateLineItemsTx } from "./estimate-lines-write";
 import { replaceEstimateStakeholdersTx } from "./estimate-stakeholders";
 
-/** Statuses where profile.site_id must not change (S8). */
-const SITE_FROZEN_STATUSES = new Set(["won", "lost", "expired"]);
+/** Statuses where profile.site_id must not change (S8 / ST freeze). */
+const SITE_FROZEN_STATUSES = new Set(["submitted", "accepted", "rejected"]);
 
 export const assertSiteIdChangeAllowed = (
   existing: Pick<EstimateDetailRow, "site_id" | "status">,
@@ -360,7 +360,7 @@ export const deleteEstimate = async (
   status: string,
 ): Promise<void> => {
   if (status !== "draft") {
-    if (status === "won") {
+    if (status === "accepted") {
       const blockers = await loadEstimateDeleteBlockers(pool, id);
       if (blockers.some((blocker) => blocker.type === "job")) {
         throw new ConflictError("Cannot delete estimate: referenced by job");

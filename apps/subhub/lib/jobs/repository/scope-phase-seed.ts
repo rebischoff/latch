@@ -1,4 +1,4 @@
-import type { PoolClient } from "pg";
+import type { Pool, PoolClient } from "pg";
 
 import {
   filterLaborGroupByInclusion,
@@ -21,9 +21,17 @@ export type SeedScopePhaseInput = {
   site_zone_id: string | null;
 };
 
+export type JobLineMaterialPhaseOption = {
+  hours_per_unit: number;
+  labor_phase_id: string;
+  labor_phase_name: string;
+};
+
+type Queryable = Pool | PoolClient;
+
 /** Job-condition variant of `loadConditionLaborPhases` (walks `job_condition*`). */
 const loadJobConditionLaborPhases = async (
-  client: PoolClient,
+  client: Queryable,
   jobConditionId: string,
 ): Promise<string[] | null> => {
   if (!(await tableExists(client, "job_condition_labor_phase"))) {
@@ -71,17 +79,58 @@ const loadJobConditionLaborPhases = async (
   return null;
 };
 
+/**
+ * Phases that would be (or were) seeded for a job line — item labor group ∩
+ * condition inclusion. Used by seed and by Mat. phase option fallback when
+ * `scope_phase` was never created (e.g. catalog labor added after win).
+ */
+export const resolveJobLineMaterialPhaseOptions = async (
+  client: Queryable,
+  input: {
+    estimate_condition_id?: string | null;
+    item_id: string | null;
+    job_condition_id?: string | null;
+  },
+): Promise<JobLineMaterialPhaseOption[]> => {
+  const conditionId = input.estimate_condition_id ?? null;
+  const jobConditionId = input.job_condition_id ?? null;
+  if (!input.item_id || (!conditionId && !jobConditionId)) {
+    return [];
+  }
+
+  const catalog = await loadCommercialCatalog(client);
+  const laborGroup = resolveLaborGroup(catalog, input.item_id);
+  if (laborGroup.length === 0) {
+    return [];
+  }
+
+  const conditionPhases = jobConditionId
+    ? await loadJobConditionLaborPhases(client, jobConditionId)
+    : await loadConditionLaborPhases(client, conditionId!);
+  const included = resolveIncludedLaborPhaseIds(conditionPhases, laborGroup);
+  const filtered = filterLaborGroupByInclusion(laborGroup, included);
+  if (filtered.length === 0) {
+    return [];
+  }
+
+  const phaseNames = await client.query<{ id: string; name: string }>(
+    `SELECT id, name FROM labor_phase WHERE id = ANY($1::text[])`,
+    [filtered.map((row) => row.labor_phase_id)],
+  );
+  const nameById = new Map(phaseNames.rows.map((row) => [row.id, row.name]));
+
+  return filtered.map((row) => ({
+    labor_phase_id: row.labor_phase_id,
+    labor_phase_name: nameById.get(row.labor_phase_id) ?? row.labor_phase_id,
+    hours_per_unit: Number(row.hours_per_unit),
+  }));
+};
+
 export const seedScopePhasesForJobLineTx = async (
   client: PoolClient,
   input: SeedScopePhaseInput,
 ): Promise<void> => {
-  const conditionId = input.estimate_condition_id;
-  const jobConditionId = input.job_condition_id ?? null;
-  if (
-    !(await tableExists(client, "scope_phase")) ||
-    !input.item_id ||
-    (!conditionId && !jobConditionId)
-  ) {
+  if (!(await tableExists(client, "scope_phase")) || !input.item_id) {
     return;
   }
 
@@ -93,30 +142,12 @@ export const seedScopePhasesForJobLineTx = async (
     return;
   }
 
-  const catalog = await loadCommercialCatalog(client);
-  const laborGroup = resolveLaborGroup(catalog, input.item_id);
-  if (laborGroup.length === 0) {
+  const options = await resolveJobLineMaterialPhaseOptions(client, input);
+  if (options.length === 0) {
     return;
   }
 
-  // On win, phases are identical to the source estimate condition. For post-win
-  // engineer adds the source is the job condition forest (`job_condition_id`).
-  const conditionPhases = jobConditionId
-    ? await loadJobConditionLaborPhases(client, jobConditionId)
-    : await loadConditionLaborPhases(client, conditionId!);
-  const included = resolveIncludedLaborPhaseIds(conditionPhases, laborGroup);
-  const filtered = filterLaborGroupByInclusion(laborGroup, included);
-  if (filtered.length === 0) {
-    return;
-  }
-
-  const phaseNames = await client.query<{ id: string; name: string }>(
-    `SELECT id, name FROM labor_phase WHERE id = ANY($1::text[])`,
-    [filtered.map((row) => row.labor_phase_id)],
-  );
-  const nameById = new Map(phaseNames.rows.map((row) => [row.id, row.name]));
-
-  for (const [index, row] of filtered.entries()) {
+  for (const [index, row] of options.entries()) {
     await client.query(
       `INSERT INTO scope_phase (
          job_line_id,
@@ -131,11 +162,11 @@ export const seedScopePhasesForJobLineTx = async (
       [
         input.job_line_id,
         row.labor_phase_id,
-        nameById.get(row.labor_phase_id) ?? row.labor_phase_id,
+        row.labor_phase_name,
         index + 1,
         input.quantity,
-        Number(row.hours_per_unit),
-        Number(row.hours_per_unit),
+        row.hours_per_unit,
+        row.hours_per_unit,
         index + 1,
       ],
     );

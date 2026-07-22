@@ -12,6 +12,7 @@ export type ItemFlatRow = {
   id: string;
   incidental_rate_type_id: string | null;
   markup_type_id: string | null;
+  material_phase_id: string | null;
   name: string;
   node_type: "scope" | "category" | "item";
   parent_id: string | null;
@@ -25,6 +26,7 @@ export type ItemTreeNode = {
   incidental_rate_type_id: string | null;
   is_root: boolean;
   markup_type_id: string | null;
+  material_phase_id: string | null;
   name: string;
   node_type: "scope" | "category" | "item";
   parent_id: string | null;
@@ -67,7 +69,8 @@ export const loadAllItems = async (
 ): Promise<ItemFlatRow[]> => {
   const result = await pool.query<ItemFlatRow>(
     `SELECT id, name, parent_id, node_type, sort_order, csi_code,
-            freight_rate_type_id, incidental_rate_type_id, markup_type_id
+            freight_rate_type_id, incidental_rate_type_id, markup_type_id,
+            material_phase_id
      FROM item
      ORDER BY sort_order ASC, name ASC, id ASC`,
   );
@@ -98,6 +101,7 @@ export const nestItemTree = (
     freight_rate_type_id: row.freight_rate_type_id,
     incidental_rate_type_id: row.incidental_rate_type_id,
     markup_type_id: row.markup_type_id,
+    material_phase_id: row.material_phase_id ?? null,
     children: nestItemTree(rows, row.id),
   }));
 };

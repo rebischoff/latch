@@ -16,16 +16,6 @@ describe("computeRemaining", () => {
   it("floors at zero when covered exceeds demand", () => {
     expect(computeRemaining(5, 8)).toBe(0);
   });
-
-  it("second request on the same BOM row only sees the leftover", () => {
-    const demand = 10;
-    const firstRequestCovers = 6;
-    const remainingAfterFirst = computeRemaining(demand, firstRequestCovers);
-    expect(remainingAfterFirst).toBe(4);
-
-    const secondRequestCovers = firstRequestCovers + remainingAfterFirst;
-    expect(computeRemaining(demand, secondRequestCovers)).toBe(0);
-  });
 });
 
 describe("computeBomOrderStatus", () => {
@@ -74,20 +64,22 @@ describe("computeBomOrderStatus", () => {
   });
 });
 
-describe("loadRemainingForJobLinePart", () => {
-  it("excludes the given request's own current coverage from covered", async () => {
-    const queries: string[] = [];
+describe("loadRemainingForJobLinePart (RP3 — PO coverage only)", () => {
+  it("ignores open JMRs and uses PO coverage", async () => {
     const pool = {
-      query: async (sql: string, params?: unknown[]) => {
-        queries.push(sql);
+      query: async (sql: string) => {
         if (sql.includes("FROM job_line_part")) {
           return { rows: [{ quantity: 10 }] };
         }
         if (sql.includes("to_regclass")) {
           return { rows: [{ exists: true }] };
         }
-        expect(params?.[2]).toBe("jmr-1");
-        return { rows: [{ covered: 3 }] };
+        if (sql.includes("SUM(pols.quantity)")) {
+          return {
+            rows: [{ job_line_part_id: "jlp-1", covered: 3 }],
+          };
+        }
+        return { rows: [] };
       },
     } as unknown as Pool;
 
@@ -98,12 +90,9 @@ describe("loadRemainingForJobLinePart", () => {
     });
 
     expect(remaining).toBe(7);
-    expect(queries.some((sql) => sql.includes("FROM job_material_request"))).toBe(
-      true,
-    );
   });
 
-  it("uses full covered qty when no request is excluded", async () => {
+  it("returns full demand when there is no PO coverage", async () => {
     const pool = {
       query: async (sql: string) => {
         if (sql.includes("FROM job_line_part")) {
@@ -112,7 +101,7 @@ describe("loadRemainingForJobLinePart", () => {
         if (sql.includes("to_regclass")) {
           return { rows: [{ exists: true }] };
         }
-        return { rows: [{ covered: 10 }] };
+        return { rows: [] };
       },
     } as unknown as Pool;
 
@@ -121,12 +110,12 @@ describe("loadRemainingForJobLinePart", () => {
       jobLinePartId: "jlp-1",
     });
 
-    expect(remaining).toBe(0);
+    expect(remaining).toBe(10);
   });
 });
 
 describe("loadBomPoolForJob", () => {
-  it("only returns BOM rows with remaining > 0", async () => {
+  it("only returns BOM rows with remaining > 0 after PO coverage", async () => {
     const pool = {
       query: async (sql: string) => {
         if (sql.includes("FROM job_line_part")) {
@@ -158,7 +147,7 @@ describe("loadBomPoolForJob", () => {
         if (sql.includes("to_regclass")) {
           return { rows: [{ exists: true }] };
         }
-        if (sql.includes("FROM job_material_request")) {
+        if (sql.includes("SUM(pols.quantity)")) {
           return {
             rows: [{ job_line_part_id: "jlp-2", covered: 4 }],
           };

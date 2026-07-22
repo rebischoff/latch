@@ -51,6 +51,7 @@ export const ItemDetailPatchSchema = z
         incidental_rate_type_id: z.string().nullable().optional(),
         markup_type_id: z.string().nullable().optional(),
         fallback_unit_cost: z.number().optional(),
+        material_phase_id: z.string().nullable().optional(),
       })
       .strict()
       .optional(),
@@ -77,6 +78,7 @@ export const ItemDetailCreateSchema = z
         incidental_rate_type_id: z.string().nullable().optional(),
         markup_type_id: z.string().nullable().optional(),
         fallback_unit_cost: z.number().optional(),
+        material_phase_id: z.string().nullable().optional(),
       })
       .strict()
       .optional(),
@@ -95,6 +97,7 @@ export type ItemDetailRow = {
   incidental_rate_type_id: string | null;
   is_root: boolean;
   markup_type_id: string | null;
+  material_phase_id: string | null;
   name: string;
   node_type: "scope" | "category" | "item";
   parent_id: string | null;
@@ -175,6 +178,7 @@ export type ItemDetailWriteRow = Pick<
   | "freight_rate_type_id"
   | "incidental_rate_type_id"
   | "markup_type_id"
+  | "material_phase_id"
 >;
 
 const formatItemDetailRow = (row: ItemDetailRow): Record<string, unknown> => ({
@@ -187,6 +191,7 @@ const formatItemDetailRow = (row: ItemDetailRow): Record<string, unknown> => ({
   incidental_rate_type_id: row.incidental_rate_type_id,
   is_root: row.is_root,
   markup_type_id: row.markup_type_id,
+  material_phase_id: row.material_phase_id,
   name: row.name,
   node_type: row.node_type,
   parent_id: row.parent_id,
@@ -240,6 +245,7 @@ export const projectItemDetailRow = (
       incidental_rate_type_id: row.incidental_rate_type_id,
       markup_type_id: row.markup_type_id,
       fallback_unit_cost: row.fallback_unit_cost,
+      material_phase_id: row.material_phase_id,
     };
   }
 
@@ -291,6 +297,9 @@ const applyItemDetailPatch = (
   }
   if (typed.commercial?.fallback_unit_cost !== undefined) {
     next.fallback_unit_cost = typed.commercial.fallback_unit_cost;
+  }
+  if (typed.commercial?.material_phase_id !== undefined) {
+    next.material_phase_id = typed.commercial.material_phase_id;
   }
 
   return next;

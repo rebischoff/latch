@@ -65,6 +65,7 @@ export const routes = {
   },
   purchaseOrders: {
     list: "/purchase-orders",
+    new: "/purchase-orders/new",
     detail: (id: string) => `/purchase-orders/${id}`,
   },
   parts: {

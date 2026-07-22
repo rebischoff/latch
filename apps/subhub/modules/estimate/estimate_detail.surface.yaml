@@ -11,8 +11,11 @@ surfaceActions:
   - read
   - write
   - delete
-  - win
-  - lose
+  - submit
+  - accept
+  - reject
+  - recall
+  - create_job
 
 tables:
   - estimate

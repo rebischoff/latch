@@ -9,6 +9,8 @@ import {
   formatMarkupRateSummary,
   hasCommercialRateOverride,
   resolveAncestryRateTypeId,
+  resolveEffectiveMaterialPhaseId,
+  resolveAncestryMaterialPhaseId,
   resolveEffectiveRateTypeId,
 } from "./item-commercial-display";
 
@@ -27,6 +29,7 @@ const treeNode = (
   freight_rate_type_id: null,
   incidental_rate_type_id: null,
   markup_type_id: null,
+  material_phase_id: null,
   ...overrides,
 });
 
@@ -160,5 +163,34 @@ describe("displayCommercialRateTypeId", () => {
 
   it("shows null own when forced override with no selection", () => {
     expect(displayCommercialRateTypeId(true, null, "ancestry")).toBeNull();
+  });
+});
+
+describe("material phase inherit (MP4)", () => {
+  it("uses own material_phase_id when set", () => {
+    const tree = [
+      treeNode("root", null, {
+        material_phase_id: "phase-root",
+        children: [treeNode("child", "root", { material_phase_id: "phase-child" })],
+      }),
+    ];
+    const index = flattenItemTreeCommercial(tree);
+    const chain = buildAncestorChain(index, "child", "root");
+    expect(resolveEffectiveMaterialPhaseId(index, chain, "phase-child")).toBe(
+      "phase-child",
+    );
+  });
+
+  it("inherits from nearest ancestor when own is null", () => {
+    const tree = [
+      treeNode("root", null, {
+        material_phase_id: "phase-root",
+        children: [treeNode("child", "root", { material_phase_id: null })],
+      }),
+    ];
+    const index = flattenItemTreeCommercial(tree);
+    const chain = buildAncestorChain(index, "child", "root");
+    expect(resolveAncestryMaterialPhaseId(index, chain)).toBe("phase-root");
+    expect(resolveEffectiveMaterialPhaseId(index, chain, null)).toBe("phase-root");
   });
 });

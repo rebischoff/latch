@@ -15,7 +15,7 @@ export type ItemDetailFieldId = (typeof ItemDetailFieldIds)[keyof typeof ItemDet
 
 export const itemDetailColumnMap = {
   profile: ["item.id", "item.name", "item.parent_id", "item.node_type", "item.sort_order", "item.csi_code"],
-  commercial: ["item.freight_rate_type_id", "item.incidental_rate_type_id", "item.markup_type_id", "item.fallback_unit_cost"],
+  commercial: ["item.freight_rate_type_id", "item.incidental_rate_type_id", "item.markup_type_id", "item.fallback_unit_cost", "item.material_phase_id"],
   item_labor_phase: [],
   resolved_labor_phase: [],
   spec_definitions: [],
@@ -37,6 +37,7 @@ export const ItemDetailSchema = z.object({
     incidental_rate_type_id: z.string().nullable(),
     markup_type_id: z.string().nullable(),
     fallback_unit_cost: z.number(),
+    material_phase_id: z.string().nullable(),
   }),
   item_labor_phase: z.array(z.object({ user_id: z.string() })),
   resolved_labor_phase: z.array(z.object({ user_id: z.string() })),
@@ -61,6 +62,7 @@ export const ItemDetailPatchSchema = z.object({
       incidental_rate_type_id: z.string().nullable().optional(),
       markup_type_id: z.string().nullable().optional(),
       fallback_unit_cost: z.number().optional(),
+      material_phase_id: z.string().nullable().optional(),
     })
     .optional(),
   item_labor_phase: z.array(z.object({ user_id: z.string() })).optional(),

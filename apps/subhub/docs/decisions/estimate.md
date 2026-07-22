@@ -29,6 +29,72 @@
 > **Amended (2026-07-15):** [Scope-F1 dual qty + Job LI parity (JLI-1…7)](#w3--conditions--costing-on-the-job-locked--amends-prior-estimate-only) — `sold_quantity` frozen + working `quantity` editable; Sold badge removed; Item/Part + job zone danger ([47](../tasks/47-job-line-items-parity.md)).
 >
 > **Locked (2026-07-15):** [estimate / job / CO commercial boundaries (JC1–JC7)](#decision-estimate--job--co-commercial-boundaries-2026-07-15) — as-sold via estimate Win; Jobs New kept; CO = separate Surfaces; condition drift; mid-job progress ([48](../tasks/48-job-create-front-doors-condition-drift.md) / [49](../tasks/49-change-order-surfaces.md)).
+>
+> **Amended (2026-07-21):** [estimate status dropdown lifecycle (ST1–ST10)](#decision-estimate-status-dropdown-lifecycle-st1st10-2026-07-21) — supersedes W6 Win/Lose buttons; rename `sent`/`won`/`lost` → `submitted`/`accepted`/`rejected`; header status action menu ([65](../tasks/65-estimate-status-dropdown.md)). Follow-ons: [66](../tasks/66-estimate-draft-recalculate.md), [67](../tasks/67-estimate-accept-customer-po.md).
+
+---
+
+### Decision: estimate status dropdown lifecycle (ST1–ST10) (2026-07-21)
+
+**Status:** **Locked** (ST1–ST10). **Task:** [65](../tasks/65-estimate-status-dropdown.md). **Follow-ons (authored, not in 65):** [66](../tasks/66-estimate-draft-recalculate.md) draft Recalculate; [67](../tasks/67-estimate-accept-customer-po.md) accept-time customer PO. **Supersedes:** [W6 Win/Lose action buttons](#w6--win--lose-ui--api-locked--action-buttons) (2026-07-14). **Amends:** [D6a lifecycle freeze](#decision-estimate-lifecycle-freeze-and-line-lock-2026-07-05) status vocabulary; JC1/JC2 “Win” wording → **Accept** (handoff math unchanged — W0–W5 / W1b / W1c). **Keeps:** thick accept → job copy (W1–W5); Create-job recreate when a catalog-scope slice is missing (W1b); dual locks + live preview in `draft` only.
+
+**Problem:** Win / Lose toolbar buttons and read-only status tag split lifecycle chrome. Product wants one **header status control**. Draft costing should stay live; submitting must lock a fresh cost snapshot; accepting creates jobs; rejecting stays locked with no job.
+
+#### Locked choices
+
+| # | Topic | Choice |
+|---|--------|--------|
+| **ST1** | Vocabulary | `estimate.status` CHECK: **`draft` \| `submitted` \| `accepted` \| `rejected`**. Rename: `sent`→`submitted`, `won`→`accepted`, `lost`→`rejected`. Drop **`expired`** (backfill → `rejected`). |
+| **ST2** | Default | New estimate = **`draft`**. |
+| **ST3** | Chrome | Estimate detail **header**: status **dropdown / action menu** (shows current; lists allowed next statuses). **Remove** Win / Lose buttons. Status is **not** a quiet Save/PATCH field. |
+| **ST4** | Transition API | Each change = confirm → dedicated transition route (re-resolve manifest). Reuse win/lose/recreate DAL under new names; do **not** flip status via `PATCH profile.status`. |
+| **ST5** | Permissions | Replace Surface actions `win` / `lose` with **`submit`**, **`accept`**, **`reject`**, **`recall`** (+ keep **`create_job`** for W1b recreate). Grant matrix updated accordingly. |
+| **ST6** | Draft costing | Unchanged W1: auto preview/recalc on item / part / condition config; Save recalcs. Catalog-only commercial edits → follow-on **[66](../tasks/66-estimate-draft-recalculate.md)** (not in 65). |
+| **ST7** | → `submitted` | **Full line recalc** (all lines, live catalog) **then** freeze estimate + line items (same freeze as former `sent`). Snapshots after this pass are the issued quote. |
+| **ST8** | → `accepted` | Run existing win handoff (W1–W5 + W1c dialog). Navigate per U1. Accept-time **customer PO** fields → follow-on **[67](../tasks/67-estimate-accept-customer-po.md)** (v1 accept without PO capture). |
+| **ST9** | → `rejected` | Lock only; no job. Allowed from `draft` or `submitted`. |
+| **ST10** | Recall | **`submitted` → `draft`** allowed (`recall`) with confirm — unlocks for revise. **`accepted` / `rejected`** terminal (no reopen v1). Recreate missing jobs stays **Create job**, not re-Accept. |
+
+#### Transition graph
+
+```text
+draft ──────► submitted ──────► accepted   (create job(s))
+  │               │
+  │               └──► draft              (recall)
+  │
+  ├──────────► rejected
+  │
+submitted ───► rejected
+
+accepted / rejected — terminal (except Create job when accepted + missing catalog-scope slice)
+```
+
+#### Freeze / costing by status
+
+| Status | Edit quote inputs | Recalc / preview |
+|--------|-------------------|------------------|
+| **`draft`** | Full edit | **Yes** — W1 + Save; dual locks apply |
+| **`submitted`** | Frozen | **No** (after ST7 enter-pass) |
+| **`accepted`** | Frozen | **No** |
+| **`rejected`** | Frozen | **No** |
+
+#### UI notes
+
+- Header menu options = **allowed next statuses only** (plus Create job when W1b applies — may remain a separate toolbar action or menu item).
+- Dirty form: block transition until Save or discard (same guard as today’s Win).
+- Confirm copy per target: submit (“lock quote + refresh costs”), accept (handoff + W1c), reject, recall.
+
+#### Rejected
+
+| Option | Why |
+|--------|-----|
+| Status Select bound to Save/PATCH | Hides job-creating side effects; conflates `write` with transitions (same W6 rationale — chrome shape changed, not the transaction model) |
+| Auto-recalc on every estimate mount | Surprising; dirties form; Recalculate is explicit ([66](../tasks/66-estimate-draft-recalculate.md)) |
+| Re-Accept to recreate jobs | Blocks clean W1b; use Create job |
+
+**Rationale:** One header control matches how estimators think about lifecycle; transitions stay explicit server actions; submit is the last cost pass before the customer-facing freeze; accept keeps the thick job handoff already shipped.
+
+**Companion wording:** Docs/UI say **Accept** where they said **Win**; **Submit** where they said **Sent**; **Reject** where they said **Lose**. Handoff rules W0–W5 / W1b / W1c unchanged.
 
 ---
 
@@ -195,26 +261,13 @@ Re-seed policy: skip if the line already has phase/BOM rows (idempotent recreate
 
 **Rationale:** Win should leave the job ready for progress tracking and material demand, not only a price ledger.
 
-#### W6 — Win / lose UI & API (locked — action buttons)
+#### W6 — Win / lose UI & API (superseded 2026-07-21)
 
-**Choice: dedicated Surface actions**, not status dropdown + Save.
+> **Superseded** by [status dropdown lifecycle (ST1–ST10)](#decision-estimate-status-dropdown-lifecycle-st1st10-2026-07-21) — header status action menu; `submitted` / `accepted` / `rejected`; transition APIs `submit` / `accept` / `reject` / `recall`. Historical choice below retained for audit.
 
-| Topic | Rule |
-|-------|------|
-| **Chrome** | Estimate detail toolbar: **Win** / **Lose** (manifest `win` / `lose`). Status remains a **read-only** lifecycle tag — not a PATCH field |
-| **Lose** | Confirm → `status = lost`; no job created |
-| **Win** | Confirm → run handoff (W1–W5). If site has an **active** job → **W1c** intent dialog before commit |
-| **When** | Win from `draft` or `sent`. Lose when not already `won` (and grant allows) |
-| **After win (1 job)** | Navigate to that job |
-| **After win (N jobs)** | **U1** — navigate to the first created job; toast/message lists the other jobs (links) |
-| **Recreate (W1b)** | When `won` and a catalog-scope slice has no live job: toolbar **Create job** (same copy path for missing slice(s)) — not “set status to won again” |
-| **Save** | Draft edits only — **never** creates jobs or flips win/lose |
+**Choice (historical):** dedicated Surface actions **Win** / **Lose**, not status dropdown + Save. Status was a read-only lifecycle tag. Win from `draft`/`sent`; Lose → `lost`; Create job for W1b recreate. Save never flipped win/lose.
 
-**Rejected — status Select + Save:** hides job-creating side effects; conflates `write` with `win`/`lose`; blocks clean recreate.
-
-**API:** `POST` (or Surface action routes) for `win` / `lose` / recreate — re-resolve manifest per action.
-
-**Rationale:** Win is a transaction with N jobs, conditions, allocations, BOM, phases, and sold snapshots — it must be an explicit action.
+**Still true after ST:** accept/reject/submit are **transactions** (confirm + dedicated routes), not quiet PATCH; Create job remains for missing catalog-scope slices; Save never creates jobs.
 
 #### W7 — 5b scope boundary (locked — thick)
 
@@ -935,18 +988,18 @@ If **LI** row drag is implemented, **optional:** drop on **S** scope/zone node r
 
 ### Decision: estimate lifecycle freeze and line lock (2026-07-05)
 
-**Status:** **Locked** for estimate-level freeze (D6a). **Draft line lock column superseded (2026-07-11)** by [dual line locks + live preview](#decision-estimate-dual-line-locks-and-live-preview-2026-07-11) (`sales_locked` + `material_locked`). **Originally superseded** 37f [O4 sell lock deferred](../tasks/37f-estimate-line-costing.md#decision-o4--sell-lock-deferred-2026-07-04).
+**Status:** **Locked** for estimate-level freeze (D6a). **Draft line lock column superseded (2026-07-11)** by [dual line locks + live preview](#decision-estimate-dual-line-locks-and-live-preview-2026-07-11) (`sales_locked` + `material_locked`). **Status vocabulary amended (2026-07-21)** by [ST1–ST10](#decision-estimate-status-dropdown-lifecycle-st1st10-2026-07-21). **Originally superseded** 37f [O4 sell lock deferred](../tasks/37f-estimate-line-costing.md#decision-o4--sell-lock-deferred-2026-07-04).
 
 | `estimate.status` | Edit policy | Recalc / preview |
 |-------------------|-------------|------------------|
 | **`draft`** | Full edit — lines, conditions, specs, complexity | **Yes** — per dual locks ([2026-07-11](#decision-estimate-dual-line-locks-and-live-preview-2026-07-11)) |
-| **`sent`** | **Frozen** — no PATCH to quote-driving fields | **No** — snapshots are the issued quote |
-| **`won`** | Immutable (existing) | **No** |
-| **`lost` / `expired`** | Read-only (v1: same freeze as `sent`) | **No** |
+| **`submitted`** *(was `sent`)* | **Frozen** — no PATCH to quote-driving fields | **No** after enter — ST7 runs one full recalc **on transition in** |
+| **`accepted`** *(was `won`)* | Immutable | **No** |
+| **`rejected`** *(was `lost` / `expired`)* | Read-only (same freeze as `submitted`) | **No** |
 
-**Historical (`lock` enum, retired 2026-07-11):** `none` \| `sell` \| `line` — see catalog D6b archive notes. Estimate-level freeze (`sent`+) still supersedes per-line locks.
+**Historical (`lock` enum, retired 2026-07-11):** `none` \| `sell` \| `line` — see catalog D6b archive notes. Estimate-level freeze (`submitted`+) still supersedes per-line locks.
 
-**Source:** [catalog D6a](./catalog.md#estimate-status-and-recalc-policy-d6a--locked-2026-07-05); line locks → [dual locks decision](#decision-estimate-dual-line-locks-and-live-preview-2026-07-11).
+**Source:** [catalog D6a](./catalog.md#estimate-status-and-recalc-policy-d6a--locked-2026-07-05); line locks → [dual locks decision](#decision-estimate-dual-line-locks-and-live-preview-2026-07-11); vocabulary → [ST1–ST10](#decision-estimate-status-dropdown-lifecycle-st1st10-2026-07-21).
 
 ---
 

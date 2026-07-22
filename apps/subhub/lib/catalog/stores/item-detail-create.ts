@@ -12,12 +12,17 @@ import { withPermissionDb } from "@latch/pg-session";
 import type { Pool } from "pg";
 import { z } from "zod";
 
+import { assertMaterialPhaseAllowed } from "../material-phase-guard";
 import {
   ItemDetailCreateSchema,
+  ItemDetailPatchSchema,
   itemDetailDescriptor,
   type ItemDetailWriteRow,
 } from "../descriptors/item-detail";
-import { loadItemDetail } from "../repository/item-detail";
+import {
+  loadItemDetail,
+  resolveResolvedLaborPhases,
+} from "../repository/item-detail";
 import { insertItem, replaceItemLaborPhases } from "../repository/item-write";
 
 export const parseCategoryCreateBody = (
@@ -52,7 +57,23 @@ export const createCategoryRowFromBody = (
   incidental_rate_type_id: body.commercial?.incidental_rate_type_id ?? null,
   markup_type_id: body.commercial?.markup_type_id ?? null,
   fallback_unit_cost: body.commercial?.fallback_unit_cost ?? 0,
+  material_phase_id: body.commercial?.material_phase_id ?? null,
 });
+
+const assertItemMaterialPhaseStillValid = async (
+  pool: Pool,
+  itemId: string,
+): Promise<void> => {
+  const item = await loadItemDetail(pool, itemId);
+  if (!item?.material_phase_id) {
+    return;
+  }
+  const resolved = await resolveResolvedLaborPhases(pool, itemId);
+  assertMaterialPhaseAllowed(
+    item.material_phase_id,
+    resolved.map((row) => row.labor_phase_id),
+  );
+};
 
 export const extendItemDetailDal = (
   pool: Pool,
@@ -72,7 +93,22 @@ export const extendItemDetailDal = (
       return itemDetailBaseDal.get(ctx, id);
     }
 
+    const schema = narrowPatchSchema(ItemDetailPatchSchema, ctx.manifest);
+    const parsed = schema.safeParse(body);
+    if (parsed.success) {
+      const materialPhaseId = parsed.data.commercial?.material_phase_id;
+      if (materialPhaseId) {
+        const resolved = await resolveResolvedLaborPhases(pool, id);
+        const allowed = new Set(resolved.map((row) => row.labor_phase_id));
+        for (const row of parsed.data.item_labor_phase ?? []) {
+          allowed.add(row.labor_phase_id);
+        }
+        assertMaterialPhaseAllowed(materialPhaseId, allowed);
+      }
+    }
+
     await itemDetailBaseDal.patch(ctx, id, body);
+    await assertItemMaterialPhaseStillValid(pool, id);
     return itemDetailBaseDal.get(ctx, id);
   },
   create: async (ctx, id, body) => {
@@ -83,6 +119,20 @@ export const extendItemDetailDal = (
     }
 
     const row = createCategoryRowFromBody(id, input);
+
+    if (row.material_phase_id) {
+      const allowed = new Set(
+        (input.item_labor_phase ?? []).map((phase) => phase.labor_phase_id),
+      );
+      if (row.parent_id) {
+        const inherited = await resolveResolvedLaborPhases(pool, row.parent_id);
+        for (const phase of inherited) {
+          allowed.add(phase.labor_phase_id);
+        }
+      }
+      assertMaterialPhaseAllowed(row.material_phase_id, allowed);
+    }
+
     const actorId = await getActorId();
     await insertItem(pool, actorId, row);
 
@@ -123,6 +173,7 @@ export const extendItemDetailDal = (
         root_item_id: row.parent_id === null ? row.id : null,
         root_item_name: null,
         fallback_unit_cost: row.fallback_unit_cost,
+        material_phase_id: row.material_phase_id,
         has_children: false,
         in_use: false,
       }),

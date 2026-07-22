@@ -5,7 +5,6 @@ import type { Pool, PoolClient } from "pg";
 import { isUniqueViolation } from "../../sites/repository/sql-utils";
 import {
   loadPurchaseOrderCoverageForJob,
-  loadRequisitionedCoverageForJob,
 } from "./remaining";
 
 const toNumber = (value: unknown): number => Number(value ?? 0);
@@ -135,10 +134,27 @@ export const assertWithinRemaining = async (
     demandResult.rows.map((row) => [row.id, toNumber(row.quantity)] as const),
   );
 
-  const [jobWideCoverage, poCoverage] = await Promise.all([
-    loadRequisitionedCoverageForJob(client, jobId),
-    loadPurchaseOrderCoverageForJob(client, jobId),
-  ]);
+  // RP3: remaining = demand − PO. Cap concurrent open asks so edits cannot
+  // oversubscribe the leftover (other open JMRs still count against the cap).
+  const poCoverage = await loadPurchaseOrderCoverageForJob(client, jobId);
+
+  const otherOpenResult = await client.query<{
+    job_line_part_id: string;
+    covered: string | number;
+  }>(
+    `SELECT job_line_part_id, SUM(quantity) AS covered
+     FROM job_material_request
+     WHERE job_id = $1
+       AND job_line_part_id = ANY($2::text[])
+       AND status = 'open'
+     GROUP BY job_line_part_id`,
+    [jobId, partIds],
+  );
+  const otherOpen = new Map(
+    otherOpenResult.rows.map(
+      (row) => [row.job_line_part_id, toNumber(row.covered)] as const,
+    ),
+  );
 
   for (const [partId, incomingQty] of incomingSums) {
     const demand = demandMap.get(partId);
@@ -150,10 +166,10 @@ export const assertWithinRemaining = async (
       });
     }
 
-    const otherCovered =
-      (jobWideCoverage.get(partId) ?? 0) - (ownCoverage.get(partId) ?? 0);
+    const openOthers =
+      (otherOpen.get(partId) ?? 0) - (ownCoverage.get(partId) ?? 0);
     const poCovered = poCoverage.get(partId) ?? 0;
-    const allowed = Math.max(0, demand - otherCovered - poCovered);
+    const allowed = Math.max(0, demand - poCovered - openOthers);
 
     if (incomingQty > allowed + 1e-9) {
       throw new ValidationError(

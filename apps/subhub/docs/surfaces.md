@@ -510,7 +510,7 @@ Applies to **customer, vendor, manufacturer, property_owner** detail lenses — 
 |-----|---------|
 | **Overview** | `profile`, `stakeholders`, derived Field lifecycle/%, `billing_settings` (6b) |
 | **Scope** | `conditions`, `line_items`; links to change orders + procurement Surfaces |
-| **Field** | `field_progress` (zone×phase boolean; 51) + ☐ Order via `field_zone_orders` (55) + **Issues** table via `field_issues` (57/60 FI1–FI12). Planned material enters via **Scope → Line Items → Add line** only (FI12; Field-direct ad-hoc removed). |
+| **Field** | `field_progress` (zone×phase Done; 51) + **Order** column via `field_zone_orders` → `job_field_order_cell` (62 JML6–JML9) + **Issues** table via `field_issues` (57/60 FI1–FI12). No Work/item/part list on Field (JML8). Planned material enters via **Scope → Line Items → Add line** only. |
 | **Billing** | `billable_items`, `sov_milestones` (wave 6b); links to invoices |
 
 **`job_list` columns:** `title`, `site` name, derived Field lifecycle + %
@@ -525,7 +525,7 @@ Applies to **customer, vendor, manufacturer, property_owner** detail lenses — 
 | `conditions` | collection | `job_condition*` — commercial forest |
 | `line_items` | collection | `job_line` — sold scope; **same flat vs site-geography grouping** as estimate ([decision](./decisions/estimate.md#decision-estimate--job-line-grouping--site-geography-2026-06-17)) |
 | `field_progress` | collection | `job_field_progress_cell` — zone×phase boolean; derived % / lifecycle (51 F1–F9); Save appends `job_progress_report*` when changed (55) |
-| `field_zone_orders` | collection | Desired Field ☐ Order intents; Save → `job_material_request` rows with `site_zone_id` (55/56) |
+| `field_zone_orders` | collection | Replace-array of `job_field_order_cell` (62); persistent Order state — live pool derivation in [63](./tasks/63-requisitions-live-pool.md) |
 | `field_issues` | collection | Pending create/update/resolve/cancel for `job_issue`; Stakeholders-like table on Field (57/60 FI1–FI12); batched into whole-job Save |
 | `billable_items` | collection | `billable_line` — **wave 6b**; shown when billing section granted |
 | `sov_milestones` | collection | `schedule_of_value` + `sov_line` + `sov_allocation` — when `billing_model = progress_sov` ([decision](./decisions/billing.md#decision-sov-ui--nested-on-job_detail-billing-tab-2026-06-17)) |
@@ -569,7 +569,7 @@ Applies to **customer, vendor, manufacturer, property_owner** detail lenses — 
 
 **UX (task 59 / [IT1–IT8](./decisions/procurement.md#decision-material-request-item_id--poolpo-descriptions-it1it8-2026-07-20)):** snapshot `item_id` from Field ☐ Order onto `job_material_request` (+ `purchase_order_line`); pool columns Qty · **Item** (RO; **Multiple** if mixed) · Part # (narrowed by item / union) · **Description** (manufacturer PN desc; soft-spec = request text) · Vendor. PO line seed description = `vendor_description || manufacturer_description || jmr.description`, overridable on the PO. **Complete** (migration **088**).
 
-**Notes:** Created only from Job → Field ☐ Order (or purchaser PO9 ad-hoc on a draft PO). No Field “+ Add material”; planned extras enter via Scope → Line Items ([FI2/FI12](./decisions/job.md#decision-field-issues--signal-only--revert-field-ad-hoc-fi1fi12-2026-07-20)). No manual create UI (RQ3). Uncheck-while-open = hard delete (RQ2). PO linkage via `purchase_order_line_source` ([53](./tasks/53-purchase-order-workbench.md)).
+**Notes:** Open `job_material_request` rows will be derived live from locked BOM × Order cells ([63](./tasks/63-requisitions-live-pool.md)). Field Order toggles persist `job_field_order_cell` only (62) — no Save-time JMR snapshot. No Field “+ Add material”; planned extras enter via Scope → Line Items ([FI2/FI12](./decisions/job.md#decision-field-issues--signal-only--revert-field-ad-hoc-fi1fi12-2026-07-20) / JML8). No manual create UI (RQ3). PO linkage via `purchase_order_line_source` ([53](./tasks/53-purchase-order-workbench.md)).
 
 ### `purchase_order_list` · `purchase_order_detail`
 

@@ -61,9 +61,12 @@ export const loadJobCostSummary = async (
   let committed = 0;
   if (await tableExists(pool, "purchase_order_line")) {
     // purchase_order_line uses unit_price (migration 084); receipt filter only when MRL exists.
-    // Key off purchase_order.job_id directly (not job_line_part) so ad-hoc / soft-spec PO
-    // lines with no BOM link still count toward committed; exclude cancelled/rejected so a
-    // retracted PO (task 53) doesn't leave stale committed $ on the job.
+    // Key off purchase_order.job_id directly (not job_line_part) so ad-hoc /
+    // soft-spec PO lines with no BOM link still count toward committed.
+    // General-bucket POs (`job_id IS NULL`, task 64 RP9) never match this
+    // predicate and are excluded from every job cost report.
+    // Exclude cancelled/rejected so a retracted PO (task 53) doesn't leave
+    // stale committed $ on the job.
     const receiptFilter = (await tableExists(pool, "material_receipt_line"))
       ? `AND (
            NOT EXISTS (

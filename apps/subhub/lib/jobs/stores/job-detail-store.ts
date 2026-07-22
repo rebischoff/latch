@@ -74,7 +74,7 @@ export const createJobDetailStore = (
     ) {
       await applyJobFieldSave(pool, actorId, jobId, {
         cells: patch.field_progress,
-        zoneOrders: patch.field_zone_orders,
+        orderCells: patch.field_zone_orders,
         issues: patch.field_issues,
       });
     }

@@ -703,6 +703,7 @@ Table item {
   freight_rate_type_id text [note: 'nullable FK → cost_add_on_type (kind=freight)']
   incidental_rate_type_id text [note: 'nullable FK → cost_add_on_type (kind=incidental)']
   markup_type_id text [note: 'nullable FK → markup_type']
+  material_phase_id text [note: 'nullable FK → labor_phase — default phase whose work consumes this leaf item''s material (task 61 MP1); overridable per line via job_line.material_phase_id']
   created_at timestamptz [not null, default: `now()`]
   updated_at timestamptz [not null, default: `now()`]
 
@@ -878,7 +879,7 @@ Table estimate {
   id text [pk, default: `gen_random_uuid()::text`]
   site_id text [not null, note: 'FK → site — logical place for quote']
   title text [not null, default: '']
-  status text [not null, default: 'draft', note: 'CHECK: draft | sent | won | lost | expired']
+  status text [not null, default: 'draft', note: 'CHECK: draft | submitted | accepted | rejected']
   estimate_date date [note: 'nullable — quote date']
   valid_until date [note: 'nullable — quote expiry']
   source_estimate_id text [note: 'nullable FK → estimate.id; revision chain']
@@ -1198,7 +1199,8 @@ Table job_line {
   site_asset_id text [note: 'nullable FK → site_asset — device-level scope']
   material_status text [note: 'nullable — carried from estimate']
   sales_locked boolean [not null, default: false]
-  material_locked boolean [not null, default: false]
+  material_locked boolean [not null, default: false, note: 'JLI part-pin sticky flag (37aa P6) — also gates procurement readiness (task 61 JML1–JML4): true = ready to order (part_id may still be null = soft lock / TBD, purchaser finalizes PN)']
+  material_phase_id text [note: 'nullable FK → labor_phase — per-line override of item.material_phase_id (task 61 MP2); resolution: this → item default → line''s earliest scope_phase by sequence']
   item_id text [note: 'nullable FK → item — sold scope; may stay generic']
   part_id text [note: 'nullable FK → manufacturer_part']
   vendor_part_id text [note: 'nullable FK → vendor_part']
@@ -1317,6 +1319,29 @@ Table job_field_progress_cell {
     Living Field board (51 F1–F9) — boolean complete per (scope_phase, site_zone | General).
     Surface Field `field_progress` replace-array. History = append-only `job_progress_report*`
     on Save when progress changed (55). Do not write `progress_entry*` from this path.
+  '''
+}
+
+Table job_field_order_cell {
+  id text [pk, default: `gen_random_uuid()::text`]
+  scope_phase_id text [not null]
+  site_zone_id text [note: 'nullable FK → site_zone — null = General (unplaced) pseudo-geography']
+  requested boolean [not null, default: false]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (scope_phase_id, site_zone_id) [unique, name: 'job_field_order_cell_phase_zone_unique', note: 'partial WHERE site_zone_id IS NOT NULL']
+    (scope_phase_id) [unique, name: 'job_field_order_cell_phase_general_unique', note: 'partial WHERE site_zone_id IS NULL']
+  }
+
+  Note: '''
+    Field "Order" column (task 61/62 JML6–JML9) — boolean requested-for-ordering per
+    (scope_phase, site_zone | General). Same shape as `job_field_progress_cell`; independent
+    axis (a phase may be ordered before/after it is worked). scope_phase_id is always the
+    row matching a job_line's *effective material phase* (catalog.md MP3), so this table only
+    ever gets populated for scope_phase rows that a line's BOM actually routes through.
+    Persistent/subscription state — not a Save-time snapshot; `/requisitions` (job_material_request)
+    is derived live from this × locked job_line_part × job_line_allocation (procurement.md RP1).
   '''
 }
 
@@ -1528,7 +1553,7 @@ Table job_material_request {
 
 Table purchase_order {
   id text [pk, default: `gen_random_uuid()::text`]
-  job_id text [not null]
+  job_id text [note: 'nullable — NULL = general/job-less bucket (task 64 RP9): overhead, shop-stock replenishment, incidentals. Never job-tagged once null.']
   vendor_party_id text [not null, note: 'FK → party (vendor tag)']
   po_number text [note: 'nullable until issued — unique when set']
   status text [not null, default: 'draft', note: 'CHECK: draft | sent | received | cancelled']
@@ -1543,9 +1568,12 @@ Table purchase_order {
   }
 
   Note: '''
-    Vendor commitment from job. Created draft from Requested pool (grouped by vendor) or manually.
-    Must stay **draft** to add ad-hoc lines; **Send** issues PO (`sent`). Header `received` when all
-    lines received or cancelled.
+    Job-assigned: vendor commitment pulled from the `/requisitions` pool (task 61–63) — part_id
+    frozen per line, qty editable, line deletable, **no direct ad-hoc line add** (RP7–RP8).
+    General bucket (`job_id IS NULL`, task 64 RP9–RP10): freeform ad-hoc lines allowed at will;
+    strictly job-less, never appears on any job's cost report. Must stay **draft** to add ad-hoc
+    lines (general bucket only); **Send** issues PO (`sent`). Header `received` when all lines
+    received or cancelled.
   '''
 }
 
@@ -1882,6 +1910,7 @@ Ref: site_contact.party_id > party.id [delete: cascade]
 Ref: site_contact.relation_id > site_contact_relation.id [delete: restrict]
 
 Ref: item.parent_id > item.id [delete: set null]
+Ref: item.material_phase_id > labor_phase.id [delete: set null]
 Ref: item.freight_rate_type_id > cost_add_on_type.id [delete: set null]
 Ref: item.incidental_rate_type_id > cost_add_on_type.id [delete: set null]
 Ref: item.markup_type_id > markup_type.id [delete: set null]
@@ -1946,6 +1975,7 @@ Ref: job_scope_group.site_zone_id > site_zone.id [delete: set null]
 Ref: job_scope_group.sov_line_id > sov_line.id [delete: set null]
 Ref: job_line.job_id > job.id [delete: cascade]
 Ref: job_line.job_condition_id > job_condition.id [delete: set null]
+Ref: job_line.material_phase_id > labor_phase.id [delete: set null]
 Ref: job_condition.job_id > job.id [delete: cascade]
 Ref: job_condition.parent_condition_id > job_condition.id [delete: cascade]
 Ref: job_condition.site_zone_id > site_zone.id [delete: restrict]
@@ -1971,6 +2001,8 @@ Ref: scope_phase.job_line_id > job_line.id [delete: cascade]
 Ref: scope_phase.labor_phase_id > labor_phase.id [delete: restrict]
 Ref: job_field_progress_cell.scope_phase_id > scope_phase.id [delete: cascade]
 Ref: job_field_progress_cell.site_zone_id > site_zone.id [delete: restrict]
+Ref: job_field_order_cell.scope_phase_id > scope_phase.id [delete: cascade]
+Ref: job_field_order_cell.site_zone_id > site_zone.id [delete: restrict]
 Ref: job_progress_report.job_id > job.id [delete: cascade]
 Ref: job_progress_report.recorded_by > employee.party_id [delete: set null]
 Ref: job_progress_report_cell.report_id > job_progress_report.id [delete: cascade]

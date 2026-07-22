@@ -17,8 +17,8 @@ export const POST = async (
       entityId: estimateId,
     });
 
-    // Recreate reuses the same `win` grant (W1b).
-    if (!surfaceAllows(ctx.manifest, "win")) {
+    // Recreate uses the dedicated `create_job` grant (W1b / ST5).
+    if (!surfaceAllows(ctx.manifest, "create_job")) {
       throw new ForbiddenError();
     }
 

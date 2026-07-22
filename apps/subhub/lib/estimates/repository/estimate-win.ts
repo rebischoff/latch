@@ -4,30 +4,51 @@ import type { Pool, PoolClient } from "pg";
 
 import { seedBomFromSoldLineTx } from "../../jobs/repository/job-line-bom-seed";
 import { seedScopePhasesForJobLineTx } from "../../jobs/repository/scope-phase-seed";
+import {
+  recalcLineItems,
+  type RecalcLineInput,
+} from "./estimate-line-recalc";
 
-/** Estimate statuses that may be won (W6 / status gate). */
-export const WIN_ALLOWED_STATUSES = new Set(["draft", "sent"]);
+/** Estimate lifecycle statuses (ST1). */
+export const ESTIMATE_STATUSES = [
+  "draft",
+  "submitted",
+  "accepted",
+  "rejected",
+] as const;
+
+export type EstimateLifecycleStatus = (typeof ESTIMATE_STATUSES)[number];
+
+/** Non-draft statuses — quote inputs and preview/recalc are frozen (ST7–ST9). */
+export const ESTIMATE_FROZEN_STATUSES = new Set<string>([
+  "submitted",
+  "accepted",
+  "rejected",
+]);
+
+export const isEstimateFrozenStatus = (status: string): boolean =>
+  ESTIMATE_FROZEN_STATUSES.has(status);
 
 /** Job statuses considered "active" on a site for the W1c second-estimate gate. */
 export const ACTIVE_JOB_STATUSES = ["planned", "active"] as const;
 
-export type WinEstimateOptions = {
+export type AcceptEstimateOptions = {
   /**
-   * W1c: when the site already has an active job and this is false, `winEstimate`
+   * W1c: when the site already has an active job and this is false, `acceptEstimate`
    * throws a structured `site_has_active_job` conflict so the UI can confirm and
    * retry with `true`.
    */
   proceedDespiteActiveSiteJobs?: boolean;
 };
 
-export type WonJobSummary = {
+export type AcceptedJobSummary = {
   id: string;
   catalog_scope_item_id: string;
   title: string;
 };
 
-export type WinEstimateResult = {
-  jobs: WonJobSummary[];
+export type AcceptEstimateResult = {
+  jobs: AcceptedJobSummary[];
 };
 
 type EstimateHeader = {
@@ -144,8 +165,17 @@ export const buildJobTitle = (
   return base || scope || "";
 };
 
-export const isWinnableStatus = (status: string): boolean =>
-  WIN_ALLOWED_STATUSES.has(status);
+/** Accept is only from `submitted` (ST8 / ST10). */
+export const isAcceptableStatus = (status: string): boolean =>
+  status === "submitted";
+
+export const canSubmitEstimate = (status: string): boolean => status === "draft";
+
+export const canRejectEstimate = (status: string): boolean =>
+  status === "draft" || status === "submitted";
+
+export const canRecallEstimate = (status: string): boolean =>
+  status === "submitted";
 
 // ─── Loaders ─────────────────────────────────────────────────────────────────
 
@@ -502,7 +532,7 @@ const createJobForSliceTx = async (
   ctx: SliceContext,
   scopeItemId: string,
   sliceLineIds: string[],
-): Promise<WonJobSummary> => {
+): Promise<AcceptedJobSummary> => {
   const sliceLines = sliceLineIds
     .map((id) => ctx.linesById.get(id))
     .filter((row): row is EstimateLineRow => row !== undefined);
@@ -594,17 +624,119 @@ const buildSliceContext = async (
 
 // ─── Public API ────────────────────────────────────────────────────────────────
 
-const winEstimateTx = async (
+/** ST7: live-catalog recalc all lines, persist snapshots, then freeze as submitted. */
+const submitEstimateTx = async (
   client: PoolClient,
   estimateId: string,
-  options: WinEstimateOptions,
-): Promise<WinEstimateResult> => {
+): Promise<void> => {
   const estimate = await loadEstimateHeaderForUpdate(client, estimateId);
 
-  if (!isWinnableStatus(estimate.status)) {
-    throw new ConflictError("Estimate cannot be won from its current status", {
+  if (!canSubmitEstimate(estimate.status)) {
+    throw new ConflictError("Estimate cannot be submitted from its current status", {
       field: "status",
-      code: "estimate_not_winnable",
+      code: "estimate_not_submittable",
+      status: estimate.status,
+    });
+  }
+
+  const lines = await loadEstimateLines(client, estimateId);
+  const inputs: RecalcLineInput[] = lines.map((line) => ({
+    id: line.id,
+    estimate_condition_id: line.estimate_condition_id,
+    parent_line_id: line.parent_line_id,
+    line_role: line.line_role as RecalcLineInput["line_role"],
+    description: line.description,
+    quantity: Number(line.quantity),
+    qty_manual: Boolean(line.qty_manual),
+    unit: line.unit,
+    unit_cost: Number(line.unit_cost),
+    unit_price: Number(line.unit_price),
+    unit_material: Number(line.unit_material),
+    unit_labor: Number(line.unit_labor),
+    unit_freight: Number(line.unit_freight),
+    unit_incidental: Number(line.unit_incidental),
+    unit_price_target:
+      line.unit_price_target === null || line.unit_price_target === undefined
+        ? undefined
+        : Number(line.unit_price_target),
+    sales_locked: Boolean(line.sales_locked),
+    material_locked: Boolean(line.material_locked),
+    item_id: line.item_id,
+    part_id: line.part_id,
+    vendor_part_id: line.vendor_part_id,
+  }));
+
+  const priorIds = new Set(inputs.map((line) => line.id));
+  const recalculated = await recalcLineItems(client, inputs, priorIds);
+
+  for (const line of recalculated) {
+    await client.query(
+      `UPDATE estimate_line SET
+         description = $2,
+         quantity = $3,
+         qty_manual = $4,
+         unit = $5,
+         unit_cost = $6,
+         unit_price = $7,
+         unit_material = $8,
+         unit_labor = $9,
+         unit_freight = $10,
+         unit_incidental = $11,
+         unit_price_target = $12,
+         sales_locked = $13,
+         material_locked = $14,
+         item_id = $15,
+         part_id = $16,
+         vendor_part_id = $17
+       WHERE id = $1 AND estimate_id = $18`,
+      [
+        line.id,
+        line.description,
+        line.quantity,
+        line.qty_manual ?? false,
+        line.unit,
+        line.unit_cost,
+        line.unit_price,
+        line.unit_material,
+        line.unit_labor,
+        line.unit_freight,
+        line.unit_incidental,
+        line.unit_price_target ?? null,
+        line.sales_locked ?? false,
+        line.material_locked ?? false,
+        line.item_id ?? null,
+        line.part_id ?? null,
+        line.vendor_part_id ?? null,
+        estimateId,
+      ],
+    );
+  }
+
+  await client.query(
+    `UPDATE estimate SET status = 'submitted', updated_at = now() WHERE id = $1`,
+    [estimateId],
+  );
+};
+
+/** ST7: full line recalc then freeze as `submitted`. */
+export const submitEstimate = async (
+  pool: Pool,
+  actorId: string,
+  estimateId: string,
+): Promise<void> =>
+  withPermissionDb(pool, actorId, (client) => submitEstimateTx(client, estimateId));
+
+const acceptEstimateTx = async (
+  client: PoolClient,
+  estimateId: string,
+  options: AcceptEstimateOptions,
+): Promise<AcceptEstimateResult> => {
+  const estimate = await loadEstimateHeaderForUpdate(client, estimateId);
+
+  if (!isAcceptableStatus(estimate.status)) {
+    throw new ConflictError("Estimate cannot be accepted from its current status", {
+      field: "status",
+      code: "estimate_not_acceptable",
       status: estimate.status,
     });
   }
@@ -612,7 +744,7 @@ const winEstimateTx = async (
   const { ctx, byScope } = await buildSliceContext(client, estimate);
 
   if (byScope.size === 0) {
-    throw new ValidationError("Estimate has no line items to win", {
+    throw new ValidationError("Estimate has no line items to accept", {
       field: "line_items",
       code: "no_lines",
     });
@@ -632,7 +764,7 @@ const winEstimateTx = async (
 
   const existingScopes = await loadExistingScopeJobIds(client, estimateId);
 
-  const jobs: WonJobSummary[] = [];
+  const jobs: AcceptedJobSummary[] = [];
   for (const scopeItemId of [...byScope.keys()].sort()) {
     if (existingScopes.has(scopeItemId)) {
       throw new ConflictError("A job already exists for this catalog scope", {
@@ -647,7 +779,7 @@ const winEstimateTx = async (
   }
 
   await client.query(
-    `UPDATE estimate SET status = 'won', updated_at = now() WHERE id = $1`,
+    `UPDATE estimate SET status = 'accepted', updated_at = now() WHERE id = $1`,
     [estimateId],
   );
 
@@ -655,62 +787,97 @@ const winEstimateTx = async (
 };
 
 /**
- * W1a–W5: win an estimate. Partitions lines by catalog scope root, creates one
- * job per scope (copying parties, conditions, lines, allocations, specs; seeding
- * phases + BOM), sets the estimate `status = won`, and returns the created jobs.
+ * ST8 / W1a–W5: accept a submitted estimate. Partitions lines by catalog scope,
+ * creates one job per scope, sets `status = accepted`.
  */
-export const winEstimate = async (
+export const acceptEstimate = async (
   pool: Pool,
   actorId: string,
   estimateId: string,
-  options: WinEstimateOptions = {},
-): Promise<WinEstimateResult> =>
+  options: AcceptEstimateOptions = {},
+): Promise<AcceptEstimateResult> =>
   withPermissionDb(pool, actorId, (client) =>
-    winEstimateTx(client, estimateId, options),
+    acceptEstimateTx(client, estimateId, options),
   );
 
-const loseEstimateTx = async (
+const rejectEstimateTx = async (
   client: PoolClient,
   estimateId: string,
 ): Promise<void> => {
   const estimate = await loadEstimateHeaderForUpdate(client, estimateId);
 
-  if (estimate.status === "won") {
-    throw new ConflictError("A won estimate cannot be marked lost", {
+  if (estimate.status === "accepted") {
+    throw new ConflictError("An accepted estimate cannot be rejected", {
       field: "status",
-      code: "estimate_already_won",
+      code: "estimate_already_accepted",
       status: estimate.status,
     });
   }
 
-  if (estimate.status === "lost") {
+  if (estimate.status === "rejected") {
     return;
   }
 
+  if (!canRejectEstimate(estimate.status)) {
+    throw new ConflictError("Estimate cannot be rejected from its current status", {
+      field: "status",
+      code: "estimate_not_rejectable",
+      status: estimate.status,
+    });
+  }
+
   await client.query(
-    `UPDATE estimate SET status = 'lost', updated_at = now() WHERE id = $1`,
+    `UPDATE estimate SET status = 'rejected', updated_at = now() WHERE id = $1`,
     [estimateId],
   );
 };
 
-/** Mark an estimate lost. Idempotent when already lost; conflicts when won. */
-export const loseEstimate = async (
+/** ST9: lock as rejected. Idempotent when already rejected; conflicts when accepted. */
+export const rejectEstimate = async (
   pool: Pool,
   actorId: string,
   estimateId: string,
 ): Promise<void> =>
-  withPermissionDb(pool, actorId, (client) => loseEstimateTx(client, estimateId));
+  withPermissionDb(pool, actorId, (client) => rejectEstimateTx(client, estimateId));
+
+const recallEstimateTx = async (
+  client: PoolClient,
+  estimateId: string,
+): Promise<void> => {
+  const estimate = await loadEstimateHeaderForUpdate(client, estimateId);
+
+  if (!canRecallEstimate(estimate.status)) {
+    throw new ConflictError("Only a submitted estimate can be recalled to draft", {
+      field: "status",
+      code: "estimate_not_recallable",
+      status: estimate.status,
+    });
+  }
+
+  await client.query(
+    `UPDATE estimate SET status = 'draft', updated_at = now() WHERE id = $1`,
+    [estimateId],
+  );
+};
+
+/** ST10: submitted → draft unlock for revise. */
+export const recallEstimate = async (
+  pool: Pool,
+  actorId: string,
+  estimateId: string,
+): Promise<void> =>
+  withPermissionDb(pool, actorId, (client) => recallEstimateTx(client, estimateId));
 
 const recreateMissingJobsTx = async (
   client: PoolClient,
   estimateId: string,
-): Promise<WinEstimateResult> => {
+): Promise<AcceptEstimateResult> => {
   const estimate = await loadEstimateHeaderForUpdate(client, estimateId);
 
-  if (estimate.status !== "won") {
-    throw new ConflictError("Only a won estimate can recreate missing jobs", {
+  if (estimate.status !== "accepted") {
+    throw new ConflictError("Only an accepted estimate can recreate missing jobs", {
       field: "status",
-      code: "estimate_not_won",
+      code: "estimate_not_accepted",
       status: estimate.status,
     });
   }
@@ -718,7 +885,7 @@ const recreateMissingJobsTx = async (
   const { ctx, byScope } = await buildSliceContext(client, estimate);
   const existingScopes = await loadExistingScopeJobIds(client, estimateId);
 
-  const jobs: WonJobSummary[] = [];
+  const jobs: AcceptedJobSummary[] = [];
   for (const scopeItemId of [...byScope.keys()].sort()) {
     if (existingScopes.has(scopeItemId)) {
       continue;
@@ -733,13 +900,13 @@ const recreateMissingJobsTx = async (
 
 /**
  * W1b: recreate jobs for catalog-scope slices that have no live job (e.g. after a
- * job delete). Skips scopes that already have a job; the estimate stays `won`.
+ * job delete). Skips scopes that already have a job; the estimate stays `accepted`.
  */
 export const recreateMissingJobs = async (
   pool: Pool,
   actorId: string,
   estimateId: string,
-): Promise<WinEstimateResult> =>
+): Promise<AcceptEstimateResult> =>
   withPermissionDb(pool, actorId, (client) =>
     recreateMissingJobsTx(client, estimateId),
   );

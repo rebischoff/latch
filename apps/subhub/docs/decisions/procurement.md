@@ -12,6 +12,48 @@
 
 **Amended 2026-07-20:** Snapshot `item_id` on demand + pool/PO description rules — [IT1–IT8](#decision-material-request-item_id--poolpo-descriptions-it1it8-2026-07-20); task [59](../tasks/59-material-request-item-id-and-descriptions.md).
 
+**Amended 2026-07-21:** `/requisitions` becomes a **live derived pool**, rollup drops to **one row per `job_line`** (reverses IT4/RQ-UI3's `job × part` rollup), PO job-lock rules, and new job-less **general bucket** PO — [RP1–RP10](#decision-requisitions-live-pool-per-line-rollup-and-po-job-lock-rp1rp10-2026-07-21); tasks [61](../tasks/61-job-material-lock-and-phase.md)–[64](../tasks/64-general-bucket-purchase-orders.md).
+
+### Decision: requisitions live pool, per-line rollup, and PO job-lock (RP1–RP10) (2026-07-21)
+
+**Status:** **Locked**. **Tasks:** [61](../tasks/61-job-material-lock-and-phase.md)–[64](../tasks/64-general-bucket-purchase-orders.md). **Companion:** [catalog.md — material phase (MP1–MP4)](./catalog.md#decision-material-phase--item-default--job-line-override-mp1mp4-2026-07-21); [job.md — job material lock + zone Order (JML1–JML12)](./job.md#decision-job-material-lock-phase-aware-zone-order-and-live-requisition-pool-jml1jml12-2026-07-21). **Amends / reverses:** [IT4/IT8](#decision-material-request-item_id--poolpo-descriptions-it1it8-2026-07-20) ("rollup stays `job × part`" — **reversed**, see RP4); [RQ-UI3](#decision-requisitions--po-pool-ux-fold-workbench-rq-ui1rq-ui8-2026-07-20) (display rollup — same reversal); [RQ-UI5](#decision-requisitions--po-pool-ux-fold-workbench-rq-ui1rq-ui8-2026-07-20) (PN may stay TBD until Create POs — tightened, see RP6); [R2](#decision-requisition-surfaces-ux-r1r8-2026-07-16) (freeform ad-hoc on the pool — **retired**, see RP5); PO9 / freeform ad-hoc line ([53](../tasks/53-purchase-order-workbench.md)) — retired for **job-assigned** POs only (RP8), kept for the new **general bucket** (RP10).
+
+**Problem:** Chat session (2026-07-20/21) rethought Field/Scope/Requisitions/PO boundaries end to end — Field stops listing parts (job.md JML8), Scope becomes the sole source of buy intent, and `/requisitions` needs to reflect that live instead of via Save-triggered snapshots. This block records the procurement-side outcome; see chat transcript for the full options/pros-cons walkthrough.
+
+#### `/requisitions` pool (RP1–RP4)
+
+| Id | Choice |
+|----|--------|
+| **RP1** | **Live derived pool** — no more Save-triggered snapshot creation (retires L8/L29/L30's "Order-changing Save → new `requested_order`" trigger path; that model was already collapsed into flat `job_material_request` by task 56, this goes one step further). `job_material_request` **keeps its shape** (`open` / `on_purchase_order` / `fulfilled`) but rows are **system-derived**, not user-Save-authored: the DAL keeps open rows in sync with (locked `job_line_part` × effective material phase × zone allocation × `Order[phase,zone]=true`) on every relevant read/write — no persisted "snapshot event," no `requested_order` header table revival. |
+| **RP2** | **No ad-hoc / freeform demand** (amends R2). Every pool row traces to a `job_line` via `job_line_part_id`. There is no path to create an open requisition row without a Scope line behind it. |
+| **RP3** | Remaining qty = `job_line_part.quantity` **minus PO coverage** for that `job_line_part_id`. (Simplifies `remaining.ts`'s existing two-term calc — the "requested coverage" term collapses because there is no other open-but-uncounted state once RP1 lands; a row's mere presence in the pool already means "not yet on a PO.") |
+| **RP4** | **Rollup reversed — one row per `job_line`, never merged across lines**, even when two lines resolve to the identical part. (Reverses IT4/IT8/RQ-UI3's `job × part` merge.) Ad-hoc/freeform rows that used to also merge under the old rollup are moot per RP2. |
+
+#### Part # narrowing on the pool (RP5–RP6)
+
+| Id | Choice |
+|----|--------|
+| **RP5** | Pool's Part # dropdown calls the **same resolver** Scope's Part picker uses — `fetchJobPartPicker(item_id, job_condition_id, draft)` — not the looser item-only union (amends IT4's "union of items' linked parts"). Each pool row carries its contributing `job_line_id` **and** that line's `job_condition_id` so the purchaser gets the identical narrowed option set an engineer would see on Scope. Since rollup is now one-row-per-line (RP4), this is always a single, unambiguous `(item_id, job_condition_id)` pair per row — no merged-row option-set conflict to resolve. |
+| **RP6** | Both **`part_id` and vendor must be resolved on the pool row before it is eligible to be pulled into a PO** (tightens RQ-UI5 — previously PN could stay blank until Create POs; vendor was picked at PO-creation time). Soft-locked/TBD rows (JML3) stay visible in the pool but are not PO-selectable until resolved. |
+
+#### Purchase orders — job-assigned (RP7–RP8)
+
+| Id | Choice |
+|----|--------|
+| **RP7** | Once a PO line belongs to a **job-assigned** PO: `part_id` frozen (no swap); `quantity` editable; line deletable (cancel). Matches [job.md JML4](./job.md#decision-job-material-lock-phase-aware-zone-order-and-live-requisition-pool-jml1jml12-2026-07-21) — this is the real freeze point, Scope unlock has no effect on qty already here. |
+| **RP8** | **No new lines may be added directly** to a job-assigned PO (retires PO9 freeform ad-hoc for this PO type). All material must originate via Scope → lock → Order → pool → pulled into a PO. |
+
+#### General / job-less bucket PO (RP9–RP10)
+
+| Id | Choice |
+|----|--------|
+| **RP9** | New PO type: **`purchase_order.job_id` becomes nullable**. `job_id IS NULL` = **general bucket** — overhead spend, shop-stock replenishment (ahead of job demand, received via `job_material_movement` rather than a job), and incidentals. **Strictly job-less** — a general-bucket PO/line never references any job, and never appears on any job's cost report (rejected: optional job tag on an otherwise-general line — kept the model simple and unambiguous). |
+| **RP10** | General-bucket POs keep **freeform ad-hoc line add at will** (the PO9 capability, scoped now to this PO type only) — there is no Scope pipeline to feed a job-less buy. |
+
+**Rationale:** RP1–RP4 make "what's outstanding" always true without anyone re-triggering anything, matching the same subscription philosophy as JML9. RP5–RP6 close a real accuracy gap — the pool was narrowing PN more loosely than Scope itself did. RP7–RP8 make the PO the one genuine hard freeze in the whole pipeline, consistent with every other freeze point resolved in this session. RP9–RP10 give overhead/stock/incidental purchasing a legitimate home without stretching job-scoped PO semantics to cover them.
+
+---
+
 ### Decision: Material request `item_id` + pool/PO descriptions (IT1–IT8) (2026-07-20)
 
 **Status:** **Locked**. **Task:** [59](../tasks/59-material-request-item-id-and-descriptions.md). **Amends:** Field ☐ Order write ([Field zone Order](#decision-field-zone-order--requisition-snapshots-2026-07-17)); `/requisitions` column chrome ([RQ-UI3](#decision-requisitions--po-pool-ux-fold-workbench-rq-ui1rq-ui8-2026-07-20) *display* — **keeps** rollup key **`job × part`**); Create POs / PO9 line seed text ([53](../tasks/53-purchase-order-workbench.md)). **Keeps:** RQ-UI3 rollup; RQ-UI5 staged PN; one draft PO per job × vendor.

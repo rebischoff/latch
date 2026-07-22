@@ -39,7 +39,7 @@
 | 10 | **`site_system_id`** | Always **`null`** on create/patch in 4e. Link/copy deferred to 4c′ / win. |
 | 11 | **Win → job** | Reconcile quote **areas** → `site_area` at win (4b). `site_asset` on site at install / `job.complete` — not from quote asset rows. |
 | 12 | **List / create / delete** | Unchanged from 4a — list columns `title`, site name, `status`, `estimate_date`; POST `title` + `site_id`; hard delete `draft` only when allowed |
-| 13 | **Site anchor (task 33 → 44)** | `profile.site_id` required on create; **writable while editable** — warn-and-clear when changing site with conditions/lines; Line Items gated on non-empty `site_id`; freeze only for `won`/`lost`/`expired` ([decision](../decisions/estimate.md#decision-estimate--job-site-anchor--warn-and-clear-not-immutable-2026-07-14)) |
+| 13 | **Site anchor (task 33 → 44)** | `profile.site_id` required on create; **writable while editable** — warn-and-clear when changing site with conditions/lines; Line Items gated on non-empty `site_id`; freeze for `submitted`/`accepted`/`rejected` ([decision](../decisions/estimate.md#decision-estimate-status-dropdown-lifecycle-st1st10-2026-07-21)) |
 
 **Supersedes (4a):** flat-only line grid; `estimate_section_id` / `site_location_id` on lines; grouped-by-place toggle keyed off `site_section` / `site_location`; proposed `site_location` writes on estimate Save.
 
@@ -94,7 +94,7 @@
 
 | Field id | Type | Writable | Columns / child table | Notes |
 |----------|------|----------|-------------------------|-------|
-| `profile` | scalar | read + write | `title`, `site_id`, `status`, `estimate_date`, `valid_until`, `source_estimate_id`, `category_id` | `status` read-only except via `win`/`lose` actions; **`site_id` writable while editable** — warn-and-clear on change with structure; freeze for `won`/`lost`/`expired` ([decision](../decisions/estimate.md#decision-estimate--job-site-anchor--warn-and-clear-not-immutable-2026-07-14)) |
+| `profile` | scalar | read + write | `title`, `site_id`, `status`, `estimate_date`, `valid_until`, `source_estimate_id`, `category_id` | `status` read-only except via `submit`/`accept`/`reject`/`recall` actions; **`site_id` writable while editable** — warn-and-clear on change with structure; freeze for `submitted`/`accepted`/`rejected` ([decision](../decisions/estimate.md#decision-estimate-status-dropdown-lifecycle-st1st10-2026-07-21)) |
 | `stakeholders` | collection | read + write | `estimate_party` | `party_id`, `relation_id`, `sort_order` |
 | `systems` | collection | read + write | `estimate_system` + nested `estimate_system_spec` | Logical Field — `columns: []` in YAML; see below |
 | `line_items` | collection | read + write | `estimate_line` | Flat persist; tree UI parents are not separate Fields |
@@ -118,7 +118,7 @@
 }
 ```
 
-Writable PATCH keys: manifest-narrowed subset of above; **`status`** not writable via PATCH body (actions only). **`site_id`** patchable when status allows profile edit; on change, body must clear `conditions` + `line_items` (or DAL replaces them empty) — see [warn-and-clear](../decisions/estimate.md#decision-estimate--job-site-anchor--warn-and-clear-not-immutable-2026-07-14). Reject site change when `won` / `lost` / `expired`.
+Writable PATCH keys: manifest-narrowed subset of above; **`status`** not writable via PATCH body (actions only). **`site_id`** patchable when status allows profile edit; on change, body must clear `conditions` + `line_items` (or DAL replaces them empty) — see [warn-and-clear](../decisions/estimate.md#decision-estimate--job-site-anchor--warn-and-clear-not-immutable-2026-07-14). Reject site change when `submitted` / `accepted` / `rejected`.
 
 ### Collection — `stakeholders` element
 
@@ -229,8 +229,11 @@ Read path merges catalog `system_spec_def` rows for each `system_id` with saved 
 | `estimate_detail` | `read` | grant on detail | Each GET |
 | `estimate_detail` | `write` | grant on detail + Field | Each PATCH / POST |
 | `estimate_detail` | `delete` | grant on detail | Each DELETE |
-| `estimate_detail` | `win` | grant on detail | Each win action |
-| `estimate_detail` | `lose` | grant on detail | Each lose action |
+| `estimate_detail` | `submit` | grant on detail | Each submit action (ST7) |
+| `estimate_detail` | `accept` | grant on detail | Each accept action (ST8) |
+| `estimate_detail` | `reject` | grant on detail | Each reject action (ST9) |
+| `estimate_detail` | `recall` | grant on detail | Each recall action (ST10) |
+| `estimate_detail` | `create_job` | grant on detail | W1b recreate missing catalog-scope jobs |
 
 **List create:** `GET /api/estimates` → `estimate_list` `read`; `POST` create → `estimate_detail` `write`.
 
@@ -265,10 +268,13 @@ Read path merges catalog `system_spec_def` rows for each `system_id` with saved 
 | Operation | Body keys | Semantics |
 |-----------|-----------|-----------|
 | `create` | `profile` (`title`, `site_id`), optional `stakeholders`, optional `systems`, optional `line_items` | Insert `estimate` status `draft`; validate `site_id` exists |
-| `patch` | manifest-narrowed `profile`, `stakeholders`, `systems`, `line_items` | Scalar profile keys; collections replace-array; **`profile.site_id` changeable** — on change, clear conditions + line items (S7); reject when lifecycle-frozen (`won`/`lost`/`expired`) |
-| `delete` | — | Hard delete when allowed; pre-check job reference when `won` |
-| `win` | — | Set `status = won`; create `job` + copy parties/lines (4b — when job slice ready) |
-| `lose` | — | Set `status = lost` |
+| `patch` | manifest-narrowed `profile`, `stakeholders`, `systems`, `line_items` | Scalar profile keys; collections replace-array; **`profile.site_id` changeable** — on change, clear conditions + line items (S7); reject when lifecycle-frozen (`submitted`/`accepted`/`rejected`) |
+| `delete` | — | Hard delete when allowed; pre-check job reference when `accepted` |
+| `submit` | — | Full line recalc then `status = submitted` (freeze) |
+| `accept` | — | Set `status = accepted`; create `job`(s) per catalog scope (W1–W5) |
+| `reject` | — | Set `status = rejected` (lock, no job) |
+| `recall` | — | `submitted` → `draft` unlock |
+| `create_job` | — | Recreate missing catalog-scope jobs on `accepted` (W1b) |
 
 ### `systems` replace-array
 
@@ -304,7 +310,7 @@ Estimate PATCH **must not** INSERT/UPDATE `site_area`, `site_asset`, or `site_sy
 
 | Condition | Error |
 |-----------|-------|
-| `status = won` and `job` references estimate | `ConflictError` `{ type: 'job' }` |
+| `status = accepted` and `job` references estimate | `ConflictError` `{ type: 'job' }` |
 
 **Transactions:** `patch()` orchestrates `systems` then `line_items` in one transaction; audit on registered tables.
 
@@ -342,7 +348,7 @@ Master-detail: list in `estimates/layout.tsx`, detail in `[id]/page.tsx` ([`rout
 
 ```text
 ┌──────────────────────────────────────────────────────────────┐
-│ SurfaceToolbar — New | Save | Revert | Win | Lose | Delete … │
+│ SurfaceToolbar — New | Save | Revert | Status ▾ | Create job | Delete … │
 ├──────────────────────────────────────────────────────────────┤
 │ Tabs: General | Line Items                                   │
 ├──────────────────────────────────────────────────────────────┤
@@ -431,8 +437,11 @@ Empty forest → prompt to **Add root** (existing root zones + **New…** propos
 | 1 | Save | PATCH `estimate_detail` | dirty + `write` |
 | 2 | Revert | reset form | dirty |
 | 3 | New (list) | POST create | list `write` |
-| 4 | Win | `win` action | `draft` or `sent`; `win` grant |
-| 5 | Lose | `lose` action | not `won`; `lose` grant |
+| 4 | Submit | `submit` action | `draft` only; `submit` grant |
+| 5 | Accept | `accept` action | `submitted` only; `accept` grant |
+| 6 | Reject | `reject` action | `draft` or `submitted`; `reject` grant |
+| 7 | Recall | `recall` action | `submitted` only; `recall` grant |
+| 8 | Create job | `create_job` action | `accepted` + missing scope slice; `create_job` grant |
 | 6 | Delete | DELETE | `draft` + `delete` grant |
 
 ### Linked Surfaces (navigation only v1)
@@ -449,7 +458,7 @@ Empty forest → prompt to **Add root** (existing root zones + **New…** propos
 
 | Field | Add | Pickers | Empty state |
 |-------|-----|---------|-------------|
-| `profile.site_id` | — | [`LinkedSelectInput`](../../components/form/LinkedSelectInput.tsx) — site list; **`… Add site`** when `site_detail` `write` + field writable → `/sites/new` + picker return ([decision](../decisions/estimate.md#decision-estimate--job-site-anchor--warn-and-clear-not-immutable-2026-07-14), [linked picker](../decisions/general.md#decision-linked-picker-control-linkedselectinput--2026-06-24)); **writable** while profile editable; **read-only + open icon** only when lifecycle-frozen (`won`/`lost`/`expired`); change with conditions/lines → confirm clear | Required on create |
+| `profile.site_id` | — | [`LinkedSelectInput`](../../components/form/LinkedSelectInput.tsx) — site list; **`… Add site`** when `site_detail` `write` + field writable → `/sites/new` + picker return ([decision](../decisions/estimate.md#decision-estimate--job-site-anchor--warn-and-clear-not-immutable-2026-07-14), [linked picker](../decisions/general.md#decision-linked-picker-control-linkedselectinput--2026-06-24)); **writable** while profile editable; **read-only + open icon** only when lifecycle-frozen (`submitted`/`accepted`/`rejected`); change with conditions/lines → confirm clear | Required on create |
 | `stakeholders` | Add stakeholder | Any `party`; relation from `job_party_relation_table` | "No stakeholders" |
 | `scopes` | Implicit include on **C** edit or **Add line** | **S** panel selects `site_tree` scope/zone — **does not create site geography** | CTA to `/sites/[id]` when site has zero scopes |
 | `line_items` | **Add line** footer in **LI** panel | Item `TreeSelect` scoped to line's `estimate_scope`; part resolver — **Line Items tab hidden until `site_id` set** | "Select a scope or zone" / bucket-specific empty copy per W3 |
@@ -469,12 +478,14 @@ Empty forest → prompt to **Add root** (existing root zones + **New…** propos
 | Event | Transition | Notes |
 |-------|------------|-------|
 | Create | POST | `draft`; `title` + `site_id` required |
-| Edit profile | PATCH | scalar keys including `site_id` (warn-and-clear when structure present); freeze when `won`/`lost`/`expired` |
-| Edit lines / systems | PATCH | replace-array `systems`, `line_items` |
-| Send (manual) | PATCH `status` → `sent` | **Optional v1** |
-| Win | `win` action | `won` + job create (4b) |
-| Lose | `lose` action | `lost` |
-| Expire | batch or manual | `expired` — defer automation v1 |
+| Edit profile | PATCH | scalar keys including `site_id` (warn-and-clear when structure present); freeze when `submitted`/`accepted`/`rejected` |
+| Edit lines / systems | PATCH | replace-array `systems`, `line_items` (draft only) |
+| Status | header Status menu | confirm → dedicated transition routes (not PATCH) |
+| Submit | `submit` action | full recalc then freeze as `submitted` |
+| Accept | `accept` action | `accepted` + job create (W1–W5) |
+| Reject | `reject` action | `rejected` |
+| Recall | `recall` action | `submitted` → `draft` |
+| Create job | `create_job` action | recreate missing catalog-scope jobs (W1b) |
 | Delete | DELETE | `draft` when no blocking job |
 
 ---
@@ -485,13 +496,13 @@ Empty forest → prompt to **Add root** (existing root zones + **New…** propos
 |-------|----------|
 | **No site selected (create)** | Line Items tab absent; stakeholders still editable; hint on General tab when line items read granted |
 | **Site change (create or edit)** | Changing `profile.site_id` (or clearing) when form has conditions/lines → confirm; on OK clear `conditions` + `line_items` + `site_tree`; first pick from empty does not confirm; Save persists; stakeholders unchanged |
-| **Site change when frozen** | `won` / `lost` / `expired` — site read-only; DAL rejects change |
+| **Site change when frozen** | `submitted` / `accepted` / `rejected` — site read-only; DAL rejects change |
 | **ROM / no systems** | Valid once site selected — General parent only; all lines `estimate_system_id = null`; **site still required** on POST |
 | **Mixed quote** | General lines + one or more system blocks in same estimate |
 | **Line without catalog ids** | Valid — description + qty + cost + sell suffice |
 | **Assembly expand** | One PATCH may grow line count; client generates temp keys until save |
 | **Kit header sell rollup** | Header may show sell; components may have own costs — ext sell sums all lines unless UI hides components from rollup (defer print rules) |
-| **Won estimate edit** | **Block** `line_items` / `systems` PATCH when `won` — v1 immutable |
+| **Accepted estimate edit** | **Block** `line_items` / `conditions` PATCH when not `draft` — v1 immutable |
 | **`part_id` without catalog read** | Store id; omit label in DTO |
 | **Zero spec defs** | System parent row has no spec expand content; block still valid |
 | **Remove system parent** | Client-only until Save; PATCH omit ⇒ DAL hard-deletes block + its lines |

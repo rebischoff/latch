@@ -1,12 +1,17 @@
 "use client";
 
-import { PlusOutlined } from "@ant-design/icons";
+import {
+  LockOutlined,
+  PlusOutlined,
+  UnlockOutlined,
+} from "@ant-design/icons";
 import { fieldAllows, type Manifest } from "@latch/contracts";
 import {
   App,
   Button,
   InputNumber,
   Select,
+  Space,
   Table,
   Tree,
   Typography,
@@ -119,6 +124,9 @@ const JobPartSelect = ({
   }
 
   if (!writable) {
+    if (line.material_locked && !line.part_id) {
+      return <Typography.Text type="secondary">TBD</Typography.Text>;
+    }
     return (
       <Typography.Text>{line.part_mpn ?? line.part_id ?? "—"}</Typography.Text>
     );
@@ -135,6 +143,7 @@ const JobPartSelect = ({
   }
 
   const empty = !isLoading && filteredOptions.length === 0;
+  const softLockedTbd = Boolean(line.material_locked && !line.part_id);
 
   return (
     <Select
@@ -142,7 +151,7 @@ const JobPartSelect = ({
       style={{ width: "100%" }}
       allowClear
       loading={isLoading}
-      placeholder={empty ? "No match" : "Pick PN"}
+      placeholder={softLockedTbd ? "TBD" : empty ? "No match" : "Pick PN"}
       value={line.part_id ?? undefined}
       disabled={disabled || Boolean(line.material_locked)}
       options={options}
@@ -160,12 +169,39 @@ const JobPartSelect = ({
   );
 };
 
+type MaterialLockCellProps = {
+  disabled: boolean;
+  line: JobLineFormRow;
+  onToggle: (nextLocked: boolean) => void;
+};
+
+const MaterialLockCell = ({
+  disabled,
+  line,
+  onToggle,
+}: MaterialLockCellProps) => {
+  const locked = Boolean(line.material_locked);
+  const label = locked ? "Unlock material" : "Lock material (soft lock OK)";
+
+  return (
+    <Button
+      type="text"
+      size="small"
+      disabled={disabled}
+      title={label}
+      aria-label={label}
+      icon={locked ? <LockOutlined /> : <UnlockOutlined />}
+      onClick={() => onToggle(!locked)}
+    />
+  );
+};
+
 export const JobLineItemsPanels = ({
   manifest,
   siteId,
 }: JobLineItemsPanelsProps) => {
   const { control, setValue } = useFormContext<JobScopeFormValues>();
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const { disabled } = useFormUi();
 
   const conditions = useWatch({ control, name: "conditions" }) ?? [];
@@ -229,6 +265,68 @@ export const JobLineItemsPanels = ({
     );
   };
 
+  const requestUnlock = (line: JobLineFormRow, apply: () => void) => {
+    if (!line.material_locked) {
+      apply();
+      return;
+    }
+    if (!line.has_open_material_demand) {
+      apply();
+      return;
+    }
+    modal.confirm({
+      title: "Unlock material?",
+      content:
+        "This part is requested for ordering and not yet purchased. Unlocking removes it from the pool until re-locked. Continue?",
+      okText: "Unlock",
+      okButtonProps: { danger: true },
+      onOk: apply,
+    });
+  };
+
+  const onToggleMaterialLock = (line: JobLineFormRow, nextLocked: boolean) => {
+    if (nextLocked) {
+      updateLine(line.id, { material_locked: true });
+      return;
+    }
+    requestUnlock(line, () => updateLine(line.id, { material_locked: false }));
+  };
+
+  const onLockAllVisible = (locked: boolean) => {
+    const visibleIds = new Set(visibleLines.map((line) => line.id));
+    if (locked) {
+      commitLines(
+        lineItems.map((line) =>
+          visibleIds.has(line.id) ? { ...line, material_locked: true } : line,
+        ),
+      );
+      return;
+    }
+
+    const needsWarn = visibleLines.some(
+      (line) => line.material_locked && line.has_open_material_demand,
+    );
+    const apply = () => {
+      commitLines(
+        lineItems.map((line) =>
+          visibleIds.has(line.id) ? { ...line, material_locked: false } : line,
+        ),
+      );
+    };
+    if (needsWarn) {
+      modal.confirm({
+        title: "Unlock all visible lines?",
+        content:
+          "One or more parts are requested for ordering and not yet purchased. Unlocking removes them from the pool until re-locked. Continue?",
+        okText: "Unlock all",
+        okButtonProps: { danger: true },
+        onOk: apply,
+      });
+      return;
+    }
+    apply();
+  };
+
   const onAddLine = () => {
     if (!selectedConditionId) {
       message.warning("Select a condition to add a line.");
@@ -261,6 +359,9 @@ export const JobLineItemsPanels = ({
       allocations: [],
       sales_locked: false,
       material_locked: false,
+      material_phase_id: null,
+      material_phase_options: [],
+      has_open_material_demand: false,
       item_id: null,
       item_name: null,
       part_id: null,
@@ -282,6 +383,29 @@ export const JobLineItemsPanels = ({
     }
     commitLines(lineItems.filter((row) => row.id !== line.id));
   };
+
+  const lockHeader = writableLines ? (
+    <Space size={0}>
+      <Button
+        type="text"
+        size="small"
+        title="Lock all visible"
+        aria-label="Lock all visible"
+        icon={<LockOutlined />}
+        onClick={() => onLockAllVisible(true)}
+      />
+      <Button
+        type="text"
+        size="small"
+        title="Unlock all visible"
+        aria-label="Unlock all visible"
+        icon={<UnlockOutlined />}
+        onClick={() => onLockAllVisible(false)}
+      />
+    </Space>
+  ) : (
+    ""
+  );
 
   const columns: ColumnsType<JobLineFormRow> = [
     {
@@ -339,6 +463,23 @@ export const JobLineItemsPanels = ({
       },
     },
     {
+      title: lockHeader,
+      key: "material_lock",
+      width: 72,
+      render: (_value, line) =>
+        writableLines ? (
+          <MaterialLockCell
+            disabled={disabled}
+            line={line}
+            onToggle={(next) => onToggleMaterialLock(line, next)}
+          />
+        ) : line.material_locked ? (
+          <LockOutlined />
+        ) : (
+          <UnlockOutlined style={{ opacity: 0.35 }} />
+        ),
+    },
+    {
       title: "Part",
       dataIndex: "part_id",
       width: 140,
@@ -351,6 +492,39 @@ export const JobLineItemsPanels = ({
           onChange={(patch) => updateLine(line.id, patch)}
         />
       ),
+    },
+    {
+      title: "Mat. phase",
+      dataIndex: "material_phase_id",
+      width: 140,
+      render: (_value, line) => {
+        const options = line.material_phase_options.map((phase) => ({
+          value: phase.labor_phase_id,
+          label: phase.labor_phase_name,
+        }));
+        if (!writableLines) {
+          const label =
+            options.find((option) => option.value === line.material_phase_id)
+              ?.label ?? line.material_phase_id;
+          return <Typography.Text>{label ?? "—"}</Typography.Text>;
+        }
+        return (
+          <Select
+            size="small"
+            style={{ width: "100%" }}
+            allowClear
+            placeholder="Default"
+            value={line.material_phase_id ?? undefined}
+            options={options}
+            disabled={disabled || options.length === 0}
+            onChange={(next) =>
+              updateLine(line.id, {
+                material_phase_id: typeof next === "string" ? next : null,
+              })
+            }
+          />
+        );
+      },
     },
     {
       title: "Sold unit $",
@@ -445,7 +619,7 @@ export const JobLineItemsPanels = ({
           columns={columns}
           dataSource={visibleLines}
           pagination={false}
-          scroll={{ x: 1200 }}
+          scroll={{ x: 1400 }}
           locale={{ emptyText: "No line items for this condition." }}
           footer={
             writableLines

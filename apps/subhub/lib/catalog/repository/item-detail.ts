@@ -17,6 +17,7 @@ export type ItemDetailRow = {
   incidental_rate_type_id: string | null;
   is_root: boolean;
   markup_type_id: string | null;
+  material_phase_id: string | null;
   name: string;
   node_type: "scope" | "category" | "item";
   parent_id: string | null;
@@ -108,6 +109,7 @@ export const loadItemDetail = async (
     id: string;
     incidental_rate_type_id: string | null;
     markup_type_id: string | null;
+    material_phase_id: string | null;
     name: string;
     node_type: "scope" | "category" | "item";
     parent_id: string | null;
@@ -125,6 +127,7 @@ export const loadItemDetail = async (
        c.freight_rate_type_id,
        c.incidental_rate_type_id,
        c.markup_type_id,
+       c.material_phase_id,
        parent.name AS parent_name
      FROM item c
      LEFT JOIN item parent ON parent.id = c.parent_id
@@ -161,6 +164,7 @@ export const loadItemDetail = async (
     in_use,
     incidental_rate_type_id: row.incidental_rate_type_id,
     markup_type_id: row.markup_type_id,
+    material_phase_id: row.material_phase_id,
     is_root: row.parent_id === null,
     root_item_id: rootItemId,
     root_item_name: rootRow?.name ?? null,

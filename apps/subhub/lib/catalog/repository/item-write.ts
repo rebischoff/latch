@@ -17,6 +17,7 @@ export type ItemWriteRow = {
   id: string;
   incidental_rate_type_id: string | null;
   markup_type_id: string | null;
+  material_phase_id?: string | null;
   name: string;
   node_type?: ItemNodeType;
   parent_id: string | null;
@@ -336,8 +337,9 @@ export const insertItem = async (
     await client.query(
       `INSERT INTO item (
          id, name, parent_id, node_type, sort_order, csi_code,
-         freight_rate_type_id, incidental_rate_type_id, markup_type_id
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+         freight_rate_type_id, incidental_rate_type_id, markup_type_id,
+         material_phase_id
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
       [
         row.id,
         row.name,
@@ -348,6 +350,7 @@ export const insertItem = async (
         row.freight_rate_type_id,
         row.incidental_rate_type_id,
         row.markup_type_id,
+        row.material_phase_id ?? null,
       ],
     );
   });
@@ -417,7 +420,8 @@ export const updateItem = async (
            freight_rate_type_id = $7,
            incidental_rate_type_id = $8,
            markup_type_id = $9,
-           fallback_unit_cost = COALESCE($10, fallback_unit_cost)
+           fallback_unit_cost = COALESCE($10, fallback_unit_cost),
+           material_phase_id = $11
        WHERE id = $1`,
       [
         row.id,
@@ -430,6 +434,7 @@ export const updateItem = async (
         row.incidental_rate_type_id,
         row.markup_type_id,
         row.fallback_unit_cost ?? null,
+        row.material_phase_id ?? null,
       ],
     );
   });

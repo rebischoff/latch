@@ -6,8 +6,8 @@ import type { JobCostSummary } from "../repository/job-cost-summary";
 import type {
   JobFieldProgressCellPatch,
   JobFieldProgressDto,
-  JobFieldZoneOrderPatch,
 } from "../repository/job-field-progress";
+import type { JobFieldOrderCellPatch } from "../repository/job-field-order";
 import type {
   JobFieldIssuePatch,
 } from "../repository/job-issue";
@@ -27,10 +27,11 @@ const JobFieldProgressCellPatchElementSchema = z
   })
   .strict();
 
-const JobFieldZoneOrderPatchElementSchema = z
+const JobFieldOrderCellPatchElementSchema = z
   .object({
+    scope_phase_id: z.string(),
     site_zone_id: z.string().nullable(),
-    ordered: z.boolean(),
+    requested: z.boolean(),
   })
   .strict();
 
@@ -169,6 +170,7 @@ const JobLineItemPatchElementSchema = z
     allocations: z.array(JobLineAllocationPatchElementSchema).optional(),
     sales_locked: z.boolean().optional(),
     material_locked: z.boolean().optional(),
+    material_phase_id: z.string().nullable().optional(),
     site_zone_id: z.string().nullable().optional(),
     site_asset_id: z.string().nullable().optional(),
     item_id: z.string().nullable().optional(),
@@ -201,8 +203,8 @@ export const JobDetailPatchSchema = z
     line_items: z.array(JobLineItemPatchElementSchema).optional(),
     /** Replace-array of zone×phase cells (task 51). */
     field_progress: z.array(JobFieldProgressCellPatchElementSchema).optional(),
-    /** Desired Field ☐ Order state per leaf / General (task 55). */
-    field_zone_orders: z.array(JobFieldZoneOrderPatchElementSchema).optional(),
+    /** Replace-array of zone×material-phase Order cells (task 62). */
+    field_zone_orders: z.array(JobFieldOrderCellPatchElementSchema).optional(),
     /** Pending issue create/update/resolve/cancel (tasks 57 / 60). */
     field_issues: z.array(JobFieldIssuePatchElementSchema).optional(),
   })
@@ -320,6 +322,14 @@ export type JobLineItemRow = {
   line_number: number;
   line_role: string;
   material_locked: boolean;
+  material_phase_id: string | null;
+  /** Seeded scope_phase labor phases for this line (material phase override options). */
+  material_phase_options: Array<{
+    labor_phase_id: string;
+    labor_phase_name: string;
+  }>;
+  /** Open / on-PO JMR exists for this line's parts (UI unlock warn). */
+  has_open_material_demand: boolean;
   parent_line_id: string | null;
   part_id: string | null;
   part_mpn: string | null;
@@ -369,7 +379,7 @@ export type JobDetailWriteRow = Pick<
 
 export type JobFieldProgressPatchRow = JobFieldProgressCellPatch;
 
-export type JobFieldZoneOrderPatchRow = JobFieldZoneOrderPatch;
+export type JobFieldOrderPatchRow = JobFieldOrderCellPatch;
 
 export type JobFieldIssuePatchRow = JobFieldIssuePatch;
 
@@ -377,7 +387,7 @@ export type JobDetailRelatedPatch = {
   conditions?: JobConditionPatchRow[];
   field_issues?: JobFieldIssuePatchRow[];
   field_progress?: JobFieldProgressPatchRow[];
-  field_zone_orders?: JobFieldZoneOrderPatchRow[];
+  field_zone_orders?: JobFieldOrderPatchRow[];
   line_items?: JobLineItemPatchRow[];
   stakeholders?: JobStakeholderPatchRow[];
 };
@@ -402,6 +412,8 @@ const emptyFieldProgress = (): JobFieldProgressDto => ({
   zone_tree: [],
   phases: [],
   work_rows: [],
+  order_cells: [],
+  order_rows: [],
   zone_orders: [],
   issues: [],
   scope_phase_index: [],
@@ -529,7 +541,7 @@ export const jobDetailDescriptor: SurfaceDescriptor<
     }
     if (typed.field_zone_orders !== undefined) {
       related.field_zone_orders =
-        typed.field_zone_orders as JobFieldZoneOrderPatchRow[];
+        typed.field_zone_orders as JobFieldOrderPatchRow[];
     }
     if (typed.field_issues !== undefined) {
       related.field_issues = typed.field_issues as JobFieldIssuePatchRow[];

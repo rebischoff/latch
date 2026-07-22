@@ -8,7 +8,7 @@ const PurchaseOrdersPage = async () => {
   return (
     <SelectFromListPlaceholder
       title="Select a purchase order"
-      description="Choose a PO from the list, or open the Workbench to create draft POs from open material requests."
+      description="Choose a PO from the list, create a general (job-less) PO, or open Requisitions to create from job demand."
     />
   );
 };

@@ -5,10 +5,9 @@ import { tableExists } from "../../sites/repository/sql-utils";
 const toNumber = (value: unknown): number => Number(value ?? 0);
 
 /**
- * Job-wide remaining need for a single BOM row (task 52 R3/R4 → 56).
- * `remaining = max(0, demand − covered)`. `covered` = requested qty across every
- * `job_material_request` on the job (includes on-PO via PO9 backing requests).
- * `loadPurchaseOrderCoverageForJob` stays empty to avoid double-counting.
+ * Job-wide remaining need for a single BOM row (task 63 / RP3).
+ * `remaining = max(0, demand − PO coverage)`. Open `job_material_request`
+ * rows no longer subtract — presence in the live pool already means "not on a PO."
  */
 export const computeRemaining = (demand: number, covered: number): number =>
   Math.max(0, demand - covered);
@@ -27,7 +26,9 @@ export type BomPoolRow = {
 };
 
 /**
- * Requested coverage per `job_line_part_id`, job-wide (flat `job_material_request`).
+ * @deprecated Prefer {@link loadPurchaseOrderCoverageForJob}. Open JMRs are not
+ * coverage under RP3; kept for callers that still need status-aware open qty.
+ * Returns qty on non-open requests only (`on_purchase_order` + `fulfilled`).
  */
 export const loadRequisitionedCoverageForJob = async (
   client: Pool | PoolClient,
@@ -37,11 +38,15 @@ export const loadRequisitionedCoverageForJob = async (
     return new Map();
   }
 
-  const result = await client.query<{ job_line_part_id: string; covered: string | number }>(
+  const result = await client.query<{
+    job_line_part_id: string;
+    covered: string | number;
+  }>(
     `SELECT job_line_part_id, SUM(quantity) AS covered
      FROM job_material_request
      WHERE job_id = $1
        AND job_line_part_id IS NOT NULL
+       AND status IN ('on_purchase_order', 'fulfilled')
      GROUP BY job_line_part_id`,
     [jobId],
   );
@@ -54,22 +59,72 @@ export const loadRequisitionedCoverageForJob = async (
 };
 
 /**
- * PO coverage per `job_line_part_id`.
- *
- * With PO9 every PO line has a backing `job_material_request` (via
- * `purchase_order_line_source`), and those requests already appear in
- * `loadRequisitionedCoverageForJob`. Returning additional PO qty here would
- * double-count. Kept as a named hook for any future PO-only coverage that is
- * not represented by a material request.
+ * PO coverage per `job_line_part_id` (RP3).
+ * Sums active (non-cancelled) PO line source qty linked through backing JMRs,
+ * plus any PO lines that still carry `job_line_part_id` directly.
  */
 export const loadPurchaseOrderCoverageForJob = async (
   client: Pool | PoolClient,
-  _jobId: string,
+  jobId: string,
 ): Promise<Map<string, number>> => {
   if (!(await tableExists(client, "purchase_order_line"))) {
     return new Map();
   }
-  return new Map();
+
+  const coverage = new Map<string, number>();
+
+  if (await tableExists(client, "purchase_order_line_source")) {
+    const viaSources = await client.query<{
+      job_line_part_id: string;
+      covered: string | number;
+    }>(
+      `SELECT jmr.job_line_part_id, SUM(pols.quantity) AS covered
+       FROM purchase_order_line_source pols
+       INNER JOIN purchase_order_line pol ON pol.id = pols.purchase_order_line_id
+       INNER JOIN purchase_order po ON po.id = pol.purchase_order_id
+       INNER JOIN job_material_request jmr
+         ON jmr.id = pols.job_material_request_id
+       WHERE po.job_id = $1
+         AND po.status <> 'cancelled'
+         AND pol.status IS DISTINCT FROM 'cancelled'
+         AND jmr.job_line_part_id IS NOT NULL
+       GROUP BY jmr.job_line_part_id`,
+      [jobId],
+    );
+    for (const row of viaSources.rows) {
+      coverage.set(
+        row.job_line_part_id,
+        (coverage.get(row.job_line_part_id) ?? 0) + toNumber(row.covered),
+      );
+    }
+  }
+
+  const viaLine = await client.query<{
+    job_line_part_id: string;
+    covered: string | number;
+  }>(
+    `SELECT pol.job_line_part_id, SUM(pol.quantity) AS covered
+     FROM purchase_order_line pol
+     INNER JOIN purchase_order po ON po.id = pol.purchase_order_id
+     WHERE po.job_id = $1
+       AND po.status <> 'cancelled'
+       AND pol.status IS DISTINCT FROM 'cancelled'
+       AND pol.job_line_part_id IS NOT NULL
+       AND NOT EXISTS (
+         SELECT 1 FROM purchase_order_line_source pols
+         WHERE pols.purchase_order_line_id = pol.id
+       )
+     GROUP BY pol.job_line_part_id`,
+    [jobId],
+  );
+  for (const row of viaLine.rows) {
+    coverage.set(
+      row.job_line_part_id,
+      (coverage.get(row.job_line_part_id) ?? 0) + toNumber(row.covered),
+    );
+  }
+
+  return coverage;
 };
 
 /** All job BOM rows (`job_line_part`) with computed job-wide remaining need. */
@@ -109,16 +164,11 @@ export const loadBomRemainingForJob = async (
     return [];
   }
 
-  const [requisitioned, purchaseOrder] = await Promise.all([
-    loadRequisitionedCoverageForJob(pool, jobId),
-    loadPurchaseOrderCoverageForJob(pool, jobId),
-  ]);
+  const purchaseOrder = await loadPurchaseOrderCoverageForJob(pool, jobId);
 
   return result.rows.map((row) => {
     const demand = toNumber(row.quantity);
-    const covered =
-      (requisitioned.get(row.job_line_part_id) ?? 0) +
-      (purchaseOrder.get(row.job_line_part_id) ?? 0);
+    const covered = purchaseOrder.get(row.job_line_part_id) ?? 0;
     return {
       job_line_part_id: row.job_line_part_id,
       job_line_id: row.job_line_id,
@@ -144,8 +194,8 @@ export const loadBomPoolForJob = async (
 };
 
 /**
- * Job-wide remaining for one `job_line_part_id`, optionally excluding one
- * request's own current coverage (edit path).
+ * Job-wide remaining for one `job_line_part_id` (RP3: demand − PO only).
+ * `excludeRequestId` is ignored — open requests are not coverage.
  */
 export const loadRemainingForJobLinePart = async (
   client: Pool | PoolClient,
@@ -159,21 +209,8 @@ export const loadRemainingForJobLinePart = async (
     [args.jobLinePartId, args.jobId],
   );
   const demand = toNumber(demandResult.rows[0]?.quantity);
-
-  if (!(await tableExists(client, "job_material_request"))) {
-    return computeRemaining(demand, 0);
-  }
-
-  const coveredResult = await client.query<{ covered: string | number | null }>(
-    `SELECT SUM(quantity) AS covered
-     FROM job_material_request
-     WHERE job_id = $1
-       AND job_line_part_id = $2
-       AND ($3::text IS NULL OR id <> $3)`,
-    [args.jobId, args.jobLinePartId, args.excludeRequestId ?? null],
-  );
-  const covered = toNumber(coveredResult.rows[0]?.covered);
-
+  const poCoverage = await loadPurchaseOrderCoverageForJob(client, args.jobId);
+  const covered = poCoverage.get(args.jobLinePartId) ?? 0;
   return computeRemaining(demand, covered);
 };
 

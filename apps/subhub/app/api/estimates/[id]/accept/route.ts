@@ -3,11 +3,11 @@ import { ForbiddenError, surfaceAllows, ValidationError } from "@latch/contracts
 import { z } from "zod";
 
 import { getPool, resolveContextFresh } from "@/lib/latch";
-import { winEstimate } from "@/lib/estimates/repository";
+import { acceptEstimate } from "@/lib/estimates/repository";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
-const WinRequestSchema = z
+const AcceptRequestSchema = z
   .object({
     proceedDespiteActiveSiteJobs: z.boolean().optional(),
   })
@@ -24,7 +24,7 @@ export const POST = async (
       entityId: estimateId,
     });
 
-    if (!surfaceAllows(ctx.manifest, "win")) {
+    if (!surfaceAllows(ctx.manifest, "accept")) {
       throw new ForbiddenError();
     }
 
@@ -38,15 +38,20 @@ export const POST = async (
       }
     }
 
-    const parsed = WinRequestSchema.safeParse(body);
+    const parsed = AcceptRequestSchema.safeParse(body);
     if (!parsed.success) {
-      throw new ValidationError("Invalid win payload", {
+      throw new ValidationError("Invalid accept payload", {
         code: "invalid_body",
         issues: parsed.error.issues,
       });
     }
 
     const pool = getPool();
-    const result = await winEstimate(pool, ctx.principal.id, estimateId, parsed.data);
+    const result = await acceptEstimate(
+      pool,
+      ctx.principal.id,
+      estimateId,
+      parsed.data,
+    );
     return jsonSuccess(result, ctx.manifest);
   });

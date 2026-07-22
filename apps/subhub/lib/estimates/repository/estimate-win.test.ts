@@ -4,10 +4,13 @@ import { describe, expect, it } from "vitest";
 import {
   ACTIVE_JOB_STATUSES,
   buildJobTitle,
+  canRecallEstimate,
+  canRejectEstimate,
+  canSubmitEstimate,
   collectSliceConditionIds,
-  isWinnableStatus,
+  isAcceptableStatus,
+  isEstimateFrozenStatus,
   partitionLineIdsByCatalogScope,
-  WIN_ALLOWED_STATUSES,
 } from "./estimate-win";
 
 describe("partitionLineIdsByCatalogScope (W1a)", () => {
@@ -104,17 +107,43 @@ describe("buildJobTitle (W2 title prefill)", () => {
   });
 });
 
-describe("win status gate", () => {
-  it("allows only draft and sent estimates to win", () => {
-    expect(isWinnableStatus("draft")).toBe(true);
-    expect(isWinnableStatus("sent")).toBe(true);
-    expect(isWinnableStatus("won")).toBe(false);
-    expect(isWinnableStatus("lost")).toBe(false);
-    expect(isWinnableStatus("expired")).toBe(false);
+describe("status transition graph (ST1–ST10)", () => {
+  it("allows submit only from draft", () => {
+    expect(canSubmitEstimate("draft")).toBe(true);
+    expect(canSubmitEstimate("submitted")).toBe(false);
+    expect(canSubmitEstimate("accepted")).toBe(false);
+    expect(canSubmitEstimate("rejected")).toBe(false);
   });
 
-  it("exposes the allowed-status and active-job sets", () => {
-    expect([...WIN_ALLOWED_STATUSES].sort()).toEqual(["draft", "sent"]);
+  it("allows accept only from submitted", () => {
+    expect(isAcceptableStatus("submitted")).toBe(true);
+    expect(isAcceptableStatus("draft")).toBe(false);
+    expect(isAcceptableStatus("accepted")).toBe(false);
+    expect(isAcceptableStatus("rejected")).toBe(false);
+  });
+
+  it("allows reject from draft or submitted", () => {
+    expect(canRejectEstimate("draft")).toBe(true);
+    expect(canRejectEstimate("submitted")).toBe(true);
+    expect(canRejectEstimate("accepted")).toBe(false);
+    expect(canRejectEstimate("rejected")).toBe(false);
+  });
+
+  it("allows recall only from submitted", () => {
+    expect(canRecallEstimate("submitted")).toBe(true);
+    expect(canRecallEstimate("draft")).toBe(false);
+    expect(canRecallEstimate("accepted")).toBe(false);
+    expect(canRecallEstimate("rejected")).toBe(false);
+  });
+
+  it("freezes submitted, accepted, and rejected", () => {
+    expect(isEstimateFrozenStatus("draft")).toBe(false);
+    expect(isEstimateFrozenStatus("submitted")).toBe(true);
+    expect(isEstimateFrozenStatus("accepted")).toBe(true);
+    expect(isEstimateFrozenStatus("rejected")).toBe(true);
+  });
+
+  it("exposes the active-job set for W1c", () => {
     expect([...ACTIVE_JOB_STATUSES]).toEqual(["planned", "active"]);
   });
 });

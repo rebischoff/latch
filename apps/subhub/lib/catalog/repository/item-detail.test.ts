@@ -15,6 +15,7 @@ const baseRow: ItemDetailRow = {
   freight_rate_type_id: null,
   incidental_rate_type_id: null,
   markup_type_id: null,
+  material_phase_id: null,
   is_root: false,
   root_item_id: "fa-root",
   root_item_name: "Fire Alarm",
@@ -76,5 +77,24 @@ describe("projectItemDetailRow", () => {
     const specDefs = dto.spec_definitions as Array<Record<string, unknown>>;
     expect(specDefs[0]).not.toHaveProperty("in_use_participation_count");
     expect(specDefs[0]?.in_use_part_count).toBe(2);
+  });
+
+  it("projects material_phase_id under commercial when readable", () => {
+    const dto = projectItemDetailRow(
+      { ...baseRow, material_phase_id: "phase-install" },
+      {
+        surface: "item_detail",
+        actions: ["read", "write"],
+        fields: {
+          profile: ["read"],
+          commercial: ["read"],
+        },
+      },
+      related,
+    );
+
+    expect(dto.commercial).toMatchObject({
+      material_phase_id: "phase-install",
+    });
   });
 });

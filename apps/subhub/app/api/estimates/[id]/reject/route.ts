@@ -2,7 +2,7 @@ import { jsonSuccess, withApiHandler } from "@latch/app-kit";
 import { ForbiddenError, surfaceAllows } from "@latch/contracts";
 
 import { getPool, resolveContextFresh } from "@/lib/latch";
-import { loseEstimate } from "@/lib/estimates/repository";
+import { rejectEstimate } from "@/lib/estimates/repository";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -17,11 +17,11 @@ export const POST = async (
       entityId: estimateId,
     });
 
-    if (!surfaceAllows(ctx.manifest, "lose")) {
+    if (!surfaceAllows(ctx.manifest, "reject")) {
       throw new ForbiddenError();
     }
 
     const pool = getPool();
-    await loseEstimate(pool, ctx.principal.id, estimateId);
+    await rejectEstimate(pool, ctx.principal.id, estimateId);
     return jsonSuccess({ id: estimateId }, ctx.manifest);
   });

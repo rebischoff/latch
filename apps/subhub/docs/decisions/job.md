@@ -6,6 +6,39 @@
 
 ---
 
+### Decision: job material lock, phase-aware zone Order, and live requisition pool (JML1–JML12) (2026-07-21)
+
+**Status:** **Locked**. **Task:** [61](../tasks/61-job-material-lock-and-phase.md), [62](../tasks/62-field-zone-phase-order.md). **Companion:** [catalog.md — material phase (MP1–MP4)](./catalog.md#decision-material-phase--item-default--job-line-override-mp1mp4-2026-07-21); [procurement.md — requisitions live pool + PO rules (RP1–RP10)](./procurement.md#decision-requisitions-live-pool-per-line-rollup-and-po-job-lock-rp1rp10-2026-07-21). **Amends:** [FI12](#decision-field-issues--signal-only--revert-field-ad-hoc-fi1fi12-2026-07-20) (Field Work/PO-trail list — dropped, see JML8); [Field — progress reports + zone Order compose (L5–L7, L27)](#decision-field--progress-reports--zone-order-compose-2026-07-17) (Order UI + derivation — superseded by JML6–JML9); [JLI-5](../tasks/47-job-line-items-parity.md) (Item RO / Part editable — unchanged, this decision only adds a lock affordance around the existing Part column). **Reuses:** existing `job_line.material_locked` boolean (37aa P6) — no new lock column; this decision extends its meaning and adds explicit UI/DAL rules around it.
+
+**Problem:** Chat session (2026-07-20/21) re-designed how a Scope line becomes "ready to buy," how Field signals zone/phase readiness without a second parts UI, and how `/requisitions` stays current without manual re-triggering. See chat transcript for the full option/rationale walkthrough — this block records the locked outcome only.
+
+#### Scope Line Items — lock (JML1–JML5)
+
+| Id | Choice |
+|----|--------|
+| **JML1** | Lock icon column, left of **Part**, on Job Scope Line Items. Locks **Part only** — no separate description Field (TBD state = locked + `part_id` null; Item stays the identity, already read-only per JLI-5). |
+| **JML2** | Manual Part pick → **auto-lock** (unchanged `material_locked` behavior). New: explicit lock/unlock affordance independent of picking a PN — **soft lock** (locked with `part_id` still null) is a first-class state, not just a side effect of picking. Header control locks/unlocks all currently-visible rows (selected condition). |
+| **JML3** | Soft lock allowed — Field / requisitions show **Part = TBD**; purchaser finalizes the exact PN at Create POs. Engineer's lock means "narrowed as far as I should — purchasing owns the final buy" (packaging/reel/box calls), not "exact PN chosen." |
+| **JML4** | **Unlock:** while the line's part is sitting in the live requisitions pool but **not yet on a PO** — allowed, with a warn-confirm ("requested for ordering, not yet purchased — continue?"). **Hard-blocked** once any qty is actually on a `purchase_order_line` (matches [procurement.md RP7](./procurement.md#decision-requisitions-live-pool-per-line-rollup-and-po-job-lock-rp1rp10-2026-07-21) — PO already freezes `part_id` there regardless). |
+| **JML5** | Working `quantity` / zone allocation (`job_line_allocation`) stay editable at all times — **no freeze**, even while the line's effective phase/zone is actively Ordered (JML6). Matches JLI-3 (qty free without a CO). Pool row shows a lightweight **"changed since released"** flag when qty/allocation shifted after Order was checked — visibility, not a block. |
+
+#### Field — zone × phase Order column (JML6–JML9)
+
+| Id | Choice |
+|----|--------|
+| **JML6** | Field zone × phase grid gains an **Order** column, placed before **Done**. Same tri-state / cascade semantics as the existing **Done** column (parent checks cascade to all descendant leaves + General; checking/unchecking a leaf makes the parent indeterminate). |
+| **JML7** | `Order[scope_phase, site_zone]` resolves against `job_line_part` rows whose line's **effective material phase** ([catalog.md MP3](./catalog.md#decision-material-phase--item-default--job-line-override-mp1mp4-2026-07-21)) matches that `scope_phase` and whose `job_line_allocation` covers that zone (or General = unplaced qty, same pattern as `job_field_progress_cell`). Only **locked** lines (JML1) are eligible — unlocked lines under an Ordered cell are excluded and surfaced via a "N unlocked lines excluded" indicator, not a block on the toggle. |
+| **JML8** | **Amends FI12 / drops the Field Work item-list.** Field shows **only** the Done + Order columns per zone × phase — no item/part rows, no PO trail list on Field. (PO trail remains visible from Scope / requisitions, not Field.) |
+| **JML9** | Order toggles are **persistent state**, not a Save-time snapshot trigger. Scope edits, CO approvals, and new locked lines under an already-Ordered zone/phase need **no re-check** — the requisitions pool recalculates live (see [procurement.md RP1](./procurement.md#decision-requisitions-live-pool-per-line-rollup-and-po-job-lock-rp1rp10-2026-07-21)). No auto-flip logic anywhere; nothing "fires" on CO approve. |
+
+#### Out of scope this decision
+
+Order/Done sequencing gates (e.g. blocking Order after Done) — deferred to v2, no gate in v1 ([JML10 — deferred]). Per-part-row phase tagging (rejected — MP1–MP4 keep phase at item/line level, not on `job_line_part`).
+
+**Rationale:** Progress (Done) and material readiness (Order) are genuinely independent axes on the same zone × phase grid — a phase can be ready to order before it's worked, or worked with material still pending. Reusing the Done UI's proven cascade avoids teaching field crews a second interaction pattern. Keeping the lock scoped to Part (not Item, not description) matches the already-locked JLI-5 split between commercial identity (frozen) and procurement refinement (free). Soft lock without an exact PN is deliberate — it's usually the engineer who should narrow, but commodity items (Cat6, fasteners) are purchasing's call on packaging.
+
+---
+
 ### Decision: Field Issues — signal-only + revert Field ad-hoc (FI1–FI12) (2026-07-20)
 
 **Status:** **Locked**. **Task:** [60](../tasks/60-field-issues-table-revert-adhoc.md). **Amends:** [planning/21 §3 ISS3 UI](../planning/21-po-lifecycle-issues-field-adhoc-open.md#§3--locked-zone-issues-required-follow-on-l4l31) (table chrome); **supersedes** [§4 AH1–AH3](../planning/21-po-lifecycle-issues-field-adhoc-open.md#§4--locked-field-direct-ad-hoc-amends-l9) (Field-direct ad-hoc). **Restores** [L9](../planning/20-field-labor-materials-open.md) spirit: planned material enters via **Scope → Line Items**. **Keeps:** ISS1/2/4/5/6 (`job_issue` shape, terminal resolve/cancel, decoupled from progress, batched Save, no reopen); Field ☐ Order; Work table informational.

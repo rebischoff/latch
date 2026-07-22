@@ -15,6 +15,7 @@ export type ItemTreeNode = {
   incidental_rate_type_id: string | null;
   is_root: boolean;
   markup_type_id: string | null;
+  material_phase_id: string | null;
   name: string;
   node_type: "scope" | "category" | "item";
   parent_id: string | null;

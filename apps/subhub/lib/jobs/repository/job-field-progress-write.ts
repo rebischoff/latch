@@ -8,13 +8,15 @@ import { tableExists } from "@/lib/sites/repository/sql-utils";
 import {
   zoneKeyFor,
   type JobFieldProgressCellPatch,
-  type JobFieldZoneOrderPatch,
 } from "./job-field-progress";
 import {
   buildFieldProgressSlices,
   loadJobFieldProgress,
 } from "./job-field-progress-load";
-import { applyFieldZoneOrdersTx } from "./job-field-zone-order-write";
+import {
+  replaceJobFieldOrderTx,
+} from "./job-field-order-write";
+import type { JobFieldOrderCellPatch } from "./job-field-order";
 import {
   applyFieldIssuesTx,
   type JobFieldIssuePatch,
@@ -314,8 +316,8 @@ export const replaceJobFieldProgress = async (
 };
 
 /**
- * Persist Field progress, zone Order, and issues in one transaction
- * (tasks 55 + 57 + 60 — Field-direct ad-hoc removed by FI2).
+ * Persist Field progress, Order cells, and issues in one transaction
+ * (tasks 55 + 57 + 60 + 62 — zone Order JMR snapshot retired; order cells persist).
  */
 export const applyJobFieldSave = async (
   pool: Pool,
@@ -324,7 +326,7 @@ export const applyJobFieldSave = async (
   args: {
     cells?: JobFieldProgressCellPatch[];
     issues?: JobFieldIssuePatch[];
-    zoneOrders?: JobFieldZoneOrderPatch[];
+    orderCells?: JobFieldOrderCellPatch[];
   },
 ): Promise<void> => {
   await withPermissionDb(pool, actorId, async (client) => {
@@ -336,12 +338,8 @@ export const applyJobFieldSave = async (
       });
     }
 
-    if (args.zoneOrders !== undefined && args.zoneOrders.length > 0) {
-      await applyFieldZoneOrdersTx(client, {
-        jobId,
-        desired: args.zoneOrders,
-        requestedBy: employeeId,
-      });
+    if (args.orderCells !== undefined) {
+      await replaceJobFieldOrderTx(client, jobId, args.orderCells);
     }
 
     if (args.issues !== undefined && args.issues.length > 0) {

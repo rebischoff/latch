@@ -8,7 +8,7 @@ import {
   surfaceAllows,
   type Manifest,
 } from "@latch/contracts";
-import { App, Tag, Typography } from "antd";
+import { App, Tag, Typography, type MenuProps } from "antd";
 import Link from "next/link";
 import { notFound, usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -76,23 +76,31 @@ import {
 } from "@/lib/surface-navigation";
 import type { ToolbarAction } from "@/components/shell/SurfaceToolbar";
 import {
+  postEstimateAccept,
   postEstimateCreateJob,
-  postEstimateLose,
-  postEstimateWin,
+  postEstimateRecall,
+  postEstimateReject,
+  postEstimateSubmit,
   SurfaceApiError,
-  type EstimateWonJobSummary,
+  type EstimateAcceptedJobSummary,
 } from "@/lib/surface-api";
 
 const STATUS_COLORS: Record<string, string> = {
   draft: "default",
-  sent: "processing",
-  won: "success",
-  lost: "error",
-  expired: "warning",
+  submitted: "processing",
+  accepted: "success",
+  rejected: "error",
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  draft: "Draft",
+  submitted: "Submitted",
+  accepted: "Accepted",
+  rejected: "Rejected",
 };
 
 const statusLabel = (status: string): string =>
-  status.charAt(0).toUpperCase() + status.slice(1);
+  STATUS_LABELS[status] ?? status.charAt(0).toUpperCase() + status.slice(1);
 
 type EstimateDetailFormProps = {
   estimateId: string;
@@ -824,16 +832,21 @@ export const EstimateDetailForm = ({
   }, [message, modal, remove, router]);
 
   const estimateStatus = profile?.status ?? "draft";
-  const isWinnableStatus = estimateStatus === "draft" || estimateStatus === "sent";
-  const isWonStatus = estimateStatus === "won";
-  const canWin = !isCreate && surfaceAllows(activeManifest, "win");
-  const canLose = !isCreate && surfaceAllows(activeManifest, "lose");
+  const isFrozenStatus =
+    estimateStatus === "submitted" ||
+    estimateStatus === "accepted" ||
+    estimateStatus === "rejected";
+  const isAcceptedStatus = estimateStatus === "accepted";
+  const canSubmit = !isCreate && surfaceAllows(activeManifest, "submit");
+  const canAccept = !isCreate && surfaceAllows(activeManifest, "accept");
+  const canReject = !isCreate && surfaceAllows(activeManifest, "reject");
+  const canRecall = !isCreate && surfaceAllows(activeManifest, "recall");
+  const canCreateJob = !isCreate && surfaceAllows(activeManifest, "create_job");
 
-  const [winPending, setWinPending] = useState(false);
-  const [losePending, setLosePending] = useState(false);
+  const [statusPending, setStatusPending] = useState(false);
 
   const navigateAfterJobs = useCallback(
-    (jobs: EstimateWonJobSummary[], successMessage: string) => {
+    (jobs: EstimateAcceptedJobSummary[], successMessage: string) => {
       if (jobs.length === 0) {
         message.info("No new jobs were created");
         router.refresh();
@@ -868,92 +881,167 @@ export const EstimateDetailForm = ({
     [message, modal, router],
   );
 
-  const runWin = useCallback(
+  const refreshAfterStatus = useCallback(
+    (successMessage: string) => {
+      message.success(successMessage);
+      router.refresh();
+    },
+    [message, router],
+  );
+
+  const guardDirtyTransition = useCallback((): boolean => {
+    if (isDirty) {
+      message.warning("Save your changes before changing estimate status.");
+      return false;
+    }
+    return true;
+  }, [isDirty, message]);
+
+  const runAccept = useCallback(
     async (proceedDespiteActiveSiteJobs: boolean) => {
-      setWinPending(true);
+      setStatusPending(true);
       try {
-        const result = await postEstimateWin(
+        const result = await postEstimateAccept(
           estimateId,
-          proceedDespiteActiveSiteJobs ? { proceedDespiteActiveSiteJobs: true } : undefined,
+          proceedDespiteActiveSiteJobs
+            ? { proceedDespiteActiveSiteJobs: true }
+            : undefined,
         );
-        navigateAfterJobs(result.data.jobs, "Estimate won");
-      } catch (winError) {
-        if (winError instanceof SurfaceApiError) {
-          const details = winError.details as
+        navigateAfterJobs(result.data.jobs, "Estimate accepted");
+      } catch (acceptError) {
+        if (acceptError instanceof SurfaceApiError) {
+          const details = acceptError.details as
             | { code?: string; job_ids?: string[] }
             | undefined;
 
-          if (winError.status === 409 && details?.code === "site_has_active_job") {
+          if (acceptError.status === 409 && details?.code === "site_has_active_job") {
             modal.confirm({
               title: "Site already has an active job",
               content:
-                "This site already has active job(s). Create new job(s) for this estimate, or steer this work into the existing job as an add-on / change order (handled outside win)?",
+                "This site already has active job(s). Create new job(s) for this estimate, or steer this work into the existing job as an add-on / change order (handled outside accept)?",
               okText: "Create new job(s)",
               cancelText: "Add-on / cancel",
-              onOk: () => runWin(true),
+              onOk: () => runAccept(true),
             });
             return;
           }
 
           if (details?.code === "no_lines") {
-            message.error("Add line items before winning this estimate");
+            message.error("Add line items before accepting this estimate");
             return;
           }
 
-          message.error(winError.message || "Unable to win estimate");
+          message.error(acceptError.message || "Unable to accept estimate");
           return;
         }
 
-        message.error("Unable to win estimate");
+        message.error("Unable to accept estimate");
       } finally {
-        setWinPending(false);
+        setStatusPending(false);
       }
     },
     [estimateId, message, modal, navigateAfterJobs],
   );
 
-  const onWin = useCallback(() => {
-    if (isDirty) {
-      message.warning("Save your changes before winning the estimate.");
+  const onSubmitStatus = useCallback(() => {
+    if (!guardDirtyTransition()) {
       return;
     }
 
     modal.confirm({
-      title: "Win this estimate?",
+      title: "Submit this estimate?",
       content:
-        "Match signed contract $ on this estimate first. Win copies sold lines to the job — do not edit sold $ on Job Scope afterward.",
-      okText: "Win",
-      onOk: () => runWin(false),
-    });
-  }, [isDirty, message, modal, runWin]);
-
-  const onLose = useCallback(() => {
-    modal.confirm({
-      title: "Mark estimate lost?",
-      content: "This marks the estimate lost. It can no longer be won.",
-      okText: "Mark lost",
-      okButtonProps: { danger: true },
+        "Costs refresh from the live catalog, then the quote freezes. You can recall to Draft to revise.",
+      okText: "Submit",
       onOk: async () => {
-        setLosePending(true);
+        setStatusPending(true);
         try {
-          await postEstimateLose(estimateId);
-          message.success("Estimate marked lost");
-          router.refresh();
-        } catch (loseError) {
-          if (loseError instanceof SurfaceApiError) {
-            message.error(loseError.message || "Unable to mark estimate lost");
+          await postEstimateSubmit(estimateId);
+          refreshAfterStatus("Estimate submitted");
+        } catch (submitError) {
+          if (submitError instanceof SurfaceApiError) {
+            message.error(submitError.message || "Unable to submit estimate");
           } else {
-            message.error("Unable to mark estimate lost");
+            message.error("Unable to submit estimate");
           }
         } finally {
-          setLosePending(false);
+          setStatusPending(false);
         }
       },
     });
-  }, [estimateId, message, modal, router]);
+  }, [estimateId, guardDirtyTransition, message, modal, refreshAfterStatus]);
+
+  const onAcceptStatus = useCallback(() => {
+    if (!guardDirtyTransition()) {
+      return;
+    }
+
+    modal.confirm({
+      title: "Accept this estimate?",
+      content:
+        "Match signed contract $ on this estimate first. Accept copies sold lines to the job — do not edit sold $ on Job Scope afterward.",
+      okText: "Accept",
+      onOk: () => runAccept(false),
+    });
+  }, [guardDirtyTransition, modal, runAccept]);
+
+  const onRejectStatus = useCallback(() => {
+    if (!guardDirtyTransition()) {
+      return;
+    }
+
+    modal.confirm({
+      title: "Reject this estimate?",
+      content: "This locks the estimate as rejected. No job is created.",
+      okText: "Reject",
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        setStatusPending(true);
+        try {
+          await postEstimateReject(estimateId);
+          refreshAfterStatus("Estimate rejected");
+        } catch (rejectError) {
+          if (rejectError instanceof SurfaceApiError) {
+            message.error(rejectError.message || "Unable to reject estimate");
+          } else {
+            message.error("Unable to reject estimate");
+          }
+        } finally {
+          setStatusPending(false);
+        }
+      },
+    });
+  }, [estimateId, guardDirtyTransition, message, modal, refreshAfterStatus]);
+
+  const onRecallStatus = useCallback(() => {
+    if (!guardDirtyTransition()) {
+      return;
+    }
+
+    modal.confirm({
+      title: "Recall to draft?",
+      content: "This unlocks the estimate for editing. Submit again when ready.",
+      okText: "Recall to draft",
+      onOk: async () => {
+        setStatusPending(true);
+        try {
+          await postEstimateRecall(estimateId);
+          refreshAfterStatus("Estimate recalled to draft");
+        } catch (recallError) {
+          if (recallError instanceof SurfaceApiError) {
+            message.error(recallError.message || "Unable to recall estimate");
+          } else {
+            message.error("Unable to recall estimate");
+          }
+        } finally {
+          setStatusPending(false);
+        }
+      },
+    });
+  }, [estimateId, guardDirtyTransition, message, modal, refreshAfterStatus]);
 
   const onCreateJob = useCallback(async () => {
-    setWinPending(true);
+    setStatusPending(true);
     try {
       const result = await postEstimateCreateJob(estimateId);
       navigateAfterJobs(result.data.jobs, "Job(s) created");
@@ -964,7 +1052,7 @@ export const EstimateDetailForm = ({
         message.error("Unable to create job");
       }
     } finally {
-      setWinPending(false);
+      setStatusPending(false);
     }
   }, [estimateId, message, navigateAfterJobs]);
 
@@ -974,57 +1062,91 @@ export const EstimateDetailForm = ({
     }
 
     const actions: ToolbarAction[] = [];
+    const statusMenuItems: NonNullable<MenuProps["items"]> = [];
 
-    if (isWinnableStatus && canWin) {
+    // Build menu of legal next statuses only (ST3).
+    if (estimateStatus === "draft") {
+      if (canSubmit) {
+        statusMenuItems.push({
+          key: "submitted",
+          label: "Submitted",
+          onClick: onSubmitStatus,
+        });
+      }
+      if (canReject) {
+        statusMenuItems.push({
+          key: "rejected",
+          label: "Rejected",
+          danger: true,
+          onClick: onRejectStatus,
+        });
+      }
+    } else if (estimateStatus === "submitted") {
+      if (canRecall) {
+        statusMenuItems.push({
+          key: "draft",
+          label: "Draft",
+          onClick: onRecallStatus,
+        });
+      }
+      if (canAccept) {
+        statusMenuItems.push({
+          key: "accepted",
+          label: "Accepted",
+          onClick: onAcceptStatus,
+        });
+      }
+      if (canReject) {
+        statusMenuItems.push({
+          key: "rejected",
+          label: "Rejected",
+          danger: true,
+          onClick: onRejectStatus,
+        });
+      }
+    }
+
+    if (statusMenuItems.length > 0) {
       actions.push({
-        key: "win",
-        label: "Win",
+        variant: "dropdown",
+        key: "status",
+        label: `Status: ${statusLabel(estimateStatus)}`,
         priority: "primary",
-        surfaceAction: "win",
-        disabled: winPending || saving,
-        loading: winPending,
-        onClick: onWin,
+        disabled: statusPending || saving,
+        loading: statusPending,
+        menu: statusMenuItems,
       });
     }
 
-    if (isWinnableStatus && canLose) {
-      actions.push({
-        key: "lose",
-        label: "Lose",
-        priority: "secondary",
-        surfaceAction: "lose",
-        danger: true,
-        disabled: losePending || saving,
-        loading: losePending,
-        onClick: onLose,
-      });
-    }
-
-    if (isWonStatus && canWin) {
+    if (isAcceptedStatus && canCreateJob) {
       actions.push({
         key: "create-job",
         label: "Create job",
         priority: "secondary",
-        surfaceAction: "win",
-        disabled: winPending || saving,
-        loading: winPending,
+        surfaceAction: "create_job",
+        disabled: statusPending || saving,
+        loading: statusPending,
         onClick: onCreateJob,
       });
     }
 
     return actions;
   }, [
-    canLose,
-    canWin,
+    canAccept,
+    canCreateJob,
+    canRecall,
+    canReject,
+    canSubmit,
+    estimateStatus,
+    isAcceptedStatus,
     isCreate,
-    isWinnableStatus,
-    isWonStatus,
-    losePending,
+    onAcceptStatus,
     onCreateJob,
-    onLose,
-    onWin,
+    onRecallStatus,
+    onRejectStatus,
+    onSubmitStatus,
     saving,
-    winPending,
+    statusPending,
   ]);
 
   useSurfaceFormChrome({
@@ -1049,9 +1171,7 @@ export const EstimateDetailForm = ({
   const initialLoading = !isCreate && isLoading && !detail;
   const blocking = !isCreate && isFetching && Boolean(detail);
   const status = profile?.status ?? "draft";
-  const siteFrozen =
-    !isCreate &&
-    (status === "won" || status === "lost" || status === "expired");
+  const siteFrozen = !isCreate && isFrozenStatus;
   const siteWritable =
     fieldAllows(activeManifest, "profile", "write") && !siteFrozen;
 
@@ -1107,9 +1227,9 @@ export const EstimateDetailForm = ({
         </FormSection>
       ) : null}
 
-      {!isCreate && (estimateStatus === "draft" || estimateStatus === "sent") ? (
+      {!isCreate && estimateStatus === "draft" ? (
         <Typography.Paragraph type="secondary" style={{ marginBottom: 16 }}>
-          As-sold reconstruction: match signed contract $ on this estimate, then Win —
+          As-sold reconstruction: match signed contract $ on this estimate, then Accept —
           do not edit sold $ on the job.
         </Typography.Paragraph>
       ) : null}
@@ -1157,7 +1277,7 @@ export const EstimateDetailForm = ({
       manifest={activeManifest}
       loading={initialLoading}
       blocking={blocking}
-      disabled={saving || status === "sent" || status === "won"}
+      disabled={saving || isFrozenStatus}
       form={form}
       defaultValues={defaultValues}
       resetKey={isCreate ? "create" : `${estimateId}:${detail?.data?.id ?? ""}`}
@@ -1166,6 +1286,11 @@ export const EstimateDetailForm = ({
         <SurfaceFormLayout>
           <DetailHeader
             title={isCreate ? "New estimate" : (profile?.title ?? "Estimate")}
+            tags={
+              !isCreate ? (
+                <Tag color={STATUS_COLORS[status] ?? "default"}>{statusLabel(status)}</Tag>
+              ) : undefined
+            }
             activeKey={activeKey}
             onChange={setTab}
             items={tabItems.length > 0 ? tabItems : undefined}

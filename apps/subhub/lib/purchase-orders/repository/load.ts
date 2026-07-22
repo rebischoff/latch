@@ -6,8 +6,9 @@ export type PurchaseOrderListRow = {
   id: string;
   po_number: string | null;
   status: string;
-  job_id: string;
-  job_title: string;
+  /** Null = general / job-less bucket (task 64 RP9). */
+  job_id: string | null;
+  job_title: string | null;
   vendor_party_id: string;
   vendor_display_name: string;
   order_date: string | null;
@@ -62,8 +63,8 @@ export const loadPurchaseOrderList = async (
     id: string;
     po_number: string | null;
     status: string;
-    job_id: string;
-    job_title: string;
+    job_id: string | null;
+    job_title: string | null;
     vendor_party_id: string;
     vendor_display_name: string;
     order_date: string | null;
@@ -80,7 +81,7 @@ export const loadPurchaseOrderList = async (
        po.order_date::text AS order_date,
        po.created_at::text AS created_at
      FROM purchase_order po
-     INNER JOIN job j ON j.id = po.job_id
+     LEFT JOIN job j ON j.id = po.job_id
      INNER JOIN party v ON v.id = po.vendor_party_id
      WHERE ${whereSql}
      ORDER BY po.created_at DESC, po.id ASC
@@ -102,8 +103,8 @@ export const loadPurchaseOrderById = async (
     id: string;
     po_number: string | null;
     status: string;
-    job_id: string;
-    job_title: string;
+    job_id: string | null;
+    job_title: string | null;
     vendor_party_id: string;
     vendor_display_name: string;
     order_date: string | null;
@@ -120,7 +121,7 @@ export const loadPurchaseOrderById = async (
        po.order_date::text AS order_date,
        po.created_at::text AS created_at
      FROM purchase_order po
-     INNER JOIN job j ON j.id = po.job_id
+     LEFT JOIN job j ON j.id = po.job_id
      INNER JOIN party v ON v.id = po.vendor_party_id
      WHERE po.id = $1`,
     [id],
@@ -170,8 +171,9 @@ export type PurchaseOrderDetailRow = {
   id: string;
   po_number: string | null;
   status: string;
-  job_id: string;
-  job_title: string;
+  /** Null = general / job-less bucket (task 64 RP9). */
+  job_id: string | null;
+  job_title: string | null;
   vendor_party_id: string;
   vendor_display_name: string;
   delivery_method: string | null;
@@ -190,8 +192,8 @@ export const loadPurchaseOrderDetail = async (
     id: string;
     po_number: string | null;
     status: string;
-    job_id: string;
-    job_title: string;
+    job_id: string | null;
+    job_title: string | null;
     vendor_party_id: string;
     vendor_display_name: string;
     delivery_method: string | null;
@@ -214,7 +216,7 @@ export const loadPurchaseOrderDetail = async (
        po.created_at::text AS created_at,
        po.updated_at::text AS updated_at
      FROM purchase_order po
-     INNER JOIN job j ON j.id = po.job_id
+     LEFT JOIN job j ON j.id = po.job_id
      INNER JOIN party v ON v.id = po.vendor_party_id
      WHERE po.id = $1`,
     [id],

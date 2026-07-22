@@ -59,8 +59,8 @@ import type {
   JobFieldLifecycle,
   JobFieldProgressCell,
   JobFieldProgressDto,
-  JobFieldZoneOrderPatch,
 } from "@/lib/jobs/repository/job-field-progress";
+import type { JobFieldOrderCellPatch } from "@/lib/jobs/repository/job-field-order";
 import type {
   JobFieldIssuePatch,
 } from "@/lib/jobs/repository/job-issue";
@@ -130,7 +130,7 @@ type JobDetailFormValues = {
   conditions: JobConditionFormRow[];
   line_items: JobLineFormRow[];
   field_progress: JobFieldProgressCell[];
-  field_zone_orders: JobFieldZoneOrderPatch[];
+  field_zone_orders: JobFieldOrderCellPatch[];
   field_issues: JobFieldIssuePatch[];
 };
 
@@ -194,10 +194,11 @@ const buildDefaultValues = (
     field_progress:
       (data?.field_progress as JobFieldProgressDto | undefined)?.cells ?? [],
     field_zone_orders: (
-      (data?.field_progress as JobFieldProgressDto | undefined)?.zone_orders ?? []
+      (data?.field_progress as JobFieldProgressDto | undefined)?.order_cells ?? []
     ).map((row) => ({
+      scope_phase_id: row.scope_phase_id,
       site_zone_id: row.site_zone_id,
-      ordered: row.ordered,
+      requested: row.requested,
     })),
     field_issues: [],
   };

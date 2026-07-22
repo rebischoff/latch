@@ -299,6 +299,10 @@ flowchart LR
 | **58** | [58-requisitions-po-pool-ux.md](./58-requisitions-po-pool-ux.md) | Fold PO workbench into `/requisitions` open pool (RQ-UI1–RQ-UI8) — **complete** (2026-07-20); no All-jobs view |
 | **59** | [59-material-request-item-id-and-descriptions.md](./59-material-request-item-id-and-descriptions.md) | Snapshot `item_id` on JMR + PO line; pool Item + mfr Description; PO description seed + override (IT1–IT8) — **complete** (2026-07-20); migration **088** |
 | **60** | [60-field-issues-table-revert-adhoc.md](./60-field-issues-table-revert-adhoc.md) | Field Issues table (FI1–FI12) + revert Field-direct ad-hoc; Scope Line Items for plan entry — **complete** (2026-07-20) |
+| **61** | [61-job-material-lock-and-phase.md](./61-job-material-lock-and-phase.md) | Material phase (catalog default + line override, MP1–MP4); Scope LI lock/unlock + soft lock (JML1–JML5) — **planned** (2026-07-21) |
+| **62** | [62-field-zone-phase-order.md](./62-field-zone-phase-order.md) | Field zone × phase **Order** column (JML6–JML9); drop Field Work item/part list (amends FI12) — **complete** (2026-07-21) |
+| **63** | [63-requisitions-live-pool.md](./63-requisitions-live-pool.md) | `/requisitions` live derived pool; one row per `job_line` (reverses IT4 rollup); resolver reuse (RP1–RP6) — **complete** (2026-07-21) |
+| **64** | [64-general-bucket-purchase-orders.md](./64-general-bucket-purchase-orders.md) | PO job-lock (part frozen, no direct add); job-less general bucket PO (RP7–RP10) — **complete** (2026-07-21) |
 
 ### Backbone pass (estimate finish) — tasks 29–32
 
@@ -423,6 +427,9 @@ Field detail: [`surfaces.md`](../surfaces.md). DBML: [`current.dbml`](../schema/
 | # | Task | Delivers |
 |---|------|----------|
 | 22 | [22-estimate-wave-4a.md](./22-estimate-wave-4a.md) | Migration, YAML, DAL, API, flat `/estimates` UI — **complete** |
+| **65** | [65-estimate-status-dropdown.md](./65-estimate-status-dropdown.md) | Status action menu; `draft`/`submitted`/`accepted`/`rejected`; submit recalc + freeze; supersedes Win/Lose (ST1–ST10) — **complete** (2026-07-21) |
+| **66** | [66-estimate-draft-recalculate.md](./66-estimate-draft-recalculate.md) | Draft **Recalculate** for catalog rate changes — **planned / skipped from 65** (2026-07-21) |
+| **67** | [67-estimate-accept-customer-po.md](./67-estimate-accept-customer-po.md) | Accept modal customer PO capture → jobs — **planned / skipped from 65** (2026-07-21) |
 
 ---
 
@@ -448,6 +455,13 @@ Field detail: [`surfaces.md`](../surfaces.md). DBML: [`current.dbml`](../schema/
 | **58** | [58-requisitions-po-pool-ux.md](./58-requisitions-po-pool-ux.md) | `/requisitions` = open PO pool; delete `/purchase-orders/workbench` (RQ-UI1–RQ-UI8) — **complete** (2026-07-20) |
 | **59** | [59-material-request-item-id-and-descriptions.md](./59-material-request-item-id-and-descriptions.md) | `item_id` snapshot + pool/PO descriptions (IT1–IT8) — **complete** (2026-07-20); migration **088** |
 | **60** | [60-field-issues-table-revert-adhoc.md](./60-field-issues-table-revert-adhoc.md) | Field Issues table + revert AH1 (FI1–FI12) — **complete** (2026-07-20) |
+| **61** | [61-job-material-lock-and-phase.md](./61-job-material-lock-and-phase.md) | Catalog `material_phase_id` (+ line override); Scope LI lock/unlock, soft lock (MP1–MP4, JML1–JML5) — **complete** (2026-07-21) |
+| **62** | [62-field-zone-phase-order.md](./62-field-zone-phase-order.md) | Field zone × phase Order column; drop Field Work list (JML6–JML9, amends FI12) — **complete** (2026-07-21) |
+| **63** | [63-requisitions-live-pool.md](./63-requisitions-live-pool.md) | `/requisitions` live pool; one row per `job_line`; resolver reuse (RP1–RP6) — **complete** (2026-07-21) |
+| **64** | [64-general-bucket-purchase-orders.md](./64-general-bucket-purchase-orders.md) | PO job-lock; job-less general bucket PO (RP7–RP10) — **complete** (2026-07-21) |
+| **65** | [65-estimate-status-dropdown.md](./65-estimate-status-dropdown.md) | Estimate status menu (ST1–ST10); supersedes Win/Lose — **complete** (2026-07-21); see Slice 04 |
+| **66** | [66-estimate-draft-recalculate.md](./66-estimate-draft-recalculate.md) | Draft Recalculate — **skipped from 65** (2026-07-21) |
+| **67** | [67-estimate-accept-customer-po.md](./67-estimate-accept-customer-po.md) | Accept customer PO — **skipped from 65** (2026-07-21) |
 
 ---
 

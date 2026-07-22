@@ -1,6 +1,6 @@
 "use client";
 
-import { Space, Table, Tag, Typography } from "antd";
+import { Button, Space, Table, Tag, Typography } from "antd";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
@@ -11,6 +11,7 @@ import { buildDetailHref } from "@/lib/surface-navigation";
 type Summary = {
   po_number?: string | null;
   status?: string | null;
+  job_id?: string | null;
   title?: string | null;
   display_name?: string | null;
   order_date?: string | null;
@@ -32,6 +33,13 @@ const statusColor = (status: string): string => {
   }
 };
 
+const jobLabel = (summary: Summary | undefined): string => {
+  if (!summary?.job_id) {
+    return "General";
+  }
+  return summary.title ?? summary.job_id;
+};
+
 export const PurchaseOrderList = () => {
   const searchParams = useSearchParams();
   const { data, isLoading, error } = useSurfaceList("purchase_order_list");
@@ -48,6 +56,16 @@ export const PurchaseOrderList = () => {
     <div style={{ padding: 8 }}>
       <Space style={{ marginBottom: 8, width: "100%", justifyContent: "space-between" }}>
         <Typography.Text strong>Purchase orders</Typography.Text>
+        <Space>
+          <Link href={routes.requisitions.list}>
+            <Button size="small">From job</Button>
+          </Link>
+          <Link href={routes.purchaseOrders.new}>
+            <Button size="small" type="primary">
+              General
+            </Button>
+          </Link>
+        </Space>
       </Space>
       <Table
         size="small"
@@ -83,7 +101,13 @@ export const PurchaseOrderList = () => {
           },
           {
             title: "Job",
-            render: (_, row) => (row.summary as Summary | undefined)?.title ?? "—",
+            render: (_, row) => {
+              const summary = row.summary as Summary | undefined;
+              if (!summary?.job_id) {
+                return <Tag>General</Tag>;
+              }
+              return jobLabel(summary);
+            },
           },
           {
             title: "Vendor",

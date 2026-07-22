@@ -43,6 +43,7 @@ const baseRow: ItemDetailRow = {
   freight_rate_type_id: null,
   incidental_rate_type_id: null,
   markup_type_id: null,
+  material_phase_id: null,
   is_root: false,
   root_item_id: "root-1",
   root_item_name: "Scope",

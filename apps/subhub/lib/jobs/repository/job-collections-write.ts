@@ -1,6 +1,8 @@
 import { withPermissionDb } from "@latch/pg-session";
 import type { Pool, PoolClient } from "pg";
 
+import { syncOpenJobMaterialRequestsForJob } from "@/lib/requested-orders/repository/job-material-request-derive";
+
 import type { JobDetailRelatedPatch } from "../descriptors/job-detail";
 import {
   loadJobConditionIds,
@@ -40,6 +42,14 @@ export const replaceJobCollectionsTx = async (
       related.line_items,
       validConditionIds,
     );
+  }
+
+  // RP1: lock / BOM / allocation edits refresh the live open pool.
+  if (
+    related.line_items !== undefined ||
+    related.conditions !== undefined
+  ) {
+    await syncOpenJobMaterialRequestsForJob(client, jobId);
   }
 };
 

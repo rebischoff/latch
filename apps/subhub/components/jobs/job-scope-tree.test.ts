@@ -112,6 +112,9 @@ describe("jobLineToPatch (47 sold fields)", () => {
       allocations: [],
       sales_locked: false,
       material_locked: false,
+      material_phase_id: null,
+      material_phase_options: [],
+      has_open_material_demand: false,
       item_id: "item-1",
       item_name: "Device",
       part_id: "part-1",
@@ -127,5 +130,6 @@ describe("jobLineToPatch (47 sold fields)", () => {
     expect(patch).not.toHaveProperty("sold_unit_cost");
     expect(patch.quantity).toBe(4);
     expect(patch.part_id).toBe("part-1");
+    expect(patch.material_phase_id).toBeNull();
   });
 });

@@ -415,36 +415,56 @@ export const fetchEstimateLinePreview = async (
   return parseResponse<EstimateLinePreviewData>(response);
 };
 
-export type EstimateWonJobSummary = {
+export type EstimateAcceptedJobSummary = {
   id: string;
   catalog_scope_item_id: string;
   title: string;
 };
 
-export type EstimateWinData = {
-  jobs: EstimateWonJobSummary[];
+export type EstimateAcceptData = {
+  jobs: EstimateAcceptedJobSummary[];
 };
 
-export const postEstimateWin = async (
+export const postEstimateSubmit = async (
+  estimateId: string,
+): Promise<ApiSuccessBody<{ id: string }>> => {
+  const response = await fetch(
+    `/api/estimates/${encodeURIComponent(estimateId)}/submit`,
+    { method: "POST" },
+  );
+  return parseResponse<{ id: string }>(response);
+};
+
+export const postEstimateAccept = async (
   estimateId: string,
   body?: { proceedDespiteActiveSiteJobs?: boolean },
-): Promise<ApiSuccessBody<EstimateWinData>> => {
+): Promise<ApiSuccessBody<EstimateAcceptData>> => {
   const response = await fetch(
-    `/api/estimates/${encodeURIComponent(estimateId)}/win`,
+    `/api/estimates/${encodeURIComponent(estimateId)}/accept`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body ?? {}),
     },
   );
-  return parseResponse<EstimateWinData>(response);
+  return parseResponse<EstimateAcceptData>(response);
 };
 
-export const postEstimateLose = async (
+export const postEstimateReject = async (
   estimateId: string,
 ): Promise<ApiSuccessBody<{ id: string }>> => {
   const response = await fetch(
-    `/api/estimates/${encodeURIComponent(estimateId)}/lose`,
+    `/api/estimates/${encodeURIComponent(estimateId)}/reject`,
+    { method: "POST" },
+  );
+  return parseResponse<{ id: string }>(response);
+};
+
+export const postEstimateRecall = async (
+  estimateId: string,
+): Promise<ApiSuccessBody<{ id: string }>> => {
+  const response = await fetch(
+    `/api/estimates/${encodeURIComponent(estimateId)}/recall`,
     { method: "POST" },
   );
   return parseResponse<{ id: string }>(response);
@@ -452,12 +472,12 @@ export const postEstimateLose = async (
 
 export const postEstimateCreateJob = async (
   estimateId: string,
-): Promise<ApiSuccessBody<EstimateWinData>> => {
+): Promise<ApiSuccessBody<EstimateAcceptData>> => {
   const response = await fetch(
     `/api/estimates/${encodeURIComponent(estimateId)}/create-job`,
     { method: "POST" },
   );
-  return parseResponse<EstimateWinData>(response);
+  return parseResponse<EstimateAcceptData>(response);
 };
 
 export const fetchEstimateSiteTree = async (
@@ -845,17 +865,22 @@ export type PoolRollupRow = {
   key: string;
   job_id: string;
   job_title: string;
+  job_line_id: string | null;
+  job_condition_id: string | null;
   part_id: string | null;
   part_mpn: string | null;
   part_description: string | null;
-  item_ids: string[];
+  item_id: string | null;
   item_label: string | null;
   description: string;
   quantity: number;
   unit: string;
   vendors: PoolVendorCandidate[];
   zones: PoolZoneContribution[];
+  /** Empty — Part # uses fetchJobPartPicker (RP5). */
   part_options: PoolPartOption[];
+  /** RP6: part resolved on the row; Create POs also needs a staged vendor. */
+  po_eligible: boolean;
 };
 
 export type RequisitionPoolData = {
@@ -941,12 +966,8 @@ export const postPurchaseOrderAdhocLine = async (
     quantity: number;
     unit?: string;
     unitPrice?: number;
-    siteZoneId?: string | null;
-    jobLinePartId?: string | null;
   },
-): Promise<
-  ApiSuccessBody<{ purchaseOrderLineId: string; jobMaterialRequestId: string }>
-> => {
+): Promise<ApiSuccessBody<{ purchaseOrderLineId: string }>> => {
   const response = await fetch(
     `/api/purchase-orders/${encodeURIComponent(purchaseOrderId)}/adhoc-line`,
     {
@@ -955,10 +976,7 @@ export const postPurchaseOrderAdhocLine = async (
       body: JSON.stringify(body),
     },
   );
-  return parseResponse<{
-    purchaseOrderLineId: string;
-    jobMaterialRequestId: string;
-  }>(response);
+  return parseResponse<{ purchaseOrderLineId: string }>(response);
 };
 
 export const postPurchaseOrderSplit = async (
@@ -986,19 +1004,47 @@ export const postPurchaseOrderSplit = async (
   }>(response);
 };
 
-/** IT6 override: purchaser edits the seeded PO line description while draft. */
-export const patchPurchaseOrderLineDescription = async (
+/** IT6 / RP7–RP10: draft line patch (description, qty, part on general bucket). */
+export const patchPurchaseOrderLine = async (
   purchaseOrderId: string,
   lineId: string,
-  description: string,
+  body: {
+    description?: string;
+    quantity?: number;
+    partId?: string | null;
+  },
 ): Promise<ApiSuccessBody<{ ok: boolean }>> => {
   const response = await fetch(
     `/api/purchase-orders/${encodeURIComponent(purchaseOrderId)}/lines/${encodeURIComponent(lineId)}`,
     {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ description }),
+      body: JSON.stringify(body),
     },
   );
   return parseResponse<{ ok: boolean }>(response);
+};
+
+/** @deprecated Prefer {@link patchPurchaseOrderLine}. */
+export const patchPurchaseOrderLineDescription = async (
+  purchaseOrderId: string,
+  lineId: string,
+  description: string,
+): Promise<ApiSuccessBody<{ ok: boolean }>> =>
+  patchPurchaseOrderLine(purchaseOrderId, lineId, { description });
+
+export type CreateGeneralBucketPurchaseOrderData = { id: string };
+
+/** RP9: create a job-less general-bucket PO. */
+export const postGeneralBucketPurchaseOrder = async (body: {
+  vendor_party_id: string;
+  ship_to_note?: string;
+  delivery_method?: string | null;
+}): Promise<ApiSuccessBody<CreateGeneralBucketPurchaseOrderData>> => {
+  const response = await fetch("/api/purchase-orders", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  return parseResponse<CreateGeneralBucketPurchaseOrderData>(response);
 };

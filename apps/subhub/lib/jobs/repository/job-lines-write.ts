@@ -2,14 +2,17 @@ import { ValidationError } from "@latch/contracts";
 import { withPermissionDb } from "@latch/pg-session";
 import type { Pool, PoolClient } from "pg";
 
+import { assertJobLineMaterialPhaseAllowed } from "@/lib/catalog/material-phase-guard";
 import { tableExists } from "@/lib/sites/repository/sql-utils";
 
 import type { JobLineItemPatchRow } from "../descriptors/job-detail";
+import { assertMaterialUnlockAllowed } from "./job-material-unlock";
 import { recalcJobLineItems } from "./job-line-recalc";
 import { seedScopePhasesForJobLineTx } from "./scope-phase-seed";
 
 type PriorLine = {
   id: string;
+  material_locked: boolean;
   quantity: number;
   sold_quantity: number;
   sold_unit_price: number;
@@ -52,7 +55,7 @@ const loadPriorLines = async (
   jobId: string,
 ): Promise<Map<string, PriorLine>> => {
   const result = await client.query<PriorLine>(
-    `SELECT id, quantity, sold_quantity, sold_unit_price, sold_unit_cost,
+    `SELECT id, material_locked, quantity, sold_quantity, sold_unit_price, sold_unit_cost,
             sold_unit_material, sold_unit_labor, sold_unit_freight, sold_unit_incidental
      FROM job_line WHERE job_id = $1`,
     [jobId],
@@ -62,6 +65,7 @@ const loadPriorLines = async (
       row.id,
       {
         id: row.id,
+        material_locked: Boolean(row.material_locked),
         quantity: num(row.quantity),
         sold_quantity: num(row.sold_quantity),
         sold_unit_price: num(row.sold_unit_price),
@@ -174,6 +178,16 @@ export const replaceJobLineItemsTx = async (
     }
   }
 
+  for (const row of normalized) {
+    const priorLine = prior.get(row.id);
+    await assertMaterialUnlockAllowed(
+      client,
+      row.id,
+      priorLine?.material_locked,
+      row.material_locked,
+    );
+  }
+
   const recalculated = await recalcJobLineItems(
     client,
     normalized.map((row) => ({
@@ -222,7 +236,8 @@ export const replaceJobLineItemsTx = async (
          unit_material, unit_labor, unit_freight, unit_incidental, unit_price_target,
          sold_unit_price, sold_unit_cost, sold_unit_material, sold_unit_labor,
          sold_unit_freight, sold_unit_incidental,
-         sales_locked, material_locked, site_zone_id, site_asset_id, item_id, part_id,
+         sales_locked, material_locked, material_phase_id, site_zone_id, site_asset_id,
+         item_id, part_id,
          vendor_part_id, estimate_line_id, change_order_line_id, source, status,
          superseded_by_job_line_id, sort_order
        ) VALUES (
@@ -231,9 +246,10 @@ export const replaceJobLineItemsTx = async (
          $15, $16, $17, $18, $19,
          $20, $21, $22, $23,
          $24, $25,
-         $26, $27, $28, $29, $30, $31,
-         $32, $33, $34, $35, $36,
-         $37, $38
+         $26, $27, $28, $29, $30,
+         $31, $32,
+         $33, $34, $35, $36, $37,
+         $38, $39
        )
        ON CONFLICT (id) DO UPDATE SET
          job_condition_id = EXCLUDED.job_condition_id,
@@ -254,6 +270,7 @@ export const replaceJobLineItemsTx = async (
          unit_price_target = EXCLUDED.unit_price_target,
          sales_locked = EXCLUDED.sales_locked,
          material_locked = EXCLUDED.material_locked,
+         material_phase_id = EXCLUDED.material_phase_id,
          site_zone_id = EXCLUDED.site_zone_id,
          site_asset_id = EXCLUDED.site_asset_id,
          item_id = EXCLUDED.item_id,
@@ -288,6 +305,7 @@ export const replaceJobLineItemsTx = async (
         soldIncidental,
         row.sales_locked ?? false,
         row.material_locked ?? false,
+        row.material_phase_id ?? null,
         singleZoneId,
         row.site_asset_id ?? null,
         row.item_id ?? null,
@@ -340,7 +358,8 @@ export const replaceJobLineItemsTx = async (
       }
     }
 
-    if (!isExisting && row.item_id) {
+    // Idempotent: backfill when catalog labor appeared after win (task 61 Mat. phase).
+    if (row.item_id) {
       await seedScopePhasesForJobLineTx(client, {
         job_line_id: row.id,
         item_id: row.item_id,
@@ -349,6 +368,18 @@ export const replaceJobLineItemsTx = async (
         site_zone_id: singleZoneId,
         quantity: row.quantity,
       });
+    }
+
+    if (row.material_phase_id) {
+      const phaseResult = await client.query<{ labor_phase_id: string }>(
+        `SELECT labor_phase_id FROM scope_phase WHERE job_line_id = $1`,
+        [row.id],
+      );
+      assertJobLineMaterialPhaseAllowed(
+        row.material_phase_id,
+        phaseResult.rows.map((phase) => phase.labor_phase_id),
+        row.id,
+      );
     }
   }
 };

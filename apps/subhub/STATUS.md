@@ -1,15 +1,15 @@
 # STATUS — SubHub
 
 > App-local quarterback. Platform pointer: [`../../STATUS.md`](../../STATUS.md).
-> Updated: 2026-07-20.
+> Updated: 2026-07-21.
 
 - **Package:** `@latch/subhub` · **Port:** 3003
 - **Docs:** [`docs/README.md`](./docs/README.md) · **Tasks:** [`docs/tasks/01-task-index.md`](./docs/tasks/01-task-index.md)
-- **State:** Migrations **037**–**089** applied on dev. Tasks **29–36**, **37a**–**37z**, **37aa**, **37ac**, **37ad**, **37ae**–**37aj**, **38**, **39**, **40**, **41ak**, **41al**, **41am**, **41an**, **41ao**, **42a**, **42b**, **42c**, **43**, **44**, **45**, **46**, **47**, **48**, **50**, **51**, **52**, **53**, **55**, **56**, **57**, **58**, **59**, **60** complete; **49** ready; **41ab** superseded/reverted by **37ac**; **37h cancelled** (obsolete).
+- **State:** Migrations **037**–**093** applied on dev. Tasks **29–36**, **37a**–**37z**, **37aa**, **37ac**, **37ad**, **37ae**–**37aj**, **38**, **39**, **40**, **41ak**, **41al**, **41am**, **41an**, **41ao**, **42a**, **42b**, **42c**, **43**, **44**, **45**, **46**, **47**, **48**, **50**, **51**, **52**, **53**, **55**, **56**, **57**, **58**, **59**, **60**, **61**, **62**, **63**, **64**, **65** complete; **49** ready; **66**–**67** authored (planned); **41ab** superseded/reverted by **37ac**; **37h cancelled** (obsolete).
 
 ## Right now — do this next
 
-**[49 — Change-order Surfaces](./docs/tasks/49-change-order-surfaces.md)** — wave 5d CO Surfaces + Approve. Or **receipts** (procurement receiving).
+**[49 — Change-order Surfaces](./docs/tasks/49-change-order-surfaces.md)** — CO list/detail Surfaces + shared helpers (5d). **Receipts** remain ready whenever picked up instead. Estimate follow-ons [66](./docs/tasks/66-estimate-draft-recalculate.md) / [67](./docs/tasks/67-estimate-accept-customer-po.md) stay planned (skipped from 65).
 
 ## Blockers
 
@@ -19,17 +19,31 @@
 
 - **[17 — Service / warranty / T&M](./docs/planning/17-service-warranty-tm-open.md)** — SW0 blank-job Add condition; SW1–SW5 T&M, fixed service, ticket fields. JC1–JC2 stay locked; do not implement until session.
 
+## Skipped follow-ons (do not forget)
+
+| Task | Skipped from | Deliverable |
+|------|--------------|-------------|
+| [66 — Draft Recalculate](./docs/tasks/66-estimate-draft-recalculate.md) | [65](./docs/tasks/65-estimate-status-dropdown.md) | Explicit draft cost refresh after catalog commercial edits |
+| [67 — Accept customer PO](./docs/tasks/67-estimate-accept-customer-po.md) | [65](./docs/tasks/65-estimate-status-dropdown.md) | Customer PO # / date on accept → created jobs |
+
 ## Active slice
 
 | Slice | Focus | State |
 |-------|--------|-------|
 | **03 — Catalog** | Spec participation removal (namespace narrowing + wildcard matching) | **37ai complete**; CCTV **081**–**083** applied (2026-07-16) |
-| **04 — Estimates** | Site warn-and-clear (S1–S9) | **44 complete** (2026-07-14) |
-| **05 — Jobs** | **5b + 47–51 + 55 + 57 + 60 complete**; **49** ready (5d) | Ready |
-| **06a — Procurement** | Requisition / PO Surfaces | **52 + 53 + 55 + 56 + 57 + 58 + 59 complete**; receipts next |
+| **04 — Estimates** | Status dropdown (ST1–ST10) complete; site warn-and-clear done | **44 + 65 complete**; **66–67 planned** |
+| **05 — Jobs** | **5b + 47–51 + 55 + 57 + 60–64 complete**; **49** ready (5d) | Ready |
+| **06a — Procurement** | Requisition / PO Surfaces | **52 + 53 + 55 + 56 + 57 + 58 + 59 + 63 + 64 complete**; receipts next |
 
 ## Recently completed
 
+- **64 — General bucket purchase orders (RP7–RP10)** — migration **093** (`purchase_order.job_id` nullable); job-assigned part frozen / qty editable (decrease) / no direct add; general-bucket create + freeform ad-hoc lines (no JMR); list/detail chrome distinguishes General vs job; cost summary exclusion asserted (2026-07-21).
+- **63 — Requisitions live pool (RP1–RP6)** — derive open `job_material_request` from locked BOM × Order cells (sync-on-read/write); retire Save→JMR snapshot; remaining = demand − PO only; one pool row per `job_line_part` (reverses IT4); Part # uses Scope `fetchJobPartPicker`; Create POs gated on part + vendor (2026-07-21).
+- **65 — Estimate status dropdown lifecycle (ST1–ST10)** — migration **092** (`sent`/`won`/`lost`/`expired` → `submitted`/`accepted`/`rejected`); `submit`/`accept`/`reject`/`recall`/`create_job` Surface actions; submit = full line recalc then freeze; header Status menu replaces Win/Lose; accept keeps W1–W5/W1c handoff; **66** / **67** remain planned (2026-07-21).
+- **65–67 authored — estimate status dropdown + skipped follow-ons** — decision ST1–ST10 (supersedes W6 Win/Lose); rename `sent`/`won`/`lost` → `submitted`/`accepted`/`rejected`; header status action menu; submit = full recalc then freeze; accept = existing job handoff; **66** Recalculate + **67** customer PO tracked as skipped-from-65 (2026-07-21).
+- **62 — Field zone × phase Order column (JML6–JML9)** — migration **091** (`job_field_order_cell`); Order column before Done with shared cascade helper; `unlocked_excluded_count` badge; drop Field Work/item/PO-trail list (amends FI12); Field Save persists order cells (no JMR snapshot) (2026-07-21).
+- **61 — Job material lock + material phase (MP1–MP4, JML1–JML5)** — migration **090** (`item`/`job_line.material_phase_id`); catalog Material phase Select from resolved labor phases + write guard; Scope LI lock icon + soft-lock TBD + header lock-all; per-line material phase override from seeded `scope_phase`; unlock blocked on PO (`part_on_purchase_order`), warn-confirm when open JMR (2026-07-21).
+- **61–64 authored — job material lock, phase-aware Order, live requisitions, general bucket PO** — catalog `material_phase_id` (+ line override, MP1–MP4); Scope LI lock icon + soft lock + header lock-all (JML1–JML5); Field zone × phase **Order** column, drop Work/item list (JML6–JML9, amends FI12); `/requisitions` live derived pool, one row per `job_line` (reverses IT4 `job × part` rollup), Part # resolver reuse (RP1–RP6); PO job-lock (part frozen, no direct add) + job-less general bucket PO (`purchase_order.job_id` nullable, RP7–RP10); migrations **090–092** drafted; tasks ready, no code yet (2026-07-21).
 - **60 — Field Issues table + revert Field ad-hoc (FI1–FI12)** — Issues Stakeholders-like table (Description · Status · actions); pending Delete vs Resolve/Cancel; edit while open; remove Field “+ Add material” / `field_adhoc_materials`; Scope Line Items for plan entry; JMR create = ☐ Order + PO9 only (2026-07-20).
 - **60 authored — Field Issues table + revert Field ad-hoc (FI1–FI12)** — signal-only Issues; Stakeholders-like table; remove Field “+ Add material”; Scope Line Items for plan entry; task ready, no code yet (2026-07-20).
 - **57 — Zone issues + Field-direct ad-hoc (ISS1–ISS7, AH1–AH3)** — migration **089** (`job_issue`); Issues Field block + zone-tree open badge; Field "+ Add material" freeform JMR (no BOM); `field_issues` / `field_adhoc_materials` batched into whole-job Save with progress/Order (2026-07-20). **Partial supersede:** AH1 + ISS3 UI → task **60**.
@@ -106,7 +120,14 @@
 
 ## Pointers
 
-- [Task 49 — CO Surfaces (5d)](./docs/tasks/49-change-order-surfaces.md) ← **do next**
+- [Task 62 — Field zone × phase Order column](./docs/tasks/62-field-zone-phase-order.md) ← **do next**
+- [Task 61 — job material lock + material phase](./docs/tasks/61-job-material-lock-and-phase.md) ✅
+- [Task 63 — requisitions live pool](./docs/tasks/63-requisitions-live-pool.md)
+- [Task 64 — PO job-lock + general bucket PO](./docs/tasks/64-general-bucket-purchase-orders.md)
+- [Decision — RP1–RP10 (requisitions live pool + PO job-lock)](./docs/decisions/procurement.md#decision-requisitions-live-pool-per-line-rollup-and-po-job-lock-rp1rp10-2026-07-21)
+- [Decision — JML1–JML12 (job material lock + zone Order)](./docs/decisions/job.md#decision-job-material-lock-phase-aware-zone-order-and-live-requisition-pool-jml1jml12-2026-07-21)
+- [Decision — MP1–MP4 (material phase)](./docs/decisions/catalog.md#decision-material-phase--item-default--job-line-override-mp1mp4-2026-07-21)
+- [Task 49 — CO Surfaces (5d)](./docs/tasks/49-change-order-surfaces.md) — also ready
 - [Task 60 — Field Issues table + revert ad-hoc (FI1–FI12)](./docs/tasks/60-field-issues-table-revert-adhoc.md) ✅
 - [Decision — FI1–FI12](./docs/decisions/job.md#decision-field-issues--signal-only--revert-field-ad-hoc-fi1fi12-2026-07-20)
 - [Task 57 — zone issues + Field ad-hoc](./docs/tasks/57-zone-issues-and-field-adhoc.md) ✅ (partial → 60)
